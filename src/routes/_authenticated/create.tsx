@@ -12,6 +12,7 @@ export const Route = createFileRoute("/_authenticated/create")({ component: Crea
 
 function CreatePage() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -33,15 +34,23 @@ function CreatePage() {
     if (!form.topic.trim()) return toast.error("Please enter a topic");
     setLoading(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error("Not signed in");
+      const access = await getAccessInfo();
+      if (!access) throw new Error("Not signed in");
+
+      if (!canGenerate(access, GENERATION_COST)) {
+        toast.error("Not enough credits. Upgrade your plan or add credits.", {
+          action: { label: "See plans", onClick: () => navigate({ to: "/pricing" }) },
+        });
+        setLoading(false);
+        return;
+      }
 
       const output = generateProject({
         topic: form.topic, tone: form.tone, platform: form.platform, style: form.style,
       });
 
       const { data: project, error: pErr } = await supabase.from("projects").insert({
-        user_id: userData.user.id,
+        user_id: access.userId,
         title: output.title,
         content_type: form.content_type,
         topic: form.topic,
@@ -57,7 +66,7 @@ function CreatePage() {
 
       const { error: oErr } = await supabase.from("generated_outputs").insert({
         project_id: project.id,
-        user_id: userData.user.id,
+        user_id: access.userId,
         title: output.title,
         hook: output.hook,
         script: output.script,
@@ -69,7 +78,19 @@ function CreatePage() {
       });
       if (oErr) throw oErr;
 
-      toast.success("Project generated!");
+      // Deduct credits (admin bypass handled server-side + client-side)
+      const result = await deductUsage({
+        amount: GENERATION_COST,
+        projectId: project.id,
+        description: `Generated ${form.content_type}: ${output.title}`,
+      });
+      if (!result.ok && result.error !== "not_authenticated") {
+        console.warn("Deduction failed:", result.error);
+      }
+
+      qc.invalidateQueries({ queryKey: ["access"] });
+      qc.invalidateQueries({ queryKey: ["stats"] });
+      toast.success(access.isAdmin ? "Generated (admin — no credits used)" : "Project generated!");
       navigate({ to: "/projects/$id", params: { id: project.id } });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Generation failed");
