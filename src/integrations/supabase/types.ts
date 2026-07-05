@@ -127,8 +127,11 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          is_admin: boolean
           plan: string
+          role: string
           updated_at: string
+          user_credits: number
         }
         Insert: {
           brand_name?: string | null
@@ -139,8 +142,11 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          is_admin?: boolean
           plan?: string
+          role?: string
           updated_at?: string
+          user_credits?: number
         }
         Update: {
           brand_name?: string | null
@@ -151,8 +157,11 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          is_admin?: boolean
           plan?: string
+          role?: string
           updated_at?: string
+          user_credits?: number
         }
         Relationships: []
       }
@@ -211,25 +220,88 @@ export type Database = {
         Row: {
           expires_at: string | null
           id: string
+          monthly_credit_limit: number
+          monthly_credits_used: number
           plan_name: string
+          renews_at: string | null
           started_at: string
           status: string
+          unlimited_usage: boolean
           user_id: string
         }
         Insert: {
           expires_at?: string | null
           id?: string
+          monthly_credit_limit?: number
+          monthly_credits_used?: number
           plan_name?: string
+          renews_at?: string | null
           started_at?: string
           status?: string
+          unlimited_usage?: boolean
           user_id: string
         }
         Update: {
           expires_at?: string | null
           id?: string
+          monthly_credit_limit?: number
+          monthly_credits_used?: number
           plan_name?: string
+          renews_at?: string | null
           started_at?: string
           status?: string
+          unlimited_usage?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
+      usage_history: {
+        Row: {
+          created_at: string
+          credits_used: number
+          description: string | null
+          id: string
+          project_id: string | null
+          source: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_used?: number
+          description?: string | null
+          id?: string
+          project_id?: string | null
+          source?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_used?: number
+          description?: string | null
+          id?: string
+          project_id?: string | null
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
         Relationships: []
@@ -239,10 +311,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      deduct_credits: {
+        Args: {
+          _amount: number
+          _description: string
+          _project_id: string
+          _user_id: string
+        }
+        Returns: Json
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
+      reset_monthly_subscription_credits: { Args: never; Returns: undefined }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -369,6 +458,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
