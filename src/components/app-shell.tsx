@@ -23,6 +23,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { data: access } = useAccess();
+
+  const NAV = access?.isAdmin
+    ? [...BASE_NAV, { to: "/admin" as const, label: "Admin", icon: Crown }]
+    : BASE_NAV;
 
   async function signOut() {
     await qc.cancelQueries();
