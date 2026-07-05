@@ -2,12 +2,13 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import {
   LayoutDashboard, Plus, FolderOpen, Image as ImageIcon, Type,
-  Settings, CreditCard, Sparkles, LogOut, Menu, X,
+  Settings, CreditCard, Sparkles, LogOut, Menu, X, Crown,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAccess } from "@/lib/access";
 
-const NAV = [
+const BASE_NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/create", label: "New Project", icon: Plus },
   { to: "/projects", label: "Library", icon: FolderOpen },
