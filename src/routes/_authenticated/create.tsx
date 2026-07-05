@@ -3,7 +3,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { generateProject } from "@/lib/generators";
-import { CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, MUSIC } from "@/lib/constants";
+import { CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, MUSIC, GENERATION_COST } from "@/lib/constants";
+import { deductUsage, getAccessInfo, canGenerate } from "@/lib/access";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Wand2, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/create")({ component: CreatePage });

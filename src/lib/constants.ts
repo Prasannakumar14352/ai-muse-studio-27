@@ -49,20 +49,36 @@ export const MUSIC = [
   "Motivational", "Cinematic", "Emotional", "Corporate", "Luxury", "Suspense", "Chill", "No Music",
 ];
 
-export const PLANS = [
+export const GENERATION_COST = 1; // credits per project generation
+
+export type PlanDef = {
+  id: string; name: string; price: string; period: string;
+  monthlyCredits: number; features: string[]; cta: string; featured?: boolean;
+};
+
+export const PLANS: PlanDef[] = [
   {
     id: "free", name: "Free", price: "₹0", period: "forever",
-    features: ["5 generations / month", "Basic captions", "Basic images", "Community styles"],
+    monthlyCredits: 0,
+    features: ["50 signup credits", "Basic captions & images", "Community styles", "Uses credit balance only"],
     cta: "Current plan",
   },
   {
-    id: "creator", name: "Creator", price: "₹499", period: "/ month", featured: true,
-    features: ["100 generations / month", "Long & short videos", "Premium visual styles", "Voice selection", "Priority support"],
+    id: "starter", name: "Starter", price: "₹299", period: "/ month",
+    monthlyCredits: 300,
+    features: ["300 credits / month", "All content types", "Standard visual styles", "Priority queue"],
+    cta: "Upgrade to Starter",
+  },
+  {
+    id: "creator", name: "Creator", price: "₹699", period: "/ month", featured: true,
+    monthlyCredits: 1000,
+    features: ["1,000 credits / month", "Premium styles", "Voice selection", "Priority support"],
     cta: "Upgrade to Creator",
   },
   {
-    id: "pro", name: "Pro", price: "₹999", period: "/ month",
-    features: ["Unlimited generations", "Advanced styles + presets", "Brand kits", "Priority rendering", "Early access features"],
+    id: "pro", name: "Pro", price: "₹1,499", period: "/ month",
+    monthlyCredits: 3000,
+    features: ["3,000 credits / month", "Advanced styles + presets", "Brand kits", "Priority rendering"],
     cta: "Go Pro",
   },
 ];
