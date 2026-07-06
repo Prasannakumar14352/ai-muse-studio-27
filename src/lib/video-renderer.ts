@@ -225,7 +225,8 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
     recorder.onstop = () => resolve();
   });
 
-  recorder.start();
+  // Emit chunks every 250ms so the final blob is well-formed even on short renders.
+  recorder.start(250);
 
   // Draw an initial frame before recording starts capturing.
   drawScene(ctx, img, opts.scenes[0], {
