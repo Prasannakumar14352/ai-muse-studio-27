@@ -2,10 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { PLANS, type PlanDef } from "@/lib/constants";
+import { getPlanGenerationEstimate } from "@/lib/credit-costs";
 import { useAccess } from "@/lib/access";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, Sparkles, Crown, X, Loader2 } from "lucide-react";
+import { Check, Sparkles, Crown, X, Loader2, Image as ImageIcon, Layers, Film, Video } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/pricing")({ component: PricingPage });
 
@@ -17,10 +18,10 @@ function PricingPage() {
     <div className="space-y-8 max-w-6xl mx-auto">
       <div className="text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass text-xs text-muted-foreground mb-4">
-          <Sparkles className="w-3 h-3 text-[color:var(--neon-pink)]" /> Upgrade any time · Powered by Razorpay
+          <Sparkles className="w-3 h-3 text-[color:var(--neon-pink)]" /> Upgrade any time · Secure checkout
         </div>
         <h1 className="text-3xl md:text-5xl font-bold">Choose your <span className="gradient-text">plan</span></h1>
-        <p className="text-muted-foreground mt-2">Cancel any time. Prices in INR.</p>
+        <p className="text-muted-foreground mt-2">Cancel any time. Prices in USD.</p>
         {access?.isAdmin && (
           <div className="mt-4 inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 text-sm">
             <Crown className="w-4 h-4 text-amber-400" /> Admin — Unlimited access, no billing
@@ -31,6 +32,8 @@ function PricingPage() {
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
         {PLANS.map((p) => {
           const isCurrent = access?.plan === p.id;
+          const totalCredits = p.monthlyCredits + (p.signupCredits ?? 0);
+          const estimate = getPlanGenerationEstimate(totalCredits);
           return (
             <div key={p.id}
               className={`glass rounded-2xl p-6 relative flex flex-col ${p.featured ? "border-[color:var(--neon-purple)]/60 shadow-[var(--shadow-glow)]" : ""}`}>
@@ -44,6 +47,37 @@ function PricingPage() {
                 <span className="text-3xl font-bold">{p.price}</span>
                 <span className="text-sm text-muted-foreground">{p.period}</span>
               </div>
+              {estimate && (
+                <div className="mt-4 rounded-lg border border-border/60 bg-black/20 p-3 text-xs">
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Approximate generations</div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <ImageIcon className="w-3.5 h-3.5 text-[color:var(--neon-pink)]" /> AI images
+                      </span>
+                      <strong className="text-foreground">{estimate.images}</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <Layers className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" /> Carousels
+                      </span>
+                      <strong className="text-foreground">{estimate.carousels}</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <Film className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" /> Short reels
+                      </span>
+                      <strong className="text-foreground">{estimate.shortReels}</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <Video className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" /> 5-min long videos
+                      </span>
+                      <strong className="text-foreground">{estimate.longVideos}</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
               <ul className="mt-5 space-y-2.5 flex-1">
                 {p.features.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
@@ -68,13 +102,13 @@ function PricingPage() {
         Need custom / team pricing? <Link to="/dashboard" className="text-[color:var(--neon-purple)] hover:underline">Contact us</Link>
       </div>
 
-      {modalPlan && <RazorpayModal plan={modalPlan} onClose={() => setModalPlan(null)} />}
+      {modalPlan && <CheckoutModal plan={modalPlan} onClose={() => setModalPlan(null)} />}
     </div>
   );
 }
 
-/* Razorpay placeholder — pretends to run checkout and activates the plan locally. */
-function RazorpayModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }) {
+/* Checkout placeholder — pretends to run payment and activates the plan locally. */
+function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }) {
   const { data: access } = useAccess();
   const qc = useQueryClient();
   const [processing, setProcessing] = useState(false);
@@ -82,7 +116,7 @@ function RazorpayModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
   async function simulatePayment() {
     if (!access) return;
     setProcessing(true);
-    // Fake Razorpay call
+    // Fake payment call
     await new Promise((r) => setTimeout(r, 1400));
 
     // Activate the plan in our DB (client-side because RLS allows the owner)
@@ -119,9 +153,9 @@ function RazorpayModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
           <X className="w-4 h-4" />
         </button>
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">R</div>
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">$</div>
           <div>
-            <div className="font-semibold">Razorpay Checkout</div>
+            <div className="font-semibold">Checkout</div>
             <div className="text-xs text-muted-foreground">Secure payment (demo)</div>
           </div>
         </div>
@@ -134,7 +168,7 @@ function RazorpayModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
         </div>
         <p className="text-xs text-muted-foreground mb-4">
           This is a demo checkout. Clicking "Pay" will activate the {plan.name} plan on your account without charging you.
-          Live Razorpay integration can be wired later using their Orders API + webhook.
+          Live payment integration can be wired later using Stripe, Paddle, or any payment provider.
         </p>
         <button
           onClick={simulatePayment}
