@@ -408,11 +408,19 @@ function VideoPreview({
           )}
           <button
             onClick={handleRender}
-            disabled={rendering}
-            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
+            disabled={rendering || ugcRendering}
+            className="rounded-lg glass hover:bg-white/5 px-4 py-2 text-sm font-medium disabled:opacity-60 flex items-center gap-2">
             {rendering
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Rendering {Math.round(renderProgress * 100)}%</>
-              : <><VideoIcon className="w-4 h-4" /> {videoUrl ? "Re-render video" : "Render video"}</>}
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Storyboard {Math.round(renderProgress * 100)}%</>
+              : <><VideoIcon className="w-4 h-4" /> Storyboard only</>}
+          </button>
+          <button
+            onClick={handleUgcRender}
+            disabled={rendering || ugcRendering}
+            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
+            {ugcRendering
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> {ugcLabel(ugcStage)}</>
+              : <><Sparkles className="w-4 h-4" /> {videoUrl ? "Re-generate UGC video" : "Generate UGC video"}</>}
           </button>
         </div>
       </div>
