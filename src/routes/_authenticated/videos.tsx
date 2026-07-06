@@ -162,6 +162,7 @@ function ImageToVideoCard() {
   const [image, setImage] = useState<string | null>(null);
   const [duration, setDuration] = useState(6);
   const [ratio, setRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
+  const [fit, setFit] = useState<"contain" | "cover">("contain");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -202,11 +203,15 @@ function ImageToVideoCard() {
       function drawFrame(t: number) {
         const p = Math.min(1, (t - start) / durMs);
         setProgress(p);
-        // Ken Burns: pan + zoom
-        const zoom = 1 + p * 0.25;
-        const panX = (p - 0.5) * canvas.width * 0.1;
         const iw = img.width, ih = img.height;
-        const scale = Math.max(canvas.width / iw, canvas.height / ih) * zoom;
+        // contain = fit whole image (no crop, letterbox); cover = fill canvas (may crop edges)
+        const baseScale = fit === "contain"
+          ? Math.min(canvas.width / iw, canvas.height / ih)
+          : Math.max(canvas.width / iw, canvas.height / ih);
+        // Contain: gentle breathing that never overflows. Cover: full Ken Burns.
+        const zoom = fit === "contain" ? 0.96 + p * 0.04 : 1 + p * 0.25;
+        const panX = fit === "contain" ? 0 : (p - 0.5) * canvas.width * 0.1;
+        const scale = baseScale * zoom;
         const dw = iw * scale, dh = ih * scale;
         const dx = (canvas.width - dw) / 2 + panX;
         const dy = (canvas.height - dh) / 2;
@@ -247,7 +252,7 @@ function ImageToVideoCard() {
           </button>
         </div>
       </div>
-      <div className="mt-4 grid md:grid-cols-3 gap-4">
+      <div className="mt-4 grid md:grid-cols-4 gap-4">
         <div>
           <div className="text-xs text-muted-foreground mb-1">Aspect ratio</div>
           <div className="flex gap-1">
@@ -258,11 +263,21 @@ function ImageToVideoCard() {
           </div>
         </div>
         <div>
+          <div className="text-xs text-muted-foreground mb-1">Fit</div>
+          <div className="flex gap-1">
+            {(["contain", "cover"] as const).map((f) => (
+              <button key={f} onClick={() => setFit(f)}
+                title={f === "contain" ? "Show full image (no crop, letterbox)" : "Fill frame (edges may crop)"}
+                className={`px-3 py-1.5 rounded-lg text-xs border capitalize ${fit === f ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>{f}</button>
+            ))}
+          </div>
+        </div>
+        <div>
           <div className="text-xs text-muted-foreground mb-1">Duration ({duration}s)</div>
           <input type="range" min={3} max={15} value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} className="w-full" />
         </div>
         <div className="text-xs text-muted-foreground">
-          Output: WebM · in-browser only. Download to save.
+          Output: WebM · in-browser only. Use <span className="text-white">Contain</span> for logos so text isn't cropped.
         </div>
       </div>
       {(image || videoUrl) && (
