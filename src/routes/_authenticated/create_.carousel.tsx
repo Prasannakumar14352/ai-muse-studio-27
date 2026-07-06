@@ -10,7 +10,7 @@ import { saveOutput } from "@/lib/local-store";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Wand2, ArrowRight, Layers } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/create/carousel")({
+export const Route = createFileRoute("/_authenticated/create_/carousel")({
   head: () => ({
     meta: [
       { title: "New carousel — CreatorVaultAI" },
