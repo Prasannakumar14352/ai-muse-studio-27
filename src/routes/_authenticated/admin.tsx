@@ -112,6 +112,8 @@ function AdminPanel() {
 
       <CreditCostCard />
 
+      <TeamPlanSalesCard />
+
       <CreditGuide />
 
 
@@ -226,7 +228,106 @@ function AssetCost({ icon, label, cost }: { icon: React.ReactNode; label: string
   );
 }
 
+// -------------------- Team Plan Sales Playbook (admin-only) --------------------
+
+const TEAM_PLAN_DETAILS = {
+  name: "Team",
+  positioning: "For agencies, in-house content teams and multi-creator brands that need shared credits, seats, and brand kits.",
+  price: "Custom · starts at $49/mo per seat (min 3 seats)",
+  includes: [
+    "Multi-seat workspace with per-user access controls",
+    "Shared brand kits, presets & saved styles",
+    "Custom monthly credit pool that all seats draw from",
+    "Priority rendering pool (skip the queue)",
+    "Dedicated onboarding call + private Slack channel",
+    "Invoiced billing (annual) — NET-30 available",
+  ],
+  bestFor: [
+    "Content / social agencies producing >200 assets / month",
+    "In-house marketing teams at 5–50 person companies",
+    "Multi-creator YouTube / Reels studios",
+  ],
+  qualifyingQuestions: [
+    "How many seats do you need this quarter?",
+    "Roughly how many videos / carousels / images per month?",
+    "Do you need SSO, invoiced billing or a signed MSA?",
+    "Any brand-kit / style-guide requirements we should preload?",
+  ],
+  salesFlow: [
+    "1. Lead lands via /contact → arrives at productsupport@prodxstore.com",
+    "2. Reply within 1 business day with a 15-min discovery call link",
+    "3. On the call, run the qualifying questions above",
+    "4. Send a custom quote based on seats × credit pool × support tier",
+    "5. Close on invoice or upgrade; manually provision credits and admin here",
+  ],
+};
+
+function TeamPlanSalesCard() {
+  const [open, setOpen] = useState(true);
+  const d = TEAM_PLAN_DETAILS;
+  return (
+    <div className="glass rounded-2xl p-6 border border-[color:var(--brand-orange)]/40">
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between text-left">
+        <h2 className="font-semibold flex items-center gap-2">
+          <Crown className="w-4 h-4 text-[color:var(--brand-orange)]" />
+          Team plan — sales playbook
+        </h2>
+        {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+      </button>
+      <p className="text-xs text-muted-foreground mt-1">
+        How to sell the Team plan when a lead comes in from the Contact Us page.
+      </p>
+      {open && (
+        <div className="mt-4 grid md:grid-cols-2 gap-4 text-sm">
+          <SalesBlock title="Positioning">
+            <p className="text-muted-foreground">{d.positioning}</p>
+            <div className="mt-2 rounded-lg border border-border/60 bg-black/20 p-3">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Suggested pricing</div>
+              <div className="font-semibold mt-1">{d.price}</div>
+            </div>
+          </SalesBlock>
+          <SalesBlock title="What's included">
+            <ul className="space-y-1 text-muted-foreground list-disc pl-4">
+              {d.includes.map((i) => <li key={i}>{i}</li>)}
+            </ul>
+          </SalesBlock>
+          <SalesBlock title="Best-fit buyers">
+            <ul className="space-y-1 text-muted-foreground list-disc pl-4">
+              {d.bestFor.map((i) => <li key={i}>{i}</li>)}
+            </ul>
+          </SalesBlock>
+          <SalesBlock title="Qualifying questions">
+            <ul className="space-y-1 text-muted-foreground list-disc pl-4">
+              {d.qualifyingQuestions.map((i) => <li key={i}>{i}</li>)}
+            </ul>
+          </SalesBlock>
+          <SalesBlock title="Sales flow" wide>
+            <ol className="space-y-1 text-muted-foreground">
+              {d.salesFlow.map((i) => <li key={i}>{i}</li>)}
+            </ol>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <a href="mailto:productsupport@prodxstore.com" className="rounded-lg bg-[color:var(--brand-orange)] text-black text-xs px-3 py-1.5 font-medium">
+                Email productsupport@prodxstore.com
+              </a>
+            </div>
+          </SalesBlock>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SalesBlock({ title, children, wide }: { title: string; children: React.ReactNode; wide?: boolean }) {
+  return (
+    <div className={`rounded-xl border border-border/60 bg-black/20 p-4 ${wide ? "md:col-span-2" : ""}`}>
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">{title}</div>
+      {children}
+    </div>
+  );
+}
+
 // -------------------- Credits & Pricing Guide --------------------
+
 
 
 function CreditGuide() {

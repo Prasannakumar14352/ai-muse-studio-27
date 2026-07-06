@@ -2,12 +2,13 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
-  Settings, CreditCard, Sparkles, LogOut, Menu, X, Crown, Film, Layers,
+  Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAccess } from "@/lib/access";
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
+import brandLogo from "@/assets/prodxstore-logo.png.asset.json";
 
 const BASE_NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -17,6 +18,7 @@ const BASE_NAV = [
   { to: "/images", label: "Images", icon: ImageIcon },
   { to: "/captions", label: "Captions", icon: Type },
   { to: "/pricing", label: "Pricing", icon: CreditCard },
+  { to: "/contact", label: "Contact Us", icon: Mail },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
@@ -42,11 +44,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="h-screen flex overflow-hidden">
       {/* Sidebar desktop */}
       <aside className="hidden md:flex md:w-64 shrink-0 flex-col border-r border-border/50 bg-sidebar/60 backdrop-blur-xl overflow-y-auto">
-        <Link to="/dashboard" className="flex items-center gap-2 px-6 py-5 border-b border-border/50">
-          <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-bold">CreatorVault<span className="gradient-text">AI</span></span>
+        <Link to="/dashboard" className="flex items-center gap-2 px-4 py-4 border-b border-border/50">
+          <img src={brandLogo.url} alt="Prodxstore" className="h-9 w-auto object-contain" />
         </Link>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV.map((n) => {
@@ -70,10 +69,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <Link to="/dashboard" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
-            <Sparkles className="w-3.5 h-3.5 text-white" />
-          </div>
-          <span className="font-bold text-sm">CreatorVault<span className="gradient-text">AI</span></span>
+          <img src={brandLogo.url} alt="Prodxstore" className="h-7 w-auto object-contain" />
         </Link>
         <button onClick={() => setOpen(!open)} className="p-2 rounded-lg hover:bg-white/5">
           {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

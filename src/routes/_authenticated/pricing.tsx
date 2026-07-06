@@ -27,17 +27,22 @@ function PricingPage() {
         )}
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-5">
         {PLANS.map((p) => {
           const isCurrent = access?.plan === p.id;
           const totalCredits = p.monthlyCredits + (p.signupCredits ?? 0);
-          const estimate = getPlanGenerationEstimate(totalCredits);
+          const estimate = p.contactSales ? null : getPlanGenerationEstimate(totalCredits);
           return (
             <div key={p.id}
-              className={`glass rounded-2xl p-6 relative flex flex-col ${p.featured ? "border-[color:var(--neon-purple)]/60 shadow-[var(--shadow-glow)]" : ""}`}>
+              className={`glass rounded-2xl p-6 relative flex flex-col ${p.featured ? "border-[color:var(--neon-purple)]/60 shadow-[var(--shadow-glow)]" : ""} ${p.contactSales ? "border-[color:var(--brand-orange)]/60" : ""}`}>
               {p.featured && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 gradient-primary text-white text-xs px-3 py-1 rounded-full font-medium">
                   Most popular
+                </div>
+              )}
+              {p.contactSales && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[color:var(--brand-orange)] text-black text-xs px-3 py-1 rounded-full font-medium">
+                  For teams
                 </div>
               )}
               <h3 className="text-xl font-semibold">{p.name}</h3>
@@ -62,6 +67,11 @@ function PricingPage() {
                   </div>
                 </div>
               )}
+              {p.contactSales && (
+                <div className="mt-4 rounded-lg border border-[color:var(--brand-orange)]/40 bg-[color:var(--brand-orange)]/5 p-3 text-xs text-muted-foreground">
+                  Pricing is tailored to your team size, credit needs and support tier. Reach out and we'll get back within 1 business day.
+                </div>
+              )}
               <ul className="mt-5 space-y-2.5 flex-1">
                 {p.features.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
@@ -69,14 +79,22 @@ function PricingPage() {
                   </li>
                 ))}
               </ul>
-              <button
-                disabled={isCurrent || p.id === "free"}
-                onClick={() => setModalPlan(p)}
-                className={`mt-6 w-full rounded-lg py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
-                  p.featured ? "gradient-primary text-white" : "glass hover:bg-white/5"
-                }`}>
-                {isCurrent ? "Current plan" : p.cta}
-              </button>
+              {p.contactSales ? (
+                <Link
+                  to="/contact"
+                  className="mt-6 w-full text-center rounded-lg py-2.5 text-sm font-medium bg-[color:var(--brand-orange)] text-black hover:opacity-90 transition">
+                  {p.cta}
+                </Link>
+              ) : (
+                <button
+                  disabled={isCurrent || p.id === "free"}
+                  onClick={() => setModalPlan(p)}
+                  className={`mt-6 w-full rounded-lg py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
+                    p.featured ? "gradient-primary text-white" : "glass hover:bg-white/5"
+                  }`}>
+                  {isCurrent ? "Current plan" : p.cta}
+                </button>
+              )}
             </div>
           );
         })}
@@ -87,7 +105,7 @@ function PricingPage() {
       <PricingFAQ />
 
       <div className="text-center text-sm text-muted-foreground">
-        Need custom / team pricing? <Link to="/dashboard" className="text-[color:var(--neon-purple)] hover:underline">Contact us</Link>
+        Need custom / team pricing? <Link to="/contact" className="text-[color:var(--brand-orange)] hover:underline">Contact us</Link>
       </div>
 
       {modalPlan && <CheckoutModal plan={modalPlan} onClose={() => setModalPlan(null)} />}
@@ -138,7 +156,7 @@ function CreditsEstimator({ plan, onChangePlan }: { plan: PlanDef; onChangePlan:
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {PLANS.map((p) => {
+          {PLANS.filter((p) => !p.contactSales).map((p) => {
             const active = plan.id === p.id;
             return (
               <button

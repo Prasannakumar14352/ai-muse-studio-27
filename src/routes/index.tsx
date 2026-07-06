@@ -1,12 +1,13 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import {
-  Sparkles, Wand2, Video, Image as ImageIcon, Type, Mic, Music2,
-  Zap, Layers, Rocket, ChevronRight, Star, Check,
+  Wand2, Video, Image as ImageIcon, Type, Mic, Music2,
+  Zap, Layers, Rocket, Check, Mail, ChevronRight, Star,
 } from "lucide-react";
 import { PLANS } from "@/lib/constants";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
+import brandLogo from "@/assets/prodxstore-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({ component: Landing });
 
@@ -34,15 +35,13 @@ function Landing() {
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/60 border-b border-border/40">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-lg">CreatorVault<span className="gradient-text">AI</span></span>
+            <img src={brandLogo.url} alt="Prodxstore" className="h-9 md:h-10 w-auto object-contain" />
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground">Features</a>
             <a href="#pricing" className="hover:text-foreground">Pricing</a>
             <a href="#faq" className="hover:text-foreground">FAQ</a>
+            <Link to="/contact" className="hover:text-foreground">Contact Us</Link>
           </nav>
           <div className="flex items-center gap-3">
             <Link to="/auth" className="text-sm text-muted-foreground hover:text-foreground">Sign in</Link>
@@ -140,29 +139,41 @@ function Landing() {
             <h2 className="text-4xl md:text-5xl font-bold">Simple, <span className="gradient-text">creator-first</span> pricing</h2>
             <p className="mt-4 text-muted-foreground">Start free. Upgrade when you're ready to scale.</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-5 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-5">
             {PLANS.map((p) => (
-              <div key={p.id} className={`glass rounded-2xl p-8 relative ${p.featured ? "border-[color:var(--neon-purple)]/60 shadow-[var(--shadow-glow)]" : ""}`}>
+              <div key={p.id} className={`glass rounded-2xl p-6 relative flex flex-col ${p.featured ? "border-[color:var(--neon-purple)]/60 shadow-[var(--shadow-glow)]" : ""} ${p.contactSales ? "border-[color:var(--brand-orange)]/60" : ""}`}>
                 {p.featured && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 gradient-primary text-white text-xs px-3 py-1 rounded-full font-medium">
                     Most popular
                   </div>
                 )}
+                {p.contactSales && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[color:var(--brand-orange)] text-black text-xs px-3 py-1 rounded-full font-medium">
+                    For teams
+                  </div>
+                )}
                 <h3 className="text-xl font-semibold">{p.name}</h3>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold">{p.price}</span>
+                  <span className="text-3xl font-bold">{p.price}</span>
                   <span className="text-sm text-muted-foreground">{p.period}</span>
                 </div>
-                <ul className="mt-6 space-y-3">
+                <ul className="mt-6 space-y-3 flex-1">
                   {p.features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm">
-                      <Check className="w-4 h-4 text-[color:var(--neon-purple)] mt-0.5 shrink-0" />
+                      <Check className={`w-4 h-4 mt-0.5 shrink-0 ${p.contactSales ? "text-[color:var(--brand-orange)]" : "text-[color:var(--neon-purple)]"}`} />
                       <span>{f}</span>
                     </li>
                   ))}
                 </ul>
-                <Link to="/auth"
-                  className={`mt-8 block text-center rounded-lg py-3 text-sm font-medium ${p.featured ? "gradient-primary text-white" : "glass hover:bg-white/5"}`}>
+                <Link
+                  to={p.contactSales ? "/contact" : "/auth"}
+                  className={`mt-8 block text-center rounded-lg py-3 text-sm font-medium ${
+                    p.contactSales
+                      ? "bg-[color:var(--brand-orange)] text-black hover:opacity-90"
+                      : p.featured
+                        ? "gradient-primary text-white"
+                        : "glass hover:bg-white/5"
+                  }`}>
                   {p.cta}
                 </Link>
               </div>
@@ -203,8 +214,19 @@ function Landing() {
         </div>
       </section>
 
-      <footer className="border-t border-border/40 py-8 text-center text-sm text-muted-foreground">
-        © 2026 CreatorVault AI. Built for creators.
+      <footer className="border-t border-border/40 py-10 px-6">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-3">
+            <img src={brandLogo.url} alt="Prodxstore" className="h-7 w-auto object-contain" />
+            <span>© 2026 Prodxstore · Digital Products Marketplace</span>
+          </div>
+          <div className="flex items-center gap-5">
+            <a href="mailto:productsupport@prodxstore.com" className="hover:text-foreground inline-flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5" /> productsupport@prodxstore.com
+            </a>
+            <Link to="/contact" className="hover:text-foreground">Contact Us</Link>
+          </div>
+        </div>
       </footer>
     </div>
   );
