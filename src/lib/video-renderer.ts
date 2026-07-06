@@ -331,7 +331,15 @@ export type UgcOptions = {
   onStage?: (stage: UgcStage) => void;
   signal?: AbortSignal;
   preferredContainer?: "webm" | "mp4";
+  showOnScreenText?: boolean;
+  /** When provided, image generation is skipped and these data URLs are used directly. */
+  preloadedImages?: Array<string | null>;
 };
+
+/** Exposed so the UI can pre-generate & validate scene images before render. */
+export async function generateSceneImage(prompt: string, style: string, ratio: string): Promise<string | null> {
+  return fetchSceneImage(prompt, style, ratio);
+}
 
 function throwIfAborted(signal?: AbortSignal) {
   if (signal?.aborted) {
