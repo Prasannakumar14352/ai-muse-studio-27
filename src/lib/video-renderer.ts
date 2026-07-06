@@ -76,7 +76,7 @@ function drawScene(
   img: HTMLImageElement | null,
   scene: RenderScene,
   opts: {
-    progress: number; accent: string;
+    progress: number; accent: string; showOnScreenText?: boolean;
   },
 ) {
   const { width: W, height: H } = ctx.canvas;
