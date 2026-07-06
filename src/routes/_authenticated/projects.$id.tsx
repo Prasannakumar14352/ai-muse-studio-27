@@ -289,6 +289,8 @@ function VideoPreview({
   const [rendering, setRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(existingVideoUrl);
+  const [ugcRendering, setUgcRendering] = useState(false);
+  const [ugcStage, setUgcStage] = useState<UgcStage | null>(null);
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number>(0);
 
