@@ -94,7 +94,7 @@ function PricingPage() {
         Need custom / team pricing? <Link to="/dashboard" className="text-[color:var(--neon-purple)] hover:underline">Contact us</Link>
       </div>
 
-      {modalPlan && <RazorpayModal plan={modalPlan} onClose={() => setModalPlan(null)} />}
+      {modalPlan && <CheckoutModal plan={modalPlan} onClose={() => setModalPlan(null)} />}
     </div>
   );
 }
