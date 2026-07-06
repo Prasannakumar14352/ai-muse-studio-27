@@ -338,9 +338,10 @@ export type UgcOptions = {
 };
 
 /** Exposed so the UI can pre-generate & validate scene images before render. */
-export async function generateSceneImage(prompt: string, style: string, ratio: string): Promise<string | null> {
-  return fetchSceneImage(prompt, style, ratio);
+export async function generateSceneImage(prompt: string, style: string, ratio: string, projectId?: string | null): Promise<string | null> {
+  return fetchSceneImage(prompt, style, ratio, projectId);
 }
+
 
 function throwIfAborted(signal?: AbortSignal) {
   if (signal?.aborted) {
