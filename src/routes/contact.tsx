@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Mail, Send, Copy, Check, Building2 } from "lucide-react";
+import { Mail, Send, Copy, Check, Building2, ArrowLeft, Home } from "lucide-react";
 
 export const Route = createFileRoute("/contact")({ component: ContactPage });
 
