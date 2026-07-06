@@ -19,16 +19,37 @@ function ImagesPage() {
   async function generate() {
     if (!prompt.trim()) return toast.error("Enter a prompt");
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 900));
-    const chosen = STYLES.find((s) => s.id === style)!;
-    setResults((prev) => [
-      ...Array.from({ length: 4 }).map(() => ({
-        id: crypto.randomUUID(), prompt, style, ratio, image: chosen.image,
-      })),
-      ...prev,
-    ]);
-    setLoading(false);
-    toast.success("Generated 4 concepts");
+    const styleLabel = STYLES.find((s) => s.id === style)?.label ?? style;
+    try {
+      // Generate 4 variations in parallel via the AI Gateway server route.
+      const responses = await Promise.all(
+        Array.from({ length: 4 }).map(() =>
+          fetch("/api/generate-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, style: styleLabel, ratio }),
+          }).then(async (r) => {
+            if (!r.ok) throw new Error((await r.json()).error || "Failed");
+            return r.json() as Promise<{ image: string }>;
+          })
+        )
+      );
+      setResults((prev) => [
+        ...responses.map((res) => ({
+          id: crypto.randomUUID(),
+          prompt,
+          style,
+          ratio,
+          image: res.image,
+        })),
+        ...prev,
+      ]);
+      toast.success("Generated 4 concepts");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Generation failed");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function save(item: { prompt: string; style: string; ratio: string }) {
