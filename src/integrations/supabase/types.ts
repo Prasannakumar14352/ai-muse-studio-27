@@ -61,6 +61,7 @@ export type Database = {
       generated_outputs: {
         Row: {
           captions: string | null
+          carousel_images: Json | null
           created_at: string
           hashtags: string[] | null
           hook: string | null
@@ -77,6 +78,7 @@ export type Database = {
         }
         Insert: {
           captions?: string | null
+          carousel_images?: Json | null
           created_at?: string
           hashtags?: string[] | null
           hook?: string | null
@@ -93,6 +95,7 @@ export type Database = {
         }
         Update: {
           captions?: string | null
+          carousel_images?: Json | null
           created_at?: string
           hashtags?: string[] | null
           hook?: string | null
