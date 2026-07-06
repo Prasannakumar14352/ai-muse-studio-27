@@ -51,7 +51,8 @@ function PricingPage() {
 
 
               {estimate && (
-                <div className="mt-3 rounded-lg border border-border/60 bg-black/20 p-3 text-xs">
+                <div className="mt-4 rounded-lg border border-border/60 bg-black/20 p-3 text-xs">
+
                   <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Up to (single-type only)</div>
                   <p className="text-[10px] text-muted-foreground mb-2">
                     Each row is a separate "up to" — not a bundle. Mixed usage splits the same {totalCredits.toLocaleString()} credits.
