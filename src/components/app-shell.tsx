@@ -7,6 +7,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAccess } from "@/lib/access";
+import { ConfirmDialogHost } from "@/components/confirm-dialog";
 
 const BASE_NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -101,6 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="flex-1 min-w-0 pt-14 md:pt-0">
         <div className="max-w-7xl mx-auto p-6 md:p-10">{children}</div>
       </main>
+      <ConfirmDialogHost />
     </div>
   );
 }
