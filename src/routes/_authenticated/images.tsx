@@ -122,8 +122,8 @@ function ImagesPage() {
                 <div className="text-xs text-muted-foreground line-clamp-2">{r.prompt}</div>
                 <div className="mt-3 flex gap-2">
                   <button onClick={() => save(r)} className="flex-1 rounded-lg glass hover:bg-white/5 py-1.5 text-xs flex items-center justify-center gap-1"><Save className="w-3 h-3" /> Save</button>
-                  <button onClick={() => toast.info("Connect image API to enable download")}
-                    className="flex-1 rounded-lg gradient-primary text-white py-1.5 text-xs flex items-center justify-center gap-1"><Download className="w-3 h-3" /> Download</button>
+                  <a href={r.image} download={`creatorvault-${r.id}.png`}
+                    className="flex-1 rounded-lg gradient-primary text-white py-1.5 text-xs flex items-center justify-center gap-1"><Download className="w-3 h-3" /> Download</a>
                 </div>
               </div>
             </div>
