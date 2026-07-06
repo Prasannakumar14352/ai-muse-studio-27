@@ -819,6 +819,168 @@ function VideoPreview({
         </div>
       </div>
 
+      {/* --- Scene prep, script editor, per-scene preview -------------------- */}
+      <div className="mb-4 rounded-xl border border-border bg-black/30 p-4 space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm font-semibold flex items-center gap-2">
+            <Edit3 className="w-4 h-4 text-[color:var(--neon-purple)]" /> Scene prep & script editor
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="flex items-center gap-2 text-xs cursor-pointer glass border border-border rounded-full px-3 py-1.5">
+              <input
+                type="checkbox"
+                checked={showOnScreenText}
+                onChange={(e) => setShowOnScreenText(e.target.checked)}
+                className="accent-[color:var(--neon-purple)]"
+              />
+              {showOnScreenText ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+              On-screen text overlays
+            </label>
+            <button
+              onClick={validateAllImages}
+              disabled={validating || rendering || ugcRendering}
+              className="rounded-lg glass border border-border hover:bg-white/5 px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-60"
+              title="Generate an image for every scene, mark any that fail"
+            >
+              {validating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              Validate images
+            </button>
+            <button
+              onClick={retryFailed}
+              disabled={missingImages === 0 || validating || rendering || ugcRendering}
+              className="rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-40"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Retry failed ({missingImages})
+            </button>
+            <button
+              onClick={() => setEditing((v) => !v)}
+              className="rounded-lg glass border border-border hover:bg-white/5 px-3 py-1.5 text-xs flex items-center gap-1.5"
+            >
+              <Edit3 className="w-3.5 h-3.5" /> {editing ? "Close editor" : "Edit script"}
+            </button>
+          </div>
+        </div>
+
+        {missingImages > 0 && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-200 px-3 py-2 text-xs flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>
+              {missingImages} of {totalScenes} scene image{missingImages === 1 ? "" : "s"} still need generation.
+              Video render is blocked until every scene has a valid image — use <b>Validate images</b> or the per-scene <b>Generate</b> buttons below.
+            </span>
+          </div>
+        )}
+
+        {editing && (
+          <div className="rounded-lg border border-border bg-black/40 p-3 space-y-3 max-h-[420px] overflow-y-auto">
+            {editedScenes.map((s, i) => (
+              <div key={s.n} className="border border-border/50 rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="gradient-primary text-white px-2 py-0.5 rounded">Scene {s.n}</span>
+                  <span className="text-muted-foreground">{s.duration}</span>
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Voiceover</div>
+                  <textarea
+                    value={s.voiceover}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setEditedScenes((prev) => prev.map((row, idx2) => idx2 === i ? { ...row, voiceover: v } : row));
+                      setScenesDirty(true);
+                    }}
+                    rows={2}
+                    className="w-full bg-input/50 border border-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[color:var(--neon-purple)]"
+                  />
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">On-screen text (optional)</div>
+                  <textarea
+                    value={s.on_screen_text ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setEditedScenes((prev) => prev.map((row, idx2) => idx2 === i ? { ...row, on_screen_text: v } : row));
+                      setScenesDirty(true);
+                    }}
+                    rows={1}
+                    placeholder="Short caption burned onto the frame — leave empty for none"
+                    className="w-full bg-input/50 border border-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[color:var(--neon-purple)]"
+                  />
+                </div>
+              </div>
+            ))}
+            <div className="flex items-center justify-end gap-2 sticky bottom-0 bg-black/60 backdrop-blur pt-2">
+              <button
+                onClick={() => { setEditedScenes(scenes); setScenesDirty(false); setEditing(false); }}
+                className="rounded-lg glass border border-border px-3 py-1.5 text-xs"
+              >Cancel</button>
+              <button
+                onClick={saveEditedScenes}
+                disabled={!scenesDirty}
+                className="rounded-lg gradient-primary text-white px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-60"
+              >
+                <Save className="w-3.5 h-3.5" /> Save script
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {effectiveScenes.map((s, i) => {
+            const img = sceneImages[i];
+            const err = imageErrors[i];
+            const busy = imgBusy.has(i);
+            return (
+              <div key={s.n} className="relative rounded-lg overflow-hidden border border-border bg-black/50 aspect-[9/16] flex flex-col">
+                <div className="relative flex-1 bg-black">
+                  {img ? (
+                    <img src={img} alt={`Scene ${s.n}`} className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs">
+                      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : err ? <ImageOff className="w-5 h-5 text-rose-400" /> : <ImageOff className="w-5 h-5 opacity-40" />}
+                    </div>
+                  )}
+                  {showOnScreenText && s.on_screen_text && (
+                    <div className="absolute top-0 left-0 right-0 p-2 bg-gradient-to-b from-black/70 to-transparent">
+                      <div className="text-white text-[11px] font-bold leading-tight drop-shadow">{s.on_screen_text}</div>
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/85 to-transparent">
+                    <div className="text-white text-[10px] font-medium leading-snug line-clamp-2 drop-shadow">{s.voiceover}</div>
+                  </div>
+                  <div className="absolute top-1 right-1 text-[9px] px-1.5 py-0.5 rounded bg-black/60 text-white/80">#{s.n}</div>
+                </div>
+                <div className="flex items-center gap-1 p-1.5 bg-black/70 border-t border-border">
+                  <button
+                    onClick={() => generateOne(i)}
+                    disabled={busy || validating || rendering || ugcRendering}
+                    className="flex-1 text-[11px] rounded bg-white/10 hover:bg-white/20 px-1.5 py-1 flex items-center justify-center gap-1 disabled:opacity-50"
+                    title={err ?? (img ? "Regenerate image" : "Generate image")}
+                  >
+                    {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    {img ? "Redo" : "Gen"}
+                  </button>
+                  <button
+                    onClick={() => playSceneVoiceover(i)}
+                    disabled={playingScene === i}
+                    className="flex-1 text-[11px] rounded gradient-primary text-white px-1.5 py-1 flex items-center justify-center gap-1 disabled:opacity-70"
+                    title="Play this scene's voiceover"
+                  >
+                    {playingScene === i ? <Loader2 className="w-3 h-3 animate-spin" /> : <Volume2 className="w-3 h-3" />}
+                    Play
+                  </button>
+                </div>
+                {err && (
+                  <div className="absolute top-6 left-1 right-1 text-[9px] text-rose-300 bg-black/70 px-1.5 py-1 rounded" title={err}>
+                    {err.slice(0, 60)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+
       {canceled && !rendering && !ugcRendering && (
         <div className="mb-4 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-200 px-4 py-2 text-sm flex items-center gap-2">
           <AlertTriangle className="w-4 h-4" /> Render was canceled. Progress rail below shows the stages reached before cancel.
