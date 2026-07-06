@@ -258,3 +258,37 @@ export const listMyPayments = createServerFn({ method: "GET" })
     if (error) throw error;
     return { payments: data ?? [] };
   });
+
+/** Get the current user's active subscription + credit balance for the Billing page. */
+export const getMySubscription = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: sub } = await context.supabase
+      .from("subscriptions")
+      .select("id, plan_name, status, started_at, expires_at, renews_at, monthly_credit_limit, monthly_credits_used, unlimited_usage")
+      .eq("user_id", context.userId)
+      .eq("status", "active")
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { data: profile } = await context.supabase
+      .from("profiles")
+      .select("user_credits, is_admin")
+      .eq("id", context.userId)
+      .maybeSingle();
+
+    const { data: recent } = await context.supabase
+      .from("payments")
+      .select("id, razorpay_order_id, pack_id, credits, amount_cents, currency, status, created_at")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    return {
+      subscription: sub ?? null,
+      balance: profile?.user_credits ?? 0,
+      isAdmin: !!profile?.is_admin,
+      recentPayments: recent ?? [],
+    };
+  });
