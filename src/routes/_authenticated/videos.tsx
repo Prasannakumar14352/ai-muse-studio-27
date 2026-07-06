@@ -21,6 +21,7 @@ type VideoRow = {
   id: string; title: string; content_type: string | null;
   style: string | null; platform: string | null; tone: string | null;
   video_url: string | null;
+  output_id: string | null;
 };
 
 function VideosPage() {
