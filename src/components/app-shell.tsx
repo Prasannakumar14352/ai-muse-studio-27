@@ -49,10 +49,18 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Sidebar desktop */}
       <aside className="hidden md:flex md:w-64 shrink-0 flex-col border-r border-border/50 bg-sidebar/60 backdrop-blur-xl overflow-y-auto">
         <div className="flex flex-col items-center gap-3 px-4 py-5 border-b border-border/50">
-          <Link to="/dashboard" className="flex items-center justify-center">
-            <img src={brandLogo.url} alt="CreatorVault AI" className="h-10 w-auto object-contain" />
+          <Link
+            to="/dashboard"
+            aria-label="CreatorVault AI home"
+            className="flex items-center justify-center rounded-lg p-1 transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <img src={brandLogo.url} alt="" className="h-10 w-auto object-contain" />
           </Link>
-          <Link to="/dashboard" className="flex items-center justify-center">
+          <Link
+            to="/dashboard"
+            aria-label="CreatorVault AI home"
+            className="flex items-center justify-center rounded-lg p-1 transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
             <span className="text-base font-bold tracking-tight whitespace-nowrap bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
               CreatorVault AI
             </span>
