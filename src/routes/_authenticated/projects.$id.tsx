@@ -275,12 +275,13 @@ type Scene = { n: number; visual: string; voiceover: string; duration: string };
 
 function VideoPreview({
   scenes, title, styleImage, styleId, platform, contentType, music,
-  projectId, userId, outputId, existingVideoUrl, imagePrompts,
+  projectId, userId, outputId, existingVideoUrl, existingDiagnostics, imagePrompts,
 }: {
   scenes: Scene[]; title: string; styleImage: string;
   styleId?: string | null;
   platform?: string | null; contentType?: string | null; music?: string | null;
-  projectId: string; userId: string; outputId: string | null; existingVideoUrl: string | null;
+  projectId: string; userId: string; outputId: string | null;
+  existingVideoUrl: string | null; existingDiagnostics?: unknown;
   imagePrompts?: Array<{ n: number; prompt: string; style: string }>;
 }) {
   const qc = useQueryClient();
@@ -292,10 +293,17 @@ function VideoPreview({
   const [videoUrl, setVideoUrl] = useState<string | null>(existingVideoUrl);
   const [ugcRendering, setUgcRendering] = useState(false);
   const [ugcStage, setUgcStage] = useState<UgcStage | null>(null);
-  const [diagnostics, setDiagnostics] = useState<VideoDiagnostics | null>(null);
+  const [diagnostics, setDiagnostics] = useState<VideoDiagnostics | null>(
+    existingDiagnostics && typeof existingDiagnostics === "object"
+      ? (existingDiagnostics as VideoDiagnostics)
+      : null,
+  );
   const [showDiag, setShowDiag] = useState(false);
   const [autoRetryUsed, setAutoRetryUsed] = useState(false);
+  const [canceled, setCanceled] = useState(false);
   const lastRenderKindRef = useRef<null | "storyboard" | "ugc">(null);
+  const lastContainerRef = useRef<"webm" | "mp4" | undefined>(undefined);
+  const abortRef = useRef<AbortController | null>(null);
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number>(0);
 
@@ -303,7 +311,11 @@ function VideoPreview({
   const aspect = isVertical ? "aspect-[9/16] max-w-[340px]" : "aspect-video w-full";
   const totalScenes = scenes.length;
 
-  useEffect(() => { setVideoUrl(existingVideoUrl); setDiagnostics(null); setAutoRetryUsed(false); }, [existingVideoUrl]);
+  useEffect(() => {
+    setVideoUrl(existingVideoUrl);
+    setAutoRetryUsed(false);
+    setCanceled(false);
+  }, [existingVideoUrl]);
 
   const currentDurationMs = useMemo(() => {
     const raw = scenes[idx]?.duration ?? "3s";
