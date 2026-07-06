@@ -24,28 +24,51 @@ type VideoRow = {
 };
 
 function VideosPage() {
+  const qc = useQueryClient();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const { data, isLoading } = useQuery({
     queryKey: ["videos"],
     queryFn: async (): Promise<VideoRow[]> => {
       const { data } = await supabase
         .from("projects")
-        .select("id,title,content_type,style,platform,tone,generated_outputs(video_url)")
+        .select("id,title,content_type,style,platform,tone,generated_outputs(id,video_url)")
         .in("content_type", ["short_reel", "long_video"])
         .order("created_at", { ascending: false });
       return (data ?? []).map((p: {
         id: string; title: string; content_type: string | null;
         style: string | null; platform: string | null; tone: string | null;
-        generated_outputs: { video_url: string | null }[] | { video_url: string | null } | null;
+        generated_outputs: { id: string; video_url: string | null }[] | { id: string; video_url: string | null } | null;
       }) => {
         const out = Array.isArray(p.generated_outputs) ? p.generated_outputs[0] : p.generated_outputs;
         return {
           id: p.id, title: p.title, content_type: p.content_type,
           style: p.style, platform: p.platform, tone: p.tone,
           video_url: out?.video_url ?? null,
+          output_id: out?.id ?? null,
         };
       });
     },
   });
+
+  async function deleteVideo(row: VideoRow) {
+    if (!confirm(`Delete "${row.title}"? The video file and project will be removed.`)) return;
+    setDeletingId(row.id);
+    try {
+      if (row.output_id) {
+        await supabase.from("generated_outputs").delete().eq("id", row.output_id);
+      }
+      const { error } = await supabase.from("projects").delete().eq("id", row.id);
+      if (error) throw error;
+      toast.success("Video deleted");
+      qc.invalidateQueries({ queryKey: ["videos"] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
