@@ -64,6 +64,9 @@ async function forceDownloadUrl(url: string, filename: string) {
     window.open(url, "_blank", "noopener");
     toast.message("Opened in a new tab — right-click → Save video as…");
   }
+}
+
+
 
   function formatPostText(): string {
     const caption = (output?.captions ?? "").trim();
