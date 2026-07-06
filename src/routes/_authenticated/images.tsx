@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { STYLES } from "@/lib/constants";
 import { pushImageGenLog, listImageGenLogs } from "@/lib/local-store";
 import { LocalOnlyBanner } from "@/components/local-only-banner";
+import { deductUsage, useAccess, canGenerate } from "@/lib/access";
 import { Loader2, Wand2, Download, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
@@ -43,6 +45,8 @@ function ImagesPage() {
   const [showDebug, setShowDebug] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [viewerIdx, setViewerIdx] = useState<number | null>(null);
+  const qc = useQueryClient();
+  const { data: access } = useAccess();
 
   // Keyboard nav for fullscreen viewer.
   useEffect(() => {
@@ -87,6 +91,11 @@ function ImagesPage() {
   }, [prompt, style, ratio, results, lastRun, debug, hydrated]);
 
   async function runGeneration(p: string, s: string, r: string) {
+    // Preflight credit check — need up to 4 credits (1 per concept).
+    if (access && !canGenerate(access, 4)) {
+      toast.error("Not enough credits to generate 4 images. Top up in Pricing.");
+      return;
+    }
     setLoading(true);
     const styleLabel = STYLES.find((x) => x.id === s)?.label ?? s;
     const startedAt = Date.now();
@@ -122,6 +131,11 @@ function ImagesPage() {
           ...prev,
         ].slice(0, 40)); // cap to avoid localStorage bloat
         setLastRun({ prompt: p, style: s, ratio: r });
+        // Deduct 1 credit per successful image (admin bypass handled inside).
+        for (let i = 0; i < ok.length; i++) {
+          await deductUsage({ amount: 1, description: `AI image generated (${styleLabel})` }).catch(() => {});
+        }
+        qc.invalidateQueries({ queryKey: ["access"] });
         toast.success(`Generated ${ok.length} of 4 concepts`);
       } else {
         toast.error(errors[0] || "Generation failed");

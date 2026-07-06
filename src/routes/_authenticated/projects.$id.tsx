@@ -8,6 +8,7 @@ import { generateProject } from "@/lib/generators";
 import { renderVideo, renderUgcVideo, generateSceneImage, type UgcStage } from "@/lib/video-renderer";
 import { getOutput, saveOutput, type LocalOutput } from "@/lib/local-store";
 import { isBlobKey, getDataURL } from "@/lib/blob-store";
+import { deductUsage } from "@/lib/access";
 import { toast } from "sonner";
 import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles, AlertTriangle, Bug, CheckCircle2, X, Package, Edit3, Save, Eye, EyeOff, ImageOff, Volume2, ChevronDown, ChevronRight, History, FileText, Wand2 } from "lucide-react";
 
@@ -683,13 +684,14 @@ function VideoPreview({
     setImgBusy((s) => { const n = new Set(s); n.add(i); return n; });
     setImageErrors((prev) => { const n = [...prev]; n[i] = null; return n; });
     try {
-      const url = await generateSceneImage(promptForScene(i), styleForScene(i), ratio);
+      const url = await generateSceneImage(promptForScene(i), styleForScene(i), ratio, projectId);
       if (!url) throw new Error("Image service returned nothing");
       setSceneImages((prev) => { const n = [...prev]; n[i] = url; return n; });
     } catch (e) {
       setImageErrors((prev) => { const n = [...prev]; n[i] = e instanceof Error ? e.message : String(e); return n; });
     } finally {
       setImgBusy((s) => { const n = new Set(s); n.delete(i); return n; });
+      qc.invalidateQueries({ queryKey: ["access"] });
     }
   }
 
@@ -724,6 +726,9 @@ function VideoPreview({
       });
       if (!res.ok) throw new Error(await res.text() || `TTS ${res.status}`);
       const blob = await res.blob();
+      // Deduct 1 credit per voiceover playback (admin bypass handled inside).
+      await deductUsage({ amount: 1, projectId, description: "Voiceover generated" }).catch(() => {});
+      qc.invalidateQueries({ queryKey: ["access"] });
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audioElRef.current = audio;
@@ -847,6 +852,7 @@ function VideoPreview({
         title, platform, contentType, styleId, scenes: effectiveScenes,
         imagePrompts,
         preloadedImages: sceneImages,
+        projectId,
         showOnScreenText,
         voice: "alloy",
         onStage: setUgcStage,

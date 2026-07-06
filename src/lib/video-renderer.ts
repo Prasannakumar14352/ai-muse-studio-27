@@ -3,6 +3,7 @@
 // supports it, WebM as fallback) — no server dependency required.
 
 import { getStyle } from "./constants";
+import { deductUsage } from "./access";
 
 export type RenderScene = { n: number; visual: string; voiceover: string; duration: string; on_screen_text?: string };
 
@@ -334,12 +335,15 @@ export type UgcOptions = {
   showOnScreenText?: boolean;
   /** When provided, image generation is skipped and these data URLs are used directly. */
   preloadedImages?: Array<string | null>;
+  /** Attached to credit deduction rows so admin usage history can trace back to the project. */
+  projectId?: string | null;
 };
 
 /** Exposed so the UI can pre-generate & validate scene images before render. */
-export async function generateSceneImage(prompt: string, style: string, ratio: string): Promise<string | null> {
-  return fetchSceneImage(prompt, style, ratio);
+export async function generateSceneImage(prompt: string, style: string, ratio: string, projectId?: string | null): Promise<string | null> {
+  return fetchSceneImage(prompt, style, ratio, projectId);
 }
+
 
 function throwIfAborted(signal?: AbortSignal) {
   if (signal?.aborted) {
@@ -349,7 +353,7 @@ function throwIfAborted(signal?: AbortSignal) {
   }
 }
 
-async function fetchSceneImage(prompt: string, style: string, ratio: string): Promise<string | null> {
+async function fetchSceneImage(prompt: string, style: string, ratio: string, projectId?: string | null): Promise<string | null> {
   try {
     const res = await fetch("/api/generate-image", {
       method: "POST",
@@ -358,7 +362,10 @@ async function fetchSceneImage(prompt: string, style: string, ratio: string): Pr
     });
     if (!res.ok) return null;
     const json = (await res.json()) as { image?: string };
-    return json.image ?? null;
+    if (!json.image) return null;
+    // Deduct 1 credit per successful scene image (admin bypass handled inside).
+    await deductUsage({ amount: 1, projectId: projectId ?? null, description: "Scene image generated" }).catch(() => {});
+    return json.image;
   } catch {
     return null;
   }
@@ -401,7 +408,7 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
       opts.scenes.map(async (scene, i) => {
         const promptRow = opts.imagePrompts?.[i];
         const prompt = promptRow?.prompt || scene.visual;
-        const url = await fetchSceneImage(prompt, style.descriptor, ratio);
+        const url = await fetchSceneImage(prompt, style.descriptor, ratio, opts.projectId);
         imgDone += 1;
         opts.onStage?.({ kind: "images", done: imgDone, total });
         return url;
