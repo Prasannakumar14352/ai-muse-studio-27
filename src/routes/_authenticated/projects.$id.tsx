@@ -233,20 +233,29 @@ function ProjectView() {
 type Scene = { n: number; visual: string; voiceover: string; duration: string };
 
 function VideoPreview({
-  scenes, title, styleImage, platform, contentType, music,
+  scenes, title, styleImage, styleId, platform, contentType, music,
+  projectId, userId, outputId, existingVideoUrl,
 }: {
   scenes: Scene[]; title: string; styleImage: string;
+  styleId?: string | null;
   platform?: string | null; contentType?: string | null; music?: string | null;
+  projectId: string; userId: string; outputId: string | null; existingVideoUrl: string | null;
 }) {
+  const qc = useQueryClient();
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [rendering, setRendering] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(0);
+  const [videoUrl, setVideoUrl] = useState<string | null>(existingVideoUrl);
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number>(0);
 
   const isVertical = contentType === "short_reel" || platform === "tiktok" || platform === "instagram";
   const aspect = isVertical ? "aspect-[9/16] max-w-[340px]" : "aspect-video w-full";
   const totalScenes = scenes.length;
+
+  useEffect(() => { setVideoUrl(existingVideoUrl); }, [existingVideoUrl]);
 
   const currentDurationMs = useMemo(() => {
     const raw = scenes[idx]?.duration ?? "3s";
@@ -272,6 +281,38 @@ function VideoPreview({
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [playing, idx, currentDurationMs, totalScenes]);
 
+  async function handleRender() {
+    if (rendering || totalScenes === 0) return;
+    setRendering(true);
+    setRenderProgress(0);
+    setPlaying(false);
+    try {
+      const result = await renderVideo({
+        title, platform, scenes, styleId, contentType,
+        onProgress: setRenderProgress,
+      });
+      // Upload to Supabase Storage under <userId>/<projectId>.<ext>
+      const path = `${userId}/${projectId}-${Date.now()}.${result.extension}`;
+      const { error: upErr } = await supabase.storage.from("renders").upload(path, result.blob, {
+        contentType: result.mimeType, upsert: true,
+      });
+      if (upErr) throw upErr;
+      const { data: signed } = await supabase.storage.from("renders").createSignedUrl(path, 60 * 60 * 24 * 7);
+      const url = signed?.signedUrl ?? null;
+      // Persist URL on the output row
+      if (outputId && url) {
+        await supabase.from("generated_outputs").update({ video_url: url } as never).eq("id", outputId);
+      }
+      setVideoUrl(url);
+      qc.invalidateQueries({ queryKey: ["project", projectId] });
+      toast.success(`Rendered ${result.durationSec.toFixed(1)}s ${result.extension.toUpperCase()} — saved to your library.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Render failed");
+    } finally {
+      setRendering(false);
+    }
+  }
+
   if (totalScenes === 0) return null;
   const scene = scenes[idx];
 
@@ -281,13 +322,30 @@ function VideoPreview({
         <div>
           <h2 className="font-semibold flex items-center gap-2"><Film className="w-4 h-4 text-[color:var(--neon-pink)]" /> Video Preview</h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Auto-playing storyboard reel · {isVertical ? "9:16 vertical" : "16:9 landscape"} · {totalScenes} scenes · {music ?? "No music"}
+            {isVertical ? "9:16 vertical" : "16:9 landscape"} · {totalScenes} scenes · {music ?? "No music"}
           </p>
         </div>
-        <button
-          onClick={() => toast.success("Full MP4 render queued — you'll be notified when it's ready.")}
-          className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)]">
-          Render MP4
+        <div className="flex flex-wrap gap-2">
+          {videoUrl && (
+            <a href={videoUrl} download className="rounded-lg glass hover:bg-white/5 px-4 py-2 text-sm font-medium flex items-center gap-2">
+              <Download className="w-4 h-4" /> Download MP4
+            </a>
+          )}
+          <button
+            onClick={handleRender}
+            disabled={rendering}
+            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
+            {rendering
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Rendering {Math.round(renderProgress * 100)}%</>
+              : <><VideoIcon className="w-4 h-4" /> {videoUrl ? "Re-render MP4" : "Render MP4"}</>}
+          </button>
+        </div>
+      </div>
+
+      {videoUrl ? (
+        <video controls src={videoUrl} className={`${aspect} mx-auto rounded-xl bg-black w-full`} />
+      ) : (
+
         </button>
       </div>
 
