@@ -10,8 +10,9 @@ import { listOutputs, saveOutput, deleteOutput, type CarouselSlide } from "@/lib
 import { LocalOnlyBanner } from "@/components/local-only-banner";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
-  Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2,
+  Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2, Film,
 } from "lucide-react";
+
 
 
 export const Route = createFileRoute("/_authenticated/carousels")({
