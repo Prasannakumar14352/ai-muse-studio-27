@@ -167,7 +167,10 @@ function CarouselsPage() {
     } finally {
       setGeneratingId(null);
       setProgress(null);
+    }
   }
+
+
 
   async function regenerateFailed(row: CarouselRow) {
     const slides = row.carousel_images ?? [];
