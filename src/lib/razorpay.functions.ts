@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { CREDIT_PACKS } from "@/lib/constants";
+import { CREDIT_PACKS, PLANS } from "@/lib/constants";
+
 
 /** Public config for the browser Razorpay checkout (key_id only — safe to expose). */
 export const getRazorpayConfig = createServerFn({ method: "GET" }).handler(async () => {
