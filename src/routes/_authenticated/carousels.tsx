@@ -7,6 +7,9 @@ import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
 import { listOutputs, saveOutput, deleteOutput, type CarouselSlide } from "@/lib/local-store";
+import {
+  putDataURL, getObjectURL, getDataURL, deleteBlobsByPrefix, isBlobKey, makeBlobKey,
+} from "@/lib/blob-store";
 import { LocalOnlyBanner } from "@/components/local-only-banner";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
@@ -39,7 +42,8 @@ type CarouselRow = {
   platform: string | null;
   tone: string | null;
   image_prompts: Prompt[];
-  carousel_images: (string | null)[] | null;
+  carousel_images: (string | null)[] | null;   // stored refs (idb keys or data URLs)
+  display_images: (string | null)[] | null;    // resolved to blob object URLs for <img>
   carousel_slides: CarouselSlide[] | null;
   slide_diagnostics: SlideDiagMap;
   saved_ratio: LayoutSettings["ratio"] | null;
@@ -75,19 +79,31 @@ function CarouselsPage() {
         .order("created_at", { ascending: false });
       const outputs = await listOutputs();
       const outMap = new Map(outputs.map((o) => [o.project_id, o]));
-      return (projects ?? []).map((p) => {
+      const rows: CarouselRow[] = [];
+      for (const p of projects ?? []) {
         const out = outMap.get(p.id);
         const rd = out?.render_diagnostics as { slide_diagnostics?: SlideDiagMap } | undefined;
-        return {
+        const stored = out?.carousel_images ?? null;
+        let display: (string | null)[] | null = null;
+        if (stored) {
+          display = await Promise.all(stored.map(async (v) => {
+            if (!v) return null;
+            if (isBlobKey(v)) return await getObjectURL(v);
+            return v;
+          }));
+        }
+        rows.push({
           id: p.id, title: p.title, style: p.style, platform: p.platform, tone: p.tone,
           image_prompts: out?.image_prompts ?? [],
-          carousel_images: out?.carousel_images ?? null,
+          carousel_images: stored,
+          display_images: display,
           carousel_slides: out?.carousel_slides ?? null,
           slide_diagnostics: (rd?.slide_diagnostics ?? {}) as SlideDiagMap,
           saved_ratio: (out?.aspect_ratio ?? null) as LayoutSettings["ratio"] | null,
           saved_slide_count: out?.slide_count ?? null,
-        };
-      });
+        });
+      }
+      return rows;
     },
   });
 
@@ -104,6 +120,7 @@ function CarouselsPage() {
   }
 
   async function generateOneSlide(
+    projectId: string, idx: number,
     prompt: Prompt, styleLabel: string, ratio: string,
   ): Promise<{ image: string | null; diag: SlideDiag }> {
     const start = Date.now();
@@ -120,7 +137,10 @@ function CarouselsPage() {
           diag: { at: new Date().toISOString(), ok: false, durationMs: Date.now() - start, httpStatus: res.status, error: j.error ?? `HTTP ${res.status}` },
         };
       }
-      return { image: j.image, diag: { at: new Date().toISOString(), ok: true, durationMs: Date.now() - start, httpStatus: res.status } };
+      // Persist bytes into IndexedDB and return a small reference key that
+      // fits in localStorage alongside other output metadata.
+      const key = await putDataURL(`carousel:${projectId}:${idx}`, j.image);
+      return { image: key, diag: { at: new Date().toISOString(), ok: true, durationMs: Date.now() - start, httpStatus: res.status } };
     } catch (e) {
       return {
         image: null,
@@ -150,7 +170,7 @@ function CarouselsPage() {
       let done = 0;
       await Promise.all(
         slice.map(async (p, i) => {
-          const r = await generateOneSlide(p, styleLabel, cfg.ratio);
+          const r = await generateOneSlide(row.id, i, p, styleLabel, cfg.ratio);
           results[i] = r.image;
           diag[String(i)] = r.diag;
           done += 1;
@@ -192,7 +212,7 @@ function CarouselsPage() {
       await Promise.all(
         failedIdxs.map(async (i) => {
           const prompt = row.image_prompts[i];
-          const r = await generateOneSlide(prompt, styleLabel, cfg.ratio);
+          const r = await generateOneSlide(row.id, i, prompt, styleLabel, cfg.ratio);
           nextImages[i] = r.image;
           nextDiag[String(i)] = r.diag;
           done += 1;
@@ -211,8 +231,26 @@ function CarouselsPage() {
     }
   }
 
+  async function resolveSlideURLs(row: CarouselRow): Promise<string[]> {
+    const refs = (row.carousel_images ?? []).filter(Boolean) as string[];
+    return Promise.all(refs.map(async (r) => (isBlobKey(r) ? ((await getObjectURL(r)) ?? "") : r)));
+  }
+  async function resolveSlideDataURLs(row: CarouselRow): Promise<string[]> {
+    const refs = (row.carousel_images ?? []).filter(Boolean) as string[];
+    const out: string[] = [];
+    for (const r of refs) {
+      if (isBlobKey(r)) {
+        const d = await getDataURL(r);
+        if (d) out.push(d);
+      } else {
+        out.push(r);
+      }
+    }
+    return out;
+  }
+
   async function exportReel(row: CarouselRow) {
-    const slides = (row.carousel_images ?? []).filter(Boolean) as string[];
+    const slides = await resolveSlideURLs(row);
     if (slides.length === 0) return toast.error("Generate slides first");
     if (!("MediaRecorder" in window)) return toast.error("MediaRecorder not supported in this browser");
     const cfg = getLayout(row);
@@ -285,7 +323,7 @@ function CarouselsPage() {
     const key = `${row.id}:${idx}`;
     setSlideRetryId(key);
     try {
-      const r = await generateOneSlide(prompt, styleLabel, cfg.ratio);
+      const r = await generateOneSlide(row.id, idx, prompt, styleLabel, cfg.ratio);
       const nextImages = [...(row.carousel_images ?? new Array(row.image_prompts.length).fill(null))];
       nextImages[idx] = r.image;
       const nextDiag: SlideDiagMap = { ...row.slide_diagnostics, [String(idx)]: r.diag };
@@ -299,7 +337,7 @@ function CarouselsPage() {
   }
 
   async function exportZip(row: CarouselRow) {
-    const slides = (row.carousel_images ?? []).filter(Boolean) as string[];
+    const slides = await resolveSlideDataURLs(row);
     if (slides.length === 0) return toast.error("Generate slides first");
     setExportingId(row.id);
     try {
@@ -319,7 +357,7 @@ function CarouselsPage() {
   }
 
   async function exportPdf(row: CarouselRow) {
-    const slides = (row.carousel_images ?? []).filter(Boolean) as string[];
+    const slides = await resolveSlideDataURLs(row);
     if (slides.length === 0) return toast.error("Generate slides first");
     const cfg = getLayout(row);
     setExportingId(row.id);
@@ -344,12 +382,13 @@ function CarouselsPage() {
     setDeletingId(row.id);
     try {
       await deleteOutput(row.id);
+      await deleteBlobsByPrefix(`carousel:${row.id}:`);
+      // best-effort clear of blob keys created by putDataURL (they store the raw id without prefix)
       const { error } = await supabase.from("projects").delete().eq("id", row.id);
       if (error) throw error;
       toast.success("Carousel deleted");
       qc.invalidateQueries({ queryKey: ["carousels"] });
       qc.invalidateQueries({ queryKey: ["projects"] });
-
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Delete failed");
     } finally {
@@ -378,7 +417,7 @@ function CarouselsPage() {
         <div className="grid md:grid-cols-2 gap-4">
           {data.map((row) => {
             const generating = generatingId === row.id;
-            const slides = row.carousel_images ?? [];
+            const slides = row.display_images ?? [];
             const failedCount = Object.values(row.slide_diagnostics).filter((d) => !d.ok).length;
             const cfg = getLayout(row);
             const isEditorOpen = editorFor === row.id;
