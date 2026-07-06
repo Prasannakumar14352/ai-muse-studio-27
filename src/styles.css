@@ -43,59 +43,64 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* Force dark theme globally — CreatorVault is a dark premium SaaS */
+/* Prodxstore — Dark brand: near-black warm + brand orange (#f06000) with hot-pink accent */
 :root {
   --radius: 0.85rem;
 
-  --background: oklch(0.14 0.03 285);
-  --foreground: oklch(0.97 0.01 300);
+  --background: oklch(0.10 0.008 40);
+  --foreground: oklch(0.97 0.005 60);
 
-  --card: oklch(0.19 0.035 285 / 0.6);
-  --card-foreground: oklch(0.97 0.01 300);
+  --card: oklch(0.15 0.012 40 / 0.6);
+  --card-foreground: oklch(0.97 0.005 60);
 
-  --popover: oklch(0.17 0.035 285);
-  --popover-foreground: oklch(0.97 0.01 300);
+  --popover: oklch(0.14 0.012 40);
+  --popover-foreground: oklch(0.97 0.005 60);
 
-  --primary: oklch(0.68 0.24 305);
-  --primary-foreground: oklch(0.98 0.005 300);
+  --primary: oklch(0.68 0.19 55);            /* brand orange #f06000 */
+  --primary-foreground: oklch(0.12 0.01 40);
 
-  --secondary: oklch(0.24 0.05 290);
-  --secondary-foreground: oklch(0.97 0.01 300);
+  --secondary: oklch(0.20 0.02 40);
+  --secondary-foreground: oklch(0.97 0.005 60);
 
-  --muted: oklch(0.22 0.03 285);
-  --muted-foreground: oklch(0.72 0.03 295);
+  --muted: oklch(0.18 0.015 40);
+  --muted-foreground: oklch(0.72 0.015 55);
 
-  --accent: oklch(0.32 0.12 320);
-  --accent-foreground: oklch(0.98 0.005 300);
+  --accent: oklch(0.32 0.12 35);
+  --accent-foreground: oklch(0.98 0.005 60);
 
   --destructive: oklch(0.62 0.24 20);
   --destructive-foreground: oklch(0.98 0 0);
 
-  --border: oklch(0.35 0.05 290 / 0.35);
-  --input: oklch(0.28 0.05 290 / 0.5);
-  --ring: oklch(0.68 0.24 305);
+  --border: oklch(0.35 0.03 45 / 0.35);
+  --input: oklch(0.24 0.02 40 / 0.5);
+  --ring: oklch(0.68 0.19 55);
 
-  --neon-purple: oklch(0.68 0.26 305);
-  --neon-pink: oklch(0.72 0.28 355);
-  --neon-blue: oklch(0.72 0.2 250);
-  --brand-orange: oklch(0.72 0.19 55);
-  --brand-orange-glow: oklch(0.78 0.2 45);
+  /* Brand accent trio — kept as variables so existing components auto-rebrand */
+  --brand-orange: oklch(0.68 0.19 55);
+  --brand-orange-glow: oklch(0.78 0.20 65);
+  --brand-pink: oklch(0.68 0.26 15);          /* hot pink for CTA endpoint */
+  --brand-amber: oklch(0.82 0.18 80);
 
-  --gradient-primary: linear-gradient(135deg, oklch(0.68 0.26 305), oklch(0.72 0.28 355));
-  --gradient-hero: radial-gradient(ellipse at top, oklch(0.35 0.22 305 / 0.55), transparent 60%),
-                   radial-gradient(ellipse at bottom right, oklch(0.4 0.24 340 / 0.35), transparent 60%);
-  --gradient-card: linear-gradient(135deg, oklch(0.22 0.05 290 / 0.7), oklch(0.16 0.04 285 / 0.5));
-  --shadow-glow: 0 0 60px -10px oklch(0.68 0.26 305 / 0.55);
-  --shadow-glow-pink: 0 0 60px -10px oklch(0.72 0.28 355 / 0.5);
+  /* Legacy alias tokens re-pointed at brand hues so old class refs stay on-brand */
+  --neon-purple: oklch(0.68 0.19 55);         /* was purple → now orange */
+  --neon-pink:   oklch(0.68 0.26 15);         /* was neon-pink → warmer brand pink */
+  --neon-blue:   oklch(0.72 0.15 65);         /* was blue → amber */
 
-  --sidebar: oklch(0.16 0.035 285);
-  --sidebar-foreground: oklch(0.95 0.01 300);
-  --sidebar-primary: oklch(0.68 0.24 305);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.24 0.06 300);
-  --sidebar-accent-foreground: oklch(0.97 0.01 300);
-  --sidebar-border: oklch(0.3 0.05 290 / 0.4);
-  --sidebar-ring: oklch(0.68 0.24 305);
+  --gradient-primary: linear-gradient(135deg, oklch(0.68 0.19 55), oklch(0.68 0.26 15));
+  --gradient-hero: radial-gradient(ellipse at top, oklch(0.6 0.20 45 / 0.35), transparent 60%),
+                   radial-gradient(ellipse at bottom right, oklch(0.55 0.24 20 / 0.28), transparent 60%);
+  --gradient-card: linear-gradient(135deg, oklch(0.18 0.02 40 / 0.7), oklch(0.12 0.015 40 / 0.5));
+  --shadow-glow: 0 0 60px -10px oklch(0.68 0.19 55 / 0.55);
+  --shadow-glow-pink: 0 0 60px -10px oklch(0.68 0.26 15 / 0.5);
+
+  --sidebar: oklch(0.12 0.012 40);
+  --sidebar-foreground: oklch(0.95 0.005 60);
+  --sidebar-primary: oklch(0.68 0.19 55);
+  --sidebar-primary-foreground: oklch(0.12 0.01 40);
+  --sidebar-accent: oklch(0.20 0.03 40);
+  --sidebar-accent-foreground: oklch(0.97 0.005 60);
+  --sidebar-border: oklch(0.28 0.03 45 / 0.4);
+  --sidebar-ring: oklch(0.68 0.19 55);
 }
 
 @layer base {
@@ -108,8 +113,8 @@
   }
   body {
     background-image:
-      radial-gradient(ellipse 80% 60% at 50% -10%, oklch(0.35 0.22 305 / 0.35), transparent 60%),
-      radial-gradient(ellipse 60% 50% at 90% 10%, oklch(0.4 0.24 340 / 0.22), transparent 60%);
+      radial-gradient(ellipse 80% 60% at 50% -10%, oklch(0.55 0.22 45 / 0.28), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 90% 10%, oklch(0.55 0.24 15 / 0.18), transparent 60%);
     background-attachment: fixed;
   }
   h1, h2, h3, h4 {
@@ -117,6 +122,7 @@
     letter-spacing: -0.02em;
   }
 }
+
 
 @utility glass {
   background: var(--gradient-card);
