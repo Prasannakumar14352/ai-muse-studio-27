@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { listOutputs } from "@/lib/local-store";
 import { Plus, FolderOpen, Film, Video as VideoIcon } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/projects")({ component: ProjectsList });
@@ -15,28 +16,22 @@ function ProjectsList() {
   const { data: projects, isLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: async (): Promise<ProjectRow[]> => {
-      // Join outputs so we can surface the rendered video on the library card.
-      const { data } = await supabase
-        .from("projects")
-        .select("id,title,content_type,style,platform,tone,generated_outputs(video_url)")
-        .order("created_at", { ascending: false });
-      return (data ?? []).map((p: {
-        id: string; title: string; content_type: string | null;
-        style: string | null; platform: string | null; tone: string | null;
-        generated_outputs:
-          | { video_url: string | null }[]
-          | { video_url: string | null }
-          | null;
-      }) => {
-        const out = Array.isArray(p.generated_outputs) ? p.generated_outputs[0] : p.generated_outputs;
-        return {
-          id: p.id, title: p.title, content_type: p.content_type,
-          style: p.style, platform: p.platform, tone: p.tone,
-          video_url: out?.video_url ?? null,
-        };
-      });
+      const [{ data }, outputs] = await Promise.all([
+        supabase
+          .from("projects")
+          .select("id,title,content_type,style,platform,tone")
+          .order("created_at", { ascending: false }),
+        listOutputs(),
+      ]);
+      const outMap = new Map(outputs.map((o) => [o.project_id, o]));
+      return (data ?? []).map((p) => ({
+        id: p.id, title: p.title, content_type: p.content_type,
+        style: p.style, platform: p.platform, tone: p.tone,
+        video_url: outMap.get(p.id)?.video_url ?? null,
+      }));
     },
   });
+
 
   return (
     <div className="space-y-6">
