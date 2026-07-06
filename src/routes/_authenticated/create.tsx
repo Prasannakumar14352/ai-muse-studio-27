@@ -144,17 +144,54 @@ function CreatePage() {
           });
         }
       } else {
-        const p = output as ReturnType<typeof generateProject>;
-        await saveOutput(project.id, {
-          title: p.title,
-          hook: p.hook,
-          script: p.script,
-          captions: p.captions,
-          hashtags: p.hashtags,
-          scenes: p.scenes,
-          image_prompts: p.image_prompts,
-          thumbnail_ideas: p.thumbnail_ideas,
-        });
+        const styleLabel = STYLES.find((s) => s.id === form.style)?.label ?? form.style;
+        let aiVideo: Awaited<ReturnType<typeof generateAiVideoScript>> | null = null;
+        try {
+          aiVideo = await generateAiVideoScript({
+            data: {
+              topic: form.topic, tone: form.tone, platform: form.platform,
+              styleLabel, contentType: form.content_type, audience: form.audience,
+            },
+          });
+        } catch (e) {
+          console.warn("AI video script failed, using template:", e);
+          toast.warning("AI script generator unavailable — using template.");
+        }
+
+        if (aiVideo) {
+          const scenes = aiVideo.scenes.map((s) => ({
+            n: s.n,
+            visual: s.visual,
+            voiceover: s.voiceover,
+            duration: s.duration || "3s",
+            on_screen_text: s.on_screen_text || "",
+          }));
+          const script = aiVideo.scenes.map((s) =>
+            `Scene ${s.n} (${s.time_range}) — ${s.role}\nVoiceover: ${s.voiceover}\n${s.on_screen_text ? `On-screen text: ${s.on_screen_text}\n` : ""}Visual: ${s.visual}`
+          ).join("\n\n---\n\n");
+          await saveOutput(project.id, {
+            title: aiVideo.reel_title || aiVideo.title,
+            hook: aiVideo.scenes[0]?.voiceover ?? "",
+            script,
+            captions: aiVideo.caption || generateCaptions(form.topic, form.platform, form.tone).join("\n\n---\n\n"),
+            hashtags: aiVideo.hashtags?.length ? aiVideo.hashtags : generateHashtags(form.topic, form.platform),
+            scenes,
+            image_prompts: aiVideo.scenes.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel })),
+            thumbnail_ideas: [],
+          });
+        } else {
+          const p = output as ReturnType<typeof generateProject>;
+          await saveOutput(project.id, {
+            title: p.title,
+            hook: p.hook,
+            script: p.script,
+            captions: p.captions,
+            hashtags: p.hashtags,
+            scenes: p.scenes,
+            image_prompts: p.image_prompts,
+            thumbnail_ideas: p.thumbnail_ideas,
+          });
+        }
       }
 
 
