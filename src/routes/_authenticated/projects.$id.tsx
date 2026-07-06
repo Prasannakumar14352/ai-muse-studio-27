@@ -410,7 +410,7 @@ function ProjectView() {
   );
 }
 
-type Scene = { n: number; visual: string; voiceover: string; duration: string };
+type Scene = { n: number; visual: string; voiceover: string; duration: string; on_screen_text?: string };
 
 function VideoPreview({
   scenes, title, styleImage, styleId, platform, contentType, music,
