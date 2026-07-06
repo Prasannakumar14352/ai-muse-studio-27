@@ -324,8 +324,24 @@ function VideoPreview({
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [playing, idx, currentDurationMs, totalScenes]);
 
+  async function uploadRender(blob: Blob, mimeType: string, extension: string, durationSec: number) {
+    const path = `${userId}/${projectId}-${Date.now()}.${extension}`;
+    const { error: upErr } = await supabase.storage.from("renders").upload(path, blob, {
+      contentType: mimeType, upsert: true,
+    });
+    if (upErr) throw upErr;
+    const { data: signed } = await supabase.storage.from("renders").createSignedUrl(path, 60 * 60 * 24 * 7);
+    const url = signed?.signedUrl ?? null;
+    if (outputId && url) {
+      await supabase.from("generated_outputs").update({ video_url: url } as never).eq("id", outputId);
+    }
+    setVideoUrl(url);
+    qc.invalidateQueries({ queryKey: ["project", projectId] });
+    toast.success(`Rendered ${durationSec.toFixed(1)}s ${extension.toUpperCase()} — saved to your library.`);
+  }
+
   async function handleRender() {
-    if (rendering || totalScenes === 0) return;
+    if (rendering || ugcRendering || totalScenes === 0) return;
     setRendering(true);
     setRenderProgress(0);
     setPlaying(false);
@@ -334,27 +350,43 @@ function VideoPreview({
         title, platform, scenes, styleId, contentType,
         onProgress: setRenderProgress,
       });
-      // Upload to Supabase Storage under <userId>/<projectId>.<ext>
-      const path = `${userId}/${projectId}-${Date.now()}.${result.extension}`;
-      const { error: upErr } = await supabase.storage.from("renders").upload(path, result.blob, {
-        contentType: result.mimeType, upsert: true,
-      });
-      if (upErr) throw upErr;
-      const { data: signed } = await supabase.storage.from("renders").createSignedUrl(path, 60 * 60 * 24 * 7);
-      const url = signed?.signedUrl ?? null;
-      // Persist URL on the output row
-      if (outputId && url) {
-        await supabase.from("generated_outputs").update({ video_url: url } as never).eq("id", outputId);
-      }
-      setVideoUrl(url);
-      qc.invalidateQueries({ queryKey: ["project", projectId] });
-      toast.success(`Rendered ${result.durationSec.toFixed(1)}s ${result.extension.toUpperCase()} — saved to your library.`);
+      await uploadRender(result.blob, result.mimeType, result.extension, result.durationSec);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Render failed");
     } finally {
       setRendering(false);
     }
   }
+
+  async function handleUgcRender() {
+    if (rendering || ugcRendering || totalScenes === 0) return;
+    setUgcRendering(true);
+    setUgcStage({ kind: "images", done: 0, total: totalScenes });
+    setPlaying(false);
+    try {
+      const result = await renderUgcVideo({
+        title, platform, contentType, styleId, scenes,
+        imagePrompts,
+        voice: "alloy",
+        onStage: setUgcStage,
+      });
+      await uploadRender(result.blob, result.mimeType, result.extension, result.durationSec);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "UGC render failed");
+    } finally {
+      setUgcRendering(false);
+      setUgcStage(null);
+    }
+  }
+
+  function ugcLabel(stage: UgcStage | null): string {
+    if (!stage) return "Preparing…";
+    if (stage.kind === "images") return `Generating scene images ${stage.done}/${stage.total}`;
+    if (stage.kind === "audio") return `Generating voiceovers ${stage.done}/${stage.total}`;
+    if (stage.kind === "render") return `Recording ${Math.round(stage.progress * 100)}%`;
+    return "Uploading…";
+  }
+
 
   if (totalScenes === 0) return null;
   const scene = scenes[idx];
