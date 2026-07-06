@@ -32,7 +32,17 @@ export const Route = createFileRoute("/_authenticated/carousels")({
 });
 
 type Prompt = { n: number; prompt: string; style: string };
-type SlideDiag = { at: string; ok: boolean; durationMs: number; httpStatus?: number; error?: string };
+type SlideDiag = {
+  at: string;
+  ok: boolean;
+  durationMs: number;
+  httpStatus?: number;
+  error?: string;
+  attempts?: number;
+  prompt?: string;
+  style?: string;
+  ratio?: string;
+};
 type SlideDiagMap = Record<string, SlideDiag>;
 type LayoutSettings = { ratio: "1:1" | "4:5" | "9:16" | "16:9"; slideCount: number; spacing: number };
 
@@ -149,12 +159,20 @@ function CarouselsPage() {
             durationMs: Date.now() - start,
             httpStatus: res.status,
             error: `${j.error ?? `HTTP ${res.status}`}${attempt < maxAttempts ? ` (attempt ${attempt}/${maxAttempts})` : ""}`,
+            attempts: attempt,
+            prompt: prompt.prompt,
+            style: styleLabel,
+            ratio,
           };
         } else {
-          // Persist bytes into IndexedDB and return a small reference key that
-          // fits in localStorage alongside other output metadata.
           const key = await putDataURL(`carousel:${projectId}:${idx}`, j.image);
-          return { image: key, diag: { at: new Date().toISOString(), ok: true, durationMs: Date.now() - start, httpStatus: res.status } };
+          return {
+            image: key,
+            diag: {
+              at: new Date().toISOString(), ok: true, durationMs: Date.now() - start, httpStatus: res.status,
+              attempts: attempt, prompt: prompt.prompt, style: styleLabel, ratio,
+            },
+          };
         }
       } catch (e) {
         last = {
@@ -162,12 +180,16 @@ function CarouselsPage() {
           ok: false,
           durationMs: Date.now() - start,
           error: `${e instanceof Error ? e.message : "Network error"}${attempt < maxAttempts ? ` (attempt ${attempt}/${maxAttempts})` : ""}`,
+          attempts: attempt,
+          prompt: prompt.prompt,
+          style: styleLabel,
+          ratio,
         };
       }
       if (!last || !shouldRetrySlide(last) || attempt === maxAttempts) break;
       await sleep(900 * attempt);
     }
-    return { image: null, diag: last ?? { at: new Date().toISOString(), ok: false, durationMs: 0, error: "Image generation failed" } };
+    return { image: null, diag: last ?? { at: new Date().toISOString(), ok: false, durationMs: 0, error: "Image generation failed", attempts: maxAttempts, prompt: prompt.prompt, style: styleLabel, ratio } };
   }
 
   async function persistSlides(row: CarouselRow, images: (string | null)[], slideDiag: SlideDiagMap) {
@@ -445,7 +467,12 @@ function CarouselsPage() {
           {data.map((row) => {
             const generating = generatingId === row.id;
             const slides = row.display_images ?? [];
-            const failedCount = Object.values(row.slide_diagnostics).filter((d) => !d.ok).length;
+            const expectedCount = Math.max(row.image_prompts.length, slides.length);
+            const missingCount = Array.from({ length: expectedCount }).filter((_, i) => {
+              const src = row.carousel_images?.[i];
+              const diag = row.slide_diagnostics[String(i)];
+              return !src || (diag && !diag.ok);
+            }).length;
             const cfg = getLayout(row);
             const isEditorOpen = editorFor === row.id;
 
@@ -459,9 +486,9 @@ function CarouselsPage() {
                     <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
                       <span className="glass px-2 py-0.5 rounded">{row.image_prompts.length} prompts</span>
                       <span className="glass px-2 py-0.5 rounded">{cfg.ratio}</span>
-                      {failedCount > 0 && (
-                        <span className="bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" /> {failedCount} failed
+                      {missingCount > 0 && (
+                        <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> {missingCount} missing/failed
                         </span>
                       )}
                     </div>
@@ -655,16 +682,51 @@ function CarouselsPage() {
                         {exportingId === row.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Film className="w-3 h-3" />}
                         Export as Reel
                       </button>
-                      {failedCount > 0 && (
+                      {missingCount > 0 && (
                         <button
                           onClick={() => regenerateFailed(row)}
                           disabled={generating}
-                          className="rounded-lg glass border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-50"
+                          className="rounded-lg glass border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-50"
+                          title="Only regenerates slides whose image is missing or failed"
                         >
-                          <RefreshCw className="w-3 h-3" /> Regenerate {failedCount} failed
+                          <RefreshCw className="w-3 h-3" /> Regenerate slides &amp; images ({missingCount})
                         </button>
                       )}
                     </div>
+
+                    <details className="rounded-lg border border-border bg-black/30">
+                      <summary className="cursor-pointer px-3 py-2 text-xs text-muted-foreground hover:text-white flex items-center justify-between">
+                        <span className="flex items-center gap-1.5"><AlertTriangle className="w-3 h-3" /> Slide diagnostics</span>
+                        <span className="text-[10px]">{Object.keys(row.slide_diagnostics).length} entries</span>
+                      </summary>
+                      <div className="px-3 pb-3 space-y-2 max-h-64 overflow-y-auto">
+                        {row.image_prompts.slice(0, expectedCount).map((p, i) => {
+                          const d = row.slide_diagnostics[String(i)];
+                          const hasImg = Boolean(row.carousel_images?.[i]);
+                          const state = hasImg && (!d || d.ok) ? "ok" : d && !d.ok ? "failed" : !hasImg ? "missing" : "unknown";
+                          const color = state === "ok" ? "text-emerald-300 border-emerald-500/30"
+                            : state === "failed" ? "text-rose-300 border-rose-500/40"
+                            : "text-amber-300 border-amber-500/40";
+                          return (
+                            <div key={i} className={`rounded border ${color} bg-black/40 p-2 text-[11px] space-y-1`}>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold">Slide {i + 1}</span>
+                                <span className="uppercase tracking-wider text-[9px]">{state}</span>
+                                {d?.attempts != null && <span className="text-muted-foreground">retries: {d.attempts}</span>}
+                                {d?.httpStatus != null && <span className="text-muted-foreground">HTTP {d.httpStatus}</span>}
+                                {d?.durationMs != null && <span className="text-muted-foreground">{d.durationMs}ms</span>}
+                                {d?.at && <span className="text-muted-foreground">{new Date(d.at).toLocaleTimeString()}</span>}
+                              </div>
+                              {d?.error && <div className="text-rose-300">{d.error}</div>}
+                              <div className="text-muted-foreground">
+                                <span className="uppercase tracking-wider text-[9px] mr-1">image_prompt</span>
+                                <span className="text-white/80 break-words">{d?.prompt ?? p.prompt}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </details>
                   </div>
                 ) : (
                   <div className="mx-4 mb-4 rounded-lg border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
