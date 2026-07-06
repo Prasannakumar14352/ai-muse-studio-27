@@ -189,6 +189,7 @@ function ProjectView() {
         userId={project.user_id}
         outputId={output?.id ?? null}
         existingVideoUrl={output?.video_url ?? null}
+        existingDiagnostics={(output as { render_diagnostics?: unknown } | null)?.render_diagnostics ?? null}
         imagePrompts={prompts}
       />
 
