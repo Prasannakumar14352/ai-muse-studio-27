@@ -241,7 +241,7 @@ function UserDashboard() {
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">Recent projects</h2>
-            <Link to="/projects" className="text-sm text-[color:var(--neon-purple)] hover:underline">View all →</Link>
+            <Link to="/videos" className="text-sm text-[color:var(--neon-purple)] hover:underline">View videos →</Link>
           </div>
           {recent && recent.length > 0 ? (
             <div className="grid sm:grid-cols-2 gap-4">
