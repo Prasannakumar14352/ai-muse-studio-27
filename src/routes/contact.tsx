@@ -6,8 +6,8 @@ import { Mail, Send, Copy, Check, Building2, ArrowLeft, Home } from "lucide-reac
 
 export const Route = createFileRoute("/contact")({ component: ContactPage });
 
-const SUPPORT_EMAIL = "productsupport@prodxstore.com";
-const BRAND = "Prodxstore";
+import { BRAND, SUPPORT_EMAIL } from "@/lib/constants";
+
 
 const schema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
