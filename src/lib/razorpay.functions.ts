@@ -75,9 +75,10 @@ export const getRazorpayConfig = createServerFn({ method: "GET" }).handler(async
 /** Create a Razorpay order for a credit pack + record a pending payment row. */
 export const createRazorpayOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { packId: string }) => {
+  .inputValidator((input: { packId: string; currency?: Currency }) => {
     if (!input || typeof input.packId !== "string") throw new Error("packId required");
-    return input;
+    const currency: Currency = input.currency === "INR" ? "INR" : "USD";
+    return { packId: input.packId, currency };
   })
   .handler(async ({ data, context }) => {
     const pack = CREDIT_PACKS.find((p) => p.id === data.packId);
@@ -87,31 +88,16 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keyId || !keySecret) throw new Error("Razorpay not configured");
 
-    const amountCents = Math.round(pack.priceUSD * 100);
     const shortUid = context.userId.replace(/-/g, "").slice(0, 12);
     const receipt = `rcpt_${shortUid}_${Date.now().toString(36)}`.slice(0, 40);
 
-    const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-    const res = await fetch("https://api.razorpay.com/v1/orders", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Basic ${auth}`,
-      },
-      body: JSON.stringify({
-        amount: amountCents,
-        currency: "USD",
-        receipt,
-        notes: { user_id: context.userId, pack_id: pack.id, credits: pack.credits },
-      }),
+    const { order, currencyUsed, amountCharged, fellBack } = await createOrderWithFallback({
+      keyId, keySecret,
+      priceUSD: pack.priceUSD,
+      currency: data.currency,
+      receipt,
+      notes: { user_id: context.userId, pack_id: pack.id, credits: pack.credits },
     });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("Razorpay order error:", res.status, errText);
-      throw new Error(`Failed to create order (${res.status})`);
-    }
-    const order = await res.json() as { id: string; amount: number; currency: string };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("payments").insert({
@@ -119,8 +105,8 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       razorpay_order_id: order.id,
       pack_id: pack.id,
       credits: pack.credits,
-      amount_cents: amountCents,
-      currency: "USD",
+      amount_cents: amountCharged,
+      currency: currencyUsed,
       status: "pending",
       receipt_number: receipt,
     });
@@ -134,6 +120,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       amount: order.amount,
       currency: order.currency,
       keyId,
+      fellBackToINR: fellBack,
       pack: { id: pack.id, label: pack.label, credits: pack.credits, priceUSD: pack.priceUSD },
     };
   });
@@ -141,9 +128,10 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
 /** Create a Razorpay order for a subscription plan (charged as one-time credit purchase). */
 export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { planId: string }) => {
+  .inputValidator((input: { planId: string; currency?: Currency }) => {
     if (!input || typeof input.planId !== "string") throw new Error("planId required");
-    return input;
+    const currency: Currency = input.currency === "INR" ? "INR" : "USD";
+    return { planId: input.planId, currency };
   })
   .handler(async ({ data, context }) => {
     const plan = PLANS.find((p) => p.id === data.planId);
@@ -157,27 +145,16 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
     if (!keyId || !keySecret) throw new Error("Razorpay not configured");
 
     const credits = plan.monthlyCredits + (plan.signupCredits ?? 0);
-    const amountCents = Math.round(priceNum * 100);
     const shortUid = context.userId.replace(/-/g, "").slice(0, 12);
     const receipt = `rcpt_${shortUid}_${Date.now().toString(36)}`.slice(0, 40);
 
-    const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-    const res = await fetch("https://api.razorpay.com/v1/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
-      body: JSON.stringify({
-        amount: amountCents,
-        currency: "USD",
-        receipt,
-        notes: { user_id: context.userId, plan_id: plan.id, credits },
-      }),
+    const { order, currencyUsed, amountCharged, fellBack } = await createOrderWithFallback({
+      keyId, keySecret,
+      priceUSD: priceNum,
+      currency: data.currency,
+      receipt,
+      notes: { user_id: context.userId, plan_id: plan.id, credits },
     });
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("Razorpay plan order error:", res.status, errText);
-      throw new Error(`Failed to create order (${res.status})`);
-    }
-    const order = await res.json() as { id: string; amount: number; currency: string };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("payments").insert({
@@ -185,8 +162,8 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
       razorpay_order_id: order.id,
       pack_id: `plan_${plan.id}`,
       credits,
-      amount_cents: amountCents,
-      currency: "USD",
+      amount_cents: amountCharged,
+      currency: currencyUsed,
       status: "pending",
       receipt_number: receipt,
     });
@@ -200,9 +177,11 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
       amount: order.amount,
       currency: order.currency,
       keyId,
+      fellBackToINR: fellBack,
       plan: { id: plan.id, name: plan.name, credits, priceUSD: priceNum },
     };
   });
+
 
 
 /** Verify Razorpay checkout signature + finalize the payment (add credits, mark success). */
