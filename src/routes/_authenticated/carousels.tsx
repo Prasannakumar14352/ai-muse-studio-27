@@ -212,7 +212,7 @@ function CarouselsPage() {
       await Promise.all(
         failedIdxs.map(async (i) => {
           const prompt = row.image_prompts[i];
-          const r = await generateOneSlide(prompt, styleLabel, cfg.ratio);
+          const r = await generateOneSlide(row.id, i, prompt, styleLabel, cfg.ratio);
           nextImages[i] = r.image;
           nextDiag[String(i)] = r.diag;
           done += 1;
@@ -305,7 +305,7 @@ function CarouselsPage() {
     const key = `${row.id}:${idx}`;
     setSlideRetryId(key);
     try {
-      const r = await generateOneSlide(prompt, styleLabel, cfg.ratio);
+      const r = await generateOneSlide(row.id, idx, prompt, styleLabel, cfg.ratio);
       const nextImages = [...(row.carousel_images ?? new Array(row.image_prompts.length).fill(null))];
       nextImages[idx] = r.image;
       const nextDiag: SlideDiagMap = { ...row.slide_diagnostics, [String(idx)]: r.diag };
