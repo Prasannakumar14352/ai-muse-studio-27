@@ -105,7 +105,7 @@ function PricingPage() {
       <PricingFAQ />
 
       <div className="text-center text-sm text-muted-foreground">
-        Need custom / team pricing? <Link to="/dashboard" className="text-[color:var(--neon-purple)] hover:underline">Contact us</Link>
+        Need custom / team pricing? <Link to="/contact" className="text-[color:var(--brand-orange)] hover:underline">Contact us</Link>
       </div>
 
       {modalPlan && <CheckoutModal plan={modalPlan} onClose={() => setModalPlan(null)} />}
