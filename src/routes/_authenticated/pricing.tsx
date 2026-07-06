@@ -18,10 +18,10 @@ function PricingPage() {
     <div className="space-y-8 max-w-6xl mx-auto">
       <div className="text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass text-xs text-muted-foreground mb-4">
-          <Sparkles className="w-3 h-3 text-[color:var(--neon-pink)]" /> Upgrade any time · Powered by Razorpay
+          <Sparkles className="w-3 h-3 text-[color:var(--neon-pink)]" /> Upgrade any time · Secure checkout
         </div>
         <h1 className="text-3xl md:text-5xl font-bold">Choose your <span className="gradient-text">plan</span></h1>
-        <p className="text-muted-foreground mt-2">Cancel any time. Prices in INR.</p>
+        <p className="text-muted-foreground mt-2">Cancel any time. Prices in USD.</p>
         {access?.isAdmin && (
           <div className="mt-4 inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 text-sm">
             <Crown className="w-4 h-4 text-amber-400" /> Admin — Unlimited access, no billing
@@ -32,6 +32,8 @@ function PricingPage() {
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
         {PLANS.map((p) => {
           const isCurrent = access?.plan === p.id;
+          const totalCredits = p.monthlyCredits + (p.signupCredits ?? 0);
+          const estimate = getPlanGenerationEstimate(totalCredits);
           return (
             <div key={p.id}
               className={`glass rounded-2xl p-6 relative flex flex-col ${p.featured ? "border-[color:var(--neon-purple)]/60 shadow-[var(--shadow-glow)]" : ""}`}>
@@ -45,6 +47,29 @@ function PricingPage() {
                 <span className="text-3xl font-bold">{p.price}</span>
                 <span className="text-sm text-muted-foreground">{p.period}</span>
               </div>
+              {estimate && (
+                <div className="mt-4 rounded-lg border border-border/60 bg-black/20 p-3 text-xs">
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Approximate generations</div>
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-3">
+                    <div className="flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-[color:var(--neon-pink)]" />
+                      <span><strong>{estimate.images}</strong> images</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />
+                      <span><strong>{estimate.carousels}</strong> carousels</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Film className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />
+                      <span><strong>{estimate.shortReels}</strong> short reels</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Video className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />
+                      <span><strong>{estimate.longVideos}</strong> 5-min videos</span>
+                    </div>
+                  </div>
+                </div>
+              )}
               <ul className="mt-5 space-y-2.5 flex-1">
                 {p.features.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
