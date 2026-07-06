@@ -42,8 +42,12 @@ export const generateAiVideoScript = createServerFn({ method: "POST" })
     if (!key) throw new Error("Missing LOVABLE_API_KEY");
 
     const isLong = data.contentType === "long_video";
-    const targetLen = isLong ? "60-90 seconds" : "30-40 seconds";
-    const sceneCount = isLong ? 10 : 7;
+    const defaultLen = isLong ? 75 : 35;
+    const lenSec = Math.max(15, Math.min(600, data.targetLengthSec ?? defaultLen));
+    const targetLen = `${lenSec} seconds`;
+    // Roughly one scene per ~8 seconds for long form, ~5 for shorts. Clamp so
+    // the AI still gets a workable structure.
+    const sceneCount = Math.max(3, Math.min(30, Math.round(lenSec / (isLong ? 8 : 5))));
     const ratio = data.contentType === "long_video" ? "16:9" : "9:16";
 
     const sys = `You are a senior short-form video creative director. You write
