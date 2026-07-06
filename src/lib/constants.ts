@@ -2,6 +2,17 @@ import {
   Video, Film, Image as ImageIcon, Type, Layers,
   Youtube, Instagram, Facebook, Linkedin, Music2,
 } from "lucide-react";
+import style3d from "@/assets/style-3d.jpg";
+import styleGhibli from "@/assets/style-ghibli.jpg";
+import styleAnime from "@/assets/style-anime.jpg";
+import styleRealistic from "@/assets/style-realistic.jpg";
+import stylePixar from "@/assets/style-pixar.jpg";
+import styleCinematic from "@/assets/style-cinematic.jpg";
+import styleDocumentary from "@/assets/style-documentary.jpg";
+import styleDark from "@/assets/style-dark.jpg";
+import styleAncient from "@/assets/style-ancient.jpg";
+import styleCyberpunk from "@/assets/style-cyberpunk.jpg";
+import styleMinimal from "@/assets/style-minimal.jpg";
 
 export const CONTENT_TYPES = [
   { id: "long_video", label: "Long YouTube Video", icon: Video, desc: "5–15 min structured video" },
@@ -22,18 +33,22 @@ export const PLATFORMS = [
 export const TONES = ["Professional", "Viral", "Emotional", "Funny", "Educational", "Luxury", "Cinematic"];
 
 export const STYLES = [
-  { id: "3d", label: "3D", grad: "from-fuchsia-500 to-purple-600" },
-  { id: "ghibli", label: "Ghibli-inspired", grad: "from-emerald-400 to-sky-500" },
-  { id: "anime", label: "Anime", grad: "from-pink-500 to-red-500" },
-  { id: "realistic", label: "Realistic", grad: "from-slate-500 to-slate-800" },
-  { id: "pixar", label: "Pixar-like", grad: "from-amber-400 to-orange-500" },
-  { id: "cinematic", label: "Cinematic", grad: "from-indigo-500 to-purple-700" },
-  { id: "documentary", label: "Documentary", grad: "from-stone-500 to-stone-800" },
-  { id: "dark", label: "Dark Mystery", grad: "from-zinc-800 to-black" },
-  { id: "ancient", label: "Ancient Gold", grad: "from-yellow-500 to-amber-800" },
-  { id: "cyberpunk", label: "Cyberpunk", grad: "from-fuchsia-500 to-cyan-400" },
-  { id: "minimal", label: "Minimal", grad: "from-neutral-300 to-neutral-600" },
+  { id: "3d", label: "3D", image: style3d },
+  { id: "ghibli", label: "Ghibli-inspired", image: styleGhibli },
+  { id: "anime", label: "Anime", image: styleAnime },
+  { id: "realistic", label: "Realistic", image: styleRealistic },
+  { id: "pixar", label: "Pixar-like", image: stylePixar },
+  { id: "cinematic", label: "Cinematic", image: styleCinematic },
+  { id: "documentary", label: "Documentary", image: styleDocumentary },
+  { id: "dark", label: "Dark Mystery", image: styleDark },
+  { id: "ancient", label: "Ancient Gold", image: styleAncient },
+  { id: "cyberpunk", label: "Cyberpunk", image: styleCyberpunk },
+  { id: "minimal", label: "Minimal", image: styleMinimal },
 ];
+
+export function getStyleImage(id?: string | null): string {
+  return STYLES.find((s) => s.id === id)?.image ?? styleCinematic;
+}
 
 export const VOICES = [
   { id: "male_narrator", label: "Male Narrator" },
