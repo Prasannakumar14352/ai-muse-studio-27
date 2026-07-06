@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
+import { pushImageGenLog, listImageGenLogs, addAsset } from "@/lib/local-store";
 import { Loader2, Wand2, Download, Save, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
+
 
 const RATIOS = ["1:1", "9:16", "16:9", "4:5"];
 const LS_STATE = "creatorvault:images:v2";
@@ -136,23 +137,20 @@ function ImagesPage() {
       };
       setDebug(info);
 
-      // Log to Supabase so the debug panel can load history later.
-      const { data: u } = await supabase.auth.getUser();
-      if (u.user) {
-        await supabase.from("image_generations").insert({
-          user_id: u.user.id,
-          prompt: p,
-          style: s,
-          ratio: r,
-          full_prompt: lastMeta?.fullPrompt ?? `${styleLabel} style. ${p}`,
-          request: info.request,
-          response: info.response ?? {},
-          errors: info.errors,
-          success_count: info.successCount,
-          failure_count: info.failureCount,
-          duration_ms: info.durationMs,
-        } as never);
-      }
+      // Save log locally (per-user browser storage).
+      await pushImageGenLog({
+        prompt: p,
+        style: s,
+        ratio: r,
+        full_prompt: lastMeta?.fullPrompt ?? `${styleLabel} style. ${p}`,
+        request: info.request,
+        response: info.response ?? {},
+        errors: info.errors,
+        success_count: info.successCount,
+        failure_count: info.failureCount,
+        duration_ms: info.durationMs,
+      });
+
     } finally {
       setLoading(false);
     }
@@ -169,15 +167,10 @@ function ImagesPage() {
   }
 
   async function loadHistory() {
-    const { data, error } = await supabase
-      .from("image_generations")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(20);
-    if (error) return toast.error(error.message);
-    if (!data || data.length === 0) return toast.info("No saved debug logs yet");
-    downloadJson(`creatorvault-image-debug-history-${Date.now()}.json`, data);
-    toast.success(`Downloaded ${data.length} logs`);
+    const logs = await listImageGenLogs();
+    if (logs.length === 0) return toast.info("No saved debug logs yet");
+    downloadJson(`creatorvault-image-debug-history-${Date.now()}.json`, logs);
+    toast.success(`Downloaded ${logs.length} logs`);
   }
 
   function downloadCurrentDebug() {
@@ -185,15 +178,13 @@ function ImagesPage() {
     downloadJson(`creatorvault-image-debug-${Date.now()}.json`, debug);
   }
 
-  async function save(item: { prompt: string; style: string; ratio: string }) {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { error } = await supabase.from("assets").insert({
-      user_id: u.user.id, asset_type: "image", prompt: item.prompt, style: item.style, aspect_ratio: item.ratio,
+  async function save(item: { prompt: string; style: string; ratio: string; image: string }) {
+    await addAsset({
+      asset_type: "image", prompt: item.prompt, style: item.style, aspect_ratio: item.ratio, image: item.image,
     });
-    if (error) toast.error(error.message);
-    else toast.success("Saved to library");
+    toast.success("Saved to library");
   }
+
 
   function clearSession() {
     setResults([]); setLastRun(null); setDebug(null);

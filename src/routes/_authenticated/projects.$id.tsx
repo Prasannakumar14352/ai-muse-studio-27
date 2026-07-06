@@ -5,10 +5,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { getStyleImage } from "@/lib/constants";
 import { generateProject } from "@/lib/generators";
 import { renderVideo, renderUgcVideo, type UgcStage } from "@/lib/video-renderer";
+import { getOutput, saveOutput, type LocalOutput } from "@/lib/local-store";
 import { toast } from "sonner";
 import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles, AlertTriangle, Bug, CheckCircle2, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
+
 
 function ProjectView() {
   const { id } = Route.useParams();
@@ -16,11 +18,11 @@ function ProjectView() {
   const { data, isLoading } = useQuery({
     queryKey: ["project", id],
     queryFn: async () => {
-      const [{ data: project }, { data: output }] = await Promise.all([
+      const [{ data: project }, output] = await Promise.all([
         supabase.from("projects").select("*").eq("id", id).maybeSingle(),
-        supabase.from("generated_outputs").select("*").eq("project_id", id).maybeSingle(),
+        getOutput(id),
       ]);
-      return { project, output };
+      return { project, output: output as LocalOutput | null };
     },
   });
 
@@ -60,27 +62,13 @@ function ProjectView() {
         style: project.style ?? "cinematic",
         contentType: project.content_type ?? "short_reel",
       });
-      const patch: Record<string, unknown> = {};
+      const patch: Partial<LocalOutput> = {};
       if (part === "all" || part === "script") { patch.script = fresh.script; patch.hook = fresh.hook; patch.title = fresh.title; }
       if (part === "all" || part === "scenes") { patch.scenes = fresh.scenes; patch.thumbnail_ideas = fresh.thumbnail_ideas; }
       if (part === "all" || part === "captions") { patch.captions = fresh.captions; patch.hashtags = fresh.hashtags; }
       if (part === "all" || part === "images") { patch.image_prompts = fresh.image_prompts; }
 
-      if (output?.id) {
-        const { error } = await supabase.from("generated_outputs").update(patch as never).eq("id", output.id);
-        if (error) throw error;
-      } else {
-        const { data: u } = await supabase.auth.getUser();
-        if (!u.user) throw new Error("Not signed in");
-        const { error } = await supabase.from("generated_outputs").insert({
-          project_id: project.id, user_id: u.user.id,
-          title: fresh.title, hook: fresh.hook, script: fresh.script,
-          scenes: fresh.scenes, image_prompts: fresh.image_prompts,
-          captions: fresh.captions, hashtags: fresh.hashtags,
-          thumbnail_ideas: fresh.thumbnail_ideas,
-        });
-        if (error) throw error;
-      }
+      await saveOutput(project.id, patch);
       if (part === "all" || part === "script") {
         await supabase.from("projects").update({ title: fresh.title }).eq("id", project.id);
       }
@@ -92,6 +80,7 @@ function ProjectView() {
       setRegenerating(null);
     }
   }
+
 
   const scenes = (output?.scenes as Array<{ n: number; visual: string; voiceover: string; duration: string }>) ?? [];
   const prompts = (output?.image_prompts as Array<{ n: number; prompt: string; style: string }>) ?? [];
@@ -343,13 +332,7 @@ function VideoPreview({
 
   async function persistDiagnostics(next: VideoDiagnostics) {
     setDiagnostics(next);
-    if (outputId) {
-      await supabase
-        .from("generated_outputs")
-        .update({ render_diagnostics: next as never } as never)
-        .eq("id", outputId)
-        .then(() => undefined, () => undefined);
-    }
+    await saveOutput(projectId, { render_diagnostics: next }).catch(() => undefined);
   }
 
   function appendAttempt(base: VideoDiagnostics, entry: RetryEntry): VideoDiagnostics {
@@ -372,9 +355,10 @@ function VideoPreview({
     }
     const { data: signed } = await supabase.storage.from("renders").createSignedUrl(path, 60 * 60 * 24 * 7);
     const url = signed?.signedUrl ?? null;
-    if (outputId && url) {
-      await supabase.from("generated_outputs").update({ video_url: url } as never).eq("id", outputId);
+    if (url) {
+      await saveOutput(projectId, { video_url: url });
     }
+
     setVideoUrl(url);
     const base = diagnostics ?? emptyDiag();
     const next: VideoDiagnostics = {

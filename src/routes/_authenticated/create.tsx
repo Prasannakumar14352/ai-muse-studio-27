@@ -5,8 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateProject } from "@/lib/generators";
 import { CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, MUSIC, NICHES, GENERATION_COST } from "@/lib/constants";
 import { deductUsage, getAccessInfo, canGenerate } from "@/lib/access";
+import { saveOutput } from "@/lib/local-store";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Wand2, ArrowRight } from "lucide-react";
+
 
 export const Route = createFileRoute("/_authenticated/create")({ component: CreatePage });
 
@@ -65,9 +67,7 @@ function CreatePage() {
       }).select().single();
       if (pErr) throw pErr;
 
-      const { error: oErr } = await supabase.from("generated_outputs").insert({
-        project_id: project.id,
-        user_id: access.userId,
+      await saveOutput(project.id, {
         title: output.title,
         hook: output.hook,
         script: output.script,
@@ -77,7 +77,7 @@ function CreatePage() {
         image_prompts: output.image_prompts,
         thumbnail_ideas: output.thumbnail_ideas,
       });
-      if (oErr) throw oErr;
+
 
       // Deduct credits (admin bypass handled server-side + client-side)
       const result = await deductUsage({

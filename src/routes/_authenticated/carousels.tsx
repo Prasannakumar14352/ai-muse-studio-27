@@ -6,10 +6,12 @@ import JSZip from "jszip";
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
+import { listOutputs, saveOutput, deleteOutput } from "@/lib/local-store";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
   Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2,
 } from "lucide-react";
+
 
 export const Route = createFileRoute("/_authenticated/carousels")({
   head: () => ({
@@ -34,7 +36,6 @@ type CarouselRow = {
   style: string | null;
   platform: string | null;
   tone: string | null;
-  output_id: string | null;
   image_prompts: Prompt[];
   carousel_images: (string | null)[] | null;
   slide_diagnostics: SlideDiagMap;
@@ -61,30 +62,26 @@ function CarouselsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["carousels"],
     queryFn: async (): Promise<CarouselRow[]> => {
-      const { data } = await supabase
+      const { data: projects } = await supabase
         .from("projects")
-        .select("id,title,style,platform,tone,generated_outputs(id,image_prompts,carousel_images,render_diagnostics)")
+        .select("id,title,style,platform,tone")
         .eq("content_type", "carousel")
         .order("created_at", { ascending: false });
-      return (data ?? []).map((p: {
-        id: string; title: string; style: string | null; platform: string | null; tone: string | null;
-        generated_outputs:
-          | { id: string; image_prompts: unknown; carousel_images: unknown; render_diagnostics: unknown }[]
-          | { id: string; image_prompts: unknown; carousel_images: unknown; render_diagnostics: unknown }
-          | null;
-      }) => {
-        const out = Array.isArray(p.generated_outputs) ? p.generated_outputs[0] : p.generated_outputs;
-        const rd = out?.render_diagnostics as { slide_diagnostics?: SlideDiagMap } | null | undefined;
+      const outputs = await listOutputs();
+      const outMap = new Map(outputs.map((o) => [o.project_id, o]));
+      return (projects ?? []).map((p) => {
+        const out = outMap.get(p.id);
+        const rd = out?.render_diagnostics as { slide_diagnostics?: SlideDiagMap } | undefined;
         return {
           id: p.id, title: p.title, style: p.style, platform: p.platform, tone: p.tone,
-          output_id: out?.id ?? null,
-          image_prompts: Array.isArray(out?.image_prompts) ? (out!.image_prompts as Prompt[]) : [],
-          carousel_images: Array.isArray(out?.carousel_images) ? (out!.carousel_images as (string | null)[]) : null,
+          image_prompts: out?.image_prompts ?? [],
+          carousel_images: out?.carousel_images ?? null,
           slide_diagnostics: (rd?.slide_diagnostics ?? {}) as SlideDiagMap,
         };
       });
     },
   });
+
 
   function getLayout(row: CarouselRow): LayoutSettings {
     return layout[row.id] ?? { ratio: "1:1", slideCount: row.image_prompts.length, spacing: 8 };
@@ -120,21 +117,16 @@ function CarouselsPage() {
   }
 
   async function persistSlides(row: CarouselRow, images: (string | null)[], slideDiag: SlideDiagMap) {
-    if (!row.output_id) return;
-    const { error } = await supabase
-      .from("generated_outputs")
-      .update({
-        carousel_images: images as never,
-        render_diagnostics: { slide_diagnostics: slideDiag } as never,
-      } as never)
-      .eq("id", row.output_id);
-    if (error) throw error;
+    await saveOutput(row.id, {
+      carousel_images: images,
+      render_diagnostics: { slide_diagnostics: slideDiag },
+    });
   }
 
   async function generateSlides(row: CarouselRow) {
-    if (!row.output_id) return toast.error("This project has no saved output yet.");
     if (row.image_prompts.length === 0) return toast.error("No image prompts on this carousel.");
     const styleLabel = STYLES.find((s) => s.id === (row.style ?? ""))?.label ?? row.style ?? "cinematic";
+
     const cfg = getLayout(row);
     const slice = row.image_prompts.slice(0, Math.max(1, Math.min(cfg.slideCount, row.image_prompts.length)));
     setGeneratingId(row.id);
@@ -231,15 +223,13 @@ function CarouselsPage() {
     if (!confirm(`Delete "${row.title}" and all its slides? This cannot be undone.`)) return;
     setDeletingId(row.id);
     try {
-      // Cascade: delete outputs first (FK), then project.
-      if (row.output_id) {
-        await supabase.from("generated_outputs").delete().eq("id", row.output_id);
-      }
+      await deleteOutput(row.id);
       const { error } = await supabase.from("projects").delete().eq("id", row.id);
       if (error) throw error;
       toast.success("Carousel deleted");
       qc.invalidateQueries({ queryKey: ["carousels"] });
       qc.invalidateQueries({ queryKey: ["projects"] });
+
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Delete failed");
     } finally {
