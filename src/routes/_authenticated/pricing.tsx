@@ -5,7 +5,7 @@ import { getPlanGenerationEstimate, ASSET_META, type AssetKey } from "@/lib/cred
 import { useAccess } from "@/lib/access";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
-import { createRazorpayOrder, verifyRazorpayPayment } from "@/lib/razorpay.functions";
+import { createRazorpayOrder, verifyRazorpayPayment, createRazorpayPlanOrder } from "@/lib/razorpay.functions";
 import { toast } from "sonner";
 import { Check, Sparkles, Crown, X, Image as ImageIcon, Layers, Film, Video, ChevronDown, Calculator, Minus, Plus, Zap, Loader2 } from "lucide-react";
 
@@ -315,11 +315,61 @@ function PricingFAQ() {
   );
 }
 
-/* Checkout — real payment required. Does NOT activate a plan without a completed payment. */
+/* Checkout — real Razorpay payment. Credits granted after signature verification. */
 function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }) {
   const totalCredits = plan.monthlyCredits + (plan.signupCredits ?? 0);
   const estimate = getPlanGenerationEstimate(totalCredits);
   const isFree = plan.monthlyCredits === 0 || /free/i.test(plan.price);
+  const { data: access } = useAccess();
+  const createOrder = useServerFn(createRazorpayPlanOrder);
+  const verifyPayment = useServerFn(verifyRazorpayPayment);
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [paying, setPaying] = useState(false);
+
+  async function handlePay() {
+    if (isFree) return;
+    setPaying(true);
+    try {
+      const ok = await loadRazorpayScript();
+      if (!ok || !window.Razorpay) throw new Error("Could not load Razorpay checkout");
+      const order = await createOrder({ data: { planId: plan.id } });
+      await new Promise<void>((resolve, reject) => {
+        const rzp = new window.Razorpay!({
+          key: order.keyId,
+          amount: order.amount,
+          currency: order.currency,
+          order_id: order.orderId,
+          name: "Prodxstore",
+          description: `${plan.name} — ${order.plan.credits.toLocaleString()} credits`,
+          prefill: access?.email ? { email: access.email } : {},
+          theme: { color: "#ff6b35" },
+          handler: async (resp: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+            try {
+              const result = await verifyPayment({ data: resp });
+              toast.success(`Added ${result.credits.toLocaleString()} credits to your account`);
+              await qc.invalidateQueries({ queryKey: ["access"] });
+              await qc.invalidateQueries({ queryKey: ["my-payments"] });
+              onClose();
+              navigate({ to: "/invoices" });
+              resolve();
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Verification failed";
+              toast.error(msg);
+              reject(e);
+            }
+          },
+          modal: { ondismiss: () => resolve() },
+        });
+        rzp.open();
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not start checkout";
+      toast.error(msg);
+    } finally {
+      setPaying(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -331,7 +381,7 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">$</div>
           <div>
             <div className="font-semibold">Checkout</div>
-            <div className="text-xs text-muted-foreground">Secure payment</div>
+            <div className="text-xs text-muted-foreground">Secure payment · Razorpay</div>
           </div>
         </div>
         <div className="glass rounded-xl p-4 mb-3">
@@ -360,16 +410,18 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
           </div>
         )}
 
-        <div className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-3 mb-4 text-xs text-yellow-100">
-          {isFree
-            ? "The Free plan is available by default — no checkout needed."
-            : "Payments aren't connected yet. Plans can't be activated until a payment provider (Stripe or Paddle) is wired up and a real charge is completed."}
-        </div>
+        {isFree && (
+          <div className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-3 mb-4 text-xs text-yellow-100">
+            The Free plan is available by default — no checkout needed.
+          </div>
+        )}
 
         <button
-          disabled
-          className="w-full rounded-lg gradient-primary text-white py-3 font-medium flex items-center justify-center gap-2 opacity-60 cursor-not-allowed">
-          {isFree ? "Already included" : `Pay ${plan.price} — unavailable`}
+          onClick={handlePay}
+          disabled={isFree || paying}
+          className="w-full rounded-lg gradient-primary text-white py-3 font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+          {paying && <Loader2 className="w-4 h-4 animate-spin" />}
+          {isFree ? "Already included" : paying ? "Opening checkout…" : `Pay ${plan.price}`}
         </button>
         <p className="mt-2 text-[11px] text-center text-muted-foreground">
           Credits are only granted after a successful payment.
@@ -378,6 +430,7 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
     </div>
   );
 }
+
 
 /* ------------- Credit Packs (Razorpay one-time USD) ------------- */
 
