@@ -44,11 +44,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="h-screen flex overflow-hidden">
       {/* Sidebar desktop */}
       <aside className="hidden md:flex md:w-64 shrink-0 flex-col border-r border-border/50 bg-sidebar/60 backdrop-blur-xl overflow-y-auto">
-        <Link to="/dashboard" className="flex items-center gap-2 px-6 py-5 border-b border-border/50">
-          <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-bold">CreatorVault<span className="gradient-text">AI</span></span>
+        <Link to="/dashboard" className="flex items-center gap-2 px-4 py-4 border-b border-border/50">
+          <img src={brandLogo.url} alt="Prodxstore" className="h-9 w-auto object-contain" />
         </Link>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV.map((n) => {
