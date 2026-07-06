@@ -199,8 +199,8 @@ function IconBtn({ children, title, onClick }: { children: React.ReactNode; titl
 
 function CreditGuide() {
   const [open, setOpen] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    return window.localStorage.getItem("cv:collapse:admin-credit-guide") !== "0";
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("cv:collapse:admin-credit-guide") === "1";
   });
   function toggle() {
     setOpen((o) => {
