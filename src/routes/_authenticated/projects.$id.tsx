@@ -937,12 +937,25 @@ function VideoPreview({
       </div>
 
       {/* --- Scene prep, script editor, per-scene preview -------------------- */}
-      <div className="mb-4 rounded-xl border border-border bg-black/30 p-4 space-y-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="text-sm font-semibold flex items-center gap-2">
+      <div className="mb-4 rounded-xl border border-border bg-black/30">
+        <button
+          onClick={() => setOpenPrep((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold"
+        >
+          <span className="flex items-center gap-2">
+            {openPrep ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             <Edit3 className="w-4 h-4 text-[color:var(--neon-purple)]" /> Scene prep & script editor
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          </span>
+          <span className="text-xs text-muted-foreground flex items-center gap-2">
+            <span>{readyImages}/{totalScenes} images ready</span>
+            {autoSaveState === "saving" && <span className="flex items-center gap-1 text-amber-300"><Loader2 className="w-3 h-3 animate-spin" /> autosaving</span>}
+            {autoSaveState === "saved" && <span className="flex items-center gap-1 text-emerald-400"><CheckCircle2 className="w-3 h-3" /> saved</span>}
+          </span>
+        </button>
+
+        {openPrep && (
+        <div className="p-4 pt-0 space-y-4">
+        <div className="flex items-center justify-end gap-2 flex-wrap">
             <label className="flex items-center gap-2 text-xs cursor-pointer glass border border-border rounded-full px-3 py-1.5">
               <input
                 type="checkbox"
@@ -960,7 +973,7 @@ function VideoPreview({
               title="Generate an image for every scene, mark any that fail"
             >
               {validating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-              Validate images
+              Validate images {validating && `(${readyImages}/${totalScenes})`}
             </button>
             <button
               onClick={retryFailed}
@@ -975,8 +988,24 @@ function VideoPreview({
             >
               <Edit3 className="w-3.5 h-3.5" /> {editing ? "Close editor" : "Edit script"}
             </button>
-          </div>
         </div>
+
+        {/* Per-scene image validation progress */}
+        {(validating || imgBusy.size > 0) && (
+          <div>
+            <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+              <span>Image validation progress</span>
+              <span>{readyImages}/{totalScenes}</span>
+            </div>
+            <div className="flex gap-1">
+              {effectiveScenes.map((_, i) => {
+                const state = sceneImages[i] ? "done" : imgBusy.has(i) ? "active" : imageErrors[i] ? "err" : "pending";
+                const cls = state === "done" ? "bg-emerald-400" : state === "active" ? "gradient-primary animate-pulse" : state === "err" ? "bg-rose-500" : "bg-white/15";
+                return <div key={i} className={`flex-1 h-1.5 rounded-full ${cls}`} title={`Scene ${i + 1}: ${state}`} />;
+              })}
+            </div>
+          </div>
+        )}
 
         {missingImages > 0 && (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-200 px-3 py-2 text-xs flex items-start gap-2">
@@ -989,7 +1018,7 @@ function VideoPreview({
         )}
 
         {editing && (
-          <div className="rounded-lg border border-border bg-black/40 p-3 space-y-3 max-h-[420px] overflow-y-auto">
+          <div className="rounded-lg border border-border bg-black/40 p-3 space-y-3 max-h-[520px] overflow-y-auto">
             {editedScenes.map((s, i) => (
               <div key={s.n} className="border border-border/50 rounded-lg p-3 space-y-2">
                 <div className="flex items-center justify-between text-xs">
@@ -1023,20 +1052,48 @@ function VideoPreview({
                     className="w-full bg-input/50 border border-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[color:var(--neon-purple)]"
                   />
                 </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1"><Wand2 className="w-3 h-3" /> Image prompt</span>
+                    <button
+                      onClick={() => generateOne(i)}
+                      disabled={imgBusy.has(i) || validating || rendering || ugcRendering}
+                      className="text-[10px] rounded-md gradient-primary text-white px-2 py-0.5 flex items-center gap-1 disabled:opacity-60"
+                    >
+                      {imgBusy.has(i) ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                      Regenerate image
+                    </button>
+                  </div>
+                  <textarea
+                    value={editedPrompts[i] ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setEditedPrompts((prev) => { const n = [...prev]; n[i] = v; return n; });
+                      setScenesDirty(true);
+                    }}
+                    rows={3}
+                    placeholder="Full image prompt for this scene"
+                    className="w-full bg-input/50 border border-border rounded-md px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[color:var(--neon-purple)]"
+                  />
+                </div>
               </div>
             ))}
-            <div className="flex items-center justify-end gap-2 sticky bottom-0 bg-black/60 backdrop-blur pt-2">
-              <button
-                onClick={() => { setEditedScenes(scenes); setScenesDirty(false); setEditing(false); }}
-                className="rounded-lg glass border border-border px-3 py-1.5 text-xs"
-              >Cancel</button>
-              <button
-                onClick={saveEditedScenes}
-                disabled={!scenesDirty}
-                className="rounded-lg gradient-primary text-white px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-60"
-              >
-                <Save className="w-3.5 h-3.5" /> Save script
-              </button>
+            <div className="flex items-center justify-between gap-2 sticky bottom-0 bg-black/60 backdrop-blur pt-2">
+              <div className="text-[11px] text-muted-foreground">
+                {autoSaveState === "saving" ? "Autosaving…" : autoSaveState === "saved" ? "All changes saved" : "Edits autosave after 1.2s"}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setEditedScenes(scenes); setEditedPrompts(scenes.map((s, i) => imagePrompts?.[i]?.prompt || s.visual || "")); setScenesDirty(false); }}
+                  className="rounded-lg glass border border-border px-3 py-1.5 text-xs"
+                >Revert unsaved</button>
+                <button
+                  onClick={saveEditedScenes}
+                  className="rounded-lg gradient-primary text-white px-3 py-1.5 text-xs flex items-center gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" /> Save now
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1065,6 +1122,7 @@ function VideoPreview({
                     <div className="text-white text-[10px] font-medium leading-snug line-clamp-2 drop-shadow">{s.voiceover}</div>
                   </div>
                   <div className="absolute top-1 right-1 text-[9px] px-1.5 py-0.5 rounded bg-black/60 text-white/80">#{s.n}</div>
+                  <div className={`absolute top-1 left-1 w-2 h-2 rounded-full ${img ? "bg-emerald-400" : busy ? "bg-amber-300 animate-pulse" : err ? "bg-rose-500" : "bg-white/30"}`} title={img ? "Ready" : busy ? "Generating" : err ? "Failed" : "Not generated"} />
                 </div>
                 <div className="flex items-center gap-1 p-1.5 bg-black/70 border-t border-border">
                   <button
@@ -1095,7 +1153,104 @@ function VideoPreview({
             );
           })}
         </div>
+        </div>
+        )}
       </div>
+
+      {/* --- Version history ------------------------------------------------- */}
+      <div className="mb-4 rounded-xl border border-border bg-black/30">
+        <button
+          onClick={() => setOpenHistory((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold"
+        >
+          <span className="flex items-center gap-2">
+            {openHistory ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            <History className="w-4 h-4 text-[color:var(--neon-purple)]" /> Script version history
+          </span>
+          <span className="text-xs text-muted-foreground">{history.length} snapshot{history.length === 1 ? "" : "s"}</span>
+        </button>
+        {openHistory && (
+          <div className="px-4 pb-4">
+            {history.length === 0 ? (
+              <div className="text-xs text-muted-foreground py-4 text-center">
+                No versions yet. Edit the script above — each autosave creates a snapshot you can revert to.
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                {history.map((v, i) => (
+                  <div key={v.at} className="flex items-center justify-between gap-2 text-xs border border-border/50 rounded-md px-3 py-2 bg-black/40">
+                    <div className="min-w-0">
+                      <div className="text-white/90">{i === 0 ? "Current" : `Version ${history.length - i}`}</div>
+                      <div className="text-muted-foreground text-[10px]">{new Date(v.at).toLocaleString()} · {v.scenes.length} scenes</div>
+                    </div>
+                    <button
+                      onClick={() => restoreVersion(v)}
+                      disabled={i === 0}
+                      className="rounded-md glass border border-border hover:bg-white/5 px-2.5 py-1 text-[11px] disabled:opacity-40"
+                    >
+                      {i === 0 ? "Latest" : "Restore"}
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => { setHistory([]); try { localStorage.removeItem(historyKey); } catch { /* ignore */ } }}
+                  className="text-[10px] text-muted-foreground hover:text-rose-400"
+                >Clear history</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* --- Export bundle --------------------------------------------------- */}
+      <div className="mb-4 rounded-xl border border-border bg-black/30">
+        <button
+          onClick={() => setOpenBundle((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold"
+        >
+          <span className="flex items-center gap-2">
+            {openBundle ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            <Package className="w-4 h-4 text-[color:var(--neon-purple)]" /> Export & download
+          </span>
+          <span className="text-xs text-muted-foreground">{videoUrl ? "video ready" : "render video first"}</span>
+        </button>
+        {openBundle && (
+          <div className="px-4 pb-4 space-y-3">
+            <div className="text-xs text-muted-foreground">
+              Downloads a ZIP with the rendered video, final script, captions, hashtags, image prompts, and audio notes.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={downloadFinalBundle}
+                disabled={bundleBusy}
+                className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2 disabled:opacity-60"
+              >
+                {bundleBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
+                Download final bundle
+              </button>
+              {videoUrl && (
+                <a href={videoUrl} download className="rounded-lg glass border border-border hover:bg-white/5 px-4 py-2 text-sm flex items-center gap-2">
+                  <VideoIcon className="w-4 h-4" /> Video only
+                </a>
+              )}
+              <button
+                onClick={() => {
+                  const txt = effectiveScenes.map((s) => `Scene ${s.n} (${s.duration})\nOn-screen: ${s.on_screen_text || "—"}\nVoiceover: ${s.voiceover}`).join("\n\n---\n\n");
+                  const blob = new Blob([txt], { type: "text/plain" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a"); a.href = url; a.download = "script.txt"; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="rounded-lg glass border border-border hover:bg-white/5 px-4 py-2 text-sm flex items-center gap-2"
+              >
+                <FileText className="w-4 h-4" /> Script only
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+
 
 
       {canceled && !rendering && !ugcRendering && (
