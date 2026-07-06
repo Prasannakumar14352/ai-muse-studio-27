@@ -378,3 +378,138 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
     </div>
   );
 }
+
+/* ------------- Credit Packs (Razorpay one-time USD) ------------- */
+
+declare global {
+  interface Window {
+    Razorpay?: new (opts: Record<string, unknown>) => { open: () => void };
+  }
+}
+
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") return resolve(false);
+    if (window.Razorpay) return resolve(true);
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+}
+
+function CreditPacksSection() {
+  const { data: access } = useAccess();
+  const createOrder = useServerFn(createRazorpayOrder);
+  const verifyPayment = useServerFn(verifyRazorpayPayment);
+  const [buyingId, setBuyingId] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+
+  async function handleBuy(pack: CreditPack) {
+    setBuyingId(pack.id);
+    try {
+      const ok = await loadRazorpayScript();
+      if (!ok || !window.Razorpay) throw new Error("Could not load Razorpay checkout");
+
+      const order = await createOrder({ data: { packId: pack.id } });
+
+      await new Promise<void>((resolve, reject) => {
+        const rzp = new window.Razorpay!({
+          key: order.keyId,
+          amount: order.amount,
+          currency: order.currency,
+          order_id: order.orderId,
+          name: "Prodxstore",
+          description: `${pack.label} — ${pack.credits.toLocaleString()} credits`,
+          prefill: access?.email ? { email: access.email } : {},
+          theme: { color: "#ff6b35" },
+          handler: async (resp: {
+            razorpay_order_id: string;
+            razorpay_payment_id: string;
+            razorpay_signature: string;
+          }) => {
+            try {
+              const result = await verifyPayment({ data: resp });
+              toast.success(`Added ${result.credits.toLocaleString()} credits to your account`);
+              await qc.invalidateQueries({ queryKey: ["access"] });
+              await qc.invalidateQueries({ queryKey: ["my-payments"] });
+              navigate({ to: "/invoices" });
+              resolve();
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Verification failed";
+              toast.error(msg);
+              reject(e);
+            }
+          },
+          modal: {
+            ondismiss: () => resolve(),
+          },
+        });
+        rzp.open();
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Checkout failed";
+      toast.error(msg);
+    } finally {
+      setBuyingId(null);
+    }
+  }
+
+  if (access?.isAdmin) return null;
+
+  return (
+    <section className="glass rounded-2xl p-6">
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
+        <div>
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Zap className="w-5 h-5 text-[color:var(--brand-orange)]" /> Top up with credit packs
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            One-time USD purchase. Credits added instantly and never expire. Secure checkout by Razorpay.
+          </p>
+        </div>
+        <Link to="/invoices" className="text-xs glass rounded-lg px-3 py-2 hover:bg-white/10">
+          View invoices →
+        </Link>
+      </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {CREDIT_PACKS.map((pack) => {
+          const busy = buyingId === pack.id;
+          return (
+            <div key={pack.id} className="glass rounded-xl p-5 flex flex-col border border-border/50 hover:border-[color:var(--brand-orange)]/40 transition">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm text-muted-foreground">{pack.label}</div>
+                  <div className="mt-1 text-2xl font-bold">{pack.credits.toLocaleString()} <span className="text-sm text-muted-foreground font-normal">credits</span></div>
+                </div>
+                {pack.bonus && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[color:var(--brand-orange)]/20 text-[color:var(--brand-orange)] font-semibold">
+                    {pack.bonus}
+                  </span>
+                )}
+              </div>
+              <div className="mt-3 text-3xl font-bold gradient-text">${pack.priceUSD.toFixed(2)}</div>
+              <div className="text-[11px] text-muted-foreground">
+                ≈ ${((pack.priceUSD / pack.credits) * 100).toFixed(2)} / 100 credits
+              </div>
+              <button
+                onClick={() => handleBuy(pack)}
+                disabled={busy || !!buyingId}
+                className="mt-5 w-full rounded-lg gradient-primary text-white py-2.5 text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2">
+                {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : "Buy pack"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="mt-4 text-[11px] text-muted-foreground text-center">
+        Payments processed in USD by Razorpay. Cards, UPI and international payment methods supported.
+      </p>
+    </section>
+  );
+}
+
