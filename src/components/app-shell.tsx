@@ -74,8 +74,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <Link to="/dashboard" className="flex items-center gap-2">
+        <Link to="/dashboard" className="flex items-center gap-2.5">
           <img src={brandLogo.url} alt="Prodxstore" className="h-7 w-auto object-contain" />
+          <span className="text-base font-bold tracking-tight bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
+            Prodxstore AI
+          </span>
         </Link>
         <div className="flex items-center gap-2">
           <CreditsChip />
