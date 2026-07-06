@@ -2,8 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { STYLES } from "@/lib/constants";
-import { pushImageGenLog, listImageGenLogs, addAsset } from "@/lib/local-store";
-import { Loader2, Wand2, Download, Save, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { pushImageGenLog, listImageGenLogs } from "@/lib/local-store";
+import { Loader2, Wand2, Download, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 
@@ -178,12 +178,8 @@ function ImagesPage() {
     downloadJson(`creatorvault-image-debug-${Date.now()}.json`, debug);
   }
 
-  async function save(item: { prompt: string; style: string; ratio: string; image: string }) {
-    await addAsset({
-      asset_type: "image", prompt: item.prompt, style: item.style, aspect_ratio: item.ratio, image: item.image,
-    });
-    toast.success("Saved to library");
-  }
+
+
 
 
   function clearSession() {
@@ -351,7 +347,6 @@ function ImagesPage() {
               <div className="p-3">
                 <div className="text-xs text-muted-foreground line-clamp-2">{r.prompt}</div>
                 <div className="mt-3 flex gap-1.5">
-                  <button onClick={() => save(r)} className="flex-1 rounded-lg glass hover:bg-white/5 py-1.5 text-xs flex items-center justify-center gap-1"><Save className="w-3 h-3" /> Save</button>
                   <a href={r.image} download={`creatorvault-${r.id}.png`}
                     className="flex-1 rounded-lg gradient-primary text-white py-1.5 text-xs flex items-center justify-center gap-1"><Download className="w-3 h-3" /> Download</a>
                   <button

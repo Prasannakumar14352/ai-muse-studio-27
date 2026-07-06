@@ -128,14 +128,13 @@ function UserDashboard() {
   const { data: stats } = useQuery({
     queryKey: ["stats"],
     queryFn: async () => {
-      const { listAssets, listOutputs } = await import("@/lib/local-store");
-      const [{ count: total }, { count: videos }, assets, outputs] = await Promise.all([
+      const { listOutputs } = await import("@/lib/local-store");
+      const [{ count: total }, { count: videos }, outputs] = await Promise.all([
         supabase.from("projects").select("*", { count: "exact", head: true }),
         supabase.from("projects").select("*", { count: "exact", head: true }).in("content_type", ["long_video", "short_reel"]),
-        listAssets("image"),
         listOutputs(),
       ]);
-      const localImages = assets.length + outputs.reduce((n, o) => n + (o.carousel_images?.filter(Boolean).length ?? 0), 0);
+      const localImages = outputs.reduce((n, o) => n + (o.carousel_images?.filter(Boolean).length ?? 0), 0);
       return { total: total ?? 0, videos: videos ?? 0, images: localImages };
     },
   });
@@ -242,7 +241,7 @@ function UserDashboard() {
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">Recent projects</h2>
-            <Link to="/projects" className="text-sm text-[color:var(--neon-purple)] hover:underline">View all →</Link>
+            <Link to="/videos" className="text-sm text-[color:var(--neon-purple)] hover:underline">View videos →</Link>
           </div>
           {recent && recent.length > 0 ? (
             <div className="grid sm:grid-cols-2 gap-4">

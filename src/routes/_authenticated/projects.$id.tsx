@@ -30,7 +30,7 @@ function ProjectView() {
     return <div className="flex items-center justify-center h-96"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
   }
   if (!data?.project) {
-    return <div className="glass rounded-2xl p-12 text-center">Project not found. <Link to="/projects" className="text-[color:var(--neon-purple)]">Back to library</Link></div>;
+    return <div className="glass rounded-2xl p-12 text-center">Project not found. <Link to="/dashboard" className="text-[color:var(--neon-purple)]">Back to dashboard</Link></div>;
   }
 
   const { project, output } = data;
@@ -88,8 +88,8 @@ function ProjectView() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <Link to="/projects" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="w-4 h-4" /> Back to library
+      <Link to="/dashboard" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="w-4 h-4" /> Back to dashboard
       </Link>
 
       {/* Header */}
