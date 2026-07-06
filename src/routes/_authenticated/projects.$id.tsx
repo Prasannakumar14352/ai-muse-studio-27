@@ -836,6 +836,7 @@ function VideoPreview({
     lastRenderKindRef.current = "ugc";
     lastContainerRef.current = container;
     setUgcRendering(true);
+    setOpenProgress(true);
     setUgcStage({ kind: "images", done: totalScenes, total: totalScenes });
     setPlaying(false);
     setCanceled(false);
