@@ -92,8 +92,9 @@ function ImagesPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {results.map((r) => (
             <div key={r.id} className="glass rounded-xl overflow-hidden group">
-              <div className={`${aspectClass[r.ratio]} bg-gradient-to-br ${r.grad} relative flex items-end p-3`}>
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.25),transparent_60%)]" />
+              <div className={`${aspectClass[r.ratio]} relative overflow-hidden flex items-end p-3`}>
+                <img src={r.image} alt={r.prompt} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                 <span className="relative text-white text-xs glass px-2 py-1 rounded">{r.style} · {r.ratio}</span>
               </div>
               <div className="p-3">
