@@ -350,7 +350,7 @@ function throwIfAborted(signal?: AbortSignal) {
   }
 }
 
-async function fetchSceneImage(prompt: string, style: string, ratio: string): Promise<string | null> {
+async function fetchSceneImage(prompt: string, style: string, ratio: string, projectId?: string | null): Promise<string | null> {
   try {
     const res = await fetch("/api/generate-image", {
       method: "POST",
@@ -359,7 +359,10 @@ async function fetchSceneImage(prompt: string, style: string, ratio: string): Pr
     });
     if (!res.ok) return null;
     const json = (await res.json()) as { image?: string };
-    return json.image ?? null;
+    if (!json.image) return null;
+    // Deduct 1 credit per successful scene image (admin bypass handled inside).
+    await deductUsage({ amount: 1, projectId: projectId ?? null, description: "Scene image generated" }).catch(() => {});
+    return json.image;
   } catch {
     return null;
   }
