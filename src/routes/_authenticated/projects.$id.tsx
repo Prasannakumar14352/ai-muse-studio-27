@@ -1642,8 +1642,8 @@ function BrandPrompt({ projectId, platform }: { projectId: string; platform: str
   const [handle, setHandle] = useState("");
   const [saved, setSaved] = useState<{ brand: string; handle: string } | null>(null);
   const [open, setOpen] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    return window.localStorage.getItem(collapseKey) !== "0";
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(collapseKey) === "1";
   });
 
   useEffect(() => {
