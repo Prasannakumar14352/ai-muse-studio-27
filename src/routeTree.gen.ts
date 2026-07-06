@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -20,13 +21,17 @@ import { Route as AuthenticatedPricingRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedImagesRouteImport } from './routes/_authenticated/images'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCreateRouteImport } from './routes/_authenticated/create'
-import { Route as AuthenticatedContactRouteImport } from './routes/_authenticated/contact'
 import { Route as AuthenticatedCarouselsRouteImport } from './routes/_authenticated/carousels'
 import { Route as AuthenticatedCaptionsRouteImport } from './routes/_authenticated/captions'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
 import { Route as AuthenticatedCreateCarouselRouteImport } from './routes/_authenticated/create_.carousel'
 
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -81,11 +86,6 @@ const AuthenticatedCreateRoute = AuthenticatedCreateRouteImport.update({
   path: '/create',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedContactRoute = AuthenticatedContactRouteImport.update({
-  id: '/contact',
-  path: '/contact',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedCarouselsRoute = AuthenticatedCarouselsRouteImport.update({
   id: '/carousels',
   path: '/carousels',
@@ -116,10 +116,10 @@ const AuthenticatedCreateCarouselRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/contact': typeof ContactRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/captions': typeof AuthenticatedCaptionsRoute
   '/carousels': typeof AuthenticatedCarouselsRoute
-  '/contact': typeof AuthenticatedContactRoute
   '/create': typeof AuthenticatedCreateRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/images': typeof AuthenticatedImagesRoute
@@ -134,10 +134,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/contact': typeof ContactRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/captions': typeof AuthenticatedCaptionsRoute
   '/carousels': typeof AuthenticatedCarouselsRoute
-  '/contact': typeof AuthenticatedContactRoute
   '/create': typeof AuthenticatedCreateRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/images': typeof AuthenticatedImagesRoute
@@ -154,10 +154,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/contact': typeof ContactRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/captions': typeof AuthenticatedCaptionsRoute
   '/_authenticated/carousels': typeof AuthenticatedCarouselsRoute
-  '/_authenticated/contact': typeof AuthenticatedContactRoute
   '/_authenticated/create': typeof AuthenticatedCreateRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/images': typeof AuthenticatedImagesRoute
@@ -174,10 +174,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/contact'
     | '/admin'
     | '/captions'
     | '/carousels'
-    | '/contact'
     | '/create'
     | '/dashboard'
     | '/images'
@@ -192,10 +192,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/contact'
     | '/admin'
     | '/captions'
     | '/carousels'
-    | '/contact'
     | '/create'
     | '/dashboard'
     | '/images'
@@ -211,10 +211,10 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/contact'
     | '/_authenticated/admin'
     | '/_authenticated/captions'
     | '/_authenticated/carousels'
-    | '/_authenticated/contact'
     | '/_authenticated/create'
     | '/_authenticated/dashboard'
     | '/_authenticated/images'
@@ -231,12 +231,20 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ContactRoute: typeof ContactRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   ApiTtsRoute: typeof ApiTtsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -314,13 +322,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCreateRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/contact': {
-      id: '/_authenticated/contact'
-      path: '/contact'
-      fullPath: '/contact'
-      preLoaderRoute: typeof AuthenticatedContactRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/carousels': {
       id: '/_authenticated/carousels'
       path: '/carousels'
@@ -363,7 +364,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedCaptionsRoute: typeof AuthenticatedCaptionsRoute
   AuthenticatedCarouselsRoute: typeof AuthenticatedCarouselsRoute
-  AuthenticatedContactRoute: typeof AuthenticatedContactRoute
   AuthenticatedCreateRoute: typeof AuthenticatedCreateRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedImagesRoute: typeof AuthenticatedImagesRoute
@@ -378,7 +378,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedCaptionsRoute: AuthenticatedCaptionsRoute,
   AuthenticatedCarouselsRoute: AuthenticatedCarouselsRoute,
-  AuthenticatedContactRoute: AuthenticatedContactRoute,
   AuthenticatedCreateRoute: AuthenticatedCreateRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedImagesRoute: AuthenticatedImagesRoute,
@@ -396,6 +395,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ContactRoute: ContactRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   ApiTtsRoute: ApiTtsRoute,
 }

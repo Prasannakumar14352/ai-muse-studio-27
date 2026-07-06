@@ -1,12 +1,13 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import {
-  Sparkles, Wand2, Video, Image as ImageIcon, Type, Mic, Music2,
-  Zap, Layers, Rocket, ChevronRight, Star, Check,
+  Wand2, Video, Image as ImageIcon, Type, Mic, Music2,
+  Zap, Layers, Rocket, Check, Mail,
 } from "lucide-react";
 import { PLANS } from "@/lib/constants";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
+import brandLogo from "@/assets/prodxstore-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({ component: Landing });
 
