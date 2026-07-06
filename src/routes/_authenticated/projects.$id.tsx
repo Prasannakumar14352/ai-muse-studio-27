@@ -80,6 +80,13 @@ function ProjectView() {
   const prompts = (output?.image_prompts as Array<{ n: number; prompt: string; style: string }>) ?? [];
   const thumbs = (output?.thumbnail_ideas as string[]) ?? [];
 
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-96"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+  }
+  if (!project) {
+    return <div className="glass rounded-2xl p-12 text-center">Project not found. <Link to="/dashboard" className="text-[color:var(--neon-purple)]">Back to dashboard</Link></div>;
+  }
+
   return (
     <div className="space-y-6 max-w-6xl">
       <Link to="/dashboard" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
