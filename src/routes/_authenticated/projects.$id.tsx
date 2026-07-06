@@ -337,16 +337,16 @@ function ProjectView() {
 
 
 
+      <BrandPrompt projectId={project.id} />
+
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Script */}
-        <div className="glass rounded-2xl p-6">
-          <h2 className="font-semibold mb-3">Full Script</h2>
+        <CollapsibleCard id={`sec:script:${project.id}`} title="Full Script" icon={<FileText className="w-4 h-4 text-[color:var(--neon-purple)]" />} className="lg:col-span-2">
           <pre className="text-sm whitespace-pre-wrap text-muted-foreground font-mono leading-relaxed">{output?.script}</pre>
-        </div>
+        </CollapsibleCard>
 
         {/* Scenes */}
-        <div className="glass rounded-2xl p-6">
-          <h2 className="font-semibold mb-3">Scene Breakdown</h2>
+        <CollapsibleCard id={`sec:scenes:${project.id}`} title="Scene Breakdown" icon={<Film className="w-4 h-4 text-[color:var(--neon-purple)]" />}>
           <div className="space-y-3 max-h-[500px] overflow-y-auto">
             {scenes.map((s) => (
               <div key={s.n} className="border border-border/50 rounded-lg p-3">
@@ -359,11 +359,10 @@ function ProjectView() {
               </div>
             ))}
           </div>
-        </div>
+        </CollapsibleCard>
 
         {/* Image prompts */}
-        <div className="glass rounded-2xl p-6">
-          <h2 className="font-semibold mb-3">Image Prompts (B-roll)</h2>
+        <CollapsibleCard id={`sec:prompts:${project.id}`} title="Image Prompts (B-roll)" icon={<Wand2 className="w-4 h-4 text-[color:var(--neon-purple)]" />}>
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {prompts.map((p) => (
               <div key={p.n} className="border border-border/50 rounded-lg p-3 text-sm">
@@ -372,11 +371,10 @@ function ProjectView() {
               </div>
             ))}
           </div>
-        </div>
+        </CollapsibleCard>
 
         {/* Captions & hashtags */}
-        <div className="glass rounded-2xl p-6">
-          <h2 className="font-semibold mb-3">Captions</h2>
+        <CollapsibleCard id={`sec:captions:${project.id}`} title="Captions & Hashtags" icon={<Copy className="w-4 h-4 text-[color:var(--neon-purple)]" />}>
           <div className="text-sm text-muted-foreground whitespace-pre-wrap max-h-64 overflow-y-auto">{output?.captions}</div>
           <h3 className="mt-4 font-semibold text-sm">Hashtags</h3>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -384,11 +382,10 @@ function ProjectView() {
               <span key={h} className="text-xs glass px-2 py-1 rounded-full">{h}</span>
             ))}
           </div>
-        </div>
+        </CollapsibleCard>
 
         {/* Thumbnails */}
-        <div className="glass rounded-2xl p-6 lg:col-span-2">
-          <h2 className="font-semibold mb-3">Thumbnail Ideas</h2>
+        <CollapsibleCard id={`sec:thumbs:${project.id}`} title="Thumbnail Ideas" icon={<Sparkles className="w-4 h-4 text-[color:var(--neon-pink)]" />} className="lg:col-span-2">
           <div className="grid md:grid-cols-2 gap-3">
             {thumbs.map((t, i) => (
               <div key={i} className="border border-border/50 rounded-lg p-4 text-sm">
@@ -397,7 +394,7 @@ function ProjectView() {
               </div>
             ))}
           </div>
-        </div>
+        </CollapsibleCard>
       </div>
 
       <div className="glass rounded-2xl p-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
