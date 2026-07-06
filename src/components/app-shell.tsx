@@ -49,10 +49,18 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Sidebar desktop */}
       <aside className="hidden md:flex md:w-64 shrink-0 flex-col border-r border-border/50 bg-sidebar/60 backdrop-blur-xl overflow-y-auto">
         <div className="flex flex-col items-center gap-3 px-4 py-5 border-b border-border/50">
-          <Link to="/dashboard" className="flex items-center justify-center">
-            <img src={brandLogo.url} alt="CreatorVault AI" className="h-10 w-auto object-contain" />
+          <Link
+            to="/dashboard"
+            aria-label="CreatorVault AI home"
+            className="flex items-center justify-center rounded-lg p-1 transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <img src={brandLogo.url} alt="" className="h-10 w-auto object-contain" />
           </Link>
-          <Link to="/dashboard" className="flex items-center justify-center">
+          <Link
+            to="/dashboard"
+            aria-label="CreatorVault AI home"
+            className="flex items-center justify-center rounded-lg p-1 transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
             <span className="text-base font-bold tracking-tight whitespace-nowrap bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
               CreatorVault AI
             </span>
@@ -78,18 +86,31 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-40 grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <Link to="/dashboard" className="flex items-center">
-          <img src={brandLogo.url} alt="CreatorVault AI" className="h-7 w-auto object-contain" />
+      <div className="md:hidden fixed top-0 inset-x-0 z-40 grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-5 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+        <Link
+          to="/dashboard"
+          aria-label="CreatorVault AI home"
+          className="flex items-center justify-center rounded-lg p-1 transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <img src={brandLogo.url} alt="" className="h-7 w-auto object-contain" />
         </Link>
-        <Link to="/dashboard" className="justify-self-center">
+        <Link
+          to="/dashboard"
+          aria-label="CreatorVault AI home"
+          className="justify-self-center flex items-center justify-center rounded-lg p-1 transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
           <span className="text-base font-bold tracking-tight whitespace-nowrap bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
             CreatorVault AI
           </span>
         </Link>
         <div className="flex items-center gap-2 justify-self-end">
           <CreditsChip />
-          <button onClick={() => setOpen(!open)} className="p-2 rounded-lg hover:bg-white/5">
+          <button
+            onClick={() => setOpen(!open)}
+            aria-label={open ? "Close menu" : "Open menu"}
+            aria-expanded={open}
+            className="p-2 rounded-lg transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
