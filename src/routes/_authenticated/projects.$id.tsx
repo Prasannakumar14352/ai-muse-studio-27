@@ -1260,36 +1260,62 @@ function VideoPreview({
       )}
 
       {(rendering || ugcRendering) && (
-        <div className="mb-4 rounded-xl border border-border bg-black/30 p-4">
-          <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-            <span>Real-time render progress</span>
-            <span>{stages.filter((s) => s.state === "done").length}/{stages.length} stages</span>
-          </div>
-          <div className="space-y-2">
-            {stages.map((s) => (
-              <div key={s.key} className="flex items-center gap-3">
-                <div className="w-5 flex-shrink-0">
-                  {s.state === "done" ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> :
-                   s.state === "active" ? <Loader2 className="w-4 h-4 animate-spin text-[color:var(--neon-pink)]" /> :
-                   <div className="w-2 h-2 rounded-full bg-white/20 mx-auto" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between text-xs">
-                    <span className={s.state === "pending" ? "text-muted-foreground" : "text-white"}>{s.label}</span>
-                    <span className="text-muted-foreground">{s.detail}</span>
+        <div className="mb-4 rounded-xl border border-border bg-black/30">
+          <button
+            onClick={() => setOpenProgress((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-xs"
+          >
+            <span className="flex items-center gap-2 text-white">
+              {openProgress ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[color:var(--neon-pink)]" />
+              Real-time render progress
+            </span>
+            <span className="text-muted-foreground">{stages.filter((s) => s.state === "done").length}/{stages.length} stages</span>
+          </button>
+          {openProgress && (
+            <div className="px-4 pb-4 space-y-2">
+              {stages.map((s) => (
+                <div key={s.key} className="flex items-center gap-3">
+                  <div className="w-5 flex-shrink-0">
+                    {s.state === "done" ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> :
+                     s.state === "active" ? <Loader2 className="w-4 h-4 animate-spin text-[color:var(--neon-pink)]" /> :
+                     <div className="w-2 h-2 rounded-full bg-white/20 mx-auto" />}
                   </div>
-                  <div className="mt-1 h-1 rounded-full bg-white/10 overflow-hidden">
-                    <div
-                      className={`h-full ${s.state === "done" ? "bg-emerald-400" : "gradient-primary"} transition-all`}
-                      style={{ width: `${Math.round(s.progress * 100)}%` }}
-                    />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between text-xs">
+                      <span className={s.state === "pending" ? "text-muted-foreground" : "text-white"}>{s.label}</span>
+                      <span className="text-muted-foreground">{s.detail}</span>
+                    </div>
+                    <div className="mt-1 h-1 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className={`h-full ${s.state === "done" ? "bg-emerald-400" : "gradient-primary"} transition-all`}
+                        style={{ width: `${Math.round(s.progress * 100)}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+              {/* Per-scene dot rail for image + audio stages */}
+              {ugcRendering && ugcStage && (ugcStage.kind === "images" || ugcStage.kind === "audio") && (
+                <div className="pt-2">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                    Per-scene {ugcStage.kind === "images" ? "image" : "voiceover"} status
+                  </div>
+                  <div className="flex gap-1">
+                    {effectiveScenes.map((_, i) => {
+                      const done = i < ugcStage.done;
+                      const active = i === ugcStage.done;
+                      const cls = done ? "bg-emerald-400" : active ? "gradient-primary animate-pulse" : "bg-white/15";
+                      return <div key={i} className={`flex-1 h-1.5 rounded-full ${cls}`} title={`Scene ${i + 1}`} />;
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
+
 
       {videoUrl ? (
         <video
