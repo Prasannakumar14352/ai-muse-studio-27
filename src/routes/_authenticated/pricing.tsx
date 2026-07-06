@@ -117,7 +117,7 @@ function CreditsEstimator({ plan, onChangePlan }: { plan: PlanDef; onChangePlan:
   });
 
   const spent = useMemo(
-    () => (Object.keys(mix) as AssetKey[]).reduce((s, k) => s + mix[k] * ASSET_CREDIT_COST[k], 0),
+    () => (Object.keys(mix) as AssetKey[]).reduce((s, k) => s + mix[k] * ASSET_META[k].cost, 0),
     [mix]
   );
   const remaining = totalCredits - spent;
