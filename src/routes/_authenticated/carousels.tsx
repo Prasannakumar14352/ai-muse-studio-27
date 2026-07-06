@@ -170,7 +170,7 @@ function CarouselsPage() {
       let done = 0;
       await Promise.all(
         slice.map(async (p, i) => {
-          const r = await generateOneSlide(p, styleLabel, cfg.ratio);
+          const r = await generateOneSlide(row.id, i, p, styleLabel, cfg.ratio);
           results[i] = r.image;
           diag[String(i)] = r.diag;
           done += 1;
