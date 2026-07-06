@@ -32,6 +32,7 @@ function CreatePage() {
     music: "Cinematic",
     aspect_ratio: "4:5" as (typeof CAROUSEL_RATIOS)[number],
     slide_count: 5,
+    long_video_length_sec: 90,
   });
 
   function update<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
