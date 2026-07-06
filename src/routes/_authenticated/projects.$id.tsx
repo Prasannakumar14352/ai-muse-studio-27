@@ -847,6 +847,7 @@ function VideoPreview({
         title, platform, contentType, styleId, scenes: effectiveScenes,
         imagePrompts,
         preloadedImages: sceneImages,
+        projectId,
         showOnScreenText,
         voice: "alloy",
         onStage: setUgcStage,
