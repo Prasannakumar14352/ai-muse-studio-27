@@ -86,6 +86,8 @@ function CarouselsPage() {
   const [layout, setLayout] = useState<Record<string, LayoutSettings>>({});
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [collapsedSlides, setCollapsedSlides] = useState<Record<string, boolean>>({});
+
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["carousels"],
