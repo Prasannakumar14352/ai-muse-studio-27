@@ -446,9 +446,30 @@ function VideoPreview({
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number>(0);
 
+  // --- Scene editor + image validation + on-screen-text toggle -----------
+  const [showOnScreenText, setShowOnScreenText] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [editedScenes, setEditedScenes] = useState<Scene[]>(scenes);
+  const [scenesDirty, setScenesDirty] = useState(false);
+  const [sceneImages, setSceneImages] = useState<Array<string | null>>(() => scenes.map(() => null));
+  const [imageErrors, setImageErrors] = useState<Array<string | null>>(() => scenes.map(() => null));
+  const [imgBusy, setImgBusy] = useState<Set<number>>(new Set());
+  const [validating, setValidating] = useState(false);
+  const [playingScene, setPlayingScene] = useState<number | null>(null);
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    setEditedScenes(scenes);
+    setScenesDirty(false);
+    setSceneImages((prev) => (prev.length === scenes.length ? prev : scenes.map(() => null)));
+    setImageErrors((prev) => (prev.length === scenes.length ? prev : scenes.map(() => null)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenes.length]);
+
   const isVertical = contentType === "short_reel" || platform === "tiktok" || platform === "instagram";
   const aspect = isVertical ? "aspect-[9/16] max-w-[340px]" : "aspect-video w-full";
   const totalScenes = scenes.length;
+  const ratio = isVertical ? "9:16" : "16:9";
 
   useEffect(() => {
     setVideoUrl(existingVideoUrl);
