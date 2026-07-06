@@ -31,7 +31,7 @@ const Input = z.object({
   contentType: z.string(),       // "short_reel" | "long_video" | ...
   audience: z.string().optional().default(""),
   /** Target length in seconds — used to size long_video output (30-600). */
-  targetLengthSec: z.number().int().min(15).max(600).optional(),
+  targetLengthSec: z.number().int().min(15).max(1800).optional(),
 });
 
 export const generateAiVideoScript = createServerFn({ method: "POST" })
@@ -43,11 +43,12 @@ export const generateAiVideoScript = createServerFn({ method: "POST" })
 
     const isLong = data.contentType === "long_video";
     const defaultLen = isLong ? 75 : 35;
-    const lenSec = Math.max(15, Math.min(600, data.targetLengthSec ?? defaultLen));
+    const lenSec = Math.max(15, Math.min(1800, data.targetLengthSec ?? defaultLen));
     const targetLen = `${lenSec} seconds`;
-    // Roughly one scene per ~8 seconds for long form, ~5 for shorts. Clamp so
-    // the AI still gets a workable structure.
-    const sceneCount = Math.max(3, Math.min(30, Math.round(lenSec / (isLong ? 8 : 5))));
+    // Roughly one scene per ~8 seconds for long form, ~5 for shorts. Allow up
+    // to 120 scenes so a 15+ minute long video isn't silently truncated to
+    // ~4 minutes worth of scenes.
+    const sceneCount = Math.max(3, Math.min(120, Math.round(lenSec / (isLong ? 8 : 5))));
     const ratio = data.contentType === "long_video" ? "16:9" : "9:16";
 
     const sys = `You are a senior short-form video creative director. You write
@@ -119,6 +120,9 @@ Return JSON EXACTLY:
             { role: "user", content: user },
           ],
           response_format: { type: "json_object" },
+          // Scale headroom with scene count so long videos aren't truncated
+          // (~350 tokens per scene + overhead).
+          max_tokens: Math.min(32000, 2000 + sceneCount * 400),
         }),
       });
     } catch (e) {

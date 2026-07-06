@@ -255,7 +255,7 @@ function CreatePage() {
             <Section title="1b. Long video length">
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
-                  {[60, 90, 120, 180, 240, 300, 420, 600].map((sec) => (
+                  {[60, 90, 120, 180, 240, 300, 420, 510, 600, 900, 1200, 1800].map((sec) => (
                     <button
                       key={sec}
                       type="button"
@@ -280,14 +280,14 @@ function CreatePage() {
                   <input
                     type="range"
                     min={30}
-                    max={600}
+                    max={1800}
                     step={15}
                     value={form.long_video_length_sec}
                     onChange={(e) => update("long_video_length_sec", parseInt(e.target.value))}
                     className="w-full max-w-md"
                   />
                   <div className="text-[11px] text-muted-foreground mt-1">
-                    We'll auto-scale the number of scenes to fit the length you pick (30s – 10 min).
+                    We'll auto-scale the number of scenes to fit the length you pick (30s – 30 min).
                   </div>
                 </div>
               </div>
