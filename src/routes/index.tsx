@@ -8,7 +8,7 @@ import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
 import brandLogo from "@/assets/prodxstore-logo.png.asset.json";
-import demoVideo from "@/assets/creatorvault-demo.mp4.asset.json";
+const demoVideo = { url: "/creatorvault-demo.mp4" };
 
 
 export const Route = createFileRoute("/")({ component: Landing });
