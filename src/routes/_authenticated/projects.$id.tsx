@@ -671,18 +671,26 @@ function VideoPreview({
 
   async function handleUgcRender(container?: "webm" | "mp4") {
     if (rendering || ugcRendering || totalScenes === 0) return;
+    // Validation gate: any missing image blocks the render until the user
+    // regenerates it (or explicitly skips via the "Retry failed" flow).
+    if (missingImages > 0) {
+      toast.error(`${missingImages} scene image${missingImages === 1 ? "" : "s"} still missing — validate & retry above first.`);
+      return;
+    }
     lastRenderKindRef.current = "ugc";
     lastContainerRef.current = container;
     setUgcRendering(true);
-    setUgcStage({ kind: "images", done: 0, total: totalScenes });
+    setUgcStage({ kind: "images", done: totalScenes, total: totalScenes });
     setPlaying(false);
     setCanceled(false);
     const controller = new AbortController();
     abortRef.current = controller;
     try {
       const result = await renderUgcVideo({
-        title, platform, contentType, styleId, scenes,
+        title, platform, contentType, styleId, scenes: effectiveScenes,
         imagePrompts,
+        preloadedImages: sceneImages,
+        showOnScreenText,
         voice: "alloy",
         onStage: setUgcStage,
         signal: controller.signal,
