@@ -79,19 +79,31 @@ function CarouselsPage() {
         .order("created_at", { ascending: false });
       const outputs = await listOutputs();
       const outMap = new Map(outputs.map((o) => [o.project_id, o]));
-      return (projects ?? []).map((p) => {
+      const rows: CarouselRow[] = [];
+      for (const p of projects ?? []) {
         const out = outMap.get(p.id);
         const rd = out?.render_diagnostics as { slide_diagnostics?: SlideDiagMap } | undefined;
-        return {
+        const stored = out?.carousel_images ?? null;
+        let display: (string | null)[] | null = null;
+        if (stored) {
+          display = await Promise.all(stored.map(async (v) => {
+            if (!v) return null;
+            if (isBlobKey(v)) return await getObjectURL(v);
+            return v;
+          }));
+        }
+        rows.push({
           id: p.id, title: p.title, style: p.style, platform: p.platform, tone: p.tone,
           image_prompts: out?.image_prompts ?? [],
-          carousel_images: out?.carousel_images ?? null,
+          carousel_images: stored,
+          display_images: display,
           carousel_slides: out?.carousel_slides ?? null,
           slide_diagnostics: (rd?.slide_diagnostics ?? {}) as SlideDiagMap,
           saved_ratio: (out?.aspect_ratio ?? null) as LayoutSettings["ratio"] | null,
           saved_slide_count: out?.slide_count ?? null,
-        };
-      });
+        });
+      }
+      return rows;
     },
   });
 
