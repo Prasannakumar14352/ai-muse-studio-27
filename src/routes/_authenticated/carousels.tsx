@@ -744,7 +744,7 @@ function CarouselsPage() {
           <Layers className="w-10 h-10 mx-auto text-muted-foreground" />
           <h3 className="mt-3 font-semibold">No carousels yet</h3>
           <p className="text-sm text-muted-foreground mt-1">Create a carousel project to generate multi-slide posts.</p>
-          <Link to="/create" className="mt-5 inline-flex rounded-lg gradient-primary px-5 py-2.5 text-sm text-white font-medium">
+          <Link to="/create/carousel" className="mt-5 inline-flex rounded-lg gradient-primary px-5 py-2.5 text-sm text-white font-medium">
             <Plus className="w-4 h-4 mr-2" /> New carousel
           </Link>
         </div>
