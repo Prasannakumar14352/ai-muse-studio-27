@@ -15,15 +15,23 @@ export const Route = createFileRoute("/_authenticated/projects/$id")({ component
 
 // Force a browser download to the user's local machine, even when the URL is
 // cross-origin (where the anchor `download` attribute is ignored).
-async function forceDownloadUrl(url: string, filename: string) {
+// Trigger a real browser download synchronously inside the click handler.
+// For Supabase Storage signed URLs, `?download=<name>` makes the server
+// respond with Content-Disposition: attachment so the browser saves the
+// file instead of navigating to it. Doing this synchronously (no await
+// before .click()) preserves the user-gesture flag that browsers require
+// to allow downloads.
+function forceDownloadUrl(url: string, filename: string) {
   try {
-    const res = await fetch(url, { mode: "cors" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const obj = URL.createObjectURL(blob);
+    const u = new URL(url, window.location.href);
+    u.searchParams.set("download", filename);
     const a = document.createElement("a");
-    a.href = obj; a.download = filename; a.click();
-    setTimeout(() => URL.revokeObjectURL(obj), 4000);
+    a.href = u.toString();
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   } catch {
     window.open(url, "_blank", "noopener");
     toast.message("Opened in a new tab — right-click → Save video as…");
