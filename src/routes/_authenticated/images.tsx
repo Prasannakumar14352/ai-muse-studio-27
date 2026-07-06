@@ -45,6 +45,8 @@ function ImagesPage() {
   const [showDebug, setShowDebug] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [viewerIdx, setViewerIdx] = useState<number | null>(null);
+  const qc = useQueryClient();
+  const { data: access } = useAccess();
 
   // Keyboard nav for fullscreen viewer.
   useEffect(() => {
