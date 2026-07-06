@@ -14,15 +14,13 @@ export type RenderOptions = {
   contentType?: string | null; // "long_video" | "short_reel" | ...
   fps?: number;
   onProgress?: (p: number) => void; // 0..1
-  // Optional per-scene AI-generated background images (data URLs or same-origin URLs).
-  // When provided, each scene uses its own image instead of the style stock image.
   sceneImages?: Array<string | null>;
-  // Optional per-scene voiceover audio buffers (already decoded).
-  // Each buffer is scheduled at that scene's start time and mixed into the recorder audio track.
   sceneAudio?: Array<AudioBuffer | null>;
-  // When true, scene durations are stretched to at least the length of the
-  // corresponding scene audio so no voiceover is cut off mid-sentence.
   fitToAudio?: boolean;
+  /** Cancel the render mid-flight — recorder stops and result rejects with AbortError. */
+  signal?: AbortSignal;
+  /** Force a specific container/codec instead of the browser's best choice. Used by the codec-fallback retry. */
+  preferredContainer?: "webm" | "mp4";
 };
 
 export type RenderResult = {
@@ -48,20 +46,24 @@ async function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-function pickRecorderMime(): { mime: string; ext: "mp4" | "webm" } {
-  // Prefer WebM — MediaRecorder's MP4 output in Chromium is fragmented and
-  // frequently refuses to play back in a plain <video> tag or QuickTime.
-  // WebM/VP9 is universally playable in every modern browser we render into.
-  const candidates: Array<{ mime: string; ext: "mp4" | "webm" }> = [
+function pickRecorderMime(preferred?: "webm" | "mp4"): { mime: string; ext: "mp4" | "webm" } {
+  const webmCandidates: Array<{ mime: string; ext: "mp4" | "webm" }> = [
     { mime: "video/webm;codecs=vp9,opus", ext: "webm" },
     { mime: "video/webm;codecs=vp9", ext: "webm" },
     { mime: "video/webm;codecs=vp8,opus", ext: "webm" },
     { mime: "video/webm;codecs=vp8", ext: "webm" },
     { mime: "video/webm", ext: "webm" },
+  ];
+  const mp4Candidates: Array<{ mime: string; ext: "mp4" | "webm" }> = [
+    { mime: "video/mp4;codecs=avc1.42E01E,mp4a.40.2", ext: "mp4" },
     { mime: "video/mp4;codecs=avc1.42E01E", ext: "mp4" },
     { mime: "video/mp4", ext: "mp4" },
   ];
-  for (const c of candidates) {
+  const order =
+    preferred === "mp4" ? [...mp4Candidates, ...webmCandidates]
+    : preferred === "webm" ? [...webmCandidates, ...mp4Candidates]
+    : [...webmCandidates, ...mp4Candidates];
+  for (const c of order) {
     if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(c.mime)) return c;
   }
   return { mime: "video/webm", ext: "webm" };
@@ -257,24 +259,21 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   videoStream.getVideoTracks().forEach((t) => combined.addTrack(t));
   if (audioDest) audioDest.stream.getAudioTracks().forEach((t) => combined.addTrack(t));
 
-  const { mime, ext } = pickRecorderMime();
+  const { mime, ext } = pickRecorderMime(opts.preferredContainer);
   const recorder = new MediaRecorder(combined, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
   const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
 
-  // Draw an initial frame BEFORE recording so the first captured frame isn't black.
   drawScene(ctx, sceneImgs[0] ?? fallbackImg, opts.scenes[0], {
     title: opts.title, platform: opts.platform ?? "preview",
     sceneIdx: 0, totalScenes: opts.scenes.length,
     progress: 0, accent: style.accent, styleLabel: style.label,
   });
 
-  // Emit chunks every 250ms so the final blob is well-formed even on short renders.
   recorder.start(250);
 
-  // Schedule all voiceover buffers now that the recorder is running.
   if (audioCtx && audioDest && opts.sceneAudio) {
     const t0 = audioCtx.currentTime + 0.05;
     let offset = 0;
@@ -282,34 +281,27 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       const buf = opts.sceneAudio[i];
       if (buf) {
         const src = audioCtx.createBufferSource();
-        src.buffer = buf;
-        src.connect(audioDest);
-        src.start(t0 + offset);
+        src.buffer = buf; src.connect(audioDest); src.start(t0 + offset);
       }
       offset += durations[i];
     }
   }
 
   const startedAt = performance.now();
+  let aborted = false;
+  const abortHandler = () => { aborted = true; };
+  opts.signal?.addEventListener("abort", abortHandler);
 
-  // Animation loop using rAF; MediaRecorder captures whatever the canvas shows.
   await new Promise<void>((resolve) => {
     function tick() {
+      if (aborted) { resolve(); return; }
       const elapsed = (performance.now() - startedAt) / 1000;
       const clamped = Math.min(elapsed, totalDuration);
-      let acc = 0;
-      let sceneIdx = 0;
-      let localProgress = 0;
+      let acc = 0, sceneIdx = 0, localProgress = 0;
       for (let i = 0; i < opts.scenes.length; i++) {
         const d = durations[i];
-        if (clamped <= acc + d) {
-          sceneIdx = i;
-          localProgress = (clamped - acc) / d;
-          break;
-        }
-        acc += d;
-        sceneIdx = i;
-        localProgress = 1;
+        if (clamped <= acc + d) { sceneIdx = i; localProgress = (clamped - acc) / d; break; }
+        acc += d; sceneIdx = i; localProgress = 1;
       }
       drawScene(ctx, sceneImgs[sceneIdx] ?? fallbackImg, opts.scenes[sceneIdx], {
         title: opts.title, platform: opts.platform ?? "preview",
@@ -323,12 +315,19 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
     requestAnimationFrame(tick);
   });
 
-  recorder.stop();
+  opts.signal?.removeEventListener("abort", abortHandler);
+  try { recorder.stop(); } catch { /* already stopped */ }
   await done;
   combined.getTracks().forEach((t) => t.stop());
   videoStream.getTracks().forEach((t) => t.stop());
   if (audioDest) audioDest.stream.getTracks().forEach((t) => t.stop());
   if (audioCtx) await audioCtx.close().catch(() => {});
+
+  if (aborted) {
+    const err = new Error("Render canceled");
+    err.name = "AbortError";
+    throw err;
+  }
 
   const blob = new Blob(chunks, { type: mime });
   return { blob, mimeType: mime, extension: ext, durationSec: totalDuration };
@@ -353,9 +352,19 @@ export type UgcOptions = {
   styleId?: string | null;
   scenes: RenderScene[];
   imagePrompts?: Array<{ n: number; prompt: string; style: string } | undefined>;
-  voice?: string; // TTS voice id
+  voice?: string;
   onStage?: (stage: UgcStage) => void;
+  signal?: AbortSignal;
+  preferredContainer?: "webm" | "mp4";
 };
+
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) {
+    const err = new Error("Render canceled");
+    err.name = "AbortError";
+    throw err;
+  }
+}
 
 async function fetchSceneImage(prompt: string, style: string, ratio: string): Promise<string | null> {
   try {
@@ -397,7 +406,7 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
   const ratio = isVertical ? "9:16" : "16:9";
   const total = opts.scenes.length;
 
-  // 1) Images — in parallel, report as they land.
+  throwIfAborted(opts.signal);
   let imgDone = 0;
   opts.onStage?.({ kind: "images", done: 0, total });
   const sceneImages = await Promise.all(
@@ -410,8 +419,8 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
       return url;
     }),
   );
+  throwIfAborted(opts.signal);
 
-  // 2) Audio — decode using a shared AudioContext.
   const decodeCtx = new AudioContext();
   if (decodeCtx.state === "suspended") await decodeCtx.resume().catch(() => {});
   let audDone = 0;
@@ -425,10 +434,9 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
       return buf;
     }),
   );
-  // Keep decodeCtx alive until render swaps in its own context — nothing else uses it.
   await decodeCtx.close().catch(() => {});
+  throwIfAborted(opts.signal);
 
-  // 3) Render
   opts.onStage?.({ kind: "render", progress: 0 });
   const result = await renderVideo({
     title: opts.title,
@@ -439,6 +447,8 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
     sceneImages,
     sceneAudio,
     fitToAudio: true,
+    signal: opts.signal,
+    preferredContainer: opts.preferredContainer,
     onProgress: (p) => opts.onStage?.({ kind: "render", progress: p }),
   });
   opts.onStage?.({ kind: "upload" });

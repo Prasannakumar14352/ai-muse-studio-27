@@ -6,7 +6,7 @@ import { getStyleImage } from "@/lib/constants";
 import { generateProject } from "@/lib/generators";
 import { renderVideo, renderUgcVideo, type UgcStage } from "@/lib/video-renderer";
 import { toast } from "sonner";
-import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles, AlertTriangle, Bug, CheckCircle2 } from "lucide-react";
+import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles, AlertTriangle, Bug, CheckCircle2, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
 
@@ -189,6 +189,7 @@ function ProjectView() {
         userId={project.user_id}
         outputId={output?.id ?? null}
         existingVideoUrl={output?.video_url ?? null}
+        existingDiagnostics={(output as { render_diagnostics?: unknown } | null)?.render_diagnostics ?? null}
         imagePrompts={prompts}
       />
 
@@ -274,12 +275,13 @@ type Scene = { n: number; visual: string; voiceover: string; duration: string };
 
 function VideoPreview({
   scenes, title, styleImage, styleId, platform, contentType, music,
-  projectId, userId, outputId, existingVideoUrl, imagePrompts,
+  projectId, userId, outputId, existingVideoUrl, existingDiagnostics, imagePrompts,
 }: {
   scenes: Scene[]; title: string; styleImage: string;
   styleId?: string | null;
   platform?: string | null; contentType?: string | null; music?: string | null;
-  projectId: string; userId: string; outputId: string | null; existingVideoUrl: string | null;
+  projectId: string; userId: string; outputId: string | null;
+  existingVideoUrl: string | null; existingDiagnostics?: unknown;
   imagePrompts?: Array<{ n: number; prompt: string; style: string }>;
 }) {
   const qc = useQueryClient();
@@ -291,10 +293,17 @@ function VideoPreview({
   const [videoUrl, setVideoUrl] = useState<string | null>(existingVideoUrl);
   const [ugcRendering, setUgcRendering] = useState(false);
   const [ugcStage, setUgcStage] = useState<UgcStage | null>(null);
-  const [diagnostics, setDiagnostics] = useState<VideoDiagnostics | null>(null);
+  const [diagnostics, setDiagnostics] = useState<VideoDiagnostics | null>(
+    existingDiagnostics && typeof existingDiagnostics === "object"
+      ? (existingDiagnostics as VideoDiagnostics)
+      : null,
+  );
   const [showDiag, setShowDiag] = useState(false);
   const [autoRetryUsed, setAutoRetryUsed] = useState(false);
+  const [canceled, setCanceled] = useState(false);
   const lastRenderKindRef = useRef<null | "storyboard" | "ugc">(null);
+  const lastContainerRef = useRef<"webm" | "mp4" | undefined>(undefined);
+  const abortRef = useRef<AbortController | null>(null);
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number>(0);
 
@@ -302,7 +311,11 @@ function VideoPreview({
   const aspect = isVertical ? "aspect-[9/16] max-w-[340px]" : "aspect-video w-full";
   const totalScenes = scenes.length;
 
-  useEffect(() => { setVideoUrl(existingVideoUrl); setDiagnostics(null); setAutoRetryUsed(false); }, [existingVideoUrl]);
+  useEffect(() => {
+    setVideoUrl(existingVideoUrl);
+    setAutoRetryUsed(false);
+    setCanceled(false);
+  }, [existingVideoUrl]);
 
   const currentDurationMs = useMemo(() => {
     const raw = scenes[idx]?.duration ?? "3s";
@@ -328,14 +341,33 @@ function VideoPreview({
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [playing, idx, currentDurationMs, totalScenes]);
 
-  async function uploadRender(blob: Blob, mimeType: string, extension: string, durationSec: number) {
+  async function persistDiagnostics(next: VideoDiagnostics) {
+    setDiagnostics(next);
+    if (outputId) {
+      await supabase
+        .from("generated_outputs")
+        .update({ render_diagnostics: next as never } as never)
+        .eq("id", outputId)
+        .then(() => undefined, () => undefined);
+    }
+  }
+
+  function appendAttempt(base: VideoDiagnostics, entry: RetryEntry): VideoDiagnostics {
+    return { ...base, retries: [...(base.retries ?? []), entry] };
+  }
+
+  async function uploadRender(blob: Blob, mimeType: string, extension: string, durationSec: number, container: "webm" | "mp4" | undefined) {
     const uploadStart = Date.now();
     const path = `${userId}/${projectId}-${Date.now()}.${extension}`;
     const { error: upErr } = await supabase.storage.from("renders").upload(path, blob, {
       contentType: mimeType, upsert: true,
     });
     if (upErr) {
-      setDiagnostics((d) => ({ ...(d ?? emptyDiag()), uploadError: upErr.message, blobSize: blob.size, blobType: blob.type, mimeType }));
+      const next = appendAttempt(diagnostics ?? emptyDiag(), {
+        at: new Date().toISOString(), phase: "upload", container, mimeType,
+        blobSize: blob.size, error: upErr.message,
+      });
+      await persistDiagnostics({ ...next, uploadError: upErr.message, blobSize: blob.size, blobType: blob.type, mimeType });
       throw upErr;
     }
     const { data: signed } = await supabase.storage.from("renders").createSignedUrl(path, 60 * 60 * 24 * 7);
@@ -344,62 +376,102 @@ function VideoPreview({
       await supabase.from("generated_outputs").update({ video_url: url } as never).eq("id", outputId);
     }
     setVideoUrl(url);
-    setDiagnostics({
-      ...emptyDiag(),
+    const base = diagnostics ?? emptyDiag();
+    const next: VideoDiagnostics = {
+      ...base,
       renderedAt: new Date().toISOString(),
       mimeType, extension, durationSec,
       blobSize: blob.size, blobType: blob.type,
       uploadDurationMs: Date.now() - uploadStart,
       signedUrl: url,
       codecSupport: probeCodecSupport(),
-    });
+      renderError: null, uploadError: null, playbackError: null,
+      retries: [...(base.retries ?? []), {
+        at: new Date().toISOString(), phase: "render", container, mimeType,
+        blobSize: blob.size, ok: true,
+      }],
+    };
+    await persistDiagnostics(next);
     setAutoRetryUsed(false);
     qc.invalidateQueries({ queryKey: ["project", projectId] });
     toast.success(`Rendered ${durationSec.toFixed(1)}s ${extension.toUpperCase()} — saved to your library.`);
   }
 
-  async function handleRender() {
+  async function handleRender(container?: "webm" | "mp4") {
     if (rendering || ugcRendering || totalScenes === 0) return;
     lastRenderKindRef.current = "storyboard";
+    lastContainerRef.current = container;
     setRendering(true);
     setRenderProgress(0);
     setPlaying(false);
+    setCanceled(false);
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const result = await renderVideo({
         title, platform, scenes, styleId, contentType,
         onProgress: setRenderProgress,
+        signal: controller.signal,
+        preferredContainer: container,
       });
-      await uploadRender(result.blob, result.mimeType, result.extension, result.durationSec);
+      await uploadRender(result.blob, result.mimeType, result.extension, result.durationSec, container);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Render failed";
-      setDiagnostics((d) => ({ ...(d ?? emptyDiag()), renderError: msg }));
-      toast.error(msg);
+      const isAbort = err instanceof Error && err.name === "AbortError";
+      if (isAbort) setCanceled(true);
+      const next = appendAttempt(diagnostics ?? emptyDiag(), {
+        at: new Date().toISOString(), phase: isAbort ? "canceled" : "render",
+        container, error: msg,
+      });
+      await persistDiagnostics({ ...next, renderError: isAbort ? null : msg });
+      toast[isAbort ? "message" : "error"](isAbort ? "Render canceled" : msg);
     } finally {
       setRendering(false);
+      abortRef.current = null;
     }
   }
 
-  async function handleUgcRender() {
+  async function handleUgcRender(container?: "webm" | "mp4") {
     if (rendering || ugcRendering || totalScenes === 0) return;
     lastRenderKindRef.current = "ugc";
+    lastContainerRef.current = container;
     setUgcRendering(true);
     setUgcStage({ kind: "images", done: 0, total: totalScenes });
     setPlaying(false);
+    setCanceled(false);
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const result = await renderUgcVideo({
         title, platform, contentType, styleId, scenes,
         imagePrompts,
         voice: "alloy",
         onStage: setUgcStage,
+        signal: controller.signal,
+        preferredContainer: container,
       });
-      await uploadRender(result.blob, result.mimeType, result.extension, result.durationSec);
+      await uploadRender(result.blob, result.mimeType, result.extension, result.durationSec, container);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "UGC render failed";
-      setDiagnostics((d) => ({ ...(d ?? emptyDiag()), renderError: msg }));
-      toast.error(msg);
+      const isAbort = err instanceof Error && err.name === "AbortError";
+      if (isAbort) setCanceled(true);
+      const next = appendAttempt(diagnostics ?? emptyDiag(), {
+        at: new Date().toISOString(), phase: isAbort ? "canceled" : "render",
+        container, error: msg,
+      });
+      await persistDiagnostics({ ...next, renderError: isAbort ? null : msg });
+      toast[isAbort ? "message" : "error"](isAbort ? "Render canceled" : msg);
     } finally {
       setUgcRendering(false);
       setUgcStage(null);
+      abortRef.current = null;
+    }
+  }
+
+  function handleCancel() {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      toast.message("Canceling render…");
     }
   }
 
@@ -411,20 +483,29 @@ function VideoPreview({
       3: "MEDIA_ERR_DECODE", 4: "MEDIA_ERR_SRC_NOT_SUPPORTED",
     };
     const detail = err ? `${codeMap[err.code] ?? "UNKNOWN"} — ${err.message || "no message"}` : "unknown error";
-    setDiagnostics((d) => ({
-      ...(d ?? emptyDiag()),
+    const base = diagnostics ?? emptyDiag();
+    const next: VideoDiagnostics = {
+      ...base,
       playbackError: detail,
       codecSupport: probeCodecSupport(),
       networkState: el.networkState,
       readyState: el.readyState,
       currentSrc: el.currentSrc || null,
-    }));
-    // Auto-retry ONCE: re-run the same render that produced this blob.
+      retries: [...(base.retries ?? []), {
+        at: new Date().toISOString(), phase: "playback",
+        container: lastContainerRef.current, error: detail,
+      }],
+    };
+    void persistDiagnostics(next);
+
+    // Codec fallback: swap container (webm ↔ mp4) and re-render once.
     if (!autoRetryUsed && lastRenderKindRef.current && !rendering && !ugcRendering) {
       setAutoRetryUsed(true);
-      toast.message("Preview failed to play — auto re-rendering once…");
-      if (lastRenderKindRef.current === "ugc") handleUgcRender();
-      else handleRender();
+      const wasMp4 = base.extension === "mp4" || lastContainerRef.current === "mp4";
+      const nextContainer: "webm" | "mp4" = wasMp4 ? "webm" : "mp4";
+      toast.message(`Preview failed to decode ${base.mimeType ?? ""} — retrying as ${nextContainer.toUpperCase()}…`);
+      if (lastRenderKindRef.current === "ugc") handleUgcRender(nextContainer);
+      else handleRender(nextContainer);
     } else {
       toast.error(`Video preview failed: ${detail}`);
       setShowDiag(true);
@@ -433,15 +514,16 @@ function VideoPreview({
 
   function onVideoLoaded(e: React.SyntheticEvent<HTMLVideoElement>) {
     const el = e.currentTarget;
-    setDiagnostics((d) => ({
-      ...(d ?? emptyDiag()),
+    const base = diagnostics ?? emptyDiag();
+    void persistDiagnostics({
+      ...base,
       playbackError: null,
       readyState: el.readyState,
       networkState: el.networkState,
       currentSrc: el.currentSrc || null,
       videoWidth: el.videoWidth, videoHeight: el.videoHeight,
       playableDurationSec: isFinite(el.duration) ? el.duration : null,
-    }));
+    });
   }
 
   if (totalScenes === 0) return null;
@@ -465,7 +547,7 @@ function VideoPreview({
             </a>
           )}
           <button
-            onClick={handleRender}
+            onClick={() => handleRender()}
             disabled={rendering || ugcRendering}
             className="rounded-lg glass hover:bg-white/5 px-4 py-2 text-sm font-medium disabled:opacity-60 flex items-center gap-2">
             {rendering
@@ -473,15 +555,29 @@ function VideoPreview({
               : <><VideoIcon className="w-4 h-4" /> Storyboard only</>}
           </button>
           <button
-            onClick={handleUgcRender}
+            onClick={() => handleUgcRender()}
             disabled={rendering || ugcRendering}
             className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
             {ugcRendering
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Rendering…</>
               : <><Sparkles className="w-4 h-4" /> {videoUrl ? "Re-generate UGC video" : "Generate UGC video"}</>}
           </button>
+          {(rendering || ugcRendering) && (
+            <button
+              onClick={handleCancel}
+              className="rounded-lg border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 px-4 py-2 text-sm font-medium flex items-center gap-2"
+            >
+              <X className="w-4 h-4" /> Cancel
+            </button>
+          )}
         </div>
       </div>
+
+      {canceled && !rendering && !ugcRendering && (
+        <div className="mb-4 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-200 px-4 py-2 text-sm flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4" /> Render was canceled. Progress rail below shows the stages reached before cancel.
+        </div>
+      )}
 
       {(rendering || ugcRendering) && (
         <div className="mb-4 rounded-xl border border-border bg-black/30 p-4">
@@ -636,6 +732,16 @@ function VideoPreview({
 
 // ---------- diagnostics helpers ----------
 
+type RetryEntry = {
+  at: string;
+  phase: "render" | "upload" | "playback" | "canceled";
+  container?: "webm" | "mp4";
+  mimeType?: string;
+  blobSize?: number;
+  error?: string;
+  ok?: boolean;
+};
+
 type VideoDiagnostics = {
   renderedAt: string | null;
   mimeType: string | null;
@@ -655,6 +761,7 @@ type VideoDiagnostics = {
   videoHeight: number | null;
   playableDurationSec: number | null;
   codecSupport: Record<string, string> | null;
+  retries?: RetryEntry[];
 };
 
 function emptyDiag(): VideoDiagnostics {
@@ -665,7 +772,7 @@ function emptyDiag(): VideoDiagnostics {
     signedUrl: null, currentSrc: null,
     networkState: null, readyState: null,
     videoWidth: null, videoHeight: null, playableDurationSec: null,
-    codecSupport: null,
+    codecSupport: null, retries: [],
   };
 }
 

@@ -68,6 +68,7 @@ export type Database = {
           id: string
           image_prompts: Json | null
           project_id: string
+          render_diagnostics: Json | null
           scenes: Json | null
           script: string | null
           thumbnail_ideas: Json | null
@@ -85,6 +86,7 @@ export type Database = {
           id?: string
           image_prompts?: Json | null
           project_id: string
+          render_diagnostics?: Json | null
           scenes?: Json | null
           script?: string | null
           thumbnail_ideas?: Json | null
@@ -102,6 +104,7 @@ export type Database = {
           id?: string
           image_prompts?: Json | null
           project_id?: string
+          render_diagnostics?: Json | null
           scenes?: Json | null
           script?: string | null
           thumbnail_ideas?: Json | null

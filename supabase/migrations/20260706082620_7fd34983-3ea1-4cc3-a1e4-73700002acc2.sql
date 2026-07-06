@@ -1,0 +1,1 @@
+ALTER TABLE public.generated_outputs ADD COLUMN IF NOT EXISTS render_diagnostics jsonb;
