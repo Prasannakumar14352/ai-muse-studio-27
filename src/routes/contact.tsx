@@ -4,7 +4,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Mail, Send, Copy, Check, Building2 } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/contact")({ component: ContactPage });
+export const Route = createFileRoute("/contact")({ component: ContactPage });
 
 const SUPPORT_EMAIL = "productsupport@prodxstore.com";
 const BRAND = "Prodxstore";
