@@ -457,7 +457,7 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
           disabled={isFree || paying}
           className="w-full rounded-lg gradient-primary text-white py-3 font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
           {paying && <Loader2 className="w-4 h-4 animate-spin" />}
-          {isFree ? "Already included" : paying ? "Opening checkout…" : `Pay ${plan.price}`}
+          {isFree ? "Already included" : paying ? "Opening checkout…" : `Pay ${displayAmount}`}
         </button>
         <p className="mt-2 text-[11px] text-center text-muted-foreground">
           Credits are only granted after a successful payment.
