@@ -1,13 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
+import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client";
 import { getStyleImage } from "@/lib/constants";
 import { generateProject } from "@/lib/generators";
 import { renderVideo, renderUgcVideo, type UgcStage } from "@/lib/video-renderer";
 import { getOutput, saveOutput, type LocalOutput } from "@/lib/local-store";
+import { isBlobKey, getDataURL } from "@/lib/blob-store";
 import { toast } from "sonner";
-import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles, AlertTriangle, Bug, CheckCircle2, X } from "lucide-react";
+import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles, AlertTriangle, Bug, CheckCircle2, X, Package } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
 
@@ -16,6 +18,7 @@ function ProjectView() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
   const [regenerating, setRegenerating] = useState<null | "all" | "script" | "scenes" | "captions" | "images">(null);
+  const [bundling, setBundling] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["project", id],
@@ -43,6 +46,123 @@ function ProjectView() {
     a.href = url; a.download = `${(project?.title ?? "project").replace(/[^\w]+/g, "-")}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function formatPostText(): string {
+    const caption = (output?.captions ?? "").trim();
+    const tags = (output?.hashtags ?? [])
+      .map((h) => (h.startsWith("#") ? h : `#${h}`))
+      .join(" ")
+      .trim();
+    // Two blank lines between caption and hashtags is the format most
+    // Instagram/TikTok/Reels tools expect for a "ready to post" body.
+    return [caption, tags].filter(Boolean).join("\n\n.\n.\n.\n");
+  }
+
+  async function copyPostText() {
+    const text = formatPostText();
+    if (!text) return toast.error("Nothing to copy yet — generate captions first");
+    await navigator.clipboard.writeText(text);
+    toast.success("Post text copied — ready to paste");
+  }
+
+  function slugify(s: string) {
+    return (s || "post").toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "post";
+  }
+
+  async function readyToPost() {
+    if (!project || !output) return toast.error("Nothing to bundle yet");
+    setBundling(true);
+    try {
+      const zip = new JSZip();
+      const slug = slugify(project.title);
+
+      // Human-readable post text (caption + hashtags)
+      const postText = formatPostText();
+      if (postText) zip.file("post.txt", postText);
+
+      // Script + hook
+      if (output.script) {
+        const script = [output.hook ? `HOOK: ${output.hook}\n` : "", output.script].join("\n");
+        zip.file("script.txt", script);
+      }
+
+      // Scene breakdown for reels
+      if (output.scenes?.length) {
+        const scenesText = output.scenes.map((s) => `SCENE ${s.n} (${s.duration})\nVisual: ${s.visual}\nVoiceover: ${s.voiceover}`).join("\n\n");
+        zip.file("scenes.txt", scenesText);
+      }
+
+      // Image prompts
+      if (output.image_prompts?.length) {
+        zip.file("image-prompts.txt", output.image_prompts.map((p) => `#${p.n} [${p.style}]\n${p.prompt}`).join("\n\n"));
+      }
+
+      // Carousel per-slide script if present
+      if (output.carousel_slides?.length) {
+        const slides = output.carousel_slides.map((s) => `SLIDE ${s.n} — ${s.role}\n${s.headline}\n\n${s.body}\n\nVisual: ${s.visual}`).join("\n\n---\n\n");
+        zip.file("carousel-script.txt", slides);
+      }
+
+      // Carousel slide images (resolve IDB blob keys → data URLs)
+      const refs = output.carousel_images ?? [];
+      for (let i = 0; i < refs.length; i++) {
+        const ref = refs[i];
+        if (!ref) continue;
+        try {
+          const dataURL = isBlobKey(ref) ? await getDataURL(ref) : ref;
+          if (!dataURL || !dataURL.startsWith("data:")) continue;
+          const base64 = dataURL.replace(/^data:image\/\w+;base64,/, "");
+          zip.file(`images/slide-${String(i + 1).padStart(2, "0")}.png`, base64, { base64: true });
+        } catch { /* skip broken slide */ }
+      }
+
+      // Video render (short reels / long video)
+      if (output.video_url) {
+        try {
+          const res = await fetch(output.video_url);
+          if (res.ok) {
+            const blob = await res.blob();
+            const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+            zip.file(`video.${ext}`, blob);
+          }
+        } catch { /* signed url may have expired; skip */ }
+      }
+
+      // Diagnostics + full JSON snapshot for debugging
+      if (output.render_diagnostics) {
+        zip.file("diagnostics.json", JSON.stringify(output.render_diagnostics, null, 2));
+      }
+      zip.file("project.json", JSON.stringify({ project, output: { ...output, carousel_images: refs.map((r, i) => (r ? `images/slide-${String(i + 1).padStart(2, "0")}.png` : null)) } }, null, 2));
+
+      // Manifest so downstream tooling knows what's inside
+      zip.file("README.txt", [
+        `${output.title ?? project.title}`,
+        "",
+        "Contents:",
+        "- post.txt          Caption + hashtags in ready-to-paste format",
+        "- script.txt        Hook + full script",
+        "- scenes.txt        Scene-by-scene breakdown (reels)",
+        "- image-prompts.txt B-roll / image prompts",
+        "- carousel-script.txt Per-slide carousel copy",
+        "- images/           Carousel slide PNGs",
+        "- video.*           Rendered reel/long video",
+        "- diagnostics.json  Render + slide diagnostics",
+        "- project.json      Full metadata snapshot",
+      ].join("\n"));
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `${slug}-ready-to-post.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Ready-to-post bundle downloaded");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Bundle failed");
+    } finally {
+      setBundling(false);
+    }
   }
 
   async function regenerate(part: "all" | "script" | "scenes" | "captions" | "images") {
@@ -107,7 +227,26 @@ function ProjectView() {
         <div className="mt-6 flex flex-wrap gap-2">
           {output?.script && <button onClick={() => copy(output.script!, "Script")} className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5"><Copy className="w-4 h-4" /> Copy Script</button>}
           {output?.captions && <button onClick={() => copy(output.captions!, "Caption")} className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5"><Copy className="w-4 h-4" /> Copy Caption</button>}
+          <button
+            data-testid="copy-post-text"
+            onClick={copyPostText}
+            disabled={!output?.captions && (output?.hashtags?.length ?? 0) === 0}
+            className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5 disabled:opacity-60"
+            title="Copy caption + hashtags in ready-to-paste format"
+          >
+            <Copy className="w-4 h-4" /> Copy post text
+          </button>
           <button onClick={download} className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5"><Download className="w-4 h-4" /> Download JSON</button>
+          <button
+            data-testid="ready-to-post"
+            onClick={readyToPost}
+            disabled={bundling || !output}
+            className="rounded-lg glass border border-[color:var(--neon-purple)]/50 hover:bg-white/5 px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-60"
+            title="Bundle script, captions, hashtags, images, and diagnostics into one ZIP"
+          >
+            {bundling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
+            Ready to Post
+          </button>
           <button
             onClick={() => regenerate("all")}
             disabled={!!regenerating}

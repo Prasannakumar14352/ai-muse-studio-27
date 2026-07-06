@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccess } from "@/lib/access";
+import { confirmDialog } from "@/components/confirm-dialog";
 import { Crown, Users, Layers, Zap, Plus, Shield, ShieldOff, Ban, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({ component: AdminPanel });
@@ -74,7 +75,13 @@ function AdminPanel() {
   }
 
   async function deactivateSubscription(userId: string) {
-    if (!window.confirm("Cancel this user's active subscription?")) return;
+    const ok = await confirmDialog({
+      title: "Cancel this subscription?",
+      description: "The user will lose access at the end of the current billing period.",
+      confirmText: "Cancel subscription",
+      tone: "destructive",
+    });
+    if (!ok) return;
     setBusy(userId);
     const { error } = await supabase.from("subscriptions")
       .update({ status: "cancelled" } as any).eq("user_id", userId).eq("status", "active");

@@ -11,6 +11,7 @@ import {
   putDataURL, getObjectURL, getDataURL, deleteBlobsByPrefix, isBlobKey, makeBlobKey,
 } from "@/lib/blob-store";
 import { LocalOnlyBanner } from "@/components/local-only-banner";
+import { confirmDialog } from "@/components/confirm-dialog";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
   Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2, Film,
@@ -378,7 +379,13 @@ function CarouselsPage() {
   }
 
   async function deleteCarousel(row: CarouselRow) {
-    if (!confirm(`Delete "${row.title}" and all its slides? This cannot be undone.`)) return;
+    const ok = await confirmDialog({
+      title: "Delete this carousel?",
+      description: `"${row.title}" and all its slides will be removed. This cannot be undone.`,
+      confirmText: "Delete",
+      tone: "destructive",
+    });
+    if (!ok) return;
     setDeletingId(row.id);
     try {
       await deleteOutput(row.id);

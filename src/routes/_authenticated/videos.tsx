@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { listOutputs, deleteOutput } from "@/lib/local-store";
 import { LocalOnlyBanner } from "@/components/local-only-banner";
+import { confirmDialog } from "@/components/confirm-dialog";
 import { Plus, Film, Video as VideoIcon, Trash2, Loader2, Image as ImageIcon, Download, X, Wand2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/videos")({
@@ -48,7 +49,13 @@ function VideosPage() {
   });
 
   async function deleteVideo(row: VideoRow) {
-    if (!confirm(`Delete "${row.title}"? The project and its local render will be removed.`)) return;
+    const ok = await confirmDialog({
+      title: "Delete this video?",
+      description: `"${row.title}" and its local render will be removed. This cannot be undone.`,
+      confirmText: "Delete",
+      tone: "destructive",
+    });
+    if (!ok) return;
     setDeletingId(row.id);
     try {
       await deleteOutput(row.id);
