@@ -156,7 +156,7 @@ function CreditsEstimator({ plan, onChangePlan }: { plan: PlanDef; onChangePlan:
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {PLANS.map((p) => {
+          {PLANS.filter((p) => !p.contactSales).map((p) => {
             const active = plan.id === p.id;
             return (
               <button
