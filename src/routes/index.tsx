@@ -35,15 +35,13 @@ function Landing() {
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/60 border-b border-border/40">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-lg">CreatorVault<span className="gradient-text">AI</span></span>
+            <img src={brandLogo.url} alt="Prodxstore" className="h-9 md:h-10 w-auto object-contain" />
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground">Features</a>
             <a href="#pricing" className="hover:text-foreground">Pricing</a>
             <a href="#faq" className="hover:text-foreground">FAQ</a>
+            <Link to="/contact" className="hover:text-foreground">Contact Us</Link>
           </nav>
           <div className="flex items-center gap-3">
             <Link to="/auth" className="text-sm text-muted-foreground hover:text-foreground">Sign in</Link>
