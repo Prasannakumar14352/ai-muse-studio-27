@@ -794,6 +794,7 @@ function VideoPreview({
     lastRenderKindRef.current = "storyboard";
     lastContainerRef.current = container;
     setRendering(true);
+    setOpenProgress(true);
     setRenderProgress(0);
     setPlaying(false);
     setCanceled(false);
