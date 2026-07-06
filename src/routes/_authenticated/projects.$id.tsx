@@ -274,12 +274,13 @@ type Scene = { n: number; visual: string; voiceover: string; duration: string };
 
 function VideoPreview({
   scenes, title, styleImage, styleId, platform, contentType, music,
-  projectId, userId, outputId, existingVideoUrl,
+  projectId, userId, outputId, existingVideoUrl, imagePrompts,
 }: {
   scenes: Scene[]; title: string; styleImage: string;
   styleId?: string | null;
   platform?: string | null; contentType?: string | null; music?: string | null;
   projectId: string; userId: string; outputId: string | null; existingVideoUrl: string | null;
+  imagePrompts?: Array<{ n: number; prompt: string; style: string }>;
 }) {
   const qc = useQueryClient();
   const [idx, setIdx] = useState(0);
