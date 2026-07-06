@@ -21,6 +21,8 @@ export type RenderOptions = {
   signal?: AbortSignal;
   /** Force a specific container/codec instead of the browser's best choice. Used by the codec-fallback retry. */
   preferredContainer?: "webm" | "mp4";
+  /** When false, on_screen_text overlays are not drawn. Defaults to true. */
+  showOnScreenText?: boolean;
 };
 
 export type RenderResult = {
@@ -74,7 +76,7 @@ function drawScene(
   img: HTMLImageElement | null,
   scene: RenderScene,
   opts: {
-    progress: number; accent: string;
+    progress: number; accent: string; showOnScreenText?: boolean;
   },
 ) {
   const { width: W, height: H } = ctx.canvas;
@@ -111,7 +113,7 @@ function drawScene(
 
   // Optional on-screen text — big bold headline near the top, only when the
   // script explicitly provides one. No scene numbers, no chips, no titles.
-  const onScreen = (scene.on_screen_text ?? "").trim();
+  const onScreen = opts.showOnScreenText === false ? "" : (scene.on_screen_text ?? "").trim();
   if (onScreen) {
     const topGrad = ctx.createLinearGradient(0, 0, 0, H * 0.35);
     topGrad.addColorStop(0, "rgba(0,0,0,0.55)");
@@ -244,7 +246,7 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
 
   drawScene(ctx, sceneImgs[0] ?? fallbackImg, opts.scenes[0], {
-    progress: 0, accent: style.accent,
+    progress: 0, accent: style.accent, showOnScreenText: opts.showOnScreenText,
   });
 
   recorder.start(250);
@@ -279,7 +281,7 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
         acc += d; sceneIdx = i; localProgress = 1;
       }
       drawScene(ctx, sceneImgs[sceneIdx] ?? fallbackImg, opts.scenes[sceneIdx], {
-        progress: localProgress, accent: style.accent,
+        progress: localProgress, accent: style.accent, showOnScreenText: opts.showOnScreenText,
       });
       opts.onProgress?.(clamped / totalDuration);
       if (elapsed >= totalDuration) { resolve(); return; }
@@ -329,7 +331,15 @@ export type UgcOptions = {
   onStage?: (stage: UgcStage) => void;
   signal?: AbortSignal;
   preferredContainer?: "webm" | "mp4";
+  showOnScreenText?: boolean;
+  /** When provided, image generation is skipped and these data URLs are used directly. */
+  preloadedImages?: Array<string | null>;
 };
+
+/** Exposed so the UI can pre-generate & validate scene images before render. */
+export async function generateSceneImage(prompt: string, style: string, ratio: string): Promise<string | null> {
+  return fetchSceneImage(prompt, style, ratio);
+}
 
 function throwIfAborted(signal?: AbortSignal) {
   if (signal?.aborted) {
@@ -380,18 +390,24 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
   const total = opts.scenes.length;
 
   throwIfAborted(opts.signal);
-  let imgDone = 0;
-  opts.onStage?.({ kind: "images", done: 0, total });
-  const sceneImages = await Promise.all(
-    opts.scenes.map(async (scene, i) => {
-      const promptRow = opts.imagePrompts?.[i];
-      const prompt = promptRow?.prompt || scene.visual;
-      const url = await fetchSceneImage(prompt, style.descriptor, ratio);
-      imgDone += 1;
-      opts.onStage?.({ kind: "images", done: imgDone, total });
-      return url;
-    }),
-  );
+  let sceneImages: Array<string | null>;
+  if (opts.preloadedImages && opts.preloadedImages.length === total) {
+    opts.onStage?.({ kind: "images", done: total, total });
+    sceneImages = opts.preloadedImages;
+  } else {
+    let imgDone = 0;
+    opts.onStage?.({ kind: "images", done: 0, total });
+    sceneImages = await Promise.all(
+      opts.scenes.map(async (scene, i) => {
+        const promptRow = opts.imagePrompts?.[i];
+        const prompt = promptRow?.prompt || scene.visual;
+        const url = await fetchSceneImage(prompt, style.descriptor, ratio);
+        imgDone += 1;
+        opts.onStage?.({ kind: "images", done: imgDone, total });
+        return url;
+      }),
+    );
+  }
   throwIfAborted(opts.signal);
 
   const decodeCtx = new AudioContext();
@@ -422,6 +438,7 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
     fitToAudio: true,
     signal: opts.signal,
     preferredContainer: opts.preferredContainer,
+    showOnScreenText: opts.showOnScreenText,
     onProgress: (p) => opts.onStage?.({ kind: "render", progress: p }),
   });
   opts.onStage?.({ kind: "upload" });
