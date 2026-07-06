@@ -9,7 +9,7 @@ import { renderVideo, renderUgcVideo, generateSceneImage, type UgcStage } from "
 import { getOutput, saveOutput, type LocalOutput } from "@/lib/local-store";
 import { isBlobKey, getDataURL } from "@/lib/blob-store";
 import { toast } from "sonner";
-import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles, AlertTriangle, Bug, CheckCircle2, X, Package, Edit3, Save, Eye, EyeOff, ImageOff, Volume2 } from "lucide-react";
+import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles, AlertTriangle, Bug, CheckCircle2, X, Package, Edit3, Save, Eye, EyeOff, ImageOff, Volume2, ChevronDown, ChevronRight, History, FileText, Wand2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
 
@@ -458,13 +458,79 @@ function VideoPreview({
   const [playingScene, setPlayingScene] = useState<number | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
 
+  // --- Per-scene image prompts (editable) --------------------------------
+  const [editedPrompts, setEditedPrompts] = useState<string[]>(() =>
+    scenes.map((s, i) => imagePrompts?.[i]?.prompt || s.visual || ""),
+  );
+
+  // --- Script version history --------------------------------------------
+  type ScriptVersion = { at: string; scenes: Scene[]; prompts: string[] };
+  const historyKey = `cv:script-history:${projectId}`;
+  const [history, setHistory] = useState<ScriptVersion[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem(historyKey) || "[]") as ScriptVersion[]; } catch { return []; }
+  });
+  const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSnapshotRef = useRef<string>("");
+
+  // --- Collapsible panel state -------------------------------------------
+  const [openPrep, setOpenPrep] = useState(true);
+  const [openHistory, setOpenHistory] = useState(false);
+  const [openBundle, setOpenBundle] = useState(false);
+  const [openProgress, setOpenProgress] = useState(true);
+  const [bundleBusy, setBundleBusy] = useState(false);
+
   useEffect(() => {
     setEditedScenes(scenes);
+    setEditedPrompts(scenes.map((s, i) => imagePrompts?.[i]?.prompt || s.visual || ""));
     setScenesDirty(false);
     setSceneImages((prev) => (prev.length === scenes.length ? prev : scenes.map(() => null)));
     setImageErrors((prev) => (prev.length === scenes.length ? prev : scenes.map(() => null)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenes.length]);
+
+  // Autosave: debounce scene / prompt edits, save to output + push a version.
+  useEffect(() => {
+    if (!scenesDirty) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    setAutoSaveState("saving");
+    autoSaveTimer.current = setTimeout(async () => {
+      try {
+        const nextPrompts = editedPrompts.map((p, i) => ({
+          n: i + 1,
+          prompt: p,
+          style: imagePrompts?.[i]?.style || styleId || "cinematic",
+        }));
+        await saveOutput(projectId, { scenes: editedScenes, image_prompts: nextPrompts });
+        const snap: ScriptVersion = { at: new Date().toISOString(), scenes: editedScenes, prompts: editedPrompts };
+        const sig = JSON.stringify([snap.scenes, snap.prompts]);
+        if (sig !== lastSnapshotRef.current) {
+          lastSnapshotRef.current = sig;
+          setHistory((prev) => {
+            const next = [snap, ...prev].slice(0, 20);
+            try { localStorage.setItem(historyKey, JSON.stringify(next)); } catch { /* quota */ }
+            return next;
+          });
+        }
+        setScenesDirty(false);
+        setAutoSaveState("saved");
+        setTimeout(() => setAutoSaveState("idle"), 1500);
+      } catch {
+        setAutoSaveState("idle");
+      }
+    }, 1200);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editedScenes, editedPrompts, scenesDirty]);
+
+  function restoreVersion(v: ScriptVersion) {
+    setEditedScenes(v.scenes);
+    setEditedPrompts(v.prompts);
+    setScenesDirty(true);
+    toast.success("Restored — autosaving…");
+  }
+
 
   const isVertical = contentType === "short_reel" || platform === "tiktok" || platform === "instagram";
   const aspect = isVertical ? "aspect-[9/16] max-w-[340px]" : "aspect-video w-full";
@@ -571,7 +637,7 @@ function VideoPreview({
     return imagePrompts?.[i]?.style || styleId || "cinematic";
   }
   function promptForScene(i: number): string {
-    return imagePrompts?.[i]?.prompt || effectiveScenes[i]?.visual || "";
+    return (editedPrompts[i] ?? "").trim() || imagePrompts?.[i]?.prompt || effectiveScenes[i]?.visual || "";
   }
 
   async function generateOne(i: number) {
@@ -633,6 +699,57 @@ function VideoPreview({
   }
 
   const missingImages = effectiveScenes.map((_, i) => !sceneImages[i]).filter(Boolean).length;
+  const readyImages = totalScenes - missingImages;
+
+  async function downloadFinalBundle() {
+    if (bundleBusy) return;
+    setBundleBusy(true);
+    try {
+      const zip = new JSZip();
+      const slug = (title || "video").toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "video";
+      const out = await getOutput(projectId);
+      const finalScenes = effectiveScenes;
+      // Script text
+      const scriptText = finalScenes.map((s) =>
+        `Scene ${s.n} (${s.duration}) — ${s.visual}\nOn-screen: ${s.on_screen_text || "—"}\nVoiceover: ${s.voiceover}`
+      ).join("\n\n---\n\n");
+      zip.file("script.txt", scriptText);
+      zip.file("captions.txt", out?.captions ?? "");
+      zip.file("hashtags.txt", (out?.hashtags ?? []).join(" "));
+      const audioNotes = finalScenes.map((s) => `Scene ${s.n}: voice="alloy" | duration≈${s.duration} | line: ${s.voiceover}`).join("\n");
+      zip.file("audio-notes.txt", audioNotes);
+      zip.file("bundle.json", JSON.stringify({
+        title, platform, contentType, styleId,
+        scenes: finalScenes,
+        image_prompts: editedPrompts.map((p, i) => ({ n: i + 1, prompt: p, style: styleForScene(i) })),
+        captions: out?.captions ?? "",
+        hashtags: out?.hashtags ?? [],
+        voice: "alloy",
+        video_url: videoUrl,
+      }, null, 2));
+      if (videoUrl) {
+        try {
+          const res = await fetch(videoUrl);
+          if (res.ok) {
+            const blob = await res.blob();
+            const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+            zip.file(`video.${ext}`, blob);
+          }
+        } catch { /* signed URL might be expired */ }
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `${slug}-final.zip`; a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Final bundle downloaded");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Bundle failed");
+    } finally {
+      setBundleBusy(false);
+    }
+  }
+
 
   async function handleRender(container?: "webm" | "mp4") {
     if (rendering || ugcRendering || totalScenes === 0) return;
@@ -820,12 +937,25 @@ function VideoPreview({
       </div>
 
       {/* --- Scene prep, script editor, per-scene preview -------------------- */}
-      <div className="mb-4 rounded-xl border border-border bg-black/30 p-4 space-y-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="text-sm font-semibold flex items-center gap-2">
+      <div className="mb-4 rounded-xl border border-border bg-black/30">
+        <button
+          onClick={() => setOpenPrep((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold"
+        >
+          <span className="flex items-center gap-2">
+            {openPrep ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             <Edit3 className="w-4 h-4 text-[color:var(--neon-purple)]" /> Scene prep & script editor
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          </span>
+          <span className="text-xs text-muted-foreground flex items-center gap-2">
+            <span>{readyImages}/{totalScenes} images ready</span>
+            {autoSaveState === "saving" && <span className="flex items-center gap-1 text-amber-300"><Loader2 className="w-3 h-3 animate-spin" /> autosaving</span>}
+            {autoSaveState === "saved" && <span className="flex items-center gap-1 text-emerald-400"><CheckCircle2 className="w-3 h-3" /> saved</span>}
+          </span>
+        </button>
+
+        {openPrep && (
+        <div className="p-4 pt-0 space-y-4">
+        <div className="flex items-center justify-end gap-2 flex-wrap">
             <label className="flex items-center gap-2 text-xs cursor-pointer glass border border-border rounded-full px-3 py-1.5">
               <input
                 type="checkbox"
@@ -843,7 +973,7 @@ function VideoPreview({
               title="Generate an image for every scene, mark any that fail"
             >
               {validating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-              Validate images
+              Validate images {validating && `(${readyImages}/${totalScenes})`}
             </button>
             <button
               onClick={retryFailed}
@@ -858,8 +988,24 @@ function VideoPreview({
             >
               <Edit3 className="w-3.5 h-3.5" /> {editing ? "Close editor" : "Edit script"}
             </button>
-          </div>
         </div>
+
+        {/* Per-scene image validation progress */}
+        {(validating || imgBusy.size > 0) && (
+          <div>
+            <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+              <span>Image validation progress</span>
+              <span>{readyImages}/{totalScenes}</span>
+            </div>
+            <div className="flex gap-1">
+              {effectiveScenes.map((_, i) => {
+                const state = sceneImages[i] ? "done" : imgBusy.has(i) ? "active" : imageErrors[i] ? "err" : "pending";
+                const cls = state === "done" ? "bg-emerald-400" : state === "active" ? "gradient-primary animate-pulse" : state === "err" ? "bg-rose-500" : "bg-white/15";
+                return <div key={i} className={`flex-1 h-1.5 rounded-full ${cls}`} title={`Scene ${i + 1}: ${state}`} />;
+              })}
+            </div>
+          </div>
+        )}
 
         {missingImages > 0 && (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-200 px-3 py-2 text-xs flex items-start gap-2">
@@ -872,7 +1018,7 @@ function VideoPreview({
         )}
 
         {editing && (
-          <div className="rounded-lg border border-border bg-black/40 p-3 space-y-3 max-h-[420px] overflow-y-auto">
+          <div className="rounded-lg border border-border bg-black/40 p-3 space-y-3 max-h-[520px] overflow-y-auto">
             {editedScenes.map((s, i) => (
               <div key={s.n} className="border border-border/50 rounded-lg p-3 space-y-2">
                 <div className="flex items-center justify-between text-xs">
@@ -906,20 +1052,48 @@ function VideoPreview({
                     className="w-full bg-input/50 border border-border rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-[color:var(--neon-purple)]"
                   />
                 </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1"><Wand2 className="w-3 h-3" /> Image prompt</span>
+                    <button
+                      onClick={() => generateOne(i)}
+                      disabled={imgBusy.has(i) || validating || rendering || ugcRendering}
+                      className="text-[10px] rounded-md gradient-primary text-white px-2 py-0.5 flex items-center gap-1 disabled:opacity-60"
+                    >
+                      {imgBusy.has(i) ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                      Regenerate image
+                    </button>
+                  </div>
+                  <textarea
+                    value={editedPrompts[i] ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setEditedPrompts((prev) => { const n = [...prev]; n[i] = v; return n; });
+                      setScenesDirty(true);
+                    }}
+                    rows={3}
+                    placeholder="Full image prompt for this scene"
+                    className="w-full bg-input/50 border border-border rounded-md px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[color:var(--neon-purple)]"
+                  />
+                </div>
               </div>
             ))}
-            <div className="flex items-center justify-end gap-2 sticky bottom-0 bg-black/60 backdrop-blur pt-2">
-              <button
-                onClick={() => { setEditedScenes(scenes); setScenesDirty(false); setEditing(false); }}
-                className="rounded-lg glass border border-border px-3 py-1.5 text-xs"
-              >Cancel</button>
-              <button
-                onClick={saveEditedScenes}
-                disabled={!scenesDirty}
-                className="rounded-lg gradient-primary text-white px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-60"
-              >
-                <Save className="w-3.5 h-3.5" /> Save script
-              </button>
+            <div className="flex items-center justify-between gap-2 sticky bottom-0 bg-black/60 backdrop-blur pt-2">
+              <div className="text-[11px] text-muted-foreground">
+                {autoSaveState === "saving" ? "Autosaving…" : autoSaveState === "saved" ? "All changes saved" : "Edits autosave after 1.2s"}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setEditedScenes(scenes); setEditedPrompts(scenes.map((s, i) => imagePrompts?.[i]?.prompt || s.visual || "")); setScenesDirty(false); }}
+                  className="rounded-lg glass border border-border px-3 py-1.5 text-xs"
+                >Revert unsaved</button>
+                <button
+                  onClick={saveEditedScenes}
+                  className="rounded-lg gradient-primary text-white px-3 py-1.5 text-xs flex items-center gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" /> Save now
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -948,6 +1122,7 @@ function VideoPreview({
                     <div className="text-white text-[10px] font-medium leading-snug line-clamp-2 drop-shadow">{s.voiceover}</div>
                   </div>
                   <div className="absolute top-1 right-1 text-[9px] px-1.5 py-0.5 rounded bg-black/60 text-white/80">#{s.n}</div>
+                  <div className={`absolute top-1 left-1 w-2 h-2 rounded-full ${img ? "bg-emerald-400" : busy ? "bg-amber-300 animate-pulse" : err ? "bg-rose-500" : "bg-white/30"}`} title={img ? "Ready" : busy ? "Generating" : err ? "Failed" : "Not generated"} />
                 </div>
                 <div className="flex items-center gap-1 p-1.5 bg-black/70 border-t border-border">
                   <button
@@ -978,7 +1153,104 @@ function VideoPreview({
             );
           })}
         </div>
+        </div>
+        )}
       </div>
+
+      {/* --- Version history ------------------------------------------------- */}
+      <div className="mb-4 rounded-xl border border-border bg-black/30">
+        <button
+          onClick={() => setOpenHistory((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold"
+        >
+          <span className="flex items-center gap-2">
+            {openHistory ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            <History className="w-4 h-4 text-[color:var(--neon-purple)]" /> Script version history
+          </span>
+          <span className="text-xs text-muted-foreground">{history.length} snapshot{history.length === 1 ? "" : "s"}</span>
+        </button>
+        {openHistory && (
+          <div className="px-4 pb-4">
+            {history.length === 0 ? (
+              <div className="text-xs text-muted-foreground py-4 text-center">
+                No versions yet. Edit the script above — each autosave creates a snapshot you can revert to.
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                {history.map((v, i) => (
+                  <div key={v.at} className="flex items-center justify-between gap-2 text-xs border border-border/50 rounded-md px-3 py-2 bg-black/40">
+                    <div className="min-w-0">
+                      <div className="text-white/90">{i === 0 ? "Current" : `Version ${history.length - i}`}</div>
+                      <div className="text-muted-foreground text-[10px]">{new Date(v.at).toLocaleString()} · {v.scenes.length} scenes</div>
+                    </div>
+                    <button
+                      onClick={() => restoreVersion(v)}
+                      disabled={i === 0}
+                      className="rounded-md glass border border-border hover:bg-white/5 px-2.5 py-1 text-[11px] disabled:opacity-40"
+                    >
+                      {i === 0 ? "Latest" : "Restore"}
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => { setHistory([]); try { localStorage.removeItem(historyKey); } catch { /* ignore */ } }}
+                  className="text-[10px] text-muted-foreground hover:text-rose-400"
+                >Clear history</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* --- Export bundle --------------------------------------------------- */}
+      <div className="mb-4 rounded-xl border border-border bg-black/30">
+        <button
+          onClick={() => setOpenBundle((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold"
+        >
+          <span className="flex items-center gap-2">
+            {openBundle ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            <Package className="w-4 h-4 text-[color:var(--neon-purple)]" /> Export & download
+          </span>
+          <span className="text-xs text-muted-foreground">{videoUrl ? "video ready" : "render video first"}</span>
+        </button>
+        {openBundle && (
+          <div className="px-4 pb-4 space-y-3">
+            <div className="text-xs text-muted-foreground">
+              Downloads a ZIP with the rendered video, final script, captions, hashtags, image prompts, and audio notes.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={downloadFinalBundle}
+                disabled={bundleBusy}
+                className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2 disabled:opacity-60"
+              >
+                {bundleBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
+                Download final bundle
+              </button>
+              {videoUrl && (
+                <a href={videoUrl} download className="rounded-lg glass border border-border hover:bg-white/5 px-4 py-2 text-sm flex items-center gap-2">
+                  <VideoIcon className="w-4 h-4" /> Video only
+                </a>
+              )}
+              <button
+                onClick={() => {
+                  const txt = effectiveScenes.map((s) => `Scene ${s.n} (${s.duration})\nOn-screen: ${s.on_screen_text || "—"}\nVoiceover: ${s.voiceover}`).join("\n\n---\n\n");
+                  const blob = new Blob([txt], { type: "text/plain" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a"); a.href = url; a.download = "script.txt"; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="rounded-lg glass border border-border hover:bg-white/5 px-4 py-2 text-sm flex items-center gap-2"
+              >
+                <FileText className="w-4 h-4" /> Script only
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+
 
 
       {canceled && !rendering && !ugcRendering && (
@@ -988,36 +1260,62 @@ function VideoPreview({
       )}
 
       {(rendering || ugcRendering) && (
-        <div className="mb-4 rounded-xl border border-border bg-black/30 p-4">
-          <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-            <span>Real-time render progress</span>
-            <span>{stages.filter((s) => s.state === "done").length}/{stages.length} stages</span>
-          </div>
-          <div className="space-y-2">
-            {stages.map((s) => (
-              <div key={s.key} className="flex items-center gap-3">
-                <div className="w-5 flex-shrink-0">
-                  {s.state === "done" ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> :
-                   s.state === "active" ? <Loader2 className="w-4 h-4 animate-spin text-[color:var(--neon-pink)]" /> :
-                   <div className="w-2 h-2 rounded-full bg-white/20 mx-auto" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between text-xs">
-                    <span className={s.state === "pending" ? "text-muted-foreground" : "text-white"}>{s.label}</span>
-                    <span className="text-muted-foreground">{s.detail}</span>
+        <div className="mb-4 rounded-xl border border-border bg-black/30">
+          <button
+            onClick={() => setOpenProgress((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-xs"
+          >
+            <span className="flex items-center gap-2 text-white">
+              {openProgress ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[color:var(--neon-pink)]" />
+              Real-time render progress
+            </span>
+            <span className="text-muted-foreground">{stages.filter((s) => s.state === "done").length}/{stages.length} stages</span>
+          </button>
+          {openProgress && (
+            <div className="px-4 pb-4 space-y-2">
+              {stages.map((s) => (
+                <div key={s.key} className="flex items-center gap-3">
+                  <div className="w-5 flex-shrink-0">
+                    {s.state === "done" ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> :
+                     s.state === "active" ? <Loader2 className="w-4 h-4 animate-spin text-[color:var(--neon-pink)]" /> :
+                     <div className="w-2 h-2 rounded-full bg-white/20 mx-auto" />}
                   </div>
-                  <div className="mt-1 h-1 rounded-full bg-white/10 overflow-hidden">
-                    <div
-                      className={`h-full ${s.state === "done" ? "bg-emerald-400" : "gradient-primary"} transition-all`}
-                      style={{ width: `${Math.round(s.progress * 100)}%` }}
-                    />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between text-xs">
+                      <span className={s.state === "pending" ? "text-muted-foreground" : "text-white"}>{s.label}</span>
+                      <span className="text-muted-foreground">{s.detail}</span>
+                    </div>
+                    <div className="mt-1 h-1 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className={`h-full ${s.state === "done" ? "bg-emerald-400" : "gradient-primary"} transition-all`}
+                        style={{ width: `${Math.round(s.progress * 100)}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+              {/* Per-scene dot rail for image + audio stages */}
+              {ugcRendering && ugcStage && (ugcStage.kind === "images" || ugcStage.kind === "audio") && (
+                <div className="pt-2">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                    Per-scene {ugcStage.kind === "images" ? "image" : "voiceover"} status
+                  </div>
+                  <div className="flex gap-1">
+                    {effectiveScenes.map((_, i) => {
+                      const done = i < ugcStage.done;
+                      const active = i === ugcStage.done;
+                      const cls = done ? "bg-emerald-400" : active ? "gradient-primary animate-pulse" : "bg-white/15";
+                      return <div key={i} className={`flex-1 h-1.5 rounded-full ${cls}`} title={`Scene ${i + 1}`} />;
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
+
 
       {videoUrl ? (
         <video
