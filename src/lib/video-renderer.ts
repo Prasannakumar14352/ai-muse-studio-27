@@ -246,7 +246,7 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
 
   drawScene(ctx, sceneImgs[0] ?? fallbackImg, opts.scenes[0], {
-    progress: 0, accent: style.accent,
+    progress: 0, accent: style.accent, showOnScreenText: opts.showOnScreenText,
   });
 
   recorder.start(250);
