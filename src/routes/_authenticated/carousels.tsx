@@ -462,11 +462,32 @@ function CarouselsPage() {
         </Link>
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-rose-200">Couldn't load your carousels</div>
+            <div className="mt-1 text-xs text-rose-300/90 break-words">
+              {error instanceof Error ? error.message : String(error)}
+            </div>
+          </div>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="rounded-lg glass border border-rose-500/40 hover:bg-rose-500/20 text-rose-100 px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {isFetching ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            Retry
+          </button>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="grid md:grid-cols-2 gap-4">
           {[...Array(4)].map((_, i) => <div key={i} className="glass rounded-xl h-80 animate-pulse" />)}
         </div>
       ) : data && data.length > 0 ? (
+
         <div className="grid md:grid-cols-2 gap-4">
           {data.map((row) => {
             const generating = generatingId === row.id;
