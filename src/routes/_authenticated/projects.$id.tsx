@@ -1547,3 +1547,145 @@ function buildStages(
   }
   return order.map((k) => status[k]);
 }
+
+// -------------------- Collapsible card + brand prompt -------------------
+
+function CollapsibleCard({
+  id, title, icon, className, defaultOpen = true, children,
+}: {
+  id: string;
+  title: string;
+  icon?: React.ReactNode;
+  className?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const storageKey = `cv:collapse:${id}`;
+  const [open, setOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return defaultOpen;
+    const v = window.localStorage.getItem(storageKey);
+    return v == null ? defaultOpen : v === "1";
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem(storageKey, open ? "1" : "0"); } catch { /* quota */ }
+  }, [open, storageKey]);
+  return (
+    <div className={`glass rounded-2xl p-6 ${className ?? ""}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-2 text-left"
+        aria-expanded={open}
+      >
+        <h2 className="font-semibold flex items-center gap-2">{icon}{title}</h2>
+        {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+      </button>
+      {open && <div className="mt-3">{children}</div>}
+    </div>
+  );
+}
+
+function BrandPrompt({ projectId }: { projectId: string }) {
+  const storageKey = `cv:brand:${projectId}`;
+  const collapseKey = `cv:collapse:brand:${projectId}`;
+  const [brand, setBrand] = useState("");
+  const [handle, setHandle] = useState("");
+  const [saved, setSaved] = useState<{ brand: string; handle: string } | null>(null);
+  const [open, setOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem(collapseKey) !== "0";
+  });
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (raw) {
+        const v = JSON.parse(raw) as { brand?: string; handle?: string };
+        setBrand(v.brand ?? "");
+        setHandle(v.handle ?? "");
+        if (v.brand || v.handle) setSaved({ brand: v.brand ?? "", handle: v.handle ?? "" });
+      }
+    } catch { /* ignore */ }
+  }, [storageKey]);
+
+  useEffect(() => {
+    try { window.localStorage.setItem(collapseKey, open ? "1" : "0"); } catch { /* quota */ }
+  }, [open, collapseKey]);
+
+  function save() {
+    const normalizedHandle = handle.trim().replace(/^@+/, "");
+    const value = { brand: brand.trim(), handle: normalizedHandle };
+    try { window.localStorage.setItem(storageKey, JSON.stringify(value)); } catch { /* quota */ }
+    setHandle(normalizedHandle);
+    setSaved(value);
+    toast.success("Brand saved — we'll bake it into future generations");
+  }
+
+  const hasSaved = !!(saved?.brand || saved?.handle);
+  const followLine = saved?.handle
+    ? `Follow @${saved.handle} for more like this`
+    : saved?.brand
+      ? `Follow ${saved.brand} for more like this`
+      : "";
+
+  return (
+    <div className="glass rounded-2xl p-6 border border-[color:var(--neon-purple)]/30">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-2 text-left"
+        aria-expanded={open}
+      >
+        <h2 className="font-semibold flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-[color:var(--neon-pink)]" />
+          Your brand / Instagram handle
+          {hasSaved && <span className="text-xs text-muted-foreground font-normal">· {saved?.handle ? `@${saved.handle}` : saved?.brand}</span>}
+        </h2>
+        {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Whenever a script, caption or slide ends with a <em>"follow for more"</em> style call-to-action,
+            we'll swap in your brand name or <span className="text-white">@handle</span> so every carousel and video
+            drives viewers back to you. Fill this in once per project.
+          </p>
+          <div className="grid md:grid-cols-2 gap-3">
+            <label className="text-xs text-muted-foreground space-y-1">
+              <span>Brand name</span>
+              <input
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                placeholder="e.g. Northwind Studio"
+                maxLength={80}
+                className="w-full rounded-lg bg-black/30 border border-border px-3 py-2 text-sm text-foreground"
+              />
+            </label>
+            <label className="text-xs text-muted-foreground space-y-1">
+              <span>Instagram handle</span>
+              <input
+                value={handle}
+                onChange={(e) => setHandle(e.target.value)}
+                placeholder="@yourhandle"
+                maxLength={40}
+                className="w-full rounded-lg bg-black/30 border border-border px-3 py-2 text-sm text-foreground"
+              />
+            </label>
+          </div>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="text-xs text-muted-foreground">
+              {followLine ? <>Will render as: <span className="text-white">{followLine}</span></> : "No CTA saved yet."}
+            </div>
+            <button
+              type="button"
+              onClick={save}
+              className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" /> Save brand
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
