@@ -275,7 +275,7 @@ function CarouselsPage() {
     }
   }
 
-  }
+
 
   async function retrySlide(row: CarouselRow, idx: number) {
     const prompt = row.image_prompts[idx];
