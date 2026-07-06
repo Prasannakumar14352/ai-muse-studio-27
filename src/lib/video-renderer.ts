@@ -46,20 +46,24 @@ async function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-function pickRecorderMime(): { mime: string; ext: "mp4" | "webm" } {
-  // Prefer WebM — MediaRecorder's MP4 output in Chromium is fragmented and
-  // frequently refuses to play back in a plain <video> tag or QuickTime.
-  // WebM/VP9 is universally playable in every modern browser we render into.
-  const candidates: Array<{ mime: string; ext: "mp4" | "webm" }> = [
+function pickRecorderMime(preferred?: "webm" | "mp4"): { mime: string; ext: "mp4" | "webm" } {
+  const webmCandidates: Array<{ mime: string; ext: "mp4" | "webm" }> = [
     { mime: "video/webm;codecs=vp9,opus", ext: "webm" },
     { mime: "video/webm;codecs=vp9", ext: "webm" },
     { mime: "video/webm;codecs=vp8,opus", ext: "webm" },
     { mime: "video/webm;codecs=vp8", ext: "webm" },
     { mime: "video/webm", ext: "webm" },
+  ];
+  const mp4Candidates: Array<{ mime: string; ext: "mp4" | "webm" }> = [
+    { mime: "video/mp4;codecs=avc1.42E01E,mp4a.40.2", ext: "mp4" },
     { mime: "video/mp4;codecs=avc1.42E01E", ext: "mp4" },
     { mime: "video/mp4", ext: "mp4" },
   ];
-  for (const c of candidates) {
+  const order =
+    preferred === "mp4" ? [...mp4Candidates, ...webmCandidates]
+    : preferred === "webm" ? [...webmCandidates, ...mp4Candidates]
+    : [...webmCandidates, ...mp4Candidates];
+  for (const c of order) {
     if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(c.mime)) return c;
   }
   return { mime: "video/webm", ext: "webm" };
