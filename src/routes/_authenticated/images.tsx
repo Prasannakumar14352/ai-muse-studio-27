@@ -3,11 +3,29 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
-import { Loader2, Wand2, Download, Save, Image as ImageIcon } from "lucide-react";
+import { Loader2, Wand2, Download, Save, Image as ImageIcon, RefreshCw, Bug, Copy } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 
 const RATIOS = ["1:1", "9:16", "16:9", "4:5"];
+
+type DebugInfo = {
+  requestedAt: string;
+  durationMs: number;
+  request: { prompt: string; style: string; ratio: string; endpoint: string };
+  response?: {
+    model?: string;
+    size?: string;
+    quality?: string;
+    n?: number;
+    fullPrompt?: string;
+    originalPrompt?: string;
+    stylePrefix?: string | null;
+  };
+  errors: string[];
+  successCount: number;
+  failureCount: number;
+};
 
 function ImagesPage() {
   const [prompt, setPrompt] = useState("");
@@ -15,41 +33,75 @@ function ImagesPage() {
   const [ratio, setRatio] = useState("1:1");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<Array<{ id: string; prompt: string; style: string; ratio: string; image: string }>>([]);
+  const [lastRun, setLastRun] = useState<{ prompt: string; style: string; ratio: string } | null>(null);
+  const [debug, setDebug] = useState<DebugInfo | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
 
-  async function generate() {
-    if (!prompt.trim()) return toast.error("Enter a prompt");
+  async function runGeneration(p: string, s: string, r: string) {
     setLoading(true);
-    const styleLabel = STYLES.find((s) => s.id === style)?.label ?? style;
+    const styleLabel = STYLES.find((x) => x.id === s)?.label ?? s;
+    const startedAt = Date.now();
+    const errors: string[] = [];
+    let lastMeta: DebugInfo["response"] | undefined;
     try {
-      // Generate 4 variations in parallel via the AI Gateway server route.
-      const responses = await Promise.all(
+      const settled = await Promise.allSettled(
         Array.from({ length: 4 }).map(() =>
           fetch("/api/generate-image", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt, style: styleLabel, ratio }),
-          }).then(async (r) => {
-            if (!r.ok) throw new Error((await r.json()).error || "Failed");
-            return r.json() as Promise<{ image: string }>;
+            body: JSON.stringify({ prompt: p, style: styleLabel, ratio: r }),
+          }).then(async (res) => {
+            const json = (await res.json().catch(() => ({}))) as {
+              image?: string;
+              error?: string;
+              debug?: DebugInfo["response"];
+            };
+            if (!res.ok || !json.image) throw new Error(json.error || `HTTP ${res.status}`);
+            if (json.debug) lastMeta = json.debug;
+            return json as { image: string; debug?: DebugInfo["response"] };
           })
         )
       );
-      setResults((prev) => [
-        ...responses.map((res) => ({
-          id: crypto.randomUUID(),
-          prompt,
-          style,
-          ratio,
-          image: res.image,
-        })),
-        ...prev,
-      ]);
-      toast.success("Generated 4 concepts");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Generation failed");
+
+      const ok: { image: string }[] = [];
+      settled.forEach((x) => {
+        if (x.status === "fulfilled") ok.push(x.value);
+        else errors.push(x.reason instanceof Error ? x.reason.message : String(x.reason));
+      });
+
+      if (ok.length) {
+        setResults((prev) => [
+          ...ok.map((res) => ({ id: crypto.randomUUID(), prompt: p, style: s, ratio: r, image: res.image })),
+          ...prev,
+        ]);
+        setLastRun({ prompt: p, style: s, ratio: r });
+        toast.success(`Generated ${ok.length} of 4 concepts`);
+      } else {
+        toast.error(errors[0] || "Generation failed");
+      }
+
+      setDebug({
+        requestedAt: new Date(startedAt).toISOString(),
+        durationMs: Date.now() - startedAt,
+        request: { prompt: p, style: styleLabel, ratio: r, endpoint: "/api/generate-image" },
+        response: lastMeta,
+        errors,
+        successCount: ok.length,
+        failureCount: errors.length,
+      });
     } finally {
       setLoading(false);
     }
+  }
+
+  async function generate() {
+    if (!prompt.trim()) return toast.error("Enter a prompt");
+    await runGeneration(prompt, style, ratio);
+  }
+
+  async function regenerateExact() {
+    if (!lastRun) return toast.error("Generate an image first");
+    await runGeneration(lastRun.prompt, lastRun.style, lastRun.ratio);
   }
 
   async function save(item: { prompt: string; style: string; ratio: string }) {
@@ -65,6 +117,9 @@ function ImagesPage() {
   const aspectClass: Record<string, string> = {
     "1:1": "aspect-square", "9:16": "aspect-[9/16]", "16:9": "aspect-video", "4:5": "aspect-[4/5]",
   };
+
+  const styleLabelPreview = STYLES.find((s) => s.id === style)?.label ?? style;
+  const previewFullPrompt = prompt ? `${styleLabelPreview} style. ${prompt}` : "";
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -97,11 +152,91 @@ function ImagesPage() {
                 className={`px-3 py-1.5 rounded-lg text-xs border ${ratio === r ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>{r}</button>
             ))}
           </div>
-          <button onClick={generate} disabled={loading}
-            className="rounded-lg gradient-primary text-white px-6 py-2.5 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)]">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} Generate
-          </button>
+          <div className="flex gap-2">
+            <button onClick={regenerateExact} disabled={loading || !lastRun}
+              title={lastRun ? "Rerun with the exact last prompt & settings" : "Generate once first"}
+              className="rounded-lg glass border border-border px-4 py-2.5 text-sm font-medium flex items-center gap-2 disabled:opacity-40">
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Regenerate exact
+            </button>
+            <button onClick={generate} disabled={loading}
+              className="rounded-lg gradient-primary text-white px-6 py-2.5 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)]">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} Generate
+            </button>
+          </div>
         </div>
+
+        {/* Exact prompt preview — what actually gets sent to /api/generate-image */}
+        {prompt && (
+          <div className="rounded-lg border border-border bg-black/30 p-3">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                Exact prompt sent to /api/generate-image
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(previewFullPrompt);
+                  toast.success("Prompt copied");
+                }}
+                className="text-xs text-muted-foreground hover:text-white flex items-center gap-1"
+              >
+                <Copy className="w-3 h-3" /> Copy
+              </button>
+            </div>
+            <code className="block text-xs font-mono text-white/90 whitespace-pre-wrap break-words">
+              {previewFullPrompt}
+            </code>
+          </div>
+        )}
+      </div>
+
+      {/* Debug panel */}
+      <div className="glass rounded-2xl">
+        <button
+          onClick={() => setShowDebug((v) => !v)}
+          className="w-full flex items-center justify-between px-6 py-3 text-sm"
+        >
+          <span className="flex items-center gap-2">
+            <Bug className="w-4 h-4" /> Debug panel
+            {debug && (
+              <span className="text-xs text-muted-foreground">
+                · {debug.successCount}/{debug.successCount + debug.failureCount} ok · {debug.durationMs}ms
+              </span>
+            )}
+          </span>
+          <span className="text-xs text-muted-foreground">{showDebug ? "Hide" : "Show"}</span>
+        </button>
+        {showDebug && (
+          <div className="px-6 pb-6 space-y-3 text-xs">
+            {!debug ? (
+              <div className="text-muted-foreground">No generations yet.</div>
+            ) : (
+              <>
+                <Section title="Request">
+                  <pre className="bg-black/40 rounded p-3 overflow-auto">{JSON.stringify(debug.request, null, 2)}</pre>
+                </Section>
+                <Section title="Response metadata (model & params)">
+                  <pre className="bg-black/40 rounded p-3 overflow-auto">
+                    {JSON.stringify(debug.response ?? { note: "No metadata returned" }, null, 2)}
+                  </pre>
+                </Section>
+                <Section title={`Errors (${debug.errors.length})`}>
+                  {debug.errors.length === 0 ? (
+                    <div className="text-emerald-400">None</div>
+                  ) : (
+                    <ul className="space-y-1">
+                      {debug.errors.map((e, i) => (
+                        <li key={i} className="text-rose-400 font-mono break-all">{e}</li>
+                      ))}
+                    </ul>
+                  )}
+                </Section>
+                <div className="text-muted-foreground">
+                  Started {debug.requestedAt} · Took {debug.durationMs}ms
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {results.length === 0 ? (
@@ -130,6 +265,15 @@ function ImagesPage() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{title}</div>
+      {children}
     </div>
   );
 }
