@@ -10,7 +10,7 @@ import { listOutputs, saveOutput, deleteOutput, type CarouselSlide } from "@/lib
 import {
   putDataURL, getObjectURL, getDataURL, deleteBlobsByPrefix, isBlobKey, makeBlobKey,
 } from "@/lib/blob-store";
-import { LocalOnlyBanner } from "@/components/local-only-banner";
+
 import { confirmDialog } from "@/components/confirm-dialog";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
@@ -451,7 +451,7 @@ function CarouselsPage() {
 
   return (
     <div className="space-y-6">
-      <LocalOnlyBanner />
+      
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold">Your <span className="gradient-text">Carousels</span></h1>
