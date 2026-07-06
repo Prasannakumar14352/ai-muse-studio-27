@@ -48,9 +48,10 @@ export const Route = createFileRoute("/api/generate-image")({
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "google/gemini-2.5-flash-image",
+              model: "openai/gpt-image-2",
               prompt: fullPrompt,
               size,
+              quality: "low",
               n: 1,
             }),
           }
