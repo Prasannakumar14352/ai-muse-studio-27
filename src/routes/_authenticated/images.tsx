@@ -137,23 +137,20 @@ function ImagesPage() {
       };
       setDebug(info);
 
-      // Log to Supabase so the debug panel can load history later.
-      const { data: u } = await supabase.auth.getUser();
-      if (u.user) {
-        await supabase.from("image_generations").insert({
-          user_id: u.user.id,
-          prompt: p,
-          style: s,
-          ratio: r,
-          full_prompt: lastMeta?.fullPrompt ?? `${styleLabel} style. ${p}`,
-          request: info.request,
-          response: info.response ?? {},
-          errors: info.errors,
-          success_count: info.successCount,
-          failure_count: info.failureCount,
-          duration_ms: info.durationMs,
-        } as never);
-      }
+      // Save log locally (per-user browser storage).
+      await pushImageGenLog({
+        prompt: p,
+        style: s,
+        ratio: r,
+        full_prompt: lastMeta?.fullPrompt ?? `${styleLabel} style. ${p}`,
+        request: info.request,
+        response: info.response ?? {},
+        errors: info.errors,
+        success_count: info.successCount,
+        failure_count: info.failureCount,
+        duration_ms: info.durationMs,
+      });
+
     } finally {
       setLoading(false);
     }
