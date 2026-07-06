@@ -6,10 +6,12 @@ import JSZip from "jszip";
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
+import { listOutputs, saveOutput, deleteOutput } from "@/lib/local-store";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
   Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2,
 } from "lucide-react";
+
 
 export const Route = createFileRoute("/_authenticated/carousels")({
   head: () => ({
