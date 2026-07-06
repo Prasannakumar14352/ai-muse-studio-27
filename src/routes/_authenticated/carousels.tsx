@@ -167,7 +167,111 @@ function CarouselsPage() {
     } finally {
       setGeneratingId(null);
       setProgress(null);
+  }
+
+  async function regenerateFailed(row: CarouselRow) {
+    const slides = row.carousel_images ?? [];
+    const failedIdxs: number[] = [];
+    row.image_prompts.forEach((_, i) => {
+      const src = slides[i];
+      const diag = row.slide_diagnostics[String(i)];
+      if (!src || (diag && !diag.ok)) failedIdxs.push(i);
+    });
+    if (failedIdxs.length === 0) return toast.info("No failed or missing slides to regenerate");
+    const styleLabel = STYLES.find((s) => s.id === (row.style ?? ""))?.label ?? row.style ?? "cinematic";
+    const cfg = getLayout(row);
+    setGeneratingId(row.id);
+    setProgress({ done: 0, total: failedIdxs.length });
+    try {
+      const nextImages = [...(slides.length ? slides : new Array(row.image_prompts.length).fill(null))];
+      const nextDiag: SlideDiagMap = { ...row.slide_diagnostics };
+      let done = 0;
+      await Promise.all(
+        failedIdxs.map(async (i) => {
+          const prompt = row.image_prompts[i];
+          const r = await generateOneSlide(prompt, styleLabel, cfg.ratio);
+          nextImages[i] = r.image;
+          nextDiag[String(i)] = r.diag;
+          done += 1;
+          setProgress({ done, total: failedIdxs.length });
+        }),
+      );
+      await persistSlides(row, nextImages, nextDiag);
+      const okCount = failedIdxs.filter((i) => nextImages[i]).length;
+      toast[okCount === failedIdxs.length ? "success" : "warning"](`${okCount}/${failedIdxs.length} slides regenerated`);
+      qc.invalidateQueries({ queryKey: ["carousels"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Regenerate failed");
+    } finally {
+      setGeneratingId(null);
+      setProgress(null);
     }
+  }
+
+  async function exportReel(row: CarouselRow) {
+    const slides = (row.carousel_images ?? []).filter(Boolean) as string[];
+    if (slides.length === 0) return toast.error("Generate slides first");
+    if (!("MediaRecorder" in window)) return toast.error("MediaRecorder not supported in this browser");
+    const cfg = getLayout(row);
+    setExportingId(row.id);
+    try {
+      const dims = cfg.ratio === "9:16" ? { w: 720, h: 1280 }
+        : cfg.ratio === "16:9" ? { w: 1280, h: 720 }
+        : cfg.ratio === "4:5" ? { w: 864, h: 1080 }
+        : { w: 1080, h: 1080 };
+      const canvas = document.createElement("canvas");
+      canvas.width = dims.w; canvas.height = dims.h;
+      const ctx = canvas.getContext("2d")!;
+      const imgs = await Promise.all(slides.map((src) => new Promise<HTMLImageElement>((res, rej) => {
+        const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Image load failed")); im.src = src;
+      })));
+      const stream = canvas.captureStream(30);
+      const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      const stopped = new Promise<Blob>((res) => { rec.onstop = () => res(new Blob(chunks, { type: rec.mimeType || "video/webm" })); });
+      rec.start();
+
+      const perSlideMs = 2200;
+      const totalMs = perSlideMs * imgs.length;
+      const start = performance.now();
+      await new Promise<void>((resolve) => {
+        function frame(t: number) {
+          const elapsed = t - start;
+          if (elapsed >= totalMs) { resolve(); return; }
+          const idx = Math.min(imgs.length - 1, Math.floor(elapsed / perSlideMs));
+          const local = (elapsed - idx * perSlideMs) / perSlideMs;
+          const zoom = 1 + local * 0.15;
+          const im = imgs[idx];
+          const scale = Math.max(canvas.width / im.width, canvas.height / im.height) * zoom;
+          const dw = im.width * scale, dh = im.height * scale;
+          const dx = (canvas.width - dw) / 2, dy = (canvas.height - dh) / 2;
+          ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(im, dx, dy, dw, dh);
+          // fade between slides
+          const fadeIn = Math.min(1, local / 0.15);
+          const fadeOut = Math.min(1, (1 - local) / 0.15);
+          const alpha = 1 - Math.min(fadeIn, fadeOut);
+          if (alpha > 0) {
+            ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+          requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+      });
+      rec.stop();
+      const blob = await stopped;
+      triggerDownload(blob, `${slugify(row.title)}-reel.webm`);
+      toast.success("Reel exported");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Reel export failed");
+    } finally {
+      setExportingId(null);
+    }
+  }
+
   }
 
   async function retrySlide(row: CarouselRow, idx: number) {
