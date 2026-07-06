@@ -337,7 +337,7 @@ function CarouselsPage() {
   }
 
   async function exportZip(row: CarouselRow) {
-    const slides = (row.carousel_images ?? []).filter(Boolean) as string[];
+    const slides = await resolveSlideDataURLs(row);
     if (slides.length === 0) return toast.error("Generate slides first");
     setExportingId(row.id);
     try {
@@ -357,7 +357,7 @@ function CarouselsPage() {
   }
 
   async function exportPdf(row: CarouselRow) {
-    const slides = (row.carousel_images ?? []).filter(Boolean) as string[];
+    const slides = await resolveSlideDataURLs(row);
     if (slides.length === 0) return toast.error("Generate slides first");
     const cfg = getLayout(row);
     setExportingId(row.id);
@@ -382,12 +382,13 @@ function CarouselsPage() {
     setDeletingId(row.id);
     try {
       await deleteOutput(row.id);
+      await deleteBlobsByPrefix(`carousel:${row.id}:`);
+      // best-effort clear of blob keys created by putDataURL (they store the raw id without prefix)
       const { error } = await supabase.from("projects").delete().eq("id", row.id);
       if (error) throw error;
       toast.success("Carousel deleted");
       qc.invalidateQueries({ queryKey: ["carousels"] });
       qc.invalidateQueries({ queryKey: ["projects"] });
-
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Delete failed");
     } finally {
