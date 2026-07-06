@@ -110,6 +110,8 @@ function AdminPanel() {
         <Metric icon={Zap} label="Active subs" value={users?.filter((u) => u.sub).length ?? 0} />
       </div>
 
+      <CreditGuide />
+
       <div className="glass rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
