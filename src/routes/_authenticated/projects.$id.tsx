@@ -345,59 +345,56 @@ function VideoPreview({
       {videoUrl ? (
         <video controls src={videoUrl} className={`${aspect} mx-auto rounded-xl bg-black w-full`} />
       ) : (
+        <div className={`relative ${aspect} mx-auto rounded-xl overflow-hidden bg-black`}>
+          <img
+            key={idx}
+            src={styleImage}
+            alt={scene.visual}
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ transform: `scale(${1.05 + progress * 0.08})`, transition: "transform 100ms linear" }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
 
-        </button>
-      </div>
-
-      <div className={`relative ${aspect} mx-auto rounded-xl overflow-hidden bg-black`}>
-        <img
-          key={idx}
-          src={styleImage}
-          alt={scene.visual}
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: `scale(${1.05 + progress * 0.08})`, transition: "transform 100ms linear" }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-
-        <div className="absolute top-0 left-0 right-0 p-3 flex gap-1">
-          {scenes.map((_, i) => (
-            <div key={i} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
-              <div className="h-full bg-white" style={{ width: `${i < idx ? 100 : i === idx ? progress * 100 : 0}%` }} />
-            </div>
-          ))}
-        </div>
-
-        <div className="absolute top-6 left-4 right-4">
-          <div className="text-[10px] uppercase tracking-widest text-white/70">{platform ?? "preview"}</div>
-          <div className="text-sm text-white font-semibold line-clamp-1">{title}</div>
-        </div>
-
-        <div className="absolute bottom-16 left-4 right-4 text-white">
-          <div className="inline-block text-[10px] uppercase tracking-widest bg-white/15 backdrop-blur px-2 py-0.5 rounded">
-            Scene {scene.n} · {scene.duration}
+          <div className="absolute top-0 left-0 right-0 p-3 flex gap-1">
+            {scenes.map((_, i) => (
+              <div key={i} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
+                <div className="h-full bg-white" style={{ width: `${i < idx ? 100 : i === idx ? progress * 100 : 0}%` }} />
+              </div>
+            ))}
           </div>
-          <div className="mt-2 text-lg md:text-xl font-semibold leading-snug drop-shadow-lg">{scene.visual}</div>
-          <div className="mt-1 text-xs md:text-sm text-white/80 italic">🎙 {scene.voiceover}</div>
-        </div>
 
-        <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-3">
-          <button
-            onClick={() => { setIdx((i) => (i - 1 + totalScenes) % totalScenes); setProgress(0); }}
-            className="w-9 h-9 rounded-full bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center text-white">
-            <SkipBack className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setPlaying((p) => !p)}
-            className="w-11 h-11 rounded-full gradient-primary text-white flex items-center justify-center shadow-lg">
-            {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
-          </button>
-          <button
-            onClick={() => { setIdx((i) => (i + 1) % totalScenes); setProgress(0); }}
-            className="w-9 h-9 rounded-full bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center text-white">
-            <SkipForward className="w-4 h-4" />
-          </button>
+          <div className="absolute top-6 left-4 right-4">
+            <div className="text-[10px] uppercase tracking-widest text-white/70">{platform ?? "preview"}</div>
+            <div className="text-sm text-white font-semibold line-clamp-1">{title}</div>
+          </div>
+
+          <div className="absolute bottom-16 left-4 right-4 text-white">
+            <div className="inline-block text-[10px] uppercase tracking-widest bg-white/15 backdrop-blur px-2 py-0.5 rounded">
+              Scene {scene.n} · {scene.duration}
+            </div>
+            <div className="mt-2 text-lg md:text-xl font-semibold leading-snug drop-shadow-lg">{scene.visual}</div>
+            <div className="mt-1 text-xs md:text-sm text-white/80 italic">🎙 {scene.voiceover}</div>
+          </div>
+
+          <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-3">
+            <button
+              onClick={() => { setIdx((i) => (i - 1 + totalScenes) % totalScenes); setProgress(0); }}
+              className="w-9 h-9 rounded-full bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center text-white">
+              <SkipBack className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setPlaying((p) => !p)}
+              className="w-11 h-11 rounded-full gradient-primary text-white flex items-center justify-center shadow-lg">
+              {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+            </button>
+            <button
+              onClick={() => { setIdx((i) => (i + 1) % totalScenes); setProgress(0); }}
+              className="w-9 h-9 rounded-full bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center text-white">
+              <SkipForward className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
