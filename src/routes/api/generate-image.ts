@@ -79,6 +79,15 @@ export const Route = createFileRoute("/api/generate-image")({
         return new Response(
           JSON.stringify({
             image: b64 ? `data:image/png;base64,${b64}` : url,
+            debug: {
+              model: "openai/gpt-image-2",
+              size,
+              quality: "low",
+              n: 1,
+              fullPrompt,
+              originalPrompt: prompt,
+              stylePrefix: stylePrefix || null,
+            },
           }),
           { headers: { "Content-Type": "application/json" } }
         );
