@@ -105,7 +105,10 @@ function PricingPage() {
         })}
       </div>
 
+      <CreditPacksSection />
+
       <CreditsEstimator plan={estimatorPlan} onChangePlan={setEstimatorPlan} />
+
 
       <PricingFAQ />
 
