@@ -120,6 +120,7 @@ function CarouselsPage() {
   }
 
   async function generateOneSlide(
+    projectId: string, idx: number,
     prompt: Prompt, styleLabel: string, ratio: string,
   ): Promise<{ image: string | null; diag: SlideDiag }> {
     const start = Date.now();
@@ -136,7 +137,10 @@ function CarouselsPage() {
           diag: { at: new Date().toISOString(), ok: false, durationMs: Date.now() - start, httpStatus: res.status, error: j.error ?? `HTTP ${res.status}` },
         };
       }
-      return { image: j.image, diag: { at: new Date().toISOString(), ok: true, durationMs: Date.now() - start, httpStatus: res.status } };
+      // Persist bytes into IndexedDB and return a small reference key that
+      // fits in localStorage alongside other output metadata.
+      const key = await putDataURL(`carousel:${projectId}:${idx}`, j.image);
+      return { image: key, diag: { at: new Date().toISOString(), ok: true, durationMs: Date.now() - start, httpStatus: res.status } };
     } catch (e) {
       return {
         image: null,
