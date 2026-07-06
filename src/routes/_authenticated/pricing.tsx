@@ -5,7 +5,7 @@ import { getPlanGenerationEstimate, ASSET_META, type AssetKey } from "@/lib/cred
 import { useAccess } from "@/lib/access";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
-import { createRazorpayOrder, verifyRazorpayPayment } from "@/lib/razorpay.functions";
+import { createRazorpayOrder, verifyRazorpayPayment, createRazorpayPlanOrder } from "@/lib/razorpay.functions";
 import { toast } from "sonner";
 import { Check, Sparkles, Crown, X, Image as ImageIcon, Layers, Film, Video, ChevronDown, Calculator, Minus, Plus, Zap, Loader2 } from "lucide-react";
 
