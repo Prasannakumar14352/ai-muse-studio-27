@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { STYLES } from "@/lib/constants";
 import { pushImageGenLog, listImageGenLogs } from "@/lib/local-store";
 import { LocalOnlyBanner } from "@/components/local-only-banner";
+import { deductUsage, useAccess, canGenerate } from "@/lib/access";
 import { Loader2, Wand2, Download, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
