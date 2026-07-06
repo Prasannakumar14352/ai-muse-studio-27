@@ -189,7 +189,9 @@ function ProjectView() {
         userId={project.user_id}
         outputId={output?.id ?? null}
         existingVideoUrl={output?.video_url ?? null}
+        imagePrompts={prompts}
       />
+
 
 
 
