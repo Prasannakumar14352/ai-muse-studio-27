@@ -47,10 +47,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="h-screen flex overflow-hidden">
       {/* Sidebar desktop */}
       <aside className="hidden md:flex md:w-64 shrink-0 flex-col border-r border-border/50 bg-sidebar/60 backdrop-blur-xl overflow-y-auto">
-        <Link to="/dashboard" className="flex items-center gap-3 px-4 py-4 border-b border-border/50">
-          <img src={brandLogo.url} alt="Prodxstore" className="h-9 w-auto object-contain" />
+        <Link to="/dashboard" className="flex items-center justify-center gap-4 px-4 py-4 border-b border-border/50">
+          <img src={brandLogo.url} alt="CreatorVault AI" className="h-9 w-auto object-contain" />
           <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
-            Prodxstore AI
+            CreatorVault AI
           </span>
         </Link>
         <nav className="flex-1 px-3 py-4 space-y-1">
@@ -73,14 +73,16 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <Link to="/dashboard" className="flex items-center gap-2.5">
-          <img src={brandLogo.url} alt="Prodxstore" className="h-7 w-auto object-contain" />
+      <div className="md:hidden fixed top-0 inset-x-0 z-40 grid grid-cols-[auto_1fr_auto] items-center px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+        <Link to="/dashboard" className="flex items-center">
+          <img src={brandLogo.url} alt="CreatorVault AI" className="h-7 w-auto object-contain" />
+        </Link>
+        <Link to="/dashboard" className="justify-self-center">
           <span className="text-base font-bold tracking-tight bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
-            Prodxstore AI
+            CreatorVault AI
           </span>
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 justify-self-end">
           <CreditsChip />
           <button onClick={() => setOpen(!open)} className="p-2 rounded-lg hover:bg-white/5">
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
