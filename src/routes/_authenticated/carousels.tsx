@@ -231,8 +231,26 @@ function CarouselsPage() {
     }
   }
 
+  async function resolveSlideURLs(row: CarouselRow): Promise<string[]> {
+    const refs = (row.carousel_images ?? []).filter(Boolean) as string[];
+    return Promise.all(refs.map(async (r) => (isBlobKey(r) ? ((await getObjectURL(r)) ?? "") : r)));
+  }
+  async function resolveSlideDataURLs(row: CarouselRow): Promise<string[]> {
+    const refs = (row.carousel_images ?? []).filter(Boolean) as string[];
+    const out: string[] = [];
+    for (const r of refs) {
+      if (isBlobKey(r)) {
+        const d = await getDataURL(r);
+        if (d) out.push(d);
+      } else {
+        out.push(r);
+      }
+    }
+    return out;
+  }
+
   async function exportReel(row: CarouselRow) {
-    const slides = (row.carousel_images ?? []).filter(Boolean) as string[];
+    const slides = await resolveSlideURLs(row);
     if (slides.length === 0) return toast.error("Generate slides first");
     if (!("MediaRecorder" in window)) return toast.error("MediaRecorder not supported in this browser");
     const cfg = getLayout(row);
