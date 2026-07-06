@@ -49,16 +49,6 @@ function PricingPage() {
                 <span className="text-sm text-muted-foreground">{p.period}</span>
               </div>
 
-              {/* Exact per-asset cost — same for every plan */}
-              <div className="mt-4 rounded-lg border border-border/60 bg-black/20 p-3 text-xs">
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Credit cost per asset</div>
-                <div className="space-y-1">
-                  <CostRow icon={<ImageIcon className="w-3.5 h-3.5 text-[color:var(--neon-pink)]" />} label="AI image" cost={ASSET_CREDIT_COST.image} />
-                  <CostRow icon={<Layers className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />} label="Carousel (≈5 slides)" cost={ASSET_CREDIT_COST.carousel} />
-                  <CostRow icon={<Film className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />} label="Short reel (≤ 60s)" cost={ASSET_CREDIT_COST.shortReel} />
-                  <CostRow icon={<Video className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />} label="5-min long video" cost={ASSET_CREDIT_COST.longVideo} />
-                </div>
-              </div>
 
               {estimate && (
                 <div className="mt-3 rounded-lg border border-border/60 bg-black/20 p-3 text-xs">
