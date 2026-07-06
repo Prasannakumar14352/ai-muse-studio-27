@@ -683,16 +683,51 @@ function CarouselsPage() {
                         {exportingId === row.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Film className="w-3 h-3" />}
                         Export as Reel
                       </button>
-                      {failedCount > 0 && (
+                      {missingCount > 0 && (
                         <button
                           onClick={() => regenerateFailed(row)}
                           disabled={generating}
-                          className="rounded-lg glass border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-50"
+                          className="rounded-lg glass border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-50"
+                          title="Only regenerates slides whose image is missing or failed"
                         >
-                          <RefreshCw className="w-3 h-3" /> Regenerate {failedCount} failed
+                          <RefreshCw className="w-3 h-3" /> Regenerate slides &amp; images ({missingCount})
                         </button>
                       )}
                     </div>
+
+                    <details className="rounded-lg border border-border bg-black/30">
+                      <summary className="cursor-pointer px-3 py-2 text-xs text-muted-foreground hover:text-white flex items-center justify-between">
+                        <span className="flex items-center gap-1.5"><AlertTriangle className="w-3 h-3" /> Slide diagnostics</span>
+                        <span className="text-[10px]">{Object.keys(row.slide_diagnostics).length} entries</span>
+                      </summary>
+                      <div className="px-3 pb-3 space-y-2 max-h-64 overflow-y-auto">
+                        {row.image_prompts.slice(0, expectedCount).map((p, i) => {
+                          const d = row.slide_diagnostics[String(i)];
+                          const hasImg = Boolean(row.carousel_images?.[i]);
+                          const state = hasImg && (!d || d.ok) ? "ok" : d && !d.ok ? "failed" : !hasImg ? "missing" : "unknown";
+                          const color = state === "ok" ? "text-emerald-300 border-emerald-500/30"
+                            : state === "failed" ? "text-rose-300 border-rose-500/40"
+                            : "text-amber-300 border-amber-500/40";
+                          return (
+                            <div key={i} className={`rounded border ${color} bg-black/40 p-2 text-[11px] space-y-1`}>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold">Slide {i + 1}</span>
+                                <span className="uppercase tracking-wider text-[9px]">{state}</span>
+                                {d?.attempts != null && <span className="text-muted-foreground">retries: {d.attempts}</span>}
+                                {d?.httpStatus != null && <span className="text-muted-foreground">HTTP {d.httpStatus}</span>}
+                                {d?.durationMs != null && <span className="text-muted-foreground">{d.durationMs}ms</span>}
+                                {d?.at && <span className="text-muted-foreground">{new Date(d.at).toLocaleTimeString()}</span>}
+                              </div>
+                              {d?.error && <div className="text-rose-300">{d.error}</div>}
+                              <div className="text-muted-foreground">
+                                <span className="uppercase tracking-wider text-[9px] mr-1">image_prompt</span>
+                                <span className="text-white/80 break-words">{d?.prompt ?? p.prompt}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </details>
                   </div>
                 ) : (
                   <div className="mx-4 mb-4 rounded-lg border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
