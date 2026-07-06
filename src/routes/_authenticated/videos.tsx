@@ -252,7 +252,7 @@ function ImageToVideoCard() {
           </button>
         </div>
       </div>
-      <div className="mt-4 grid md:grid-cols-3 gap-4">
+      <div className="mt-4 grid md:grid-cols-4 gap-4">
         <div>
           <div className="text-xs text-muted-foreground mb-1">Aspect ratio</div>
           <div className="flex gap-1">
@@ -263,11 +263,21 @@ function ImageToVideoCard() {
           </div>
         </div>
         <div>
+          <div className="text-xs text-muted-foreground mb-1">Fit</div>
+          <div className="flex gap-1">
+            {(["contain", "cover"] as const).map((f) => (
+              <button key={f} onClick={() => setFit(f)}
+                title={f === "contain" ? "Show full image (no crop, letterbox)" : "Fill frame (edges may crop)"}
+                className={`px-3 py-1.5 rounded-lg text-xs border capitalize ${fit === f ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>{f}</button>
+            ))}
+          </div>
+        </div>
+        <div>
           <div className="text-xs text-muted-foreground mb-1">Duration ({duration}s)</div>
           <input type="range" min={3} max={15} value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} className="w-full" />
         </div>
         <div className="text-xs text-muted-foreground">
-          Output: WebM · in-browser only. Download to save.
+          Output: WebM · in-browser only. Use <span className="text-white">Contain</span> for logos so text isn't cropped.
         </div>
       </div>
       {(image || videoUrl) && (
