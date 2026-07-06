@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { listOutputs, deleteOutput } from "@/lib/local-store";
 import { Plus, Film, Video as VideoIcon, Trash2, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/videos")({
@@ -21,7 +22,6 @@ type VideoRow = {
   id: string; title: string; content_type: string | null;
   style: string | null; platform: string | null; tone: string | null;
   video_url: string | null;
-  output_id: string | null;
 };
 
 function VideosPage() {
@@ -31,34 +31,26 @@ function VideosPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["videos"],
     queryFn: async (): Promise<VideoRow[]> => {
-      const { data } = await supabase
+      const { data: projects } = await supabase
         .from("projects")
-        .select("id,title,content_type,style,platform,tone,generated_outputs(id,video_url)")
+        .select("id,title,content_type,style,platform,tone")
         .in("content_type", ["short_reel", "long_video"])
         .order("created_at", { ascending: false });
-      return (data ?? []).map((p: {
-        id: string; title: string; content_type: string | null;
-        style: string | null; platform: string | null; tone: string | null;
-        generated_outputs: { id: string; video_url: string | null }[] | { id: string; video_url: string | null } | null;
-      }) => {
-        const out = Array.isArray(p.generated_outputs) ? p.generated_outputs[0] : p.generated_outputs;
-        return {
-          id: p.id, title: p.title, content_type: p.content_type,
-          style: p.style, platform: p.platform, tone: p.tone,
-          video_url: out?.video_url ?? null,
-          output_id: out?.id ?? null,
-        };
-      });
+      const outputs = await listOutputs();
+      const outMap = new Map(outputs.map((o) => [o.project_id, o]));
+      return (projects ?? []).map((p) => ({
+        id: p.id, title: p.title, content_type: p.content_type,
+        style: p.style, platform: p.platform, tone: p.tone,
+        video_url: outMap.get(p.id)?.video_url ?? null,
+      }));
     },
   });
 
   async function deleteVideo(row: VideoRow) {
-    if (!confirm(`Delete "${row.title}"? The video file and project will be removed.`)) return;
+    if (!confirm(`Delete "${row.title}"? The project and its local render will be removed.`)) return;
     setDeletingId(row.id);
     try {
-      if (row.output_id) {
-        await supabase.from("generated_outputs").delete().eq("id", row.output_id);
-      }
+      await deleteOutput(row.id);
       const { error } = await supabase.from("projects").delete().eq("id", row.id);
       if (error) throw error;
       toast.success("Video deleted");
@@ -76,7 +68,7 @@ function VideosPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold">Your <span className="gradient-text">Videos</span></h1>
-          <p className="text-muted-foreground mt-1">Reels and long-form videos you've rendered.</p>
+          <p className="text-muted-foreground mt-1">Reels and long-form videos you've rendered — stored in this browser.</p>
         </div>
         <Link to="/create" className="rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-medium flex items-center gap-2">
           <Plus className="w-4 h-4" /> New video
