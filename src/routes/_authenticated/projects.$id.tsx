@@ -773,7 +773,7 @@ function VideoPreview({
   }
 
   if (totalScenes === 0) return null;
-  const scene = scenes[idx];
+  const scene = effectiveScenes[idx] ?? scenes[idx];
 
   const stages = buildStages(ugcStage, ugcRendering, rendering, renderProgress);
 
