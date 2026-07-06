@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Film, Video as VideoIcon } from "lucide-react";
+import { Plus, Film, Video as VideoIcon, Trash2, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/videos")({
   head: () => ({
