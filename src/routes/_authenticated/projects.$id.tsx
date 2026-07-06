@@ -344,29 +344,23 @@ function ProjectView() {
           <Link to="/carousels" className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium">Open in Carousels</Link>
         </div>
       ) : (
-        <VideoPreview
-          scenes={scenes}
-          title={output?.title ?? project.title}
-          styleImage={getStyleImage(project.style)}
-          styleId={project.style}
-          platform={project.platform}
-          contentType={project.content_type}
-          music={project.music}
-          projectId={project.id}
-          userId={project.user_id}
-          outputId={output?.id ?? null}
-          existingVideoUrl={output?.video_url ?? null}
-          existingDiagnostics={(output as { render_diagnostics?: unknown } | null)?.render_diagnostics ?? null}
-          imagePrompts={prompts}
-        />
+        <div className="glass rounded-2xl p-4 border border-[color:var(--neon-purple)]/30">
+          <div className="flex items-start gap-3">
+            <Sparkles className="w-5 h-5 text-[color:var(--neon-purple)] mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <div className="font-semibold">Review before rendering</div>
+              <div className="text-muted-foreground mt-0.5">
+                Check the full script, scene breakdown, image prompts and your brand handles below.
+                Edit anything you want, then scroll down and hit <span className="text-foreground font-medium">Re-generate UGC video</span> to render.
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
-
-
-
-
-
-      <BrandPrompt projectId={project.id} platform={project.platform ?? "instagram"} />
+      {project.content_type !== "carousel" && (
+        <BrandPrompt projectId={project.id} platform={project.platform ?? "instagram"} />
+      )}
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Script */}
