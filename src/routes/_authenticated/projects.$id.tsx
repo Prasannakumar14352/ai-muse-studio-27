@@ -547,7 +547,7 @@ function VideoPreview({
             </a>
           )}
           <button
-            onClick={handleRender}
+            onClick={() => handleRender()}
             disabled={rendering || ugcRendering}
             className="rounded-lg glass hover:bg-white/5 px-4 py-2 text-sm font-medium disabled:opacity-60 flex items-center gap-2">
             {rendering
@@ -555,15 +555,29 @@ function VideoPreview({
               : <><VideoIcon className="w-4 h-4" /> Storyboard only</>}
           </button>
           <button
-            onClick={handleUgcRender}
+            onClick={() => handleUgcRender()}
             disabled={rendering || ugcRendering}
             className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
             {ugcRendering
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Rendering…</>
               : <><Sparkles className="w-4 h-4" /> {videoUrl ? "Re-generate UGC video" : "Generate UGC video"}</>}
           </button>
+          {(rendering || ugcRendering) && (
+            <button
+              onClick={handleCancel}
+              className="rounded-lg border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 px-4 py-2 text-sm font-medium flex items-center gap-2"
+            >
+              <X className="w-4 h-4" /> Cancel
+            </button>
+          )}
         </div>
       </div>
+
+      {canceled && !rendering && !ugcRendering && (
+        <div className="mb-4 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-200 px-4 py-2 text-sm flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4" /> Render was canceled. Progress rail below shows the stages reached before cancel.
+        </div>
+      )}
 
       {(rendering || ugcRendering) && (
         <div className="mb-4 rounded-xl border border-border bg-black/30 p-4">
