@@ -7,6 +7,9 @@ import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
 import { listOutputs, saveOutput, deleteOutput, type CarouselSlide } from "@/lib/local-store";
+import {
+  putDataURL, getObjectURL, getDataURL, deleteBlobsByPrefix, isBlobKey, makeBlobKey,
+} from "@/lib/blob-store";
 import { LocalOnlyBanner } from "@/components/local-only-banner";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
