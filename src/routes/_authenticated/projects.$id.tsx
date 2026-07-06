@@ -902,9 +902,9 @@ function VideoPreview({
         </div>
         <div className="flex flex-wrap gap-2">
           {videoUrl && (
-            <a href={videoUrl} download className="rounded-lg glass hover:bg-white/5 px-4 py-2 text-sm font-medium flex items-center gap-2">
+            <button onClick={() => forceDownloadUrl(videoUrl, `${(title || "video").replace(/[^\w]+/g, "-")}.mp4`)} className="rounded-lg glass hover:bg-white/5 px-4 py-2 text-sm font-medium flex items-center gap-2">
               <Download className="w-4 h-4" /> Download video
-            </a>
+            </button>
           )}
           <button
             onClick={() => handleRender()}
@@ -1226,9 +1226,9 @@ function VideoPreview({
                 Download final bundle
               </button>
               {videoUrl && (
-                <a href={videoUrl} download className="rounded-lg glass border border-border hover:bg-white/5 px-4 py-2 text-sm flex items-center gap-2">
+                <button onClick={() => forceDownloadUrl(videoUrl, `${(title || "video").replace(/[^\w]+/g, "-")}.mp4`)} className="rounded-lg glass border border-border hover:bg-white/5 px-4 py-2 text-sm flex items-center gap-2">
                   <VideoIcon className="w-4 h-4" /> Video only
-                </a>
+                </button>
               )}
               <button
                 onClick={() => {
