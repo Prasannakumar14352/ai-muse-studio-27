@@ -74,9 +74,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link to="/dashboard" className="flex items-center gap-2">
           <img src={brandLogo.url} alt="Prodxstore" className="h-7 w-auto object-contain" />
         </Link>
-        <button onClick={() => setOpen(!open)} className="p-2 rounded-lg hover:bg-white/5">
-          {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <CreditsChip />
+          <button onClick={() => setOpen(!open)} className="p-2 rounded-lg hover:bg-white/5">
+            {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile sheet */}
@@ -99,8 +102,47 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Main */}
       <main className="flex-1 min-w-0 pt-14 md:pt-0 overflow-y-auto">
+        {/* Desktop header with credits */}
+        <div className="hidden md:flex sticky top-0 z-20 items-center justify-end gap-3 px-6 md:px-10 py-3 border-b border-border/50 bg-background/70 backdrop-blur-xl">
+          <CreditsChip />
+        </div>
         <div className="max-w-7xl mx-auto p-6 md:p-10">{children}</div>
       </main>
+      <ConfirmDialogHost />
+    </div>
+  );
+}
+
+function CreditsChip() {
+  const { data: access } = useAccess();
+  if (!access) return null;
+  if (access.unlimited) {
+    return (
+      <Link
+        to="/pricing"
+        className="inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs font-medium border border-amber-500/40 text-amber-200 hover:bg-white/10 transition">
+        <Crown className="w-3.5 h-3.5" /> Unlimited
+      </Link>
+    );
+  }
+  const total = getAvailableCredits(access);
+  const low = total < 20;
+  return (
+    <Link
+      to="/pricing"
+      title={`Balance: ${access.balance.toLocaleString()} · Monthly left: ${access.monthlyRemaining.toLocaleString()}`}
+      className={`inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs font-medium border transition hover:bg-white/10 ${
+        low ? "border-rose-500/50 text-rose-200" : "border-[color:var(--neon-purple)]/40 text-foreground"
+      }`}>
+      <Zap className={`w-3.5 h-3.5 ${low ? "text-rose-300" : "text-[color:var(--neon-pink)]"}`} />
+      <span>{Number.isFinite(total) ? total.toLocaleString() : <InfinityIcon className="w-3.5 h-3.5" />}</span>
+      <span className="text-muted-foreground hidden sm:inline">credits</span>
+      <span className="text-muted-foreground">·</span>
+      <span className="text-[color:var(--brand-orange)]">Top up</span>
+    </Link>
+  );
+}
+
       <ConfirmDialogHost />
     </div>
   );
