@@ -279,9 +279,7 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
         acc += d; sceneIdx = i; localProgress = 1;
       }
       drawScene(ctx, sceneImgs[sceneIdx] ?? fallbackImg, opts.scenes[sceneIdx], {
-        title: opts.title, platform: opts.platform ?? "preview",
-        sceneIdx, totalScenes: opts.scenes.length,
-        progress: localProgress, accent: style.accent, styleLabel: style.label,
+        progress: localProgress, accent: style.accent,
       });
       opts.onProgress?.(clamped / totalDuration);
       if (elapsed >= totalDuration) { resolve(); return; }
