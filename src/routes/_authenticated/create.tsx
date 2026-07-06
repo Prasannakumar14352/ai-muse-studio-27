@@ -152,6 +152,9 @@ function CreatePage() {
             data: {
               topic: form.topic, tone: form.tone, platform: form.platform,
               styleLabel, contentType: form.content_type, audience: form.audience,
+              ...(form.content_type === "long_video"
+                ? { targetLengthSec: form.long_video_length_sec }
+                : {}),
             },
           });
         } catch (e) {
