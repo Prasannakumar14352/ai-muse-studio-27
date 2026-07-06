@@ -139,29 +139,41 @@ function Landing() {
             <h2 className="text-4xl md:text-5xl font-bold">Simple, <span className="gradient-text">creator-first</span> pricing</h2>
             <p className="mt-4 text-muted-foreground">Start free. Upgrade when you're ready to scale.</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-5 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-5">
             {PLANS.map((p) => (
-              <div key={p.id} className={`glass rounded-2xl p-8 relative ${p.featured ? "border-[color:var(--neon-purple)]/60 shadow-[var(--shadow-glow)]" : ""}`}>
+              <div key={p.id} className={`glass rounded-2xl p-6 relative flex flex-col ${p.featured ? "border-[color:var(--neon-purple)]/60 shadow-[var(--shadow-glow)]" : ""} ${p.contactSales ? "border-[color:var(--brand-orange)]/60" : ""}`}>
                 {p.featured && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 gradient-primary text-white text-xs px-3 py-1 rounded-full font-medium">
                     Most popular
                   </div>
                 )}
+                {p.contactSales && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[color:var(--brand-orange)] text-black text-xs px-3 py-1 rounded-full font-medium">
+                    For teams
+                  </div>
+                )}
                 <h3 className="text-xl font-semibold">{p.name}</h3>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold">{p.price}</span>
+                  <span className="text-3xl font-bold">{p.price}</span>
                   <span className="text-sm text-muted-foreground">{p.period}</span>
                 </div>
-                <ul className="mt-6 space-y-3">
+                <ul className="mt-6 space-y-3 flex-1">
                   {p.features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm">
-                      <Check className="w-4 h-4 text-[color:var(--neon-purple)] mt-0.5 shrink-0" />
+                      <Check className={`w-4 h-4 mt-0.5 shrink-0 ${p.contactSales ? "text-[color:var(--brand-orange)]" : "text-[color:var(--neon-purple)]"}`} />
                       <span>{f}</span>
                     </li>
                   ))}
                 </ul>
-                <Link to="/auth"
-                  className={`mt-8 block text-center rounded-lg py-3 text-sm font-medium ${p.featured ? "gradient-primary text-white" : "glass hover:bg-white/5"}`}>
+                <Link
+                  to={p.contactSales ? "/contact" : "/auth"}
+                  className={`mt-8 block text-center rounded-lg py-3 text-sm font-medium ${
+                    p.contactSales
+                      ? "bg-[color:var(--brand-orange)] text-black hover:opacity-90"
+                      : p.featured
+                        ? "gradient-primary text-white"
+                        : "glass hover:bg-white/5"
+                  }`}>
                   {p.cta}
                 </Link>
               </div>
