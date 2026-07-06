@@ -335,6 +335,8 @@ export type UgcOptions = {
   showOnScreenText?: boolean;
   /** When provided, image generation is skipped and these data URLs are used directly. */
   preloadedImages?: Array<string | null>;
+  /** Attached to credit deduction rows so admin usage history can trace back to the project. */
+  projectId?: string | null;
 };
 
 /** Exposed so the UI can pre-generate & validate scene images before render. */
