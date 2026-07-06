@@ -3,6 +3,7 @@
 // supports it, WebM as fallback) — no server dependency required.
 
 import { getStyle } from "./constants";
+import { deductUsage } from "./access";
 
 export type RenderScene = { n: number; visual: string; voiceover: string; duration: string; on_screen_text?: string };
 
