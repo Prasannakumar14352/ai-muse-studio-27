@@ -12,6 +12,11 @@ export type CarouselSlide = {
   headline: string;
   body: string;
   visual: string;
+  // Optional richer fields (populated by AI-generated carousels).
+  label?: string;
+  emoji?: string;
+  bullets?: string[];
+  bottom_highlight?: string;
 };
 
 export type LocalOutput = {

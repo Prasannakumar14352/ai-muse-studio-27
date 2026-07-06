@@ -550,12 +550,36 @@ function CarouselsPage() {
                     <div className="px-3 pb-3 space-y-3 max-h-72 overflow-y-auto">
                       {row.carousel_slides.map((sl) => (
                         <div key={sl.n} className="rounded border border-border/60 bg-black/40 p-2.5 text-xs">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <span className="gradient-primary text-white px-1.5 py-0.5 rounded text-[10px]">Slide {sl.n}</span>
                             <span className="text-muted-foreground uppercase tracking-wider text-[10px]">{sl.role}</span>
+                            {sl.label && (
+                              <span className="border border-[color:var(--neon-purple)]/50 text-[color:var(--neon-purple)] px-1.5 py-0.5 rounded text-[10px]">
+                                {sl.label}
+                              </span>
+                            )}
                           </div>
-                          <div className="font-semibold text-white">{sl.headline}</div>
-                          <div className="mt-1 text-muted-foreground whitespace-pre-wrap">{sl.body}</div>
+                          <div className="font-semibold text-white">
+                            {sl.emoji ? `${sl.emoji} ` : ""}{sl.headline}
+                          </div>
+                          {sl.body && (
+                            <div className="mt-1 text-muted-foreground whitespace-pre-wrap">{sl.body}</div>
+                          )}
+                          {sl.bullets && sl.bullets.length > 0 && (
+                            <ul className="mt-1.5 space-y-0.5 text-muted-foreground">
+                              {sl.bullets.map((b, i) => (
+                                <li key={i} className="pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-[color:var(--neon-purple)]">
+                                  {b}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {sl.bottom_highlight && (
+                            <div className="mt-2 rounded border border-[color:var(--neon-blue)]/40 bg-[color:var(--neon-blue)]/5 px-2 py-1 text-[11px]">
+                              <span className="uppercase tracking-wider text-[9px] text-[color:var(--neon-blue)] mr-1">Key takeaway</span>
+                              <span className="text-white">{sl.bottom_highlight}</span>
+                            </div>
+                          )}
                           <div className="mt-2 text-[10px] text-muted-foreground italic">🎨 {sl.visual}</div>
                         </div>
                       ))}
