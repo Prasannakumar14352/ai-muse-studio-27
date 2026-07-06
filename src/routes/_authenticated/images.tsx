@@ -40,6 +40,21 @@ function ImagesPage() {
   const [debug, setDebug] = useState<DebugInfo | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [viewerIdx, setViewerIdx] = useState<number | null>(null);
+
+  // Keyboard nav for fullscreen viewer.
+  useEffect(() => {
+    if (viewerIdx === null) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setViewerIdx(null);
+      if (e.key === "ArrowRight") setViewerIdx((i) => (i === null ? i : Math.min(results.length - 1, i + 1)));
+      if (e.key === "ArrowLeft") setViewerIdx((i) => (i === null ? i : Math.max(0, i - 1)));
+    }
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prevOverflow; };
+  }, [viewerIdx, results.length]);
 
   // Restore last session from localStorage.
   useEffect(() => {
