@@ -69,10 +69,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <Link to="/dashboard" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
-            <Sparkles className="w-3.5 h-3.5 text-white" />
-          </div>
-          <span className="font-bold text-sm">CreatorVault<span className="gradient-text">AI</span></span>
+          <img src={brandLogo.url} alt="Prodxstore" className="h-7 w-auto object-contain" />
         </Link>
         <button onClick={() => setOpen(!open)} className="p-2 rounded-lg hover:bg-white/5">
           {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
