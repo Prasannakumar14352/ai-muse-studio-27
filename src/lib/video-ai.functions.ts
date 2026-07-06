@@ -120,6 +120,9 @@ Return JSON EXACTLY:
             { role: "user", content: user },
           ],
           response_format: { type: "json_object" },
+          // Scale headroom with scene count so long videos aren't truncated
+          // (~350 tokens per scene + overhead).
+          max_tokens: Math.min(32000, 2000 + sceneCount * 400),
         }),
       });
     } catch (e) {
