@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccess } from "@/lib/access";
 import { confirmDialog } from "@/components/confirm-dialog";
-import { Crown, Users, Layers, Zap, Plus, Shield, ShieldOff, Ban, Loader2 } from "lucide-react";
+import { CREDIT_COSTS, CREDIT_GUIDE_INTRO } from "@/lib/credit-costs";
+import { Crown, Users, Layers, Zap, Plus, Shield, ShieldOff, Ban, Loader2, ChevronDown, ChevronRight, Coins, FileText, FileDown, Printer } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({ component: AdminPanel });
 
