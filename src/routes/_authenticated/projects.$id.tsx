@@ -32,6 +32,8 @@ function ProjectView() {
   }
 
   const { project, output } = data;
+  const qc = useQueryClient();
+  const [regenerating, setRegenerating] = useState<null | "all" | "script" | "scenes" | "captions" | "images">(null);
 
   async function copy(text: string, label: string) {
     await navigator.clipboard.writeText(text);
@@ -45,6 +47,46 @@ function ProjectView() {
     a.href = url; a.download = `${project.title.replace(/[^\w]+/g, "-")}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function regenerate(part: "all" | "script" | "scenes" | "captions" | "images") {
+    if (!project) return;
+    setRegenerating(part);
+    try {
+      const fresh = generateProject({
+        topic: project.topic ?? project.title,
+        tone: project.tone ?? "Viral",
+        platform: project.platform ?? "instagram",
+        style: project.style ?? "cinematic",
+        contentType: project.content_type ?? "short_reel",
+      });
+      const patch: Record<string, unknown> = {};
+      if (part === "all" || part === "script") { patch.script = fresh.script; patch.hook = fresh.hook; patch.title = fresh.title; }
+      if (part === "all" || part === "scenes") { patch.scenes = fresh.scenes; patch.thumbnail_ideas = fresh.thumbnail_ideas; }
+      if (part === "all" || part === "captions") { patch.captions = fresh.captions; patch.hashtags = fresh.hashtags; }
+      if (part === "all" || part === "images") { patch.image_prompts = fresh.image_prompts; }
+
+      if (output?.id) {
+        const { error } = await supabase.from("generated_outputs").update(patch).eq("id", output.id);
+        if (error) throw error;
+      } else {
+        const { data: u } = await supabase.auth.getUser();
+        if (!u.user) throw new Error("Not signed in");
+        const { error } = await supabase.from("generated_outputs").insert({
+          project_id: project.id, user_id: u.user.id, ...fresh,
+        });
+        if (error) throw error;
+      }
+      if (part === "all" || part === "script") {
+        await supabase.from("projects").update({ title: fresh.title }).eq("id", project.id);
+      }
+      qc.invalidateQueries({ queryKey: ["project", id] });
+      toast.success(`Regenerated ${part === "all" ? "everything" : part}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Regenerate failed");
+    } finally {
+      setRegenerating(null);
+    }
   }
 
   const scenes = (output?.scenes as Array<{ n: number; visual: string; voiceover: string; duration: string }>) ?? [];
@@ -71,7 +113,24 @@ function ProjectView() {
         <div className="mt-6 flex flex-wrap gap-2">
           {output?.script && <button onClick={() => copy(output.script!, "Script")} className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5"><Copy className="w-4 h-4" /> Copy Script</button>}
           {output?.captions && <button onClick={() => copy(output.captions!, "Caption")} className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5"><Copy className="w-4 h-4" /> Copy Caption</button>}
-          <button onClick={download} className="rounded-lg gradient-primary text-white px-4 py-2 text-sm flex items-center gap-2"><Download className="w-4 h-4" /> Download JSON</button>
+          <button onClick={download} className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5"><Download className="w-4 h-4" /> Download JSON</button>
+          <button
+            onClick={() => regenerate("all")}
+            disabled={!!regenerating}
+            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)] disabled:opacity-60">
+            {regenerating === "all" ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Regenerate All
+          </button>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {(["script", "scenes", "captions", "images"] as const).map((k) => (
+            <button key={k} onClick={() => regenerate(k)} disabled={!!regenerating}
+              className="rounded-full glass px-3 py-1 text-xs hover:bg-white/5 flex items-center gap-1.5 disabled:opacity-60">
+              {regenerating === k ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              Re-run {k}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -80,10 +139,17 @@ function ProjectView() {
         scenes={scenes}
         title={output?.title ?? project.title}
         styleImage={getStyleImage(project.style)}
+        styleId={project.style}
         platform={project.platform}
         contentType={project.content_type}
         music={project.music}
+        projectId={project.id}
+        userId={project.user_id}
+        outputId={output?.id ?? null}
+        existingVideoUrl={output?.video_url ?? null}
       />
+
+
 
 
 
