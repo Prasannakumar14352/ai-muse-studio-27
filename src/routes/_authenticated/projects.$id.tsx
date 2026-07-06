@@ -513,10 +513,10 @@ function VideoPreview({
   const lastSnapshotRef = useRef<string>("");
 
   // --- Collapsible panel state -------------------------------------------
-  const [openPrep, setOpenPrep] = useState(true);
+  const [openPrep, setOpenPrep] = useState(false);
   const [openHistory, setOpenHistory] = useState(false);
   const [openBundle, setOpenBundle] = useState(false);
-  const [openProgress, setOpenProgress] = useState(true);
+  const [openProgress, setOpenProgress] = useState(false);
   const [bundleBusy, setBundleBusy] = useState(false);
 
   useEffect(() => {
@@ -794,6 +794,7 @@ function VideoPreview({
     lastRenderKindRef.current = "storyboard";
     lastContainerRef.current = container;
     setRendering(true);
+    setOpenProgress(true);
     setRenderProgress(0);
     setPlaying(false);
     setCanceled(false);
@@ -835,6 +836,7 @@ function VideoPreview({
     lastRenderKindRef.current = "ugc";
     lastContainerRef.current = container;
     setUgcRendering(true);
+    setOpenProgress(true);
     setUgcStage({ kind: "images", done: totalScenes, total: totalScenes });
     setPlaying(false);
     setCanceled(false);
@@ -1592,7 +1594,7 @@ function buildStages(
 // -------------------- Collapsible card + brand prompt -------------------
 
 function CollapsibleCard({
-  id, title, icon, className, defaultOpen = true, children,
+  id, title, icon, className, defaultOpen = false, children,
 }: {
   id: string;
   title: string;
@@ -1642,8 +1644,8 @@ function BrandPrompt({ projectId, platform }: { projectId: string; platform: str
   const [handle, setHandle] = useState("");
   const [saved, setSaved] = useState<{ brand: string; handle: string } | null>(null);
   const [open, setOpen] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    return window.localStorage.getItem(collapseKey) !== "0";
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(collapseKey) === "1";
   });
 
   useEffect(() => {
