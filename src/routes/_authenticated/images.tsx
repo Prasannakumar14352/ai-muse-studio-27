@@ -167,15 +167,10 @@ function ImagesPage() {
   }
 
   async function loadHistory() {
-    const { data, error } = await supabase
-      .from("image_generations")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(20);
-    if (error) return toast.error(error.message);
-    if (!data || data.length === 0) return toast.info("No saved debug logs yet");
-    downloadJson(`creatorvault-image-debug-history-${Date.now()}.json`, data);
-    toast.success(`Downloaded ${data.length} logs`);
+    const logs = await listImageGenLogs();
+    if (logs.length === 0) return toast.info("No saved debug logs yet");
+    downloadJson(`creatorvault-image-debug-history-${Date.now()}.json`, logs);
+    toast.success(`Downloaded ${logs.length} logs`);
   }
 
   function downloadCurrentDebug() {
@@ -183,15 +178,13 @@ function ImagesPage() {
     downloadJson(`creatorvault-image-debug-${Date.now()}.json`, debug);
   }
 
-  async function save(item: { prompt: string; style: string; ratio: string }) {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { error } = await supabase.from("assets").insert({
-      user_id: u.user.id, asset_type: "image", prompt: item.prompt, style: item.style, aspect_ratio: item.ratio,
+  async function save(item: { prompt: string; style: string; ratio: string; image: string }) {
+    await addAsset({
+      asset_type: "image", prompt: item.prompt, style: item.style, aspect_ratio: item.ratio, image: item.image,
     });
-    if (error) toast.error(error.message);
-    else toast.success("Saved to library");
+    toast.success("Saved to library");
   }
+
 
   function clearSession() {
     setResults([]); setLastRun(null); setDebug(null);
