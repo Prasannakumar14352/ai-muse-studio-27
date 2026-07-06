@@ -36,7 +36,6 @@ type CarouselRow = {
   style: string | null;
   platform: string | null;
   tone: string | null;
-  output_id: string | null;
   image_prompts: Prompt[];
   carousel_images: (string | null)[] | null;
   slide_diagnostics: SlideDiagMap;
@@ -63,30 +62,26 @@ function CarouselsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["carousels"],
     queryFn: async (): Promise<CarouselRow[]> => {
-      const { data } = await supabase
+      const { data: projects } = await supabase
         .from("projects")
-        .select("id,title,style,platform,tone,generated_outputs(id,image_prompts,carousel_images,render_diagnostics)")
+        .select("id,title,style,platform,tone")
         .eq("content_type", "carousel")
         .order("created_at", { ascending: false });
-      return (data ?? []).map((p: {
-        id: string; title: string; style: string | null; platform: string | null; tone: string | null;
-        generated_outputs:
-          | { id: string; image_prompts: unknown; carousel_images: unknown; render_diagnostics: unknown }[]
-          | { id: string; image_prompts: unknown; carousel_images: unknown; render_diagnostics: unknown }
-          | null;
-      }) => {
-        const out = Array.isArray(p.generated_outputs) ? p.generated_outputs[0] : p.generated_outputs;
-        const rd = out?.render_diagnostics as { slide_diagnostics?: SlideDiagMap } | null | undefined;
+      const outputs = await listOutputs();
+      const outMap = new Map(outputs.map((o) => [o.project_id, o]));
+      return (projects ?? []).map((p) => {
+        const out = outMap.get(p.id);
+        const rd = out?.render_diagnostics as { slide_diagnostics?: SlideDiagMap } | undefined;
         return {
           id: p.id, title: p.title, style: p.style, platform: p.platform, tone: p.tone,
-          output_id: out?.id ?? null,
-          image_prompts: Array.isArray(out?.image_prompts) ? (out!.image_prompts as Prompt[]) : [],
-          carousel_images: Array.isArray(out?.carousel_images) ? (out!.carousel_images as (string | null)[]) : null,
+          image_prompts: out?.image_prompts ?? [],
+          carousel_images: out?.carousel_images ?? null,
           slide_diagnostics: (rd?.slide_diagnostics ?? {}) as SlideDiagMap,
         };
       });
     },
   });
+
 
   function getLayout(row: CarouselRow): LayoutSettings {
     return layout[row.id] ?? { ratio: "1:1", slideCount: row.image_prompts.length, spacing: 8 };
