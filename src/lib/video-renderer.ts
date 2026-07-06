@@ -60,7 +60,7 @@ function pickRecorderMime(): { mime: string; ext: "mp4" | "webm" } {
 
 function drawScene(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  img: HTMLImageElement | null,
   scene: RenderScene,
   opts: {
     title: string; platform: string; sceneIdx: number; totalScenes: number;
@@ -71,14 +71,24 @@ function drawScene(
 
   // Ken Burns zoom
   const zoom = 1.05 + opts.progress * 0.1;
-  const iw = img.width;
-  const ih = img.height;
-  const ratio = Math.max(W / iw, H / ih) * zoom;
-  const dw = iw * ratio;
-  const dh = ih * ratio;
-  ctx.fillStyle = "#000";
+  ctx.fillStyle = "#0b0b16";
   ctx.fillRect(0, 0, W, H);
-  ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  if (img) {
+    const iw = img.width;
+    const ih = img.height;
+    const ratio = Math.max(W / iw, H / ih) * zoom;
+    const dw = iw * ratio;
+    const dh = ih * ratio;
+    ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  } else {
+    // Fallback: gradient backdrop tinted with the style accent so the render
+    // still looks intentional when the style image fails to load.
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, opts.accent);
+    g.addColorStop(1, "#0b0b16");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
 
   // Bottom gradient
   const grad = ctx.createLinearGradient(0, H * 0.45, 0, H);
