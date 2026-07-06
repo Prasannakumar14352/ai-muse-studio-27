@@ -487,9 +487,9 @@ function CarouselsPage() {
                     <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
                       <span className="glass px-2 py-0.5 rounded">{row.image_prompts.length} prompts</span>
                       <span className="glass px-2 py-0.5 rounded">{cfg.ratio}</span>
-                      {failedCount > 0 && (
-                        <span className="bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" /> {failedCount} failed
+                      {missingCount > 0 && (
+                        <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> {missingCount} missing/failed
                         </span>
                       )}
                     </div>
