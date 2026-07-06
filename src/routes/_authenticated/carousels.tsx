@@ -251,6 +251,7 @@ function CarouselsPage() {
 
   return (
     <div className="space-y-6">
+      <LocalOnlyBanner />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold">Your <span className="gradient-text">Carousels</span></h1>
