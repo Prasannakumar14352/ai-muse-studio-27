@@ -420,6 +420,24 @@ function ProjectView() {
         </CollapsibleCard>
       </div>
 
+      {project.content_type !== "carousel" && (
+        <VideoPreview
+          scenes={scenes}
+          title={output?.title ?? project.title}
+          styleImage={getStyleImage(project.style)}
+          styleId={project.style}
+          platform={project.platform}
+          contentType={project.content_type}
+          music={project.music}
+          projectId={project.id}
+          userId={project.user_id}
+          outputId={output?.id ?? null}
+          existingVideoUrl={output?.video_url ?? null}
+          existingDiagnostics={(output as { render_diagnostics?: unknown } | null)?.render_diagnostics ?? null}
+          imagePrompts={prompts}
+        />
+      )}
+
       <div className="glass rounded-2xl p-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div><div className="text-xs text-muted-foreground">Voice</div><div className="font-medium">{project.voice}</div></div>
         <div><div className="text-xs text-muted-foreground">Music</div><div className="font-medium">{project.music}</div></div>
