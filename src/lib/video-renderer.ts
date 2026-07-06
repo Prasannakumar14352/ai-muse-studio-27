@@ -406,7 +406,7 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
   const ratio = isVertical ? "9:16" : "16:9";
   const total = opts.scenes.length;
 
-  // 1) Images — in parallel, report as they land.
+  throwIfAborted(opts.signal);
   let imgDone = 0;
   opts.onStage?.({ kind: "images", done: 0, total });
   const sceneImages = await Promise.all(
@@ -419,8 +419,8 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
       return url;
     }),
   );
+  throwIfAborted(opts.signal);
 
-  // 2) Audio — decode using a shared AudioContext.
   const decodeCtx = new AudioContext();
   if (decodeCtx.state === "suspended") await decodeCtx.resume().catch(() => {});
   let audDone = 0;
@@ -434,10 +434,9 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
       return buf;
     }),
   );
-  // Keep decodeCtx alive until render swaps in its own context — nothing else uses it.
   await decodeCtx.close().catch(() => {});
+  throwIfAborted(opts.signal);
 
-  // 3) Render
   opts.onStage?.({ kind: "render", progress: 0 });
   const result = await renderVideo({
     title: opts.title,
@@ -448,6 +447,8 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
     sceneImages,
     sceneAudio,
     fitToAudio: true,
+    signal: opts.signal,
+    preferredContainer: opts.preferredContainer,
     onProgress: (p) => opts.onStage?.({ kind: "render", progress: p }),
   });
   opts.onStage?.({ kind: "upload" });
