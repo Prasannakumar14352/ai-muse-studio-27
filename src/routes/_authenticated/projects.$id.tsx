@@ -1592,7 +1592,7 @@ function buildStages(
 // -------------------- Collapsible card + brand prompt -------------------
 
 function CollapsibleCard({
-  id, title, icon, className, defaultOpen = true, children,
+  id, title, icon, className, defaultOpen = false, children,
 }: {
   id: string;
   title: string;
