@@ -32,8 +32,6 @@ export const Route = createFileRoute("/api/generate-image")({
             ? "1024x1536"
             : ratio === "16:9"
             ? "1536x1024"
-            : ratio === "4:5"
-            ? "1024x1280"
             : "1024x1024";
 
         const stylePrefix = style ? `${style} style. ` : "";
