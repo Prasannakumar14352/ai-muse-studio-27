@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getStyleImage } from "@/lib/constants";
+import { generateProject } from "@/lib/generators";
+import { renderVideo } from "@/lib/video-renderer";
 import { toast } from "sonner";
-import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film } from "lucide-react";
+import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
 
@@ -30,6 +32,8 @@ function ProjectView() {
   }
 
   const { project, output } = data;
+  const qc = useQueryClient();
+  const [regenerating, setRegenerating] = useState<null | "all" | "script" | "scenes" | "captions" | "images">(null);
 
   async function copy(text: string, label: string) {
     await navigator.clipboard.writeText(text);
@@ -43,6 +47,50 @@ function ProjectView() {
     a.href = url; a.download = `${project.title.replace(/[^\w]+/g, "-")}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function regenerate(part: "all" | "script" | "scenes" | "captions" | "images") {
+    if (!project) return;
+    setRegenerating(part);
+    try {
+      const fresh = generateProject({
+        topic: project.topic ?? project.title,
+        tone: project.tone ?? "Viral",
+        platform: project.platform ?? "instagram",
+        style: project.style ?? "cinematic",
+        contentType: project.content_type ?? "short_reel",
+      });
+      const patch: Record<string, unknown> = {};
+      if (part === "all" || part === "script") { patch.script = fresh.script; patch.hook = fresh.hook; patch.title = fresh.title; }
+      if (part === "all" || part === "scenes") { patch.scenes = fresh.scenes; patch.thumbnail_ideas = fresh.thumbnail_ideas; }
+      if (part === "all" || part === "captions") { patch.captions = fresh.captions; patch.hashtags = fresh.hashtags; }
+      if (part === "all" || part === "images") { patch.image_prompts = fresh.image_prompts; }
+
+      if (output?.id) {
+        const { error } = await supabase.from("generated_outputs").update(patch as never).eq("id", output.id);
+        if (error) throw error;
+      } else {
+        const { data: u } = await supabase.auth.getUser();
+        if (!u.user) throw new Error("Not signed in");
+        const { error } = await supabase.from("generated_outputs").insert({
+          project_id: project.id, user_id: u.user.id,
+          title: fresh.title, hook: fresh.hook, script: fresh.script,
+          scenes: fresh.scenes, image_prompts: fresh.image_prompts,
+          captions: fresh.captions, hashtags: fresh.hashtags,
+          thumbnail_ideas: fresh.thumbnail_ideas,
+        });
+        if (error) throw error;
+      }
+      if (part === "all" || part === "script") {
+        await supabase.from("projects").update({ title: fresh.title }).eq("id", project.id);
+      }
+      qc.invalidateQueries({ queryKey: ["project", id] });
+      toast.success(`Regenerated ${part === "all" ? "everything" : part}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Regenerate failed");
+    } finally {
+      setRegenerating(null);
+    }
   }
 
   const scenes = (output?.scenes as Array<{ n: number; visual: string; voiceover: string; duration: string }>) ?? [];
@@ -69,7 +117,24 @@ function ProjectView() {
         <div className="mt-6 flex flex-wrap gap-2">
           {output?.script && <button onClick={() => copy(output.script!, "Script")} className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5"><Copy className="w-4 h-4" /> Copy Script</button>}
           {output?.captions && <button onClick={() => copy(output.captions!, "Caption")} className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5"><Copy className="w-4 h-4" /> Copy Caption</button>}
-          <button onClick={download} className="rounded-lg gradient-primary text-white px-4 py-2 text-sm flex items-center gap-2"><Download className="w-4 h-4" /> Download JSON</button>
+          <button onClick={download} className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5"><Download className="w-4 h-4" /> Download JSON</button>
+          <button
+            onClick={() => regenerate("all")}
+            disabled={!!regenerating}
+            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)] disabled:opacity-60">
+            {regenerating === "all" ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Regenerate All
+          </button>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {(["script", "scenes", "captions", "images"] as const).map((k) => (
+            <button key={k} onClick={() => regenerate(k)} disabled={!!regenerating}
+              className="rounded-full glass px-3 py-1 text-xs hover:bg-white/5 flex items-center gap-1.5 disabled:opacity-60">
+              {regenerating === k ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              Re-run {k}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -78,10 +143,17 @@ function ProjectView() {
         scenes={scenes}
         title={output?.title ?? project.title}
         styleImage={getStyleImage(project.style)}
+        styleId={project.style}
         platform={project.platform}
         contentType={project.content_type}
         music={project.music}
+        projectId={project.id}
+        userId={project.user_id}
+        outputId={output?.id ?? null}
+        existingVideoUrl={output?.video_url ?? null}
       />
+
+
 
 
 
@@ -161,20 +233,29 @@ function ProjectView() {
 type Scene = { n: number; visual: string; voiceover: string; duration: string };
 
 function VideoPreview({
-  scenes, title, styleImage, platform, contentType, music,
+  scenes, title, styleImage, styleId, platform, contentType, music,
+  projectId, userId, outputId, existingVideoUrl,
 }: {
   scenes: Scene[]; title: string; styleImage: string;
+  styleId?: string | null;
   platform?: string | null; contentType?: string | null; music?: string | null;
+  projectId: string; userId: string; outputId: string | null; existingVideoUrl: string | null;
 }) {
+  const qc = useQueryClient();
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [rendering, setRendering] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(0);
+  const [videoUrl, setVideoUrl] = useState<string | null>(existingVideoUrl);
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number>(0);
 
   const isVertical = contentType === "short_reel" || platform === "tiktok" || platform === "instagram";
   const aspect = isVertical ? "aspect-[9/16] max-w-[340px]" : "aspect-video w-full";
   const totalScenes = scenes.length;
+
+  useEffect(() => { setVideoUrl(existingVideoUrl); }, [existingVideoUrl]);
 
   const currentDurationMs = useMemo(() => {
     const raw = scenes[idx]?.duration ?? "3s";
@@ -200,6 +281,38 @@ function VideoPreview({
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [playing, idx, currentDurationMs, totalScenes]);
 
+  async function handleRender() {
+    if (rendering || totalScenes === 0) return;
+    setRendering(true);
+    setRenderProgress(0);
+    setPlaying(false);
+    try {
+      const result = await renderVideo({
+        title, platform, scenes, styleId, contentType,
+        onProgress: setRenderProgress,
+      });
+      // Upload to Supabase Storage under <userId>/<projectId>.<ext>
+      const path = `${userId}/${projectId}-${Date.now()}.${result.extension}`;
+      const { error: upErr } = await supabase.storage.from("renders").upload(path, result.blob, {
+        contentType: result.mimeType, upsert: true,
+      });
+      if (upErr) throw upErr;
+      const { data: signed } = await supabase.storage.from("renders").createSignedUrl(path, 60 * 60 * 24 * 7);
+      const url = signed?.signedUrl ?? null;
+      // Persist URL on the output row
+      if (outputId && url) {
+        await supabase.from("generated_outputs").update({ video_url: url } as never).eq("id", outputId);
+      }
+      setVideoUrl(url);
+      qc.invalidateQueries({ queryKey: ["project", projectId] });
+      toast.success(`Rendered ${result.durationSec.toFixed(1)}s ${result.extension.toUpperCase()} — saved to your library.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Render failed");
+    } finally {
+      setRendering(false);
+    }
+  }
+
   if (totalScenes === 0) return null;
   const scene = scenes[idx];
 
@@ -209,65 +322,79 @@ function VideoPreview({
         <div>
           <h2 className="font-semibold flex items-center gap-2"><Film className="w-4 h-4 text-[color:var(--neon-pink)]" /> Video Preview</h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Auto-playing storyboard reel · {isVertical ? "9:16 vertical" : "16:9 landscape"} · {totalScenes} scenes · {music ?? "No music"}
+            {isVertical ? "9:16 vertical" : "16:9 landscape"} · {totalScenes} scenes · {music ?? "No music"}
           </p>
         </div>
-        <button
-          onClick={() => toast.success("Full MP4 render queued — you'll be notified when it's ready.")}
-          className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)]">
-          Render MP4
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {videoUrl && (
+            <a href={videoUrl} download className="rounded-lg glass hover:bg-white/5 px-4 py-2 text-sm font-medium flex items-center gap-2">
+              <Download className="w-4 h-4" /> Download MP4
+            </a>
+          )}
+          <button
+            onClick={handleRender}
+            disabled={rendering}
+            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
+            {rendering
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Rendering {Math.round(renderProgress * 100)}%</>
+              : <><VideoIcon className="w-4 h-4" /> {videoUrl ? "Re-render MP4" : "Render MP4"}</>}
+          </button>
+        </div>
       </div>
 
-      <div className={`relative ${aspect} mx-auto rounded-xl overflow-hidden bg-black`}>
-        <img
-          key={idx}
-          src={styleImage}
-          alt={scene.visual}
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: `scale(${1.05 + progress * 0.08})`, transition: "transform 100ms linear" }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+      {videoUrl ? (
+        <video controls src={videoUrl} className={`${aspect} mx-auto rounded-xl bg-black w-full`} />
+      ) : (
+        <div className={`relative ${aspect} mx-auto rounded-xl overflow-hidden bg-black`}>
+          <img
+            key={idx}
+            src={styleImage}
+            alt={scene.visual}
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ transform: `scale(${1.05 + progress * 0.08})`, transition: "transform 100ms linear" }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
 
-        <div className="absolute top-0 left-0 right-0 p-3 flex gap-1">
-          {scenes.map((_, i) => (
-            <div key={i} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
-              <div className="h-full bg-white" style={{ width: `${i < idx ? 100 : i === idx ? progress * 100 : 0}%` }} />
-            </div>
-          ))}
-        </div>
-
-        <div className="absolute top-6 left-4 right-4">
-          <div className="text-[10px] uppercase tracking-widest text-white/70">{platform ?? "preview"}</div>
-          <div className="text-sm text-white font-semibold line-clamp-1">{title}</div>
-        </div>
-
-        <div className="absolute bottom-16 left-4 right-4 text-white">
-          <div className="inline-block text-[10px] uppercase tracking-widest bg-white/15 backdrop-blur px-2 py-0.5 rounded">
-            Scene {scene.n} · {scene.duration}
+          <div className="absolute top-0 left-0 right-0 p-3 flex gap-1">
+            {scenes.map((_, i) => (
+              <div key={i} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
+                <div className="h-full bg-white" style={{ width: `${i < idx ? 100 : i === idx ? progress * 100 : 0}%` }} />
+              </div>
+            ))}
           </div>
-          <div className="mt-2 text-lg md:text-xl font-semibold leading-snug drop-shadow-lg">{scene.visual}</div>
-          <div className="mt-1 text-xs md:text-sm text-white/80 italic">🎙 {scene.voiceover}</div>
-        </div>
 
-        <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-3">
-          <button
-            onClick={() => { setIdx((i) => (i - 1 + totalScenes) % totalScenes); setProgress(0); }}
-            className="w-9 h-9 rounded-full bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center text-white">
-            <SkipBack className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setPlaying((p) => !p)}
-            className="w-11 h-11 rounded-full gradient-primary text-white flex items-center justify-center shadow-lg">
-            {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
-          </button>
-          <button
-            onClick={() => { setIdx((i) => (i + 1) % totalScenes); setProgress(0); }}
-            className="w-9 h-9 rounded-full bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center text-white">
-            <SkipForward className="w-4 h-4" />
-          </button>
+          <div className="absolute top-6 left-4 right-4">
+            <div className="text-[10px] uppercase tracking-widest text-white/70">{platform ?? "preview"}</div>
+            <div className="text-sm text-white font-semibold line-clamp-1">{title}</div>
+          </div>
+
+          <div className="absolute bottom-16 left-4 right-4 text-white">
+            <div className="inline-block text-[10px] uppercase tracking-widest bg-white/15 backdrop-blur px-2 py-0.5 rounded">
+              Scene {scene.n} · {scene.duration}
+            </div>
+            <div className="mt-2 text-lg md:text-xl font-semibold leading-snug drop-shadow-lg">{scene.visual}</div>
+            <div className="mt-1 text-xs md:text-sm text-white/80 italic">🎙 {scene.voiceover}</div>
+          </div>
+
+          <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-3">
+            <button
+              onClick={() => { setIdx((i) => (i - 1 + totalScenes) % totalScenes); setProgress(0); }}
+              className="w-9 h-9 rounded-full bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center text-white">
+              <SkipBack className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setPlaying((p) => !p)}
+              className="w-11 h-11 rounded-full gradient-primary text-white flex items-center justify-center shadow-lg">
+              {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+            </button>
+            <button
+              onClick={() => { setIdx((i) => (i + 1) % totalScenes); setProgress(0); }}
+              className="w-9 h-9 rounded-full bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center text-white">
+              <SkipForward className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -54,32 +54,53 @@ Here's exactly what to do this week: pick one, ship it in 24 hours, measure it i
 ${pick(CTAS)}`;
 }
 
-export function generateScenes(topic: string, style: string): GeneratedProject["scenes"] {
-  const base = [
-    { visual: `Cinematic overhead shot introducing ${topic}`, vo: "Open with a bold visual statement." },
-    { visual: `Close-up of a person reacting to ${topic}`, vo: "Set the emotional stake." },
-    { visual: `Macro detail shot in ${style} style`, vo: "Zoom into the specifics." },
-    { visual: `Split screen — before vs after`, vo: "Show the contrast." },
-    { visual: `Text overlay reveal: '${topic}'`, vo: "Deliver the core idea." },
-    { visual: `Slow-motion b-roll of the transformation`, vo: "Land the emotion." },
-    { visual: `Data / chart animation`, vo: "Anchor with a proof point." },
-    { visual: `Creator direct-to-camera close-up`, vo: "Personal takeaway." },
-    { visual: `${style} cinematic wide shot`, vo: "Reset the frame." },
-    { visual: `Call-to-action end card with brand mark`, vo: "Drive the action." },
+import { getStyle } from "./constants";
+
+export function generateScenes(topic: string, style: string, contentType = "short_reel"): GeneratedProject["scenes"] {
+  const s = getStyle(style);
+  const isLong = contentType === "long_video";
+  const label = s.label;
+  const descriptor = s.descriptor;
+
+  const shortBase = [
+    { visual: `Opening hook: ${label} portrait of "${topic}" — ${descriptor}`, vo: `Open bold: "${topic}" — this changes everything.` },
+    { visual: `Close-up reaction shot rendered in ${label}, subject reacting to ${topic}`, vo: "Set the emotional stake in one sentence." },
+    { visual: `Macro detail shot, ${descriptor}, textures of ${topic}`, vo: "Zoom into the specifics people miss." },
+    { visual: `${label} split-screen: the wrong way vs the right way for ${topic}`, vo: "Show the contrast — before and after." },
+    { visual: `Kinetic typography reveal: "${topic}" in ${label} palette`, vo: "Deliver the core insight in one line." },
+    { visual: `${label} b-roll of the transformation moment, cinematic slow motion`, vo: "Land the emotion — let it breathe." },
+    { visual: `${label} data reveal / chart animation about ${topic}`, vo: "Anchor with one proof point." },
+    { visual: `Creator direct-to-camera close-up, ${label} lighting`, vo: "Personal takeaway — say it like you mean it." },
+    { visual: `${label} epic wide shot resetting the frame around ${topic}`, vo: "Reset — one breath before the payoff." },
+    { visual: `${label} end card with brand mark and CTA overlay`, vo: pick(CTAS) },
   ];
-  return base.map((s, i) => ({
+
+  const longExtra = [
+    { visual: `${label} interview cutaway: expert framed with soft key light`, vo: `Bring in the deeper why of ${topic}.` },
+    { visual: `${label} historical montage: how ${topic} evolved`, vo: "Give the context — the story arc that got us here." },
+    { visual: `${label} case study lower-third: real numbers about ${topic}`, vo: "Prove it with a story we can measure." },
+    { visual: `${label} step-by-step overlay: 3 things to do this week`, vo: "Walk through the exact playbook, one step at a time." },
+    { visual: `${label} objection-handling insert: "but what about…"`, vo: "Handle the pushback before it kills your idea." },
+    { visual: `${label} montage: before/after transformations for ${topic}`, vo: "Show the payoff at scale." },
+    { visual: `${label} cinematic wide: the horizon shot`, vo: "Zoom out — here's the bigger picture." },
+    { visual: `${label} end card with subscribe animation and CTA`, vo: pick(CTAS) },
+  ];
+
+  const arr = isLong ? [...shortBase, ...longExtra] : shortBase;
+  return arr.map((sc, i) => ({
     n: i + 1,
-    visual: s.visual,
-    voiceover: s.vo,
-    duration: `${3 + (i % 4)}s`,
+    visual: sc.visual,
+    voiceover: sc.vo,
+    duration: `${isLong ? 6 + (i % 5) : 3 + (i % 4)}s`,
   }));
 }
 
-export function generateImagePrompts(topic: string, style: string): GeneratedProject["image_prompts"] {
-  return Array.from({ length: 8 }).map((_, i) => ({
+export function generateImagePrompts(topic: string, style: string, count = 8): GeneratedProject["image_prompts"] {
+  const s = getStyle(style);
+  return Array.from({ length: count }).map((_, i) => ({
     n: i + 1,
-    prompt: `${topic}, scene ${i + 1}, ${style} aesthetic, dramatic lighting, ultra detailed, 8k, cinematic composition`,
-    style,
+    prompt: `${topic}, shot ${i + 1}, ${s.descriptor}, dramatic composition, ultra detailed, 8k`,
+    style: s.label,
   }));
 }
 
@@ -104,28 +125,31 @@ export function generateHashtags(topic: string, platform: string): string[] {
   return base.slice(0, 30);
 }
 
-export function generateThumbnailIdeas(topic: string): string[] {
+export function generateThumbnailIdeas(topic: string, style = "cinematic"): string[] {
+  const s = getStyle(style);
   return [
-    `Bold text: "THE TRUTH ABOUT ${topic.toUpperCase()}" + shocked face close-up`,
-    `Split-frame: red X vs green ✓ with '${topic}' in center`,
-    `Cinematic character portrait, neon lighting, '${topic}?' overlay`,
-    `Before/After with arrow, gradient background, curiosity gap`,
+    `${s.label} bold text: "THE TRUTH ABOUT ${topic.toUpperCase()}" + shocked face close-up`,
+    `${s.label} split-frame: red X vs green ✓ with '${topic}' in center`,
+    `${s.label} character portrait, ${s.descriptor}, '${topic}?' overlay`,
+    `${s.label} before/After with arrow, curiosity gap headline about ${topic}`,
   ];
 }
 
 export function generateProject(input: {
-  topic: string; tone: string; platform: string; style: string;
+  topic: string; tone: string; platform: string; style: string; contentType?: string;
 }): GeneratedProject {
-  const { topic, tone, platform, style } = input;
+  const { topic, tone, platform, style, contentType = "short_reel" } = input;
+  const s = getStyle(style);
+  const isLong = contentType === "long_video";
   return {
-    title: `${topic}: The ${tone} ${platform} Playbook Nobody Talks About`,
+    title: `${topic}: The ${tone} ${s.label} ${platform} ${isLong ? "Deep-Dive" : "Playbook"}`,
     hook: pick(HOOKS),
     script: generateVideoScript(topic, tone, platform),
-    scenes: generateScenes(topic, style),
-    image_prompts: generateImagePrompts(topic, style),
+    scenes: generateScenes(topic, style, contentType),
+    image_prompts: generateImagePrompts(topic, style, isLong ? 16 : 8),
     captions: generateCaptions(topic, platform, tone).join("\n\n---\n\n"),
     hashtags: generateHashtags(topic, platform),
-    thumbnail_ideas: generateThumbnailIdeas(topic),
+    thumbnail_ideas: generateThumbnailIdeas(topic, style),
     cta: pick(CTAS),
   };
 }

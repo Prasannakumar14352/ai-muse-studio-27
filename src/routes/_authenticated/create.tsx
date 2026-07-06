@@ -3,7 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { generateProject } from "@/lib/generators";
-import { CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, MUSIC, GENERATION_COST } from "@/lib/constants";
+import { CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, MUSIC, NICHES, GENERATION_COST } from "@/lib/constants";
 import { deductUsage, getAccessInfo, canGenerate } from "@/lib/access";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Wand2, ArrowRight } from "lucide-react";
@@ -46,7 +46,8 @@ function CreatePage() {
       }
 
       const output = generateProject({
-        topic: form.topic, tone: form.tone, platform: form.platform, style: form.style,
+        topic: form.topic, tone: form.tone, platform: form.platform,
+        style: form.style, contentType: form.content_type,
       });
 
       const { data: project, error: pErr } = await supabase.from("projects").insert({
@@ -120,7 +121,20 @@ function CreatePage() {
             </div>
           </Section>
 
-          <Section title="2. What's it about?">
+          <Section title="2. Pick a niche (optional — for topic ideas)">
+            <div className="flex flex-wrap gap-2">
+              {NICHES.map((n) => (
+                <button key={n.id} type="button"
+                  onClick={() => update("topic", n.topics[Math.floor(Math.random() * n.topics.length)])}
+                  className="glass border border-border hover:border-[color:var(--neon-purple)] rounded-full px-3 py-1.5 text-xs flex items-center gap-1.5 transition">
+                  <span>{n.emoji}</span> {n.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">Tap a niche to auto-fill a trending topic. You can still edit it below.</p>
+          </Section>
+
+          <Section title="3. What's it about?">
             <input value={form.topic} onChange={(e) => update("topic", e.target.value)}
               placeholder="e.g. Why silent walking is the new meditation"
               className="w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
