@@ -49,31 +49,32 @@ function PricingPage() {
               </div>
               {estimate && (
                 <div className="mt-4 rounded-lg border border-border/60 bg-black/20 p-3 text-xs">
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Approximate generations</div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Approximate monthly output</div>
+                  <p className="text-[10px] text-muted-foreground mb-2">If you spent all {totalCredits.toLocaleString()} credits on one type only:</p>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5 text-muted-foreground">
                         <ImageIcon className="w-3.5 h-3.5 text-[color:var(--neon-pink)]" /> AI images
                       </span>
-                      <strong className="text-foreground">{estimate.images}</strong>
+                      <strong className="text-foreground">~{estimate.images}</strong>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5 text-muted-foreground">
                         <Layers className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" /> Carousels
                       </span>
-                      <strong className="text-foreground">{estimate.carousels}</strong>
+                      <strong className="text-foreground">~{estimate.carousels}</strong>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5 text-muted-foreground">
                         <Film className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" /> Short reels
                       </span>
-                      <strong className="text-foreground">{estimate.shortReels}</strong>
+                      <strong className="text-foreground">~{estimate.shortReels}</strong>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5 text-muted-foreground">
                         <Video className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" /> 5-min long videos
                       </span>
-                      <strong className="text-foreground">{estimate.longVideos}</strong>
+                      <strong className="text-foreground">~{estimate.longVideos}</strong>
                     </div>
                   </div>
                 </div>
