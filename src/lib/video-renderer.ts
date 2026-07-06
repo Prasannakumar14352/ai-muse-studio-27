@@ -4,7 +4,7 @@
 
 import { getStyle } from "./constants";
 
-export type RenderScene = { n: number; visual: string; voiceover: string; duration: string };
+export type RenderScene = { n: number; visual: string; voiceover: string; duration: string; on_screen_text?: string };
 
 export type RenderOptions = {
   title: string;
