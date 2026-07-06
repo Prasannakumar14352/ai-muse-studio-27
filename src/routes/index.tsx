@@ -8,6 +8,8 @@ import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
 import brandLogo from "@/assets/prodxstore-logo.png.asset.json";
+import demoVideo from "@/assets/prodxstore-demo.mp4.asset.json";
+
 
 export const Route = createFileRoute("/")({ component: Landing });
 
@@ -21,7 +23,7 @@ const FEATURES = [
 ];
 
 const FAQ = [
-  { q: "What is CreatorVault AI?", a: "A premium AI content platform that generates full creator-ready projects — scripts, scenes, images, captions, hashtags — in one flow." },
+  { q: "What is Prodxstore?", a: "A premium AI content platform that generates full creator-ready projects — scripts, scenes, images, captions, hashtags — in one flow." },
   { q: "Do I need any editing experience?", a: "No. You describe the topic and pick a style. We generate the entire project blueprint." },
   { q: "Which platforms are supported?", a: "YouTube, Instagram, TikTok, Facebook and LinkedIn — with platform-specific tone and formatting." },
   { q: "Can I use my own brand style?", a: "Yes. Save brand presets in Settings, and every generation adapts to your defaults." },
@@ -64,7 +66,7 @@ function Landing() {
             faster than you can scroll.
           </h1>
           <p className="mt-6 max-w-2xl mx-auto text-lg text-muted-foreground">
-            CreatorVault AI turns a single idea into a complete creator project — script, scenes, AI images,
+            Prodxstore turns a single idea into a complete creator project — script, scenes, AI images,
             captions, hashtags and voiceover — in seconds.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-3">
@@ -80,32 +82,34 @@ function Landing() {
             <span className="ml-2">Loved by 10,000+ creators</span>
           </div>
 
-          {/* Video preview mock */}
+          {/* Live demo video — how the platform works */}
           <div className="mt-16 max-w-5xl mx-auto">
             <div className="glass rounded-2xl p-2 shadow-[var(--shadow-glow)]">
-              <div className="rounded-xl overflow-hidden bg-gradient-to-br from-[oklch(0.2_0.08_300)] to-[oklch(0.15_0.05_285)] aspect-video relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-20 h-20 rounded-full gradient-primary flex items-center justify-center shadow-[var(--shadow-glow)]">
-                    <div className="w-0 h-0 border-l-[16px] border-l-white border-y-[10px] border-y-transparent ml-1" />
-                  </div>
-                </div>
-                <div className="absolute top-4 left-4 flex gap-2">
-                  <span className="glass px-2 py-1 rounded text-xs">Cinematic</span>
-                  <span className="glass px-2 py-1 rounded text-xs">1080p</span>
-                </div>
-                <div className="absolute bottom-4 left-4 right-4">
-                  <div className="glass rounded-lg p-3 flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-[color:var(--neon-pink)] animate-pulse" />
-                    <div className="flex-1 text-left">
-                      <div className="text-xs text-muted-foreground">Now generating</div>
-                      <div className="text-sm font-medium">Scene 4 / 10 — Cyberpunk city aerial shot</div>
-                    </div>
-                    <div className="text-xs text-muted-foreground">00:14 / 00:45</div>
-                  </div>
+              <div className="rounded-xl overflow-hidden bg-black aspect-video relative group">
+                <video
+                  src={demoVideo.url}
+                  controls
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="auto"
+                  className="w-full h-full object-cover"
+                  aria-label="How Prodxstore works — 25 second walkthrough">
+                  Your browser does not support the video tag.
+                </video>
+
+                <div className="pointer-events-none absolute top-4 left-4 flex gap-2">
+                  <span className="glass px-2.5 py-1 rounded text-[11px] font-medium tracking-wide uppercase text-white/90">Demo</span>
+                  <span className="glass px-2.5 py-1 rounded text-[11px] font-medium tracking-wide uppercase text-white/90">25 sec</span>
                 </div>
               </div>
             </div>
+            <p className="mt-4 text-xs text-muted-foreground text-center">
+              Watch how a single idea becomes a full creator project — no sign-in needed.
+            </p>
           </div>
+
         </div>
       </section>
 
