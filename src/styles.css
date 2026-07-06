@@ -78,6 +78,8 @@
   --neon-purple: oklch(0.68 0.26 305);
   --neon-pink: oklch(0.72 0.28 355);
   --neon-blue: oklch(0.72 0.2 250);
+  --brand-orange: oklch(0.72 0.19 55);
+  --brand-orange-glow: oklch(0.78 0.2 45);
 
   --gradient-primary: linear-gradient(135deg, oklch(0.68 0.26 305), oklch(0.72 0.28 355));
   --gradient-hero: radial-gradient(ellipse at top, oklch(0.35 0.22 305 / 0.55), transparent 60%),
