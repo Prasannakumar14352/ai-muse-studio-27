@@ -143,7 +143,4 @@ function CreditsChip() {
   );
 }
 
-      <ConfirmDialogHost />
-    </div>
-  );
-}
+
