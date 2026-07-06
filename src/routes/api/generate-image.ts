@@ -32,8 +32,6 @@ export const Route = createFileRoute("/api/generate-image")({
             ? "1024x1536"
             : ratio === "16:9"
             ? "1536x1024"
-            : ratio === "4:5"
-            ? "1024x1280"
             : "1024x1024";
 
         const stylePrefix = style ? `${style} style. ` : "";
@@ -48,9 +46,10 @@ export const Route = createFileRoute("/api/generate-image")({
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "google/gemini-2.5-flash-image",
+              model: "openai/gpt-image-2",
               prompt: fullPrompt,
               size,
+              quality: "low",
               n: 1,
             }),
           }
