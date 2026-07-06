@@ -266,43 +266,11 @@ function PricingFAQ() {
   );
 }
 
-/* Checkout placeholder — pretends to run payment and activates the plan locally. */
+/* Checkout — real payment required. Does NOT activate a plan without a completed payment. */
 function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }) {
-  const { data: access } = useAccess();
-  const qc = useQueryClient();
-  const [processing, setProcessing] = useState(false);
   const totalCredits = plan.monthlyCredits + (plan.signupCredits ?? 0);
   const estimate = getPlanGenerationEstimate(totalCredits);
-
-  async function simulatePayment() {
-    if (!access) return;
-    setProcessing(true);
-    await new Promise((r) => setTimeout(r, 1400));
-
-    await supabase.from("subscriptions").update({ status: "cancelled" })
-      .eq("user_id", access.userId).eq("status", "active");
-
-    const renews = new Date();
-    renews.setMonth(renews.getMonth() + 1);
-    const { error } = await supabase.from("subscriptions").insert({
-      user_id: access.userId,
-      plan_name: plan.id,
-      status: "active",
-      monthly_credit_limit: plan.monthlyCredits,
-      monthly_credits_used: 0,
-      unlimited_usage: false,
-      renews_at: renews.toISOString(),
-    } as any);
-    setProcessing(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    await supabase.from("profiles").update({ plan: plan.id } as any).eq("id", access.userId);
-    qc.invalidateQueries({ queryKey: ["access"] });
-    toast.success(`${plan.name} plan activated!`);
-    onClose();
-  }
+  const isFree = plan.monthlyCredits === 0 || /free/i.test(plan.price);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -314,7 +282,7 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">$</div>
           <div>
             <div className="font-semibold">Checkout</div>
-            <div className="text-xs text-muted-foreground">Secure payment (demo)</div>
+            <div className="text-xs text-muted-foreground">Secure payment</div>
           </div>
         </div>
         <div className="glass rounded-xl p-4 mb-3">
@@ -343,15 +311,20 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
           </div>
         )}
 
-        <p className="text-xs text-muted-foreground mb-4">
-          Demo checkout — clicking "Pay" activates the {plan.name} plan without charging you. Live payments can be wired later via Stripe or Paddle.
-        </p>
+        <div className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-3 mb-4 text-xs text-yellow-100">
+          {isFree
+            ? "The Free plan is available by default — no checkout needed."
+            : "Payments aren't connected yet. Plans can't be activated until a payment provider (Stripe or Paddle) is wired up and a real charge is completed."}
+        </div>
+
         <button
-          onClick={simulatePayment}
-          disabled={processing}
-          className="w-full rounded-lg gradient-primary text-white py-3 font-medium flex items-center justify-center gap-2 disabled:opacity-60">
-          {processing ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : `Pay ${plan.price}`}
+          disabled
+          className="w-full rounded-lg gradient-primary text-white py-3 font-medium flex items-center justify-center gap-2 opacity-60 cursor-not-allowed">
+          {isFree ? "Already included" : `Pay ${plan.price} — unavailable`}
         </button>
+        <p className="mt-2 text-[11px] text-center text-muted-foreground">
+          Credits are only granted after a successful payment.
+        </p>
       </div>
     </div>
   );
