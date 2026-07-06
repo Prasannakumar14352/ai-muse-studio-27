@@ -160,10 +160,12 @@ function CreatePage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {STYLES.map((s) => (
                 <button key={s.id} onClick={() => update("style", s.id)}
-                  className={`relative aspect-[4/5] rounded-xl overflow-hidden bg-gradient-to-br ${s.grad} p-3 flex items-end text-left transition ${
-                    form.style === s.id ? "ring-2 ring-white shadow-[var(--shadow-glow)]" : "opacity-80 hover:opacity-100"
+                  className={`relative aspect-[4/5] rounded-xl overflow-hidden p-3 flex items-end text-left transition group ${
+                    form.style === s.id ? "ring-2 ring-white shadow-[var(--shadow-glow)]" : "opacity-85 hover:opacity-100"
                   }`}>
-                  <span className="text-white font-semibold text-sm drop-shadow">{s.label}</span>
+                  <img src={s.image} alt={s.label} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition group-hover:scale-105" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <span className="relative text-white font-semibold text-sm drop-shadow">{s.label}</span>
                 </button>
               ))}
             </div>
