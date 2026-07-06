@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { generateProject, generateCarousel } from "@/lib/generators";
 import { generateAiCarousel } from "@/lib/carousel-ai.functions";
-import { STYLES as STYLE_LIST, CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, MUSIC, NICHES, GENERATION_COST } from "@/lib/constants";
+import { CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, MUSIC, NICHES, GENERATION_COST } from "@/lib/constants";
 import { deductUsage, getAccessInfo, canGenerate } from "@/lib/access";
 import { saveOutput } from "@/lib/local-store";
 import { useQueryClient } from "@tanstack/react-query";
