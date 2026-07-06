@@ -91,6 +91,11 @@ function ImagesPage() {
   }, [prompt, style, ratio, results, lastRun, debug, hydrated]);
 
   async function runGeneration(p: string, s: string, r: string) {
+    // Preflight credit check — need up to 4 credits (1 per concept).
+    if (access && !canGenerate(access, 4)) {
+      toast.error("Not enough credits to generate 4 images. Top up in Pricing.");
+      return;
+    }
     setLoading(true);
     const styleLabel = STYLES.find((x) => x.id === s)?.label ?? s;
     const startedAt = Date.now();
