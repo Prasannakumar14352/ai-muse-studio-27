@@ -23,7 +23,7 @@ const FEATURES = [
 ];
 
 const FAQ = [
-  { q: "What is CreatorVault AI?", a: "A premium AI content platform that generates full creator-ready projects — scripts, scenes, images, captions, hashtags — in one flow." },
+  { q: "What is Prodxstore?", a: "A premium AI content platform that generates full creator-ready projects — scripts, scenes, images, captions, hashtags — in one flow." },
   { q: "Do I need any editing experience?", a: "No. You describe the topic and pick a style. We generate the entire project blueprint." },
   { q: "Which platforms are supported?", a: "YouTube, Instagram, TikTok, Facebook and LinkedIn — with platform-specific tone and formatting." },
   { q: "Can I use my own brand style?", a: "Yes. Save brand presets in Settings, and every generation adapts to your defaults." },
@@ -66,7 +66,7 @@ function Landing() {
             faster than you can scroll.
           </h1>
           <p className="mt-6 max-w-2xl mx-auto text-lg text-muted-foreground">
-            CreatorVault AI turns a single idea into a complete creator project — script, scenes, AI images,
+            Prodxstore turns a single idea into a complete creator project — script, scenes, AI images,
             captions, hashtags and voiceover — in seconds.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-3">
