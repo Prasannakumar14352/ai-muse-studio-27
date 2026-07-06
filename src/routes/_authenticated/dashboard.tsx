@@ -128,14 +128,18 @@ function UserDashboard() {
   const { data: stats } = useQuery({
     queryKey: ["stats"],
     queryFn: async () => {
-      const [{ count: total }, { count: videos }, { count: images }] = await Promise.all([
+      const { listAssets, listOutputs } = await import("@/lib/local-store");
+      const [{ count: total }, { count: videos }, assets, outputs] = await Promise.all([
         supabase.from("projects").select("*", { count: "exact", head: true }),
         supabase.from("projects").select("*", { count: "exact", head: true }).in("content_type", ["long_video", "short_reel"]),
-        supabase.from("assets").select("*", { count: "exact", head: true }).eq("asset_type", "image"),
+        listAssets("image"),
+        listOutputs(),
       ]);
-      return { total: total ?? 0, videos: videos ?? 0, images: images ?? 0 };
+      const localImages = assets.length + outputs.reduce((n, o) => n + (o.carousel_images?.filter(Boolean).length ?? 0), 0);
+      return { total: total ?? 0, videos: videos ?? 0, images: localImages };
     },
   });
+
 
   const { data: recent } = useQuery({
     queryKey: ["recent-projects"],
