@@ -21,7 +21,7 @@ function ProjectsList() {
         .select("id,title,content_type,style,platform,tone,generated_outputs(video_url)")
         .order("created_at", { ascending: false });
       return (data ?? []).map((p: {
-        id: string; title: string; content_type: string;
+        id: string; title: string; content_type: string | null;
         style: string | null; platform: string | null; tone: string | null;
         generated_outputs:
           | { video_url: string | null }[]
