@@ -417,7 +417,7 @@ function CarouselsPage() {
         <div className="grid md:grid-cols-2 gap-4">
           {data.map((row) => {
             const generating = generatingId === row.id;
-            const slides = row.carousel_images ?? [];
+            const slides = row.display_images ?? [];
             const failedCount = Object.values(row.slide_diagnostics).filter((d) => !d.ok).length;
             const cfg = getLayout(row);
             const isEditorOpen = editorFor === row.id;
