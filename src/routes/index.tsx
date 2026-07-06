@@ -231,6 +231,3 @@ function Landing() {
     </div>
   );
 }
-    </div>
-  );
-}
