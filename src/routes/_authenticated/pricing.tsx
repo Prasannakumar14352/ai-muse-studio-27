@@ -1,12 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 import { PLANS, type PlanDef } from "@/lib/constants";
 import { getPlanGenerationEstimate, ASSET_META, type AssetKey } from "@/lib/credit-costs";
 import { useAccess } from "@/lib/access";
-import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
-import { Check, Sparkles, Crown, X, Loader2, Image as ImageIcon, Layers, Film, Video, ChevronDown, Calculator, Minus, Plus } from "lucide-react";
+import { Check, Sparkles, Crown, X, Image as ImageIcon, Layers, Film, Video, ChevronDown, Calculator, Minus, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/pricing")({ component: PricingPage });
 
