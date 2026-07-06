@@ -89,13 +89,16 @@ function Landing() {
                 <video
                   src={demoVideo.url}
                   controls
+                  autoPlay
+                  muted
+                  loop
                   playsInline
-                  preload="metadata"
-                  poster=""
+                  preload="auto"
                   className="w-full h-full object-cover"
                   aria-label="How Prodxstore works — 25 second walkthrough">
                   Your browser does not support the video tag.
                 </video>
+
                 <div className="pointer-events-none absolute top-4 left-4 flex gap-2">
                   <span className="glass px-2.5 py-1 rounded text-[11px] font-medium tracking-wide uppercase text-white/90">Demo</span>
                   <span className="glass px-2.5 py-1 rounded text-[11px] font-medium tracking-wide uppercase text-white/90">25 sec</span>
