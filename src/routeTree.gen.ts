@@ -27,6 +27,7 @@ import { Route as AuthenticatedCaptionsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
 import { Route as AuthenticatedCreateCarouselRouteImport } from './routes/_authenticated/create_.carousel'
+import { Route as AuthenticatedAdminWebhooksRouteImport } from './routes/_authenticated/admin.webhooks'
 import { Route as ApiPublicWebhooksRazorpayRouteImport } from './routes/api/public/webhooks/razorpay'
 
 const ContactRoute = ContactRouteImport.update({
@@ -119,6 +120,12 @@ const AuthenticatedCreateCarouselRoute =
     path: '/create/carousel',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminWebhooksRoute =
+  AuthenticatedAdminWebhooksRouteImport.update({
+    id: '/webhooks',
+    path: '/webhooks',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const ApiPublicWebhooksRazorpayRoute =
   ApiPublicWebhooksRazorpayRouteImport.update({
     id: '/api/public/webhooks/razorpay',
@@ -130,7 +137,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/captions': typeof AuthenticatedCaptionsRoute
   '/carousels': typeof AuthenticatedCarouselsRoute
   '/create': typeof AuthenticatedCreateRoute
@@ -142,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/tts': typeof ApiTtsRoute
+  '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
@@ -150,7 +158,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/captions': typeof AuthenticatedCaptionsRoute
   '/carousels': typeof AuthenticatedCarouselsRoute
   '/create': typeof AuthenticatedCreateRoute
@@ -162,6 +170,7 @@ export interface FileRoutesByTo {
   '/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/tts': typeof ApiTtsRoute
+  '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
@@ -172,7 +181,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
-  '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/captions': typeof AuthenticatedCaptionsRoute
   '/_authenticated/carousels': typeof AuthenticatedCarouselsRoute
   '/_authenticated/create': typeof AuthenticatedCreateRoute
@@ -184,6 +193,7 @@ export interface FileRoutesById {
   '/_authenticated/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/tts': typeof ApiTtsRoute
+  '/_authenticated/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/_authenticated/create_/carousel': typeof AuthenticatedCreateCarouselRoute
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
@@ -206,6 +216,7 @@ export interface FileRouteTypes {
     | '/videos'
     | '/api/generate-image'
     | '/api/tts'
+    | '/admin/webhooks'
     | '/create/carousel'
     | '/projects/$id'
     | '/api/public/webhooks/razorpay'
@@ -226,6 +237,7 @@ export interface FileRouteTypes {
     | '/videos'
     | '/api/generate-image'
     | '/api/tts'
+    | '/admin/webhooks'
     | '/create/carousel'
     | '/projects/$id'
     | '/api/public/webhooks/razorpay'
@@ -247,6 +259,7 @@ export interface FileRouteTypes {
     | '/_authenticated/videos'
     | '/api/generate-image'
     | '/api/tts'
+    | '/_authenticated/admin/webhooks'
     | '/_authenticated/create_/carousel'
     | '/_authenticated/projects/$id'
     | '/api/public/webhooks/razorpay'
@@ -390,6 +403,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCreateCarouselRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/webhooks': {
+      id: '/_authenticated/admin/webhooks'
+      path: '/webhooks'
+      fullPath: '/admin/webhooks'
+      preLoaderRoute: typeof AuthenticatedAdminWebhooksRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/api/public/webhooks/razorpay': {
       id: '/api/public/webhooks/razorpay'
       path: '/api/public/webhooks/razorpay'
@@ -400,8 +420,19 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminWebhooksRoute: typeof AuthenticatedAdminWebhooksRoute
+}
+
+const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminWebhooksRoute: AuthenticatedAdminWebhooksRoute,
+}
+
+const AuthenticatedAdminRouteWithChildren =
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
+
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedCaptionsRoute: typeof AuthenticatedCaptionsRoute
   AuthenticatedCarouselsRoute: typeof AuthenticatedCarouselsRoute
   AuthenticatedCreateRoute: typeof AuthenticatedCreateRoute
@@ -416,7 +447,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedCaptionsRoute: AuthenticatedCaptionsRoute,
   AuthenticatedCarouselsRoute: AuthenticatedCarouselsRoute,
   AuthenticatedCreateRoute: AuthenticatedCreateRoute,
