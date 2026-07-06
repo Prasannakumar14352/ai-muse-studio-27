@@ -153,3 +153,85 @@ export function generateProject(input: {
     cta: pick(CTAS),
   };
 }
+
+// ---------- Carousel generator ----------
+
+export type CarouselSlide = { n: number; role: string; headline: string; body: string; visual: string };
+export type GeneratedCarousel = {
+  title: string;
+  slides: CarouselSlide[];
+  script: string;
+  image_prompts: Array<{ n: number; prompt: string; style: string }>;
+  captions: string;
+  hashtags: string[];
+};
+
+const HEADLINE_TEMPLATES = [
+  (t: string, n: number) => `${n} Truths About ${t}`,
+  (t: string, n: number) => `${n} Ways to Master ${t}`,
+  (t: string, n: number) => `${n} Habits That Transform Your ${t}`,
+  (t: string, n: number) => `${n} Things Nobody Tells You About ${t}`,
+];
+
+const POINT_ANGLES = [
+  { h: "Start with intention", b: "The first move sets the tone. Pick one small ritual and protect it." },
+  { h: "Do less, but deeper", b: "Depth beats breadth. Cut the noise and go all-in on one thing." },
+  { h: "Reframe the story", b: "Change the sentence you tell yourself and the outcome changes with it." },
+  { h: "Compound tiny wins", b: "Small daily reps become identity. 1% every day is a landslide in a year." },
+  { h: "Design the environment", b: "Willpower is overrated. Shape the room and the room shapes you." },
+  { h: "Measure what matters", b: "If it isn't tracked, it isn't real. Pick one metric that proves progress." },
+  { h: "Ship before ready", b: "You learn on the way. Publish rough, refine in public." },
+  { h: "Own the recovery", b: "Rest isn't a reward — it's the reason you get to keep going." },
+];
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+export function generateCarousel(input: {
+  topic: string; tone: string; platform: string; style: string; slideCount?: number; aspectRatio?: string;
+}): GeneratedCarousel {
+  const { topic, tone, platform, style, slideCount = 5, aspectRatio = "4:5" } = input;
+  const s = getStyle(style);
+  const total = Math.max(3, Math.min(10, slideCount));
+  const pointCount = total - 2;
+  const coverHeadline = pick(HEADLINE_TEMPLATES)(topic, pointCount);
+  const points = shuffle(POINT_ANGLES).slice(0, pointCount);
+
+  const slides: CarouselSlide[] = [];
+  slides.push({
+    n: 1, role: "Cover", headline: coverHeadline,
+    body: `Start your day differently.\nFeel the difference. ⚡`,
+    visual: `${s.label} hero cover for "${topic}" — ${s.descriptor}, bold negative space at top for the headline, ${aspectRatio} composition.`,
+  });
+  points.forEach((p, i) => {
+    slides.push({
+      n: i + 2, role: `Point ${i + 1}`, headline: p.h, body: p.b,
+      visual: `${s.label} editorial visual for "${p.h}" in the context of ${topic}, ${s.descriptor}, ${aspectRatio}, clean negative space in the upper third for text.`,
+    });
+  });
+  slides.push({
+    n: slides.length + 1, role: "CTA", headline: `Save this. Share it.`,
+    body: `Follow for more ${tone.toLowerCase()} breakdowns like this on ${platform}.`,
+    visual: `${s.label} closing frame with brand mark and CTA space, ${s.descriptor}, ${aspectRatio}.`,
+  });
+
+  const script = slides.map((sl) =>
+    `Slide ${sl.n} — ${sl.role}\nHeadline: ${sl.headline}\nSubtext: ${sl.body}\nVisual: ${sl.visual}`
+  ).join("\n\n");
+
+  const image_prompts = slides.map((sl) => ({
+    n: sl.n,
+    prompt: `${sl.visual}. Ultra detailed, dramatic composition, editorial ${aspectRatio}. Leave clean negative space for headline overlay.`,
+    style: s.label,
+  }));
+
+  return {
+    title: `${platform} Carousel: ${coverHeadline}`,
+    slides, script, image_prompts,
+    captions: generateCaptions(topic, platform, tone).join("\n\n---\n\n"),
+    hashtags: generateHashtags(topic, platform),
+  };
+}

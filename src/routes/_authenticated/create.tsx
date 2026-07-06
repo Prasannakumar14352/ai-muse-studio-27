@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { generateProject } from "@/lib/generators";
+import { generateProject, generateCarousel } from "@/lib/generators";
 import { CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, MUSIC, NICHES, GENERATION_COST } from "@/lib/constants";
 import { deductUsage, getAccessInfo, canGenerate } from "@/lib/access";
 import { saveOutput } from "@/lib/local-store";
@@ -11,6 +11,8 @@ import { Loader2, Wand2, ArrowRight } from "lucide-react";
 
 
 export const Route = createFileRoute("/_authenticated/create")({ component: CreatePage });
+
+const CAROUSEL_RATIOS = ["1:1", "4:5", "9:16", "16:9"] as const;
 
 function CreatePage() {
   const navigate = useNavigate();
@@ -26,6 +28,8 @@ function CreatePage() {
     style: "cinematic",
     voice: "energetic_creator",
     music: "Cinematic",
+    aspect_ratio: "4:5" as (typeof CAROUSEL_RATIOS)[number],
+    slide_count: 5,
   });
 
   function update<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
@@ -47,10 +51,16 @@ function CreatePage() {
         return;
       }
 
-      const output = generateProject({
-        topic: form.topic, tone: form.tone, platform: form.platform,
-        style: form.style, contentType: form.content_type,
-      });
+      const isCarousel = form.content_type === "carousel";
+      const output = isCarousel
+        ? generateCarousel({
+            topic: form.topic, tone: form.tone, platform: form.platform, style: form.style,
+            slideCount: form.slide_count, aspectRatio: form.aspect_ratio,
+          })
+        : generateProject({
+            topic: form.topic, tone: form.tone, platform: form.platform,
+            style: form.style, contentType: form.content_type,
+          });
 
       const { data: project, error: pErr } = await supabase.from("projects").insert({
         user_id: access.userId,
@@ -67,16 +77,34 @@ function CreatePage() {
       }).select().single();
       if (pErr) throw pErr;
 
-      await saveOutput(project.id, {
-        title: output.title,
-        hook: output.hook,
-        script: output.script,
-        captions: output.captions,
-        hashtags: output.hashtags,
-        scenes: output.scenes,
-        image_prompts: output.image_prompts,
-        thumbnail_ideas: output.thumbnail_ideas,
-      });
+      if (isCarousel) {
+        const c = output as ReturnType<typeof generateCarousel>;
+        await saveOutput(project.id, {
+          title: c.title,
+          hook: "",
+          script: c.script,
+          captions: c.captions,
+          hashtags: c.hashtags,
+          scenes: [],
+          image_prompts: c.image_prompts,
+          thumbnail_ideas: [],
+          carousel_slides: c.slides,
+          aspect_ratio: form.aspect_ratio,
+          slide_count: form.slide_count,
+        });
+      } else {
+        const p = output as ReturnType<typeof generateProject>;
+        await saveOutput(project.id, {
+          title: p.title,
+          hook: p.hook,
+          script: p.script,
+          captions: p.captions,
+          hashtags: p.hashtags,
+          scenes: p.scenes,
+          image_prompts: p.image_prompts,
+          thumbnail_ideas: p.thumbnail_ideas,
+        });
+      }
 
 
       // Deduct credits (admin bypass handled server-side + client-side)
@@ -184,6 +212,33 @@ function CreatePage() {
               ))}
             </div>
           </Section>
+
+          {form.content_type === "carousel" && (
+            <Section title="5b. Carousel layout">
+              <div className="space-y-4">
+                <div>
+                  <div className="text-xs text-muted-foreground mb-2">Aspect ratio</div>
+                  <div className="flex flex-wrap gap-2">
+                    {CAROUSEL_RATIOS.map((r) => (
+                      <button key={r} type="button" onClick={() => update("aspect_ratio", r)}
+                        className={`px-4 py-2 rounded-full text-sm border ${form.aspect_ratio === r ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-white/20"}`}>
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground mb-2">Number of slides ({form.slide_count})</div>
+                  <input type="range" min={3} max={10} value={form.slide_count}
+                    onChange={(e) => update("slide_count", parseInt(e.target.value))}
+                    className="w-full max-w-md" />
+                  <div className="text-[11px] text-muted-foreground mt-1">
+                    Auto-scripts a cover, {Math.max(1, form.slide_count - 2)} point slide{form.slide_count - 2 === 1 ? "" : "s"}, and a CTA.
+                  </div>
+                </div>
+              </div>
+            </Section>
+          )}
 
           <NavRow onBack={() => setStep(1)} onNext={() => setStep(3)} nextLabel="Next: Voice & Music" />
         </div>

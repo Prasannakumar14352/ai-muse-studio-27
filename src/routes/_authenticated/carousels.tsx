@@ -6,7 +6,8 @@ import JSZip from "jszip";
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
-import { listOutputs, saveOutput, deleteOutput } from "@/lib/local-store";
+import { listOutputs, saveOutput, deleteOutput, type CarouselSlide } from "@/lib/local-store";
+import { LocalOnlyBanner } from "@/components/local-only-banner";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
   Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2,
@@ -28,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/carousels")({
 type Prompt = { n: number; prompt: string; style: string };
 type SlideDiag = { at: string; ok: boolean; durationMs: number; httpStatus?: number; error?: string };
 type SlideDiagMap = Record<string, SlideDiag>;
-type LayoutSettings = { ratio: "1:1" | "4:5" | "9:16"; slideCount: number; spacing: number };
+type LayoutSettings = { ratio: "1:1" | "4:5" | "9:16" | "16:9"; slideCount: number; spacing: number };
 
 type CarouselRow = {
   id: string;
@@ -38,14 +39,18 @@ type CarouselRow = {
   tone: string | null;
   image_prompts: Prompt[];
   carousel_images: (string | null)[] | null;
+  carousel_slides: CarouselSlide[] | null;
   slide_diagnostics: SlideDiagMap;
+  saved_ratio: LayoutSettings["ratio"] | null;
+  saved_slide_count: number | null;
 };
 
-const RATIOS: LayoutSettings["ratio"][] = ["1:1", "4:5", "9:16"];
+const RATIOS: LayoutSettings["ratio"][] = ["1:1", "4:5", "9:16", "16:9"];
 const ASPECT_CLASS: Record<LayoutSettings["ratio"], string> = {
   "1:1": "aspect-square",
   "4:5": "aspect-[4/5]",
   "9:16": "aspect-[9/16]",
+  "16:9": "aspect-video",
 };
 
 function CarouselsPage() {
@@ -76,7 +81,10 @@ function CarouselsPage() {
           id: p.id, title: p.title, style: p.style, platform: p.platform, tone: p.tone,
           image_prompts: out?.image_prompts ?? [],
           carousel_images: out?.carousel_images ?? null,
+          carousel_slides: out?.carousel_slides ?? null,
           slide_diagnostics: (rd?.slide_diagnostics ?? {}) as SlideDiagMap,
+          saved_ratio: (out?.aspect_ratio ?? null) as LayoutSettings["ratio"] | null,
+          saved_slide_count: out?.slide_count ?? null,
         };
       });
     },
@@ -84,7 +92,11 @@ function CarouselsPage() {
 
 
   function getLayout(row: CarouselRow): LayoutSettings {
-    return layout[row.id] ?? { ratio: "1:1", slideCount: row.image_prompts.length, spacing: 8 };
+    return layout[row.id] ?? {
+      ratio: row.saved_ratio ?? "4:5",
+      slideCount: row.saved_slide_count ?? row.image_prompts.length,
+      spacing: 8,
+    };
   }
   function updateLayout(rowId: string, patch: Partial<LayoutSettings>) {
     setLayout((prev) => ({ ...prev, [rowId]: { ...(prev[rowId] ?? { ratio: "1:1", slideCount: 5, spacing: 8 }), ...patch } }));
@@ -239,6 +251,7 @@ function CarouselsPage() {
 
   return (
     <div className="space-y-6">
+      <LocalOnlyBanner />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold">Your <span className="gradient-text">Carousels</span></h1>
@@ -353,6 +366,29 @@ function CarouselsPage() {
                     </div>
                   </div>
                 )}
+
+                {row.carousel_slides && row.carousel_slides.length > 0 && (
+                  <details className="mx-4 mb-4 rounded-lg border border-border bg-black/30">
+                    <summary className="cursor-pointer px-3 py-2 text-xs text-muted-foreground hover:text-white flex items-center justify-between">
+                      <span>Per-slide script ({row.carousel_slides.length} slides)</span>
+                      <span className="text-[10px]">Click to expand</span>
+                    </summary>
+                    <div className="px-3 pb-3 space-y-3 max-h-72 overflow-y-auto">
+                      {row.carousel_slides.map((sl) => (
+                        <div key={sl.n} className="rounded border border-border/60 bg-black/40 p-2.5 text-xs">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="gradient-primary text-white px-1.5 py-0.5 rounded text-[10px]">Slide {sl.n}</span>
+                            <span className="text-muted-foreground uppercase tracking-wider text-[10px]">{sl.role}</span>
+                          </div>
+                          <div className="font-semibold text-white">{sl.headline}</div>
+                          <div className="mt-1 text-muted-foreground whitespace-pre-wrap">{sl.body}</div>
+                          <div className="mt-2 text-[10px] text-muted-foreground italic">🎨 {sl.visual}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+
 
                 {slides.length > 0 ? (
                   <div className="px-4 pb-4 space-y-3">

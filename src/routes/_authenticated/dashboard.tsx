@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccess } from "@/lib/access";
+import { LocalOnlyBanner } from "@/components/local-only-banner";
 import {
   Plus, Video, Film, Image as ImageIcon, Type, Sparkles, TrendingUp, Layers,
   Crown, Users, Zap, Calendar, ArrowUpRight,
@@ -167,6 +168,7 @@ function UserDashboard() {
 
   return (
     <div className="space-y-8">
+      <LocalOnlyBanner />
       <div>
         <h1 className="text-3xl md:text-4xl font-bold">
           Welcome back <span className="gradient-text">✨</span>

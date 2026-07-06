@@ -6,6 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type Scene = { n: number; visual: string; voiceover: string; duration: string };
 export type Prompt = { n: number; prompt: string; style: string };
+export type CarouselSlide = {
+  n: number;
+  role: string;           // e.g. "Cover", "Point 1", "CTA"
+  headline: string;
+  body: string;
+  visual: string;
+};
 
 export type LocalOutput = {
   id: string;
@@ -19,6 +26,9 @@ export type LocalOutput = {
   image_prompts: Prompt[];
   thumbnail_ideas: string[];
   carousel_images?: (string | null)[] | null;
+  carousel_slides?: CarouselSlide[] | null;
+  aspect_ratio?: string | null;
+  slide_count?: number | null;
   video_url?: string | null;
   render_diagnostics?: unknown;
   updated_at: string;
@@ -39,16 +49,6 @@ export type ImageGenLog = {
   duration_ms: number;
 };
 
-export type SavedAsset = {
-  id: string;
-  created_at: string;
-  asset_type: "image" | "video" | "carousel";
-  prompt: string;
-  style: string;
-  aspect_ratio: string;
-  image?: string;
-};
-
 let cachedUserId: string | null = null;
 
 export async function currentUserId(): Promise<string | null> {
@@ -58,12 +58,9 @@ export async function currentUserId(): Promise<string | null> {
   return cachedUserId;
 }
 
-// Wipe cache when auth changes so the next call re-reads.
 supabase.auth.onAuthStateChange(() => { cachedUserId = null; });
 
-function base(userId: string) {
-  return `cv:${userId}`;
-}
+function base(userId: string) { return `cv:${userId}`; }
 
 function safeParse<T>(raw: string | null, fallback: T): T {
   if (!raw) return fallback;
@@ -74,7 +71,7 @@ function safeWrite(key: string, value: unknown) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* quota */ }
 }
 
-// ---------- outputs (per project) ----------
+// ---------- outputs ----------
 
 export async function getOutput(projectId: string): Promise<LocalOutput | null> {
   const uid = await currentUserId(); if (!uid) return null;
@@ -97,13 +94,15 @@ export async function saveOutput(projectId: string, patch: Partial<LocalOutput>)
     image_prompts: existing?.image_prompts ?? [],
     thumbnail_ideas: existing?.thumbnail_ideas ?? [],
     carousel_images: existing?.carousel_images ?? null,
+    carousel_slides: existing?.carousel_slides ?? null,
+    aspect_ratio: existing?.aspect_ratio ?? null,
+    slide_count: existing?.slide_count ?? null,
     video_url: existing?.video_url ?? null,
     render_diagnostics: existing?.render_diagnostics,
     ...patch,
     updated_at: new Date().toISOString(),
   };
   safeWrite(`${base(uid)}:output:${projectId}`, next);
-  // Track index for gallery queries.
   const idxKey = `${base(uid)}:outputs-index`;
   const idx = safeParse<string[]>(localStorage.getItem(idxKey), []);
   if (!idx.includes(projectId)) safeWrite(idxKey, [projectId, ...idx]);
@@ -129,14 +128,14 @@ export async function listOutputs(): Promise<LocalOutput[]> {
   return results;
 }
 
-// ---------- image generation debug logs ----------
+// ---------- image gen logs ----------
 
 export async function pushImageGenLog(entry: Omit<ImageGenLog, "id" | "created_at">): Promise<void> {
   const uid = await currentUserId(); if (!uid) return;
   const key = `${base(uid)}:image-gens`;
   const list = safeParse<ImageGenLog[]>(localStorage.getItem(key), []);
   const full: ImageGenLog = { id: crypto.randomUUID(), created_at: new Date().toISOString(), ...entry };
-  safeWrite(key, [full, ...list].slice(0, 50)); // cap to 50 logs
+  safeWrite(key, [full, ...list].slice(0, 50));
 }
 
 export async function listImageGenLogs(): Promise<ImageGenLog[]> {
@@ -144,18 +143,50 @@ export async function listImageGenLogs(): Promise<ImageGenLog[]> {
   return safeParse<ImageGenLog[]>(localStorage.getItem(`${base(uid)}:image-gens`), []);
 }
 
-// ---------- saved library assets ----------
+// ---------- export / import / clear ----------
 
-export async function addAsset(entry: Omit<SavedAsset, "id" | "created_at">): Promise<void> {
-  const uid = await currentUserId(); if (!uid) return;
-  const key = `${base(uid)}:assets`;
-  const list = safeParse<SavedAsset[]>(localStorage.getItem(key), []);
-  const full: SavedAsset = { id: crypto.randomUUID(), created_at: new Date().toISOString(), ...entry };
-  safeWrite(key, [full, ...list].slice(0, 200));
+export type LocalExportBundle = {
+  version: 1;
+  exported_at: string;
+  user_id: string;
+  outputs: LocalOutput[];
+  image_gens: ImageGenLog[];
+};
+
+export async function exportAll(): Promise<LocalExportBundle> {
+  const uid = await currentUserId();
+  if (!uid) throw new Error("Not signed in");
+  return {
+    version: 1,
+    exported_at: new Date().toISOString(),
+    user_id: uid,
+    outputs: await listOutputs(),
+    image_gens: await listImageGenLogs(),
+  };
 }
 
-export async function listAssets(type?: SavedAsset["asset_type"]): Promise<SavedAsset[]> {
-  const uid = await currentUserId(); if (!uid) return [];
-  const list = safeParse<SavedAsset[]>(localStorage.getItem(`${base(uid)}:assets`), []);
-  return type ? list.filter((a) => a.asset_type === type) : list;
+export async function importAll(bundle: LocalExportBundle): Promise<{ outputs: number; logs: number }> {
+  const uid = await currentUserId();
+  if (!uid) throw new Error("Not signed in");
+  if (!bundle || bundle.version !== 1) throw new Error("Unsupported bundle version");
+  let outCount = 0;
+  for (const o of bundle.outputs ?? []) {
+    await saveOutput(o.project_id, o);
+    outCount++;
+  }
+  const existingLogs = await listImageGenLogs();
+  const merged = [...(bundle.image_gens ?? []), ...existingLogs].slice(0, 100);
+  safeWrite(`${base(uid)}:image-gens`, merged);
+  return { outputs: outCount, logs: (bundle.image_gens ?? []).length };
+}
+
+export async function clearAll(): Promise<void> {
+  const uid = await currentUserId(); if (!uid) return;
+  const prefix = `${base(uid)}:`;
+  const toDelete: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(prefix)) toDelete.push(k);
+  }
+  toDelete.forEach((k) => localStorage.removeItem(k));
 }
