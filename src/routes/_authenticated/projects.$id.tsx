@@ -67,13 +67,17 @@ function ProjectView() {
       if (part === "all" || part === "images") { patch.image_prompts = fresh.image_prompts; }
 
       if (output?.id) {
-        const { error } = await supabase.from("generated_outputs").update(patch).eq("id", output.id);
+        const { error } = await supabase.from("generated_outputs").update(patch as never).eq("id", output.id);
         if (error) throw error;
       } else {
         const { data: u } = await supabase.auth.getUser();
         if (!u.user) throw new Error("Not signed in");
         const { error } = await supabase.from("generated_outputs").insert({
-          project_id: project.id, user_id: u.user.id, ...fresh,
+          project_id: project.id, user_id: u.user.id,
+          title: fresh.title, hook: fresh.hook, script: fresh.script,
+          scenes: fresh.scenes, image_prompts: fresh.image_prompts,
+          captions: fresh.captions, hashtags: fresh.hashtags,
+          thumbnail_ideas: fresh.thumbnail_ideas,
         });
         if (error) throw error;
       }
