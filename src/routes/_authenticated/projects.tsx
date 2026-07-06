@@ -6,7 +6,7 @@ import { Plus, FolderOpen, Film, Video as VideoIcon } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/projects")({ component: ProjectsList });
 
 type ProjectRow = {
-  id: string; title: string; content_type: string;
+  id: string; title: string; content_type: string | null;
   style: string | null; platform: string | null; tone: string | null;
   video_url: string | null;
 };
