@@ -4,7 +4,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-export type Scene = { n: number; visual: string; voiceover: string; duration: string };
+export type Scene = { n: number; visual: string; voiceover: string; duration: string; on_screen_text?: string };
 export type Prompt = { n: number; prompt: string; style: string };
 export type CarouselSlide = {
   n: number;

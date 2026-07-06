@@ -4,7 +4,7 @@
 
 import { getStyle } from "./constants";
 
-export type RenderScene = { n: number; visual: string; voiceover: string; duration: string };
+export type RenderScene = { n: number; visual: string; voiceover: string; duration: string; on_screen_text?: string };
 
 export type RenderOptions = {
   title: string;
@@ -74,13 +74,12 @@ function drawScene(
   img: HTMLImageElement | null,
   scene: RenderScene,
   opts: {
-    title: string; platform: string; sceneIdx: number; totalScenes: number;
-    progress: number; accent: string; styleLabel: string;
+    progress: number; accent: string;
   },
 ) {
   const { width: W, height: H } = ctx.canvas;
 
-  // Ken Burns zoom
+  // Ken Burns zoom on the underlying image.
   const zoom = 1.05 + opts.progress * 0.1;
   ctx.fillStyle = "#0b0b16";
   ctx.fillRect(0, 0, W, H);
@@ -92,8 +91,7 @@ function drawScene(
     const dh = ih * ratio;
     ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
   } else {
-    // Fallback: gradient backdrop tinted with the style accent so the render
-    // still looks intentional when the style image fails to load.
+    // Fallback: gradient backdrop tinted with the style accent.
     const g = ctx.createLinearGradient(0, 0, W, H);
     g.addColorStop(0, opts.accent);
     g.addColorStop(1, "#0b0b16");
@@ -101,68 +99,47 @@ function drawScene(
     ctx.fillRect(0, 0, W, H);
   }
 
-  // Bottom gradient
-  const grad = ctx.createLinearGradient(0, H * 0.45, 0, H);
+  // Bottom gradient so the voiceover caption stays readable.
+  const grad = ctx.createLinearGradient(0, H * 0.55, 0, H);
   grad.addColorStop(0, "rgba(0,0,0,0)");
-  grad.addColorStop(1, "rgba(0,0,0,0.85)");
+  grad.addColorStop(1, "rgba(0,0,0,0.88)");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
-  // Top gradient
-  const gradTop = ctx.createLinearGradient(0, 0, 0, H * 0.35);
-  gradTop.addColorStop(0, "rgba(0,0,0,0.6)");
-  gradTop.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = gradTop;
-  ctx.fillRect(0, 0, W, H);
+  const sidePad = Math.round(W * 0.06);
+  ctx.textBaseline = "top";
 
-  // Top progress bars
-  const barY = Math.round(H * 0.03);
-  const barPad = Math.round(W * 0.03);
-  const barGap = 6;
-  const barW = (W - barPad * 2 - barGap * (opts.totalScenes - 1)) / opts.totalScenes;
-  const barH = Math.max(3, Math.round(H * 0.006));
-  for (let i = 0; i < opts.totalScenes; i++) {
-    const x = barPad + i * (barW + barGap);
-    ctx.fillStyle = "rgba(255,255,255,0.25)";
-    ctx.fillRect(x, barY, barW, barH);
+  // Optional on-screen text — big bold headline near the top, only when the
+  // script explicitly provides one. No scene numbers, no chips, no titles.
+  const onScreen = (scene.on_screen_text ?? "").trim();
+  if (onScreen) {
+    const topGrad = ctx.createLinearGradient(0, 0, 0, H * 0.35);
+    topGrad.addColorStop(0, "rgba(0,0,0,0.55)");
+    topGrad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = topGrad;
+    ctx.fillRect(0, 0, W, H * 0.35);
+
+    ctx.font = `800 ${Math.round(H * 0.055)}px system-ui, -apple-system, "Segoe UI", sans-serif`;
     ctx.fillStyle = "#ffffff";
-    const fill = i < opts.sceneIdx ? 1 : i === opts.sceneIdx ? opts.progress : 0;
-    ctx.fillRect(x, barY, barW * fill, barH);
+    ctx.shadowColor = "rgba(0,0,0,0.6)";
+    ctx.shadowBlur = 12;
+    wrapText(ctx, onScreen, sidePad, Math.round(H * 0.08), W - sidePad * 2, Math.round(H * 0.065), 3);
+    ctx.shadowBlur = 0;
   }
 
-  // Platform + title top-left
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.font = `${Math.round(H * 0.018)}px system-ui`;
-  ctx.textBaseline = "top";
-  ctx.fillText(opts.platform.toUpperCase(), barPad, barY + barH + 12);
-  ctx.fillStyle = "#fff";
-  ctx.font = `600 ${Math.round(H * 0.028)}px system-ui`;
-  ctx.fillText(truncate(opts.title, 60), barPad, barY + barH + 12 + Math.round(H * 0.025));
-
-  // Scene chip
-  const chipText = `Scene ${scene.n} · ${scene.duration} · ${opts.styleLabel}`;
-  ctx.font = `600 ${Math.round(H * 0.02)}px system-ui`;
-  const chipMetrics = ctx.measureText(chipText);
-  const chipW = chipMetrics.width + 24;
-  const chipH = Math.round(H * 0.038);
-  const chipX = barPad;
-  const chipY = H - Math.round(H * 0.28);
-  ctx.fillStyle = opts.accent;
-  roundRect(ctx, chipX, chipY, chipW, chipH, 8);
-  ctx.fillStyle = "#fff";
-  ctx.fillText(chipText, chipX + 12, chipY + chipH / 2 - Math.round(H * 0.011));
-
-  // Visual headline
-  ctx.font = `700 ${Math.round(H * 0.045)}px system-ui`;
-  ctx.fillStyle = "#fff";
-  wrapText(ctx, scene.visual, barPad, chipY + chipH + 20, W - barPad * 2, Math.round(H * 0.055), 3);
-
-  // Voiceover subtitle
-  ctx.font = `italic ${Math.round(H * 0.026)}px system-ui`;
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
-  const voY = H - Math.round(H * 0.08);
-  wrapText(ctx, `🎙 ${scene.voiceover}`, barPad, voY, W - barPad * 2, Math.round(H * 0.032), 2);
+  // Voiceover as clean caption text at the bottom — no icons, no prefixes.
+  const vo = (scene.voiceover ?? "").trim();
+  if (vo) {
+    ctx.font = `600 ${Math.round(H * 0.03)}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = "rgba(0,0,0,0.7)";
+    ctx.shadowBlur = 10;
+    const voY = H - Math.round(H * 0.15);
+    wrapText(ctx, vo, sidePad, voY, W - sidePad * 2, Math.round(H * 0.038), 3);
+    ctx.shadowBlur = 0;
+  }
 }
+
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
@@ -267,9 +244,7 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
 
   drawScene(ctx, sceneImgs[0] ?? fallbackImg, opts.scenes[0], {
-    title: opts.title, platform: opts.platform ?? "preview",
-    sceneIdx: 0, totalScenes: opts.scenes.length,
-    progress: 0, accent: style.accent, styleLabel: style.label,
+    progress: 0, accent: style.accent,
   });
 
   recorder.start(250);
@@ -304,9 +279,7 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
         acc += d; sceneIdx = i; localProgress = 1;
       }
       drawScene(ctx, sceneImgs[sceneIdx] ?? fallbackImg, opts.scenes[sceneIdx], {
-        title: opts.title, platform: opts.platform ?? "preview",
-        sceneIdx, totalScenes: opts.scenes.length,
-        progress: localProgress, accent: style.accent, styleLabel: style.label,
+        progress: localProgress, accent: style.accent,
       });
       opts.onProgress?.(clamped / totalDuration);
       if (elapsed >= totalDuration) { resolve(); return; }
