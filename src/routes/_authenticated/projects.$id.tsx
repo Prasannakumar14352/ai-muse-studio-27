@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getStyleImage } from "@/lib/constants";
 import { toast } from "sonner";
-import { Copy, Download, ArrowLeft, Loader2 } from "lucide-react";
+import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
 
