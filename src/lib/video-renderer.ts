@@ -352,9 +352,19 @@ export type UgcOptions = {
   styleId?: string | null;
   scenes: RenderScene[];
   imagePrompts?: Array<{ n: number; prompt: string; style: string } | undefined>;
-  voice?: string; // TTS voice id
+  voice?: string;
   onStage?: (stage: UgcStage) => void;
+  signal?: AbortSignal;
+  preferredContainer?: "webm" | "mp4";
 };
+
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) {
+    const err = new Error("Render canceled");
+    err.name = "AbortError";
+    throw err;
+  }
+}
 
 async function fetchSceneImage(prompt: string, style: string, ratio: string): Promise<string | null> {
   try {
