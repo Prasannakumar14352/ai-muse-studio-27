@@ -332,13 +332,7 @@ function VideoPreview({
 
   async function persistDiagnostics(next: VideoDiagnostics) {
     setDiagnostics(next);
-    if (outputId) {
-      await supabase
-        .from("generated_outputs")
-        .update({ render_diagnostics: next as never } as never)
-        .eq("id", outputId)
-        .then(() => undefined, () => undefined);
-    }
+    await saveOutput(projectId, { render_diagnostics: next }).catch(() => undefined);
   }
 
   function appendAttempt(base: VideoDiagnostics, entry: RetryEntry): VideoDiagnostics {
@@ -361,9 +355,10 @@ function VideoPreview({
     }
     const { data: signed } = await supabase.storage.from("renders").createSignedUrl(path, 60 * 60 * 24 * 7);
     const url = signed?.signedUrl ?? null;
-    if (outputId && url) {
-      await supabase.from("generated_outputs").update({ video_url: url } as never).eq("id", outputId);
+    if (url) {
+      await saveOutput(projectId, { video_url: url });
     }
+
     setVideoUrl(url);
     const base = diagnostics ?? emptyDiag();
     const next: VideoDiagnostics = {
