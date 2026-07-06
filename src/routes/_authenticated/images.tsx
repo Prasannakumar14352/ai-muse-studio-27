@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
-import { Loader2, Wand2, Download, Save, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown } from "lucide-react";
+import { Loader2, Wand2, Download, Save, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 
@@ -40,6 +40,21 @@ function ImagesPage() {
   const [debug, setDebug] = useState<DebugInfo | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [viewerIdx, setViewerIdx] = useState<number | null>(null);
+
+  // Keyboard nav for fullscreen viewer.
+  useEffect(() => {
+    if (viewerIdx === null) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setViewerIdx(null);
+      if (e.key === "ArrowRight") setViewerIdx((i) => (i === null ? i : Math.min(results.length - 1, i + 1)));
+      if (e.key === "ArrowLeft") setViewerIdx((i) => (i === null ? i : Math.max(0, i - 1)));
+    }
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prevOverflow; };
+  }, [viewerIdx, results.length]);
 
   // Restore last session from localStorage.
   useEffect(() => {
@@ -328,13 +343,20 @@ function ImagesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {results.map((r) => (
+          {results.map((r, i) => (
             <div key={r.id} className="glass rounded-xl overflow-hidden group">
-              <div className={`${aspectClass[r.ratio]} relative overflow-hidden flex items-end p-3`}>
-                <img src={r.image} alt={r.prompt} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+              <button
+                onClick={() => setViewerIdx(i)}
+                className={`${aspectClass[r.ratio]} relative overflow-hidden flex items-end p-3 w-full text-left cursor-zoom-in`}
+                aria-label="View full screen"
+              >
+                <img src={r.image} alt={r.prompt} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                 <span className="relative text-white text-xs glass px-2 py-1 rounded">{r.style} · {r.ratio}</span>
-              </div>
+                <span className="absolute top-2 right-2 rounded-md bg-black/60 backdrop-blur p-1.5 opacity-0 group-hover:opacity-100 transition">
+                  <Maximize2 className="w-3.5 h-3.5 text-white" />
+                </span>
+              </button>
               <div className="p-3">
                 <div className="text-xs text-muted-foreground line-clamp-2">{r.prompt}</div>
                 <div className="mt-3 flex gap-2">
@@ -345,6 +367,58 @@ function ImagesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {viewerIdx !== null && results[viewerIdx] && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setViewerIdx(null)}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); setViewerIdx(null); }}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          {viewerIdx > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setViewerIdx((i) => (i === null ? i : i - 1)); }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
+              aria-label="Previous"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+          )}
+          {viewerIdx < results.length - 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setViewerIdx((i) => (i === null ? i : i + 1)); }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
+              aria-label="Next"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          )}
+          <div className="max-w-[92vw] max-h-[92vh] flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={results[viewerIdx].image}
+              alt={results[viewerIdx].prompt}
+              className="max-w-[92vw] max-h-[80vh] object-contain rounded-lg shadow-2xl"
+            />
+            <div className="text-xs text-white/70 text-center max-w-2xl">
+              <div className="mb-1">{results[viewerIdx].style} · {results[viewerIdx].ratio} · {viewerIdx + 1}/{results.length}</div>
+              <div className="line-clamp-2">{results[viewerIdx].prompt}</div>
+            </div>
+            <a
+              href={results[viewerIdx].image}
+              download={`creatorvault-${results[viewerIdx].id}.png`}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-lg gradient-primary text-white px-4 py-2 text-xs font-medium flex items-center gap-2"
+            >
+              <Download className="w-3 h-3" /> Download
+            </a>
+          </div>
         </div>
       )}
     </div>
