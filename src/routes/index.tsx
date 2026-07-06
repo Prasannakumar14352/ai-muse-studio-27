@@ -1,7 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import {
   Wand2, Video, Image as ImageIcon, Type, Mic, Music2,
-  Zap, Layers, Rocket, Check, Mail,
+  Zap, Layers, Rocket, Check, Mail, ChevronRight, Star,
 } from "lucide-react";
 import { PLANS } from "@/lib/constants";
 import {
