@@ -15,15 +15,23 @@ export const Route = createFileRoute("/_authenticated/projects/$id")({ component
 
 // Force a browser download to the user's local machine, even when the URL is
 // cross-origin (where the anchor `download` attribute is ignored).
-async function forceDownloadUrl(url: string, filename: string) {
+// Trigger a real browser download synchronously inside the click handler.
+// For Supabase Storage signed URLs, `?download=<name>` makes the server
+// respond with Content-Disposition: attachment so the browser saves the
+// file instead of navigating to it. Doing this synchronously (no await
+// before .click()) preserves the user-gesture flag that browsers require
+// to allow downloads.
+function forceDownloadUrl(url: string, filename: string) {
   try {
-    const res = await fetch(url, { mode: "cors" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const obj = URL.createObjectURL(blob);
+    const u = new URL(url, window.location.href);
+    u.searchParams.set("download", filename);
     const a = document.createElement("a");
-    a.href = obj; a.download = filename; a.click();
-    setTimeout(() => URL.revokeObjectURL(obj), 4000);
+    a.href = u.toString();
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   } catch {
     window.open(url, "_blank", "noopener");
     toast.message("Opened in a new tab — right-click → Save video as…");
@@ -336,29 +344,23 @@ function ProjectView() {
           <Link to="/carousels" className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium">Open in Carousels</Link>
         </div>
       ) : (
-        <VideoPreview
-          scenes={scenes}
-          title={output?.title ?? project.title}
-          styleImage={getStyleImage(project.style)}
-          styleId={project.style}
-          platform={project.platform}
-          contentType={project.content_type}
-          music={project.music}
-          projectId={project.id}
-          userId={project.user_id}
-          outputId={output?.id ?? null}
-          existingVideoUrl={output?.video_url ?? null}
-          existingDiagnostics={(output as { render_diagnostics?: unknown } | null)?.render_diagnostics ?? null}
-          imagePrompts={prompts}
-        />
+        <div className="glass rounded-2xl p-4 border border-[color:var(--neon-purple)]/30">
+          <div className="flex items-start gap-3">
+            <Sparkles className="w-5 h-5 text-[color:var(--neon-purple)] mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <div className="font-semibold">Review before rendering</div>
+              <div className="text-muted-foreground mt-0.5">
+                Check the full script, scene breakdown, image prompts and your brand handles below.
+                Edit anything you want, then scroll down and hit <span className="text-foreground font-medium">Re-generate UGC video</span> to render.
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
-
-
-
-
-
-      <BrandPrompt projectId={project.id} platform={project.platform ?? "instagram"} />
+      {project.content_type !== "carousel" && (
+        <BrandPrompt projectId={project.id} platform={project.platform ?? "instagram"} />
+      )}
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Script */}
@@ -417,6 +419,24 @@ function ProjectView() {
           </div>
         </CollapsibleCard>
       </div>
+
+      {project.content_type !== "carousel" && (
+        <VideoPreview
+          scenes={scenes}
+          title={output?.title ?? project.title}
+          styleImage={getStyleImage(project.style)}
+          styleId={project.style}
+          platform={project.platform}
+          contentType={project.content_type}
+          music={project.music}
+          projectId={project.id}
+          userId={project.user_id}
+          outputId={output?.id ?? null}
+          existingVideoUrl={output?.video_url ?? null}
+          existingDiagnostics={(output as { render_diagnostics?: unknown } | null)?.render_diagnostics ?? null}
+          imagePrompts={prompts}
+        />
+      )}
 
       <div className="glass rounded-2xl p-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div><div className="text-xs text-muted-foreground">Voice</div><div className="font-medium">{project.voice}</div></div>
