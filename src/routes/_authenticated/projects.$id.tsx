@@ -13,6 +13,23 @@ import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack,
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
 
+// Force a browser download to the user's local machine, even when the URL is
+// cross-origin (where the anchor `download` attribute is ignored).
+async function forceDownloadUrl(url: string, filename: string) {
+  try {
+    const res = await fetch(url, { mode: "cors" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const obj = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = obj; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(obj), 4000);
+  } catch {
+    window.open(url, "_blank", "noopener");
+    toast.message("Opened in a new tab — right-click → Save video as…");
+  }
+}
+
 
 function ProjectView() {
   const { id } = Route.useParams();
@@ -47,6 +64,10 @@ function ProjectView() {
     a.click();
     URL.revokeObjectURL(url);
   }
+
+
+
+
 
   function formatPostText(): string {
     const caption = (output?.captions ?? "").trim();
@@ -337,7 +358,7 @@ function ProjectView() {
 
 
 
-      <BrandPrompt projectId={project.id} />
+      <BrandPrompt projectId={project.id} platform={project.platform ?? "instagram"} />
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Script */}
@@ -902,9 +923,9 @@ function VideoPreview({
         </div>
         <div className="flex flex-wrap gap-2">
           {videoUrl && (
-            <a href={videoUrl} download className="rounded-lg glass hover:bg-white/5 px-4 py-2 text-sm font-medium flex items-center gap-2">
+            <button onClick={() => forceDownloadUrl(videoUrl, `${(title || "video").replace(/[^\w]+/g, "-")}.mp4`)} className="rounded-lg glass hover:bg-white/5 px-4 py-2 text-sm font-medium flex items-center gap-2">
               <Download className="w-4 h-4" /> Download video
-            </a>
+            </button>
           )}
           <button
             onClick={() => handleRender()}
@@ -1226,9 +1247,9 @@ function VideoPreview({
                 Download final bundle
               </button>
               {videoUrl && (
-                <a href={videoUrl} download className="rounded-lg glass border border-border hover:bg-white/5 px-4 py-2 text-sm flex items-center gap-2">
+                <button onClick={() => forceDownloadUrl(videoUrl, `${(title || "video").replace(/[^\w]+/g, "-")}.mp4`)} className="rounded-lg glass border border-border hover:bg-white/5 px-4 py-2 text-sm flex items-center gap-2">
                   <VideoIcon className="w-4 h-4" /> Video only
-                </a>
+                </button>
               )}
               <button
                 onClick={() => {
@@ -1585,7 +1606,16 @@ function CollapsibleCard({
   );
 }
 
-function BrandPrompt({ projectId }: { projectId: string }) {
+const PLATFORM_HANDLE_META: Record<string, { fieldLabel: string; placeholder: string; noun: string; prefix: string }> = {
+  youtube:   { fieldLabel: "YouTube channel",  placeholder: "@yourchannel or channel name", noun: "YouTube channel",  prefix: "" },
+  instagram: { fieldLabel: "Instagram handle", placeholder: "@yourhandle",                  noun: "Instagram handle", prefix: "@" },
+  tiktok:    { fieldLabel: "TikTok handle",    placeholder: "@yourhandle",                  noun: "TikTok handle",    prefix: "@" },
+  facebook:  { fieldLabel: "Facebook page",    placeholder: "Your Facebook page",           noun: "Facebook page",    prefix: "" },
+  linkedin:  { fieldLabel: "LinkedIn handle",  placeholder: "your-linkedin-slug",           noun: "LinkedIn handle",  prefix: "" },
+};
+
+function BrandPrompt({ projectId, platform }: { projectId: string; platform: string }) {
+  const meta = PLATFORM_HANDLE_META[platform] ?? PLATFORM_HANDLE_META.instagram;
   const storageKey = `cv:brand:${projectId}`;
   const collapseKey = `cv:collapse:brand:${projectId}`;
   const [brand, setBrand] = useState("");
@@ -1622,8 +1652,9 @@ function BrandPrompt({ projectId }: { projectId: string }) {
   }
 
   const hasSaved = !!(saved?.brand || saved?.handle);
+  const displayHandle = saved?.handle ? `${meta.prefix}${saved.handle}` : "";
   const followLine = saved?.handle
-    ? `Follow @${saved.handle} for more like this`
+    ? `Follow ${displayHandle} for more like this`
     : saved?.brand
       ? `Follow ${saved.brand} for more like this`
       : "";
@@ -1638,8 +1669,8 @@ function BrandPrompt({ projectId }: { projectId: string }) {
       >
         <h2 className="font-semibold flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-[color:var(--neon-pink)]" />
-          Your brand / Instagram handle
-          {hasSaved && <span className="text-xs text-muted-foreground font-normal">· {saved?.handle ? `@${saved.handle}` : saved?.brand}</span>}
+          Your brand / {meta.noun}
+          {hasSaved && <span className="text-xs text-muted-foreground font-normal">· {displayHandle || saved?.brand}</span>}
         </h2>
         {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
       </button>
@@ -1647,7 +1678,7 @@ function BrandPrompt({ projectId }: { projectId: string }) {
         <div className="mt-3 space-y-3">
           <p className="text-xs text-muted-foreground">
             Whenever a script, caption or slide ends with a <em>"follow for more"</em> style call-to-action,
-            we'll swap in your brand name or <span className="text-white">@handle</span> so every carousel and video
+            we'll swap in your brand name or <span className="text-white">{meta.noun.toLowerCase()}</span> so every carousel and video
             drives viewers back to you. Fill this in once per project.
           </p>
           <div className="grid md:grid-cols-2 gap-3">
@@ -1662,12 +1693,12 @@ function BrandPrompt({ projectId }: { projectId: string }) {
               />
             </label>
             <label className="text-xs text-muted-foreground space-y-1">
-              <span>Instagram handle</span>
+              <span>{meta.fieldLabel}</span>
               <input
                 value={handle}
                 onChange={(e) => setHandle(e.target.value)}
-                placeholder="@yourhandle"
-                maxLength={40}
+                placeholder={meta.placeholder}
+                maxLength={60}
                 className="w-full rounded-lg bg-black/30 border border-border px-3 py-2 text-sm text-foreground"
               />
             </label>
