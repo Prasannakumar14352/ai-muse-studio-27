@@ -159,12 +159,20 @@ function CarouselsPage() {
             durationMs: Date.now() - start,
             httpStatus: res.status,
             error: `${j.error ?? `HTTP ${res.status}`}${attempt < maxAttempts ? ` (attempt ${attempt}/${maxAttempts})` : ""}`,
+            attempts: attempt,
+            prompt: prompt.prompt,
+            style: styleLabel,
+            ratio,
           };
         } else {
-          // Persist bytes into IndexedDB and return a small reference key that
-          // fits in localStorage alongside other output metadata.
           const key = await putDataURL(`carousel:${projectId}:${idx}`, j.image);
-          return { image: key, diag: { at: new Date().toISOString(), ok: true, durationMs: Date.now() - start, httpStatus: res.status } };
+          return {
+            image: key,
+            diag: {
+              at: new Date().toISOString(), ok: true, durationMs: Date.now() - start, httpStatus: res.status,
+              attempts: attempt, prompt: prompt.prompt, style: styleLabel, ratio,
+            },
+          };
         }
       } catch (e) {
         last = {
@@ -172,12 +180,16 @@ function CarouselsPage() {
           ok: false,
           durationMs: Date.now() - start,
           error: `${e instanceof Error ? e.message : "Network error"}${attempt < maxAttempts ? ` (attempt ${attempt}/${maxAttempts})` : ""}`,
+          attempts: attempt,
+          prompt: prompt.prompt,
+          style: styleLabel,
+          ratio,
         };
       }
       if (!last || !shouldRetrySlide(last) || attempt === maxAttempts) break;
       await sleep(900 * attempt);
     }
-    return { image: null, diag: last ?? { at: new Date().toISOString(), ok: false, durationMs: 0, error: "Image generation failed" } };
+    return { image: null, diag: last ?? { at: new Date().toISOString(), ok: false, durationMs: 0, error: "Image generation failed", attempts: maxAttempts, prompt: prompt.prompt, style: styleLabel, ratio } };
   }
 
   async function persistSlides(row: CarouselRow, images: (string | null)[], slideDiag: SlideDiagMap) {
