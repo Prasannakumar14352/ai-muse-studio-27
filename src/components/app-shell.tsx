@@ -2,7 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
-  Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon,
+  Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -19,6 +19,7 @@ const BASE_NAV = [
   { to: "/images", label: "Images", icon: ImageIcon },
   { to: "/captions", label: "Captions", icon: Type },
   { to: "/pricing", label: "Pricing", icon: CreditCard },
+  { to: "/billing", label: "Billing", icon: Wallet },
   { to: "/invoices", label: "Invoices", icon: Receipt },
   { to: "/contact", label: "Contact Us", icon: Mail },
   { to: "/settings", label: "Settings", icon: Settings },
@@ -47,9 +48,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="h-screen flex overflow-hidden">
       {/* Sidebar desktop */}
       <aside className="hidden md:flex md:w-64 shrink-0 flex-col border-r border-border/50 bg-sidebar/60 backdrop-blur-xl overflow-y-auto">
-        <Link to="/dashboard" className="flex items-center justify-center gap-4 px-4 py-4 border-b border-border/50">
-          <img src={brandLogo.url} alt="CreatorVault AI" className="h-9 w-auto object-contain" />
-          <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
+        <Link to="/dashboard" className="flex flex-col items-center gap-3 px-4 py-5 border-b border-border/50">
+          <img src={brandLogo.url} alt="CreatorVault AI" className="h-10 w-auto object-contain" />
+          <span className="text-base font-bold tracking-tight whitespace-nowrap bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
             CreatorVault AI
           </span>
         </Link>
@@ -73,12 +74,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-40 grid grid-cols-[auto_1fr_auto] items-center px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+      <div className="md:hidden fixed top-0 inset-x-0 z-40 grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <Link to="/dashboard" className="flex items-center">
           <img src={brandLogo.url} alt="CreatorVault AI" className="h-7 w-auto object-contain" />
         </Link>
         <Link to="/dashboard" className="justify-self-center">
-          <span className="text-base font-bold tracking-tight bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
+          <span className="text-base font-bold tracking-tight whitespace-nowrap bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
             CreatorVault AI
           </span>
         </Link>

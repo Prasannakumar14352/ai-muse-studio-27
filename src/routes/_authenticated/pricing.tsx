@@ -326,6 +326,12 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [paying, setPaying] = useState(false);
+  const [currency, setCurrency] = useState<"USD" | "INR">("USD");
+  const priceNum = Number(plan.price.replace(/[^0-9.]/g, "")) || 0;
+  const INR_PER_USD = 84;
+  const displayAmount = currency === "INR"
+    ? `₹${(priceNum * INR_PER_USD).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`
+    : plan.price;
 
   async function handlePay() {
     if (isFree) return;
@@ -333,7 +339,12 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
     try {
       const ok = await loadRazorpayScript();
       if (!ok || !window.Razorpay) throw new Error("Could not load Razorpay checkout");
-      const order = await createOrder({ data: { planId: plan.id } });
+      const order = await createOrder({ data: { planId: plan.id, currency } });
+      if (order.fellBackToINR) {
+        toast.message("Switched to INR", {
+          description: "Your Razorpay account doesn't have International Payments enabled — charging in INR instead.",
+        });
+      }
       await new Promise<void>((resolve, reject) => {
         const rzp = new window.Razorpay!({
           key: order.keyId,
@@ -350,6 +361,7 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
               toast.success(`Added ${result.credits.toLocaleString()} credits to your account`);
               await qc.invalidateQueries({ queryKey: ["access"] });
               await qc.invalidateQueries({ queryKey: ["my-payments"] });
+              await qc.invalidateQueries({ queryKey: ["my-subscription"] });
               onClose();
               navigate({ to: "/invoices" });
               resolve();
@@ -391,9 +403,33 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
             <div className="flex justify-between text-sm mb-2"><span>Signup bonus</span><span className="font-medium">+{plan.signupCredits.toLocaleString()}</span></div>
           ) : null}
           <div className="flex justify-between text-base pt-2 border-t border-border/40">
-            <span className="font-semibold">Total</span><span className="font-bold gradient-text">{plan.price}</span>
+            <span className="font-semibold">Total</span><span className="font-bold gradient-text">{displayAmount}</span>
           </div>
         </div>
+
+        {!isFree && (
+          <div className="mb-3">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Pay in</div>
+            <div className="flex rounded-lg border border-border/60 p-1 text-sm">
+              {(["USD", "INR"] as const).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCurrency(c)}
+                  className={`flex-1 rounded-md py-1.5 font-medium transition ${
+                    currency === c ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}>
+                  {c === "USD" ? "🇺🇸 USD" : "🇮🇳 INR"}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[10px] text-muted-foreground">
+              {currency === "USD"
+                ? "Charged in USD. If your Razorpay account doesn't allow international payments, we'll auto-switch to INR."
+                : `Charged in INR at ~₹${INR_PER_USD}/$1.`}
+            </p>
+          </div>
+        )}
 
         {estimate && (
           <div className="rounded-xl border border-border/60 bg-black/20 p-3 mb-3 text-xs">
@@ -421,7 +457,7 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
           disabled={isFree || paying}
           className="w-full rounded-lg gradient-primary text-white py-3 font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
           {paying && <Loader2 className="w-4 h-4 animate-spin" />}
-          {isFree ? "Already included" : paying ? "Opening checkout…" : `Pay ${plan.price}`}
+          {isFree ? "Already included" : paying ? "Opening checkout…" : `Pay ${displayAmount}`}
         </button>
         <p className="mt-2 text-[11px] text-center text-muted-foreground">
           Credits are only granted after a successful payment.
