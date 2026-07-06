@@ -255,7 +255,7 @@ function CreatePage() {
             <Section title="1b. Long video length">
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
-                  {[60, 90, 120, 180, 240, 300, 420, 600].map((sec) => (
+                  {[60, 90, 120, 180, 240, 300, 420, 510, 600, 900, 1200, 1800].map((sec) => (
                     <button
                       key={sec}
                       type="button"
