@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
-import { Loader2, Wand2, Download, Save, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown } from "lucide-react";
+import { Loader2, Wand2, Download, Save, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 
