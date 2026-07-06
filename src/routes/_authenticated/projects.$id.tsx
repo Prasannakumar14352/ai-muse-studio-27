@@ -291,6 +291,10 @@ function VideoPreview({
   const [videoUrl, setVideoUrl] = useState<string | null>(existingVideoUrl);
   const [ugcRendering, setUgcRendering] = useState(false);
   const [ugcStage, setUgcStage] = useState<UgcStage | null>(null);
+  const [diagnostics, setDiagnostics] = useState<VideoDiagnostics | null>(null);
+  const [showDiag, setShowDiag] = useState(false);
+  const [autoRetryUsed, setAutoRetryUsed] = useState(false);
+  const lastRenderKindRef = useRef<null | "storyboard" | "ugc">(null);
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number>(0);
 
@@ -298,7 +302,7 @@ function VideoPreview({
   const aspect = isVertical ? "aspect-[9/16] max-w-[340px]" : "aspect-video w-full";
   const totalScenes = scenes.length;
 
-  useEffect(() => { setVideoUrl(existingVideoUrl); }, [existingVideoUrl]);
+  useEffect(() => { setVideoUrl(existingVideoUrl); setDiagnostics(null); setAutoRetryUsed(false); }, [existingVideoUrl]);
 
   const currentDurationMs = useMemo(() => {
     const raw = scenes[idx]?.duration ?? "3s";
@@ -325,23 +329,38 @@ function VideoPreview({
   }, [playing, idx, currentDurationMs, totalScenes]);
 
   async function uploadRender(blob: Blob, mimeType: string, extension: string, durationSec: number) {
+    const uploadStart = Date.now();
     const path = `${userId}/${projectId}-${Date.now()}.${extension}`;
     const { error: upErr } = await supabase.storage.from("renders").upload(path, blob, {
       contentType: mimeType, upsert: true,
     });
-    if (upErr) throw upErr;
+    if (upErr) {
+      setDiagnostics((d) => ({ ...(d ?? emptyDiag()), uploadError: upErr.message, blobSize: blob.size, blobType: blob.type, mimeType }));
+      throw upErr;
+    }
     const { data: signed } = await supabase.storage.from("renders").createSignedUrl(path, 60 * 60 * 24 * 7);
     const url = signed?.signedUrl ?? null;
     if (outputId && url) {
       await supabase.from("generated_outputs").update({ video_url: url } as never).eq("id", outputId);
     }
     setVideoUrl(url);
+    setDiagnostics({
+      ...emptyDiag(),
+      renderedAt: new Date().toISOString(),
+      mimeType, extension, durationSec,
+      blobSize: blob.size, blobType: blob.type,
+      uploadDurationMs: Date.now() - uploadStart,
+      signedUrl: url,
+      codecSupport: probeCodecSupport(),
+    });
+    setAutoRetryUsed(false);
     qc.invalidateQueries({ queryKey: ["project", projectId] });
     toast.success(`Rendered ${durationSec.toFixed(1)}s ${extension.toUpperCase()} — saved to your library.`);
   }
 
   async function handleRender() {
     if (rendering || ugcRendering || totalScenes === 0) return;
+    lastRenderKindRef.current = "storyboard";
     setRendering(true);
     setRenderProgress(0);
     setPlaying(false);
@@ -352,7 +371,9 @@ function VideoPreview({
       });
       await uploadRender(result.blob, result.mimeType, result.extension, result.durationSec);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Render failed");
+      const msg = err instanceof Error ? err.message : "Render failed";
+      setDiagnostics((d) => ({ ...(d ?? emptyDiag()), renderError: msg }));
+      toast.error(msg);
     } finally {
       setRendering(false);
     }
@@ -360,6 +381,7 @@ function VideoPreview({
 
   async function handleUgcRender() {
     if (rendering || ugcRendering || totalScenes === 0) return;
+    lastRenderKindRef.current = "ugc";
     setUgcRendering(true);
     setUgcStage({ kind: "images", done: 0, total: totalScenes });
     setPlaying(false);
@@ -372,24 +394,60 @@ function VideoPreview({
       });
       await uploadRender(result.blob, result.mimeType, result.extension, result.durationSec);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "UGC render failed");
+      const msg = err instanceof Error ? err.message : "UGC render failed";
+      setDiagnostics((d) => ({ ...(d ?? emptyDiag()), renderError: msg }));
+      toast.error(msg);
     } finally {
       setUgcRendering(false);
       setUgcStage(null);
     }
   }
 
-  function ugcLabel(stage: UgcStage | null): string {
-    if (!stage) return "Preparing…";
-    if (stage.kind === "images") return `Generating scene images ${stage.done}/${stage.total}`;
-    if (stage.kind === "audio") return `Generating voiceovers ${stage.done}/${stage.total}`;
-    if (stage.kind === "render") return `Recording ${Math.round(stage.progress * 100)}%`;
-    return "Uploading…";
+  function onVideoError(e: React.SyntheticEvent<HTMLVideoElement>) {
+    const el = e.currentTarget;
+    const err = el.error;
+    const codeMap: Record<number, string> = {
+      1: "MEDIA_ERR_ABORTED", 2: "MEDIA_ERR_NETWORK",
+      3: "MEDIA_ERR_DECODE", 4: "MEDIA_ERR_SRC_NOT_SUPPORTED",
+    };
+    const detail = err ? `${codeMap[err.code] ?? "UNKNOWN"} — ${err.message || "no message"}` : "unknown error";
+    setDiagnostics((d) => ({
+      ...(d ?? emptyDiag()),
+      playbackError: detail,
+      codecSupport: probeCodecSupport(),
+      networkState: el.networkState,
+      readyState: el.readyState,
+      currentSrc: el.currentSrc || null,
+    }));
+    // Auto-retry ONCE: re-run the same render that produced this blob.
+    if (!autoRetryUsed && lastRenderKindRef.current && !rendering && !ugcRendering) {
+      setAutoRetryUsed(true);
+      toast.message("Preview failed to play — auto re-rendering once…");
+      if (lastRenderKindRef.current === "ugc") handleUgcRender();
+      else handleRender();
+    } else {
+      toast.error(`Video preview failed: ${detail}`);
+      setShowDiag(true);
+    }
   }
 
+  function onVideoLoaded(e: React.SyntheticEvent<HTMLVideoElement>) {
+    const el = e.currentTarget;
+    setDiagnostics((d) => ({
+      ...(d ?? emptyDiag()),
+      playbackError: null,
+      readyState: el.readyState,
+      networkState: el.networkState,
+      currentSrc: el.currentSrc || null,
+      videoWidth: el.videoWidth, videoHeight: el.videoHeight,
+      playableDurationSec: isFinite(el.duration) ? el.duration : null,
+    }));
+  }
 
   if (totalScenes === 0) return null;
   const scene = scenes[idx];
+
+  const stages = buildStages(ugcStage, ugcRendering, rendering, renderProgress);
 
   return (
     <div className="glass rounded-2xl p-6">
@@ -419,14 +477,53 @@ function VideoPreview({
             disabled={rendering || ugcRendering}
             className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
             {ugcRendering
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> {ugcLabel(ugcStage)}</>
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Rendering…</>
               : <><Sparkles className="w-4 h-4" /> {videoUrl ? "Re-generate UGC video" : "Generate UGC video"}</>}
           </button>
         </div>
       </div>
 
+      {(rendering || ugcRendering) && (
+        <div className="mb-4 rounded-xl border border-border bg-black/30 p-4">
+          <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
+            <span>Real-time render progress</span>
+            <span>{stages.filter((s) => s.state === "done").length}/{stages.length} stages</span>
+          </div>
+          <div className="space-y-2">
+            {stages.map((s) => (
+              <div key={s.key} className="flex items-center gap-3">
+                <div className="w-5 flex-shrink-0">
+                  {s.state === "done" ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> :
+                   s.state === "active" ? <Loader2 className="w-4 h-4 animate-spin text-[color:var(--neon-pink)]" /> :
+                   <div className="w-2 h-2 rounded-full bg-white/20 mx-auto" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between text-xs">
+                    <span className={s.state === "pending" ? "text-muted-foreground" : "text-white"}>{s.label}</span>
+                    <span className="text-muted-foreground">{s.detail}</span>
+                  </div>
+                  <div className="mt-1 h-1 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className={`h-full ${s.state === "done" ? "bg-emerald-400" : "gradient-primary"} transition-all`}
+                      style={{ width: `${Math.round(s.progress * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {videoUrl ? (
-        <video controls src={videoUrl} className={`${aspect} mx-auto rounded-xl bg-black w-full`} />
+        <video
+          key={videoUrl}
+          controls
+          src={videoUrl}
+          onError={onVideoError}
+          onLoadedMetadata={onVideoLoaded}
+          className={`${aspect} mx-auto rounded-xl bg-black w-full`}
+        />
       ) : (
         <div className={`relative ${aspect} mx-auto rounded-xl overflow-hidden bg-black`}>
           <img
@@ -478,6 +575,165 @@ function VideoPreview({
           </div>
         </div>
       )}
+
+      {/* Video diagnostics panel */}
+      {(videoUrl || diagnostics) && (
+        <div className="mt-4 rounded-xl border border-border bg-black/30">
+          <button
+            onClick={() => setShowDiag((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-xs"
+          >
+            <span className="flex items-center gap-2">
+              {diagnostics?.playbackError || diagnostics?.renderError || diagnostics?.uploadError
+                ? <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                : <Bug className="w-3.5 h-3.5" />}
+              Video diagnostics
+              {diagnostics?.playbackError && <span className="text-rose-400">· playback error</span>}
+              {autoRetryUsed && <span className="text-amber-400">· auto-retried</span>}
+            </span>
+            <span className="text-muted-foreground">{showDiag ? "Hide" : "Show"}</span>
+          </button>
+          {showDiag && (
+            <div className="px-4 pb-4 text-xs space-y-2">
+              <pre className="bg-black/50 rounded p-3 overflow-auto text-white/85 font-mono">
+{JSON.stringify(diagnostics ?? { note: "No diagnostics recorded yet." }, null, 2)}
+              </pre>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const blob = new Blob([JSON.stringify(diagnostics ?? {}, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url; a.download = `video-diagnostics-${Date.now()}.json`; a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  disabled={!diagnostics}
+                  className="rounded-lg glass border border-border px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-40"
+                >
+                  <Download className="w-3 h-3" /> Export diagnostics
+                </button>
+                {videoUrl && (
+                  <button
+                    onClick={() => {
+                      setAutoRetryUsed(false);
+                      if (lastRenderKindRef.current === "ugc") handleUgcRender();
+                      else handleRender();
+                    }}
+                    disabled={rendering || ugcRendering}
+                    className="rounded-lg gradient-primary text-white px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-40"
+                  >
+                    <RefreshCw className="w-3 h-3" /> Re-render now
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
+}
+
+// ---------- diagnostics helpers ----------
+
+type VideoDiagnostics = {
+  renderedAt: string | null;
+  mimeType: string | null;
+  extension: string | null;
+  durationSec: number | null;
+  blobSize: number | null;
+  blobType: string | null;
+  uploadDurationMs: number | null;
+  uploadError: string | null;
+  renderError: string | null;
+  playbackError: string | null;
+  signedUrl: string | null;
+  currentSrc: string | null;
+  networkState: number | null;
+  readyState: number | null;
+  videoWidth: number | null;
+  videoHeight: number | null;
+  playableDurationSec: number | null;
+  codecSupport: Record<string, string> | null;
+};
+
+function emptyDiag(): VideoDiagnostics {
+  return {
+    renderedAt: null, mimeType: null, extension: null, durationSec: null,
+    blobSize: null, blobType: null, uploadDurationMs: null,
+    uploadError: null, renderError: null, playbackError: null,
+    signedUrl: null, currentSrc: null,
+    networkState: null, readyState: null,
+    videoWidth: null, videoHeight: null, playableDurationSec: null,
+    codecSupport: null,
+  };
+}
+
+function probeCodecSupport(): Record<string, string> {
+  if (typeof document === "undefined") return {};
+  const v = document.createElement("video");
+  const types = [
+    "video/webm; codecs=\"vp9, opus\"",
+    "video/webm; codecs=\"vp8, vorbis\"",
+    "video/webm",
+    "video/mp4; codecs=\"avc1.42E01E, mp4a.40.2\"",
+    "video/mp4",
+  ];
+  const out: Record<string, string> = {};
+  for (const t of types) out[t] = v.canPlayType(t) || "no";
+  return out;
+}
+
+// ---------- stage rail ----------
+
+type StageRow = { key: string; label: string; state: "pending" | "active" | "done"; progress: number; detail: string };
+
+function buildStages(
+  ugc: UgcStage | null,
+  ugcRendering: boolean,
+  storyboardRendering: boolean,
+  storyboardProgress: number,
+): StageRow[] {
+  if (storyboardRendering) {
+    return [
+      { key: "record", label: "Recording canvas", state: storyboardProgress >= 1 ? "done" : "active", progress: storyboardProgress, detail: `${Math.round(storyboardProgress * 100)}%` },
+      { key: "export", label: "Exporting file", state: storyboardProgress >= 1 ? "active" : "pending", progress: storyboardProgress >= 1 ? 0.5 : 0, detail: storyboardProgress >= 1 ? "encoding…" : "waiting" },
+    ];
+  }
+  const order = ["script", "scenes", "images", "audio", "record", "export"] as const;
+  const labels: Record<string, string> = {
+    script: "Script",
+    scenes: "Scene breakdown",
+    images: "Scene images",
+    audio: "Voiceovers",
+    record: "Recording",
+    export: "Export & upload",
+  };
+  const status: Record<string, StageRow> = {};
+  for (const k of order) status[k] = { key: k, label: labels[k], state: "pending", progress: 0, detail: "" };
+  // Script + scenes are already done by the time we reach here (generator ran on project create).
+  status.script = { ...status.script, state: "done", progress: 1, detail: "ready" };
+  status.scenes = { ...status.scenes, state: "done", progress: 1, detail: "ready" };
+
+  if (!ugcRendering || !ugc) return order.map((k) => status[k]);
+
+  if (ugc.kind === "images") {
+    status.images = { ...status.images, state: ugc.done === ugc.total ? "done" : "active", progress: ugc.total ? ugc.done / ugc.total : 0, detail: `${ugc.done}/${ugc.total}` };
+  } else {
+    status.images = { ...status.images, state: "done", progress: 1, detail: "done" };
+  }
+  if (ugc.kind === "audio") {
+    status.audio = { ...status.audio, state: ugc.done === ugc.total ? "done" : "active", progress: ugc.total ? ugc.done / ugc.total : 0, detail: `${ugc.done}/${ugc.total}` };
+  } else if (ugc.kind === "render" || ugc.kind === "upload") {
+    status.audio = { ...status.audio, state: "done", progress: 1, detail: "done" };
+  }
+  if (ugc.kind === "render") {
+    status.record = { ...status.record, state: ugc.progress >= 1 ? "done" : "active", progress: ugc.progress, detail: `${Math.round(ugc.progress * 100)}%` };
+  } else if (ugc.kind === "upload") {
+    status.record = { ...status.record, state: "done", progress: 1, detail: "done" };
+  }
+  if (ugc.kind === "upload") {
+    status.export = { ...status.export, state: "active", progress: 0.6, detail: "uploading…" };
+  }
+  return order.map((k) => status[k]);
 }
