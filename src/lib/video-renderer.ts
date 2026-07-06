@@ -21,6 +21,8 @@ export type RenderOptions = {
   signal?: AbortSignal;
   /** Force a specific container/codec instead of the browser's best choice. Used by the codec-fallback retry. */
   preferredContainer?: "webm" | "mp4";
+  /** When false, on_screen_text overlays are not drawn. Defaults to true. */
+  showOnScreenText?: boolean;
 };
 
 export type RenderResult = {
