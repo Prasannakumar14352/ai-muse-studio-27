@@ -14,6 +14,8 @@ export const Route = createFileRoute("/_authenticated/projects/$id")({ component
 
 function ProjectView() {
   const { id } = Route.useParams();
+  const qc = useQueryClient();
+  const [regenerating, setRegenerating] = useState<null | "all" | "script" | "scenes" | "captions" | "images">(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["project", id],
@@ -26,16 +28,8 @@ function ProjectView() {
     },
   });
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-96"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
-  }
-  if (!data?.project) {
-    return <div className="glass rounded-2xl p-12 text-center">Project not found. <Link to="/dashboard" className="text-[color:var(--neon-purple)]">Back to dashboard</Link></div>;
-  }
-
-  const { project, output } = data;
-  const qc = useQueryClient();
-  const [regenerating, setRegenerating] = useState<null | "all" | "script" | "scenes" | "captions" | "images">(null);
+  const project = data?.project ?? null;
+  const output = data?.output ?? null;
 
   async function copy(text: string, label: string) {
     await navigator.clipboard.writeText(text);
@@ -46,7 +40,7 @@ function ProjectView() {
     const blob = new Blob([JSON.stringify({ project, output }, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `${project.title.replace(/[^\w]+/g, "-")}.json`;
+    a.href = url; a.download = `${(project?.title ?? "project").replace(/[^\w]+/g, "-")}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -85,6 +79,13 @@ function ProjectView() {
   const scenes = (output?.scenes as Array<{ n: number; visual: string; voiceover: string; duration: string }>) ?? [];
   const prompts = (output?.image_prompts as Array<{ n: number; prompt: string; style: string }>) ?? [];
   const thumbs = (output?.thumbnail_ideas as string[]) ?? [];
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-96"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+  }
+  if (!project) {
+    return <div className="glass rounded-2xl p-12 text-center">Project not found. <Link to="/dashboard" className="text-[color:var(--neon-purple)]">Back to dashboard</Link></div>;
+  }
 
   return (
     <div className="space-y-6 max-w-6xl">
