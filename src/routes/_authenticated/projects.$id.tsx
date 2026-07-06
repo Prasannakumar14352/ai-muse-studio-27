@@ -18,11 +18,11 @@ function ProjectView() {
   const { data, isLoading } = useQuery({
     queryKey: ["project", id],
     queryFn: async () => {
-      const [{ data: project }, { data: output }] = await Promise.all([
+      const [{ data: project }, output] = await Promise.all([
         supabase.from("projects").select("*").eq("id", id).maybeSingle(),
-        supabase.from("generated_outputs").select("*").eq("project_id", id).maybeSingle(),
+        getOutput(id),
       ]);
-      return { project, output };
+      return { project, output: output as LocalOutput | null };
     },
   });
 
@@ -62,27 +62,13 @@ function ProjectView() {
         style: project.style ?? "cinematic",
         contentType: project.content_type ?? "short_reel",
       });
-      const patch: Record<string, unknown> = {};
+      const patch: Partial<LocalOutput> = {};
       if (part === "all" || part === "script") { patch.script = fresh.script; patch.hook = fresh.hook; patch.title = fresh.title; }
       if (part === "all" || part === "scenes") { patch.scenes = fresh.scenes; patch.thumbnail_ideas = fresh.thumbnail_ideas; }
       if (part === "all" || part === "captions") { patch.captions = fresh.captions; patch.hashtags = fresh.hashtags; }
       if (part === "all" || part === "images") { patch.image_prompts = fresh.image_prompts; }
 
-      if (output?.id) {
-        const { error } = await supabase.from("generated_outputs").update(patch as never).eq("id", output.id);
-        if (error) throw error;
-      } else {
-        const { data: u } = await supabase.auth.getUser();
-        if (!u.user) throw new Error("Not signed in");
-        const { error } = await supabase.from("generated_outputs").insert({
-          project_id: project.id, user_id: u.user.id,
-          title: fresh.title, hook: fresh.hook, script: fresh.script,
-          scenes: fresh.scenes, image_prompts: fresh.image_prompts,
-          captions: fresh.captions, hashtags: fresh.hashtags,
-          thumbnail_ideas: fresh.thumbnail_ideas,
-        });
-        if (error) throw error;
-      }
+      await saveOutput(project.id, patch);
       if (part === "all" || part === "script") {
         await supabase.from("projects").update({ title: fresh.title }).eq("id", project.id);
       }
@@ -94,6 +80,7 @@ function ProjectView() {
       setRegenerating(null);
     }
   }
+
 
   const scenes = (output?.scenes as Array<{ n: number; visual: string; voiceover: string; duration: string }>) ?? [];
   const prompts = (output?.image_prompts as Array<{ n: number; prompt: string; style: string }>) ?? [];
