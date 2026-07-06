@@ -27,3 +27,23 @@ export const CREDIT_GUIDE_INTRO = [
   "You can top up credits any time from Settings → Plans & credits. Admins can also add credits manually from this panel.",
   "Regeneration of a single asset (one image, one scene) only costs that asset — not the whole project.",
 ];
+
+export function getPlanGenerationEstimate(credits: number): {
+  images: number;
+  carousels: number;
+  shortReels: number;
+  longVideos: number;
+} | null {
+  if (credits <= 0) return null;
+  // Estimates based on CREDIT_COSTS:
+  //   - AI image: 1 credit per image
+  //   - Carousel: 1 script + 1 per slide (avg 5 slides = 5 credits)
+  //   - Short reel: 1 script + 1 per scene image (avg 8 scenes = 9 credits)
+  //   - Long video: 1 script + 1 per scene image (~1 scene per 8s; 5 min ≈ 38 scenes = 38 credits)
+  return {
+    images: credits,
+    carousels: Math.floor(credits / 5),
+    shortReels: Math.floor(credits / 9),
+    longVideos: Math.floor(credits / 38),
+  };
+}
