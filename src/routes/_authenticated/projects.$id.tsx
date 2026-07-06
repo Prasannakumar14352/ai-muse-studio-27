@@ -13,6 +13,23 @@ import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack,
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
 
+// Force a browser download to the user's local machine, even when the URL is
+// cross-origin (where the anchor `download` attribute is ignored).
+async function forceDownloadUrl(url: string, filename: string) {
+  try {
+    const res = await fetch(url, { mode: "cors" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const obj = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = obj; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(obj), 4000);
+  } catch {
+    window.open(url, "_blank", "noopener");
+    toast.message("Opened in a new tab — right-click → Save video as…");
+  }
+}
+
 
 function ProjectView() {
   const { id } = Route.useParams();
