@@ -165,22 +165,32 @@ function ProjectView() {
       </div>
 
 
-      {/* Video Preview — auto-playing storyboard reel */}
-      <VideoPreview
-        scenes={scenes}
-        title={output?.title ?? project.title}
-        styleImage={getStyleImage(project.style)}
-        styleId={project.style}
-        platform={project.platform}
-        contentType={project.content_type}
-        music={project.music}
-        projectId={project.id}
-        userId={project.user_id}
-        outputId={output?.id ?? null}
-        existingVideoUrl={output?.video_url ?? null}
-        existingDiagnostics={(output as { render_diagnostics?: unknown } | null)?.render_diagnostics ?? null}
-        imagePrompts={prompts}
-      />
+      {/* Preview — carousels have their own preview page */}
+      {project.content_type === "carousel" ? (
+        <div className="glass rounded-2xl p-6 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <div className="font-semibold">Carousel project</div>
+            <div className="text-sm text-muted-foreground">Slide previews, per-slide regeneration and export live on the Carousels page.</div>
+          </div>
+          <Link to="/carousels" className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium">Open in Carousels</Link>
+        </div>
+      ) : (
+        <VideoPreview
+          scenes={scenes}
+          title={output?.title ?? project.title}
+          styleImage={getStyleImage(project.style)}
+          styleId={project.style}
+          platform={project.platform}
+          contentType={project.content_type}
+          music={project.music}
+          projectId={project.id}
+          userId={project.user_id}
+          outputId={output?.id ?? null}
+          existingVideoUrl={output?.video_url ?? null}
+          existingDiagnostics={(output as { render_diagnostics?: unknown } | null)?.render_diagnostics ?? null}
+          imagePrompts={prompts}
+        />
+      )}
 
 
 
