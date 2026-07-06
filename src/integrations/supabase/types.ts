@@ -161,6 +161,45 @@ export type Database = {
         }
         Relationships: []
       }
+      razorpay_webhook_events: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_type: string | null
+          headers: Json | null
+          http_status: number
+          id: string
+          raw_payload: Json | null
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          signature_verified: boolean
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_type?: string | null
+          headers?: Json | null
+          http_status: number
+          id?: string
+          raw_payload?: Json | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          signature_verified?: boolean
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_type?: string | null
+          headers?: Json | null
+          http_status?: number
+          id?: string
+          raw_payload?: Json | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          signature_verified?: boolean
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           expires_at: string | null

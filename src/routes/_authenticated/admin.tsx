@@ -98,11 +98,17 @@ function AdminPanel() {
         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
           <Crown className="w-6 h-6 text-white" />
         </div>
-        <div>
+        <div className="flex-1">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Admin Panel</div>
           <h1 className="text-2xl font-bold">Manage users & subscriptions</h1>
         </div>
+        <a
+          href="/admin/webhooks"
+          className="inline-flex items-center gap-2 rounded-lg gradient-primary text-white px-3 py-2 text-sm hover:opacity-90 transition">
+          <Zap className="w-4 h-4" /> Razorpay Debugger
+        </a>
       </div>
+
 
       <div className="grid grid-cols-3 gap-4">
         <Metric icon={Users} label="Users" value={users?.length ?? 0} />
