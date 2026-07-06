@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PLANS, type PlanDef } from "@/lib/constants";
-import { getPlanGenerationEstimate, ASSET_CREDIT_COST, ASSET_META, type AssetKey } from "@/lib/credit-costs";
+import { getPlanGenerationEstimate, ASSET_META, type AssetKey } from "@/lib/credit-costs";
 import { useAccess } from "@/lib/access";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
