@@ -24,6 +24,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCreateRouteImport } from './routes/_authenticated/create'
 import { Route as AuthenticatedCarouselsRouteImport } from './routes/_authenticated/carousels'
 import { Route as AuthenticatedCaptionsRouteImport } from './routes/_authenticated/captions'
+import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticated/billing'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
 import { Route as AuthenticatedCreateCarouselRouteImport } from './routes/_authenticated/create_.carousel'
@@ -104,6 +105,11 @@ const AuthenticatedCaptionsRoute = AuthenticatedCaptionsRouteImport.update({
   path: '/captions',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBillingRoute = AuthenticatedBillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/billing': typeof AuthenticatedBillingRoute
   '/captions': typeof AuthenticatedCaptionsRoute
   '/carousels': typeof AuthenticatedCarouselsRoute
   '/create': typeof AuthenticatedCreateRoute
@@ -159,6 +166,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/billing': typeof AuthenticatedBillingRoute
   '/captions': typeof AuthenticatedCaptionsRoute
   '/carousels': typeof AuthenticatedCarouselsRoute
   '/create': typeof AuthenticatedCreateRoute
@@ -182,6 +190,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/billing': typeof AuthenticatedBillingRoute
   '/_authenticated/captions': typeof AuthenticatedCaptionsRoute
   '/_authenticated/carousels': typeof AuthenticatedCarouselsRoute
   '/_authenticated/create': typeof AuthenticatedCreateRoute
@@ -205,6 +214,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/contact'
     | '/admin'
+    | '/billing'
     | '/captions'
     | '/carousels'
     | '/create'
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/contact'
     | '/admin'
+    | '/billing'
     | '/captions'
     | '/carousels'
     | '/create'
@@ -248,6 +259,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/contact'
     | '/_authenticated/admin'
+    | '/_authenticated/billing'
     | '/_authenticated/captions'
     | '/_authenticated/carousels'
     | '/_authenticated/create'
@@ -382,6 +394,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCaptionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/billing': {
+      id: '/_authenticated/billing'
+      path: '/billing'
+      fullPath: '/billing'
+      preLoaderRoute: typeof AuthenticatedBillingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
@@ -433,6 +452,7 @@ const AuthenticatedAdminRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedBillingRoute: typeof AuthenticatedBillingRoute
   AuthenticatedCaptionsRoute: typeof AuthenticatedCaptionsRoute
   AuthenticatedCarouselsRoute: typeof AuthenticatedCarouselsRoute
   AuthenticatedCreateRoute: typeof AuthenticatedCreateRoute
@@ -448,6 +468,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedBillingRoute: AuthenticatedBillingRoute,
   AuthenticatedCaptionsRoute: AuthenticatedCaptionsRoute,
   AuthenticatedCarouselsRoute: AuthenticatedCarouselsRoute,
   AuthenticatedCreateRoute: AuthenticatedCreateRoute,
