@@ -14,7 +14,7 @@ function ImagesPage() {
   const [style, setStyle] = useState("cinematic");
   const [ratio, setRatio] = useState("1:1");
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<Array<{ id: string; prompt: string; style: string; ratio: string; grad: string }>>([]);
+  const [results, setResults] = useState<Array<{ id: string; prompt: string; style: string; ratio: string; image: string }>>([]);
 
   async function generate() {
     if (!prompt.trim()) return toast.error("Enter a prompt");
@@ -22,8 +22,8 @@ function ImagesPage() {
     await new Promise((r) => setTimeout(r, 900));
     const chosen = STYLES.find((s) => s.id === style)!;
     setResults((prev) => [
-      ...Array.from({ length: 4 }).map((_, i) => ({
-        id: crypto.randomUUID(), prompt, style, ratio, grad: chosen.grad,
+      ...Array.from({ length: 4 }).map(() => ({
+        id: crypto.randomUUID(), prompt, style, ratio, image: chosen.image,
       })),
       ...prev,
     ]);
