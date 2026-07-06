@@ -46,7 +46,8 @@ function CreatePage() {
       }
 
       const output = generateProject({
-        topic: form.topic, tone: form.tone, platform: form.platform, style: form.style,
+        topic: form.topic, tone: form.tone, platform: form.platform,
+        style: form.style, contentType: form.content_type,
       });
 
       const { data: project, error: pErr } = await supabase.from("projects").insert({
