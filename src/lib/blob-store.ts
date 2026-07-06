@@ -100,7 +100,8 @@ export async function deleteBlobsByPrefix(prefix: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const t = db.transaction(STORE, "readwrite");
     const s = t.objectStore(STORE);
-    const req = s.openKeyCursor();
+    // openCursor() (not openKeyCursor) — .delete() requires a value cursor
+    const req = s.openCursor();
     req.onerror = () => reject(req.error);
     req.onsuccess = () => {
       const c = req.result;
