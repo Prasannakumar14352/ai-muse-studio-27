@@ -24,6 +24,7 @@ import { Route as AuthenticatedCarouselsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCaptionsRouteImport } from './routes/_authenticated/captions'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
+import { Route as AuthenticatedCreateCarouselRouteImport } from './routes/_authenticated/create.carousel'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -99,6 +100,12 @@ const AuthenticatedProjectsIdRoute = AuthenticatedProjectsIdRouteImport.update({
   path: '/projects/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCreateCarouselRoute =
+  AuthenticatedCreateCarouselRouteImport.update({
+    id: '/carousel',
+    path: '/carousel',
+    getParentRoute: () => AuthenticatedCreateRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -106,7 +113,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/captions': typeof AuthenticatedCaptionsRoute
   '/carousels': typeof AuthenticatedCarouselsRoute
-  '/create': typeof AuthenticatedCreateRoute
+  '/create': typeof AuthenticatedCreateRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/images': typeof AuthenticatedImagesRoute
   '/pricing': typeof AuthenticatedPricingRoute
@@ -114,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/tts': typeof ApiTtsRoute
+  '/create/carousel': typeof AuthenticatedCreateCarouselRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
 }
 export interface FileRoutesByTo {
@@ -122,7 +130,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/captions': typeof AuthenticatedCaptionsRoute
   '/carousels': typeof AuthenticatedCarouselsRoute
-  '/create': typeof AuthenticatedCreateRoute
+  '/create': typeof AuthenticatedCreateRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/images': typeof AuthenticatedImagesRoute
   '/pricing': typeof AuthenticatedPricingRoute
@@ -130,6 +138,7 @@ export interface FileRoutesByTo {
   '/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/tts': typeof ApiTtsRoute
+  '/create/carousel': typeof AuthenticatedCreateCarouselRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
 }
 export interface FileRoutesById {
@@ -140,7 +149,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/captions': typeof AuthenticatedCaptionsRoute
   '/_authenticated/carousels': typeof AuthenticatedCarouselsRoute
-  '/_authenticated/create': typeof AuthenticatedCreateRoute
+  '/_authenticated/create': typeof AuthenticatedCreateRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/images': typeof AuthenticatedImagesRoute
   '/_authenticated/pricing': typeof AuthenticatedPricingRoute
@@ -148,6 +157,7 @@ export interface FileRoutesById {
   '/_authenticated/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/tts': typeof ApiTtsRoute
+  '/_authenticated/create/carousel': typeof AuthenticatedCreateCarouselRoute
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRoute
 }
 export interface FileRouteTypes {
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/videos'
     | '/api/generate-image'
     | '/api/tts'
+    | '/create/carousel'
     | '/projects/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '/videos'
     | '/api/generate-image'
     | '/api/tts'
+    | '/create/carousel'
     | '/projects/$id'
   id:
     | '__root__'
@@ -199,6 +211,7 @@ export interface FileRouteTypes {
     | '/_authenticated/videos'
     | '/api/generate-image'
     | '/api/tts'
+    | '/_authenticated/create/carousel'
     | '/_authenticated/projects/$id'
   fileRoutesById: FileRoutesById
 }
@@ -317,14 +330,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/create/carousel': {
+      id: '/_authenticated/create/carousel'
+      path: '/carousel'
+      fullPath: '/create/carousel'
+      preLoaderRoute: typeof AuthenticatedCreateCarouselRouteImport
+      parentRoute: typeof AuthenticatedCreateRoute
+    }
   }
 }
+
+interface AuthenticatedCreateRouteChildren {
+  AuthenticatedCreateCarouselRoute: typeof AuthenticatedCreateCarouselRoute
+}
+
+const AuthenticatedCreateRouteChildren: AuthenticatedCreateRouteChildren = {
+  AuthenticatedCreateCarouselRoute: AuthenticatedCreateCarouselRoute,
+}
+
+const AuthenticatedCreateRouteWithChildren =
+  AuthenticatedCreateRoute._addFileChildren(AuthenticatedCreateRouteChildren)
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedCaptionsRoute: typeof AuthenticatedCaptionsRoute
   AuthenticatedCarouselsRoute: typeof AuthenticatedCarouselsRoute
-  AuthenticatedCreateRoute: typeof AuthenticatedCreateRoute
+  AuthenticatedCreateRoute: typeof AuthenticatedCreateRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedImagesRoute: typeof AuthenticatedImagesRoute
   AuthenticatedPricingRoute: typeof AuthenticatedPricingRoute
@@ -337,7 +368,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedCaptionsRoute: AuthenticatedCaptionsRoute,
   AuthenticatedCarouselsRoute: AuthenticatedCarouselsRoute,
-  AuthenticatedCreateRoute: AuthenticatedCreateRoute,
+  AuthenticatedCreateRoute: AuthenticatedCreateRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedImagesRoute: AuthenticatedImagesRoute,
   AuthenticatedPricingRoute: AuthenticatedPricingRoute,

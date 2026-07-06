@@ -453,7 +453,7 @@ function CarouselsPage() {
           <h1 className="text-3xl md:text-4xl font-bold">Your <span className="gradient-text">Carousels</span></h1>
           <p className="text-muted-foreground mt-1">Multi-slide Instagram carousels with layout editor, per-slide retry, and export.</p>
         </div>
-        <Link to="/create" className="rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-medium flex items-center gap-2">
+        <Link to="/create/carousel" className="rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-medium flex items-center gap-2">
           <Plus className="w-4 h-4" /> New carousel
         </Link>
       </div>
