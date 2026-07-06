@@ -136,7 +136,45 @@ function ProjectView() {
             </button>
           ))}
         </div>
+
+        {/* Exact generator inputs — same inputs "Regenerate All" reuses */}
+        <div className="mt-4 rounded-lg border border-border bg-black/30 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Exact inputs sent to the script / scenes / captions / hashtags generator
+            </div>
+            <button
+              onClick={() => {
+                const payload = {
+                  topic: project.topic ?? project.title,
+                  tone: project.tone ?? "Viral",
+                  platform: project.platform ?? "instagram",
+                  style: project.style ?? "cinematic",
+                  contentType: project.content_type ?? "short_reel",
+                };
+                navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+                toast.success("Inputs copied");
+              }}
+              className="text-xs text-muted-foreground hover:text-white flex items-center gap-1"
+            >
+              <Copy className="w-3 h-3" /> Copy
+            </button>
+          </div>
+          <pre className="text-xs font-mono text-white/90 whitespace-pre-wrap break-words">
+{JSON.stringify({
+  topic: project.topic ?? project.title,
+  tone: project.tone ?? "Viral",
+  platform: project.platform ?? "instagram",
+  style: project.style ?? "cinematic",
+  contentType: project.content_type ?? "short_reel",
+}, null, 2)}
+          </pre>
+          <div className="mt-2 text-[11px] text-muted-foreground">
+            Click <span className="text-white">Regenerate All</span> to re-run the script, scenes, captions, hashtags, and image prompts using these exact inputs — no edits required.
+          </div>
+        </div>
       </div>
+
 
       {/* Video Preview — auto-playing storyboard reel */}
       <VideoPreview
