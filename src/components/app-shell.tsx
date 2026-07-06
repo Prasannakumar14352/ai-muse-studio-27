@@ -47,8 +47,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="h-screen flex overflow-hidden">
       {/* Sidebar desktop */}
       <aside className="hidden md:flex md:w-64 shrink-0 flex-col border-r border-border/50 bg-sidebar/60 backdrop-blur-xl overflow-y-auto">
-        <Link to="/dashboard" className="flex items-center gap-2 px-4 py-4 border-b border-border/50">
+        <Link to="/dashboard" className="flex items-center gap-3 px-4 py-4 border-b border-border/50">
           <img src={brandLogo.url} alt="Prodxstore" className="h-9 w-auto object-contain" />
+          <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
+            Prodxstore AI
+          </span>
         </Link>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV.map((n) => {
@@ -71,8 +74,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <Link to="/dashboard" className="flex items-center gap-2">
+        <Link to="/dashboard" className="flex items-center gap-2.5">
           <img src={brandLogo.url} alt="Prodxstore" className="h-7 w-auto object-contain" />
+          <span className="text-base font-bold tracking-tight bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
+            Prodxstore AI
+          </span>
         </Link>
         <div className="flex items-center gap-2">
           <CreditsChip />
