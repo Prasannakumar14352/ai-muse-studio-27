@@ -54,8 +54,26 @@ export async function putBlob(key: string, blob: Blob): Promise<string> {
 }
 
 export async function putDataURL(key: string, dataURL: string): Promise<string> {
-  const res = await fetch(dataURL);
-  const blob = await res.blob();
+  let blob: Blob;
+  if (dataURL.startsWith("data:")) {
+    const match = dataURL.match(/^data:([^;,]+)?(;base64)?,(.*)$/);
+    if (!match) throw new Error("Invalid image data returned");
+    const mime = match[1] || "application/octet-stream";
+    const isBase64 = Boolean(match[2]);
+    const payload = match[3] ?? "";
+    if (isBase64) {
+      const binary = atob(payload);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      blob = new Blob([bytes], { type: mime });
+    } else {
+      blob = new Blob([decodeURIComponent(payload)], { type: mime });
+    }
+  } else {
+    const res = await fetch(dataURL);
+    if (!res.ok) throw new Error(`Image asset fetch failed (${res.status})`);
+    blob = await res.blob();
+  }
   return putBlob(key, blob);
 }
 
