@@ -513,10 +513,10 @@ function VideoPreview({
   const lastSnapshotRef = useRef<string>("");
 
   // --- Collapsible panel state -------------------------------------------
-  const [openPrep, setOpenPrep] = useState(true);
+  const [openPrep, setOpenPrep] = useState(false);
   const [openHistory, setOpenHistory] = useState(false);
   const [openBundle, setOpenBundle] = useState(false);
-  const [openProgress, setOpenProgress] = useState(true);
+  const [openProgress, setOpenProgress] = useState(false);
   const [bundleBusy, setBundleBusy] = useState(false);
 
   useEffect(() => {
