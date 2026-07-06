@@ -87,14 +87,15 @@ function CarouselsPage() {
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["carousels"],
     queryFn: async (): Promise<CarouselRow[]> => {
-      const { data: projects } = await supabase
+      const { data: projects, error: pErr } = await supabase
         .from("projects")
         .select("id,title,style,platform,tone")
         .eq("content_type", "carousel")
         .order("created_at", { ascending: false });
+      if (pErr) throw pErr;
       const outputs = await listOutputs();
       const outMap = new Map(outputs.map((o) => [o.project_id, o]));
       const rows: CarouselRow[] = [];
@@ -124,6 +125,7 @@ function CarouselsPage() {
       return rows;
     },
   });
+
 
 
   function getLayout(row: CarouselRow): LayoutSettings {
