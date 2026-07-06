@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { listOutputs, deleteOutput } from "@/lib/local-store";
-import { LocalOnlyBanner } from "@/components/local-only-banner";
+
 import { confirmDialog } from "@/components/confirm-dialog";
 import { Plus, Film, Video as VideoIcon, Trash2, Loader2, Image as ImageIcon, Download, X, Wand2 } from "lucide-react";
 
@@ -73,7 +73,7 @@ function VideosPage() {
 
   return (
     <div className="space-y-6">
-      <LocalOnlyBanner />
+      
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold">Your <span className="gradient-text">Videos</span></h1>

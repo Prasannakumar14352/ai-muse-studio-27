@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { STYLES } from "@/lib/constants";
 import { pushImageGenLog, listImageGenLogs } from "@/lib/local-store";
-import { LocalOnlyBanner } from "@/components/local-only-banner";
+
 import { deductUsage, useAccess, canGenerate } from "@/lib/access";
 import { Loader2, Wand2, Download, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -212,7 +212,7 @@ function ImagesPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <LocalOnlyBanner />
+      
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold">AI <span className="gradient-text">Image</span> Generator</h1>
