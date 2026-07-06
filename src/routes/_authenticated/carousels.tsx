@@ -575,8 +575,8 @@ function CarouselsPage() {
                             </ul>
                           )}
                           {sl.bottom_highlight && (
-                            <div className="mt-2 rounded border border-[color:var(--neon-cyan)]/40 bg-[color:var(--neon-cyan)]/5 px-2 py-1 text-[11px]">
-                              <span className="uppercase tracking-wider text-[9px] text-[color:var(--neon-cyan)] mr-1">Key takeaway</span>
+                            <div className="mt-2 rounded border border-[color:var(--neon-blue)]/40 bg-[color:var(--neon-blue)]/5 px-2 py-1 text-[11px]">
+                              <span className="uppercase tracking-wider text-[9px] text-[color:var(--neon-blue)] mr-1">Key takeaway</span>
                               <span className="text-white">{sl.bottom_highlight}</span>
                             </div>
                           )}
