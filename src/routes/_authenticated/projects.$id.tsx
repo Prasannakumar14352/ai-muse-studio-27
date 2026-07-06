@@ -458,13 +458,79 @@ function VideoPreview({
   const [playingScene, setPlayingScene] = useState<number | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
 
+  // --- Per-scene image prompts (editable) --------------------------------
+  const [editedPrompts, setEditedPrompts] = useState<string[]>(() =>
+    scenes.map((s, i) => imagePrompts?.[i]?.prompt || s.visual || ""),
+  );
+
+  // --- Script version history --------------------------------------------
+  type ScriptVersion = { at: string; scenes: Scene[]; prompts: string[] };
+  const historyKey = `cv:script-history:${projectId}`;
+  const [history, setHistory] = useState<ScriptVersion[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem(historyKey) || "[]") as ScriptVersion[]; } catch { return []; }
+  });
+  const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSnapshotRef = useRef<string>("");
+
+  // --- Collapsible panel state -------------------------------------------
+  const [openPrep, setOpenPrep] = useState(true);
+  const [openHistory, setOpenHistory] = useState(false);
+  const [openBundle, setOpenBundle] = useState(false);
+  const [openProgress, setOpenProgress] = useState(true);
+  const [bundleBusy, setBundleBusy] = useState(false);
+
   useEffect(() => {
     setEditedScenes(scenes);
+    setEditedPrompts(scenes.map((s, i) => imagePrompts?.[i]?.prompt || s.visual || ""));
     setScenesDirty(false);
     setSceneImages((prev) => (prev.length === scenes.length ? prev : scenes.map(() => null)));
     setImageErrors((prev) => (prev.length === scenes.length ? prev : scenes.map(() => null)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenes.length]);
+
+  // Autosave: debounce scene / prompt edits, save to output + push a version.
+  useEffect(() => {
+    if (!scenesDirty) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    setAutoSaveState("saving");
+    autoSaveTimer.current = setTimeout(async () => {
+      try {
+        const nextPrompts = editedPrompts.map((p, i) => ({
+          n: i + 1,
+          prompt: p,
+          style: imagePrompts?.[i]?.style || styleId || "cinematic",
+        }));
+        await saveOutput(projectId, { scenes: editedScenes, image_prompts: nextPrompts });
+        const snap: ScriptVersion = { at: new Date().toISOString(), scenes: editedScenes, prompts: editedPrompts };
+        const sig = JSON.stringify([snap.scenes, snap.prompts]);
+        if (sig !== lastSnapshotRef.current) {
+          lastSnapshotRef.current = sig;
+          setHistory((prev) => {
+            const next = [snap, ...prev].slice(0, 20);
+            try { localStorage.setItem(historyKey, JSON.stringify(next)); } catch { /* quota */ }
+            return next;
+          });
+        }
+        setScenesDirty(false);
+        setAutoSaveState("saved");
+        setTimeout(() => setAutoSaveState("idle"), 1500);
+      } catch {
+        setAutoSaveState("idle");
+      }
+    }, 1200);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editedScenes, editedPrompts, scenesDirty]);
+
+  function restoreVersion(v: ScriptVersion) {
+    setEditedScenes(v.scenes);
+    setEditedPrompts(v.prompts);
+    setScenesDirty(true);
+    toast.success("Restored — autosaving…");
+  }
+
 
   const isVertical = contentType === "short_reel" || platform === "tiktok" || platform === "instagram";
   const aspect = isVertical ? "aspect-[9/16] max-w-[340px]" : "aspect-video w-full";
