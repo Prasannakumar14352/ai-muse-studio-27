@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
+import { pushImageGenLog, listImageGenLogs, addAsset } from "@/lib/local-store";
 import { Loader2, Wand2, Download, Save, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
+
 
 const RATIOS = ["1:1", "9:16", "16:9", "4:5"];
 const LS_STATE = "creatorvault:images:v2";
