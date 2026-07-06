@@ -683,7 +683,7 @@ function VideoPreview({
     setImgBusy((s) => { const n = new Set(s); n.add(i); return n; });
     setImageErrors((prev) => { const n = [...prev]; n[i] = null; return n; });
     try {
-      const url = await generateSceneImage(promptForScene(i), styleForScene(i), ratio);
+      const url = await generateSceneImage(promptForScene(i), styleForScene(i), ratio, projectId);
       if (!url) throw new Error("Image service returned nothing");
       setSceneImages((prev) => { const n = [...prev]; n[i] = url; return n; });
     } catch (e) {
