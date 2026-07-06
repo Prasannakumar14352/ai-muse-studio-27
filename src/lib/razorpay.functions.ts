@@ -2,6 +2,68 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_PACKS, PLANS } from "@/lib/constants";
 
+/** Approximate USD → INR conversion used when charging in INR via Razorpay.
+ *  Kept as a constant so it's easy to update. Actual FX may vary slightly. */
+export const INR_PER_USD = 84;
+
+type Currency = "USD" | "INR";
+
+/** Look at Razorpay's error body and decide whether it's an international-payments block. */
+function isInternationalBlockedError(status: number, body: string): boolean {
+  if (status !== 400 && status !== 401 && status !== 403) return false;
+  const b = body.toLowerCase();
+  return b.includes("international") || b.includes("currency is not supported") || b.includes("payment_currency_not_supported");
+}
+
+/** Create a Razorpay order (with optional currency + international-fallback to INR). */
+async function createOrderWithFallback(opts: {
+  keyId: string;
+  keySecret: string;
+  priceUSD: number;
+  currency: Currency;
+  receipt: string;
+  notes: Record<string, string | number>;
+}): Promise<{ order: { id: string; amount: number; currency: string }; currencyUsed: Currency; amountCharged: number; fellBack: boolean }> {
+  const auth = Buffer.from(`${opts.keyId}:${opts.keySecret}`).toString("base64");
+
+  async function post(currency: Currency) {
+    const amount = currency === "INR"
+      ? Math.round(opts.priceUSD * INR_PER_USD * 100)
+      : Math.round(opts.priceUSD * 100);
+    const res = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
+      body: JSON.stringify({ amount, currency, receipt: opts.receipt, notes: opts.notes }),
+    });
+    return { res, amount, currency };
+  }
+
+  // First attempt with requested currency
+  let attempt = await post(opts.currency);
+  if (attempt.res.ok) {
+    const order = await attempt.res.json() as { id: string; amount: number; currency: string };
+    return { order, currencyUsed: attempt.currency, amountCharged: attempt.amount, fellBack: false };
+  }
+
+  const errText = await attempt.res.text();
+  console.error("Razorpay order error:", attempt.res.status, errText);
+
+  // Auto-fallback: user asked USD but international is not enabled → retry INR
+  if (opts.currency === "USD" && isInternationalBlockedError(attempt.res.status, errText)) {
+    attempt = await post("INR");
+    if (attempt.res.ok) {
+      const order = await attempt.res.json() as { id: string; amount: number; currency: string };
+      return { order, currencyUsed: "INR", amountCharged: attempt.amount, fellBack: true };
+    }
+    const errText2 = await attempt.res.text();
+    console.error("Razorpay INR fallback error:", attempt.res.status, errText2);
+    throw new Error(`Failed to create order (${attempt.res.status})`);
+  }
+
+  throw new Error(`Failed to create order (${attempt.res.status})`);
+}
+
+
 
 /** Public config for the browser Razorpay checkout (key_id only — safe to expose). */
 export const getRazorpayConfig = createServerFn({ method: "GET" }).handler(async () => {
