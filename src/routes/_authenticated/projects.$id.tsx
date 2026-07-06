@@ -699,6 +699,57 @@ function VideoPreview({
   }
 
   const missingImages = effectiveScenes.map((_, i) => !sceneImages[i]).filter(Boolean).length;
+  const readyImages = totalScenes - missingImages;
+
+  async function downloadFinalBundle() {
+    if (bundleBusy) return;
+    setBundleBusy(true);
+    try {
+      const zip = new JSZip();
+      const slug = (title || "video").toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "video";
+      const out = await getOutput(projectId);
+      const finalScenes = effectiveScenes;
+      // Script text
+      const scriptText = finalScenes.map((s) =>
+        `Scene ${s.n} (${s.duration}) — ${s.visual}\nOn-screen: ${s.on_screen_text || "—"}\nVoiceover: ${s.voiceover}`
+      ).join("\n\n---\n\n");
+      zip.file("script.txt", scriptText);
+      zip.file("captions.txt", out?.captions ?? "");
+      zip.file("hashtags.txt", (out?.hashtags ?? []).join(" "));
+      const audioNotes = finalScenes.map((s) => `Scene ${s.n}: voice="alloy" | duration≈${s.duration} | line: ${s.voiceover}`).join("\n");
+      zip.file("audio-notes.txt", audioNotes);
+      zip.file("bundle.json", JSON.stringify({
+        title, platform, contentType, styleId,
+        scenes: finalScenes,
+        image_prompts: editedPrompts.map((p, i) => ({ n: i + 1, prompt: p, style: styleForScene(i) })),
+        captions: out?.captions ?? "",
+        hashtags: out?.hashtags ?? [],
+        voice: "alloy",
+        video_url: videoUrl,
+      }, null, 2));
+      if (videoUrl) {
+        try {
+          const res = await fetch(videoUrl);
+          if (res.ok) {
+            const blob = await res.blob();
+            const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+            zip.file(`video.${ext}`, blob);
+          }
+        } catch { /* signed URL might be expired */ }
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `${slug}-final.zip`; a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Final bundle downloaded");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Bundle failed");
+    } finally {
+      setBundleBusy(false);
+    }
+  }
+
 
   async function handleRender(container?: "webm" | "mp4") {
     if (rendering || ugcRendering || totalScenes === 0) return;
