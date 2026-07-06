@@ -556,6 +556,24 @@ function CarouselsPage() {
                         {exportingId === row.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
                         Export PDF
                       </button>
+                      <button
+                        onClick={() => exportReel(row)}
+                        disabled={exportingId === row.id}
+                        className="rounded-lg glass border border-border px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-50"
+                        title="Turn slides into a Ken Burns reel (WebM)"
+                      >
+                        {exportingId === row.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Film className="w-3 h-3" />}
+                        Export as Reel
+                      </button>
+                      {failedCount > 0 && (
+                        <button
+                          onClick={() => regenerateFailed(row)}
+                          disabled={generating}
+                          className="rounded-lg glass border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          <RefreshCw className="w-3 h-3" /> Regenerate {failedCount} failed
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (
