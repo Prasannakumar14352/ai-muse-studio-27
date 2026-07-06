@@ -125,6 +125,16 @@ export const MUSIC = [
 
 export const GENERATION_COST = 1; // credits per project generation
 
+export type CreditPack = { id: string; label: string; credits: number; priceUSD: number; bonus?: string };
+
+export const CREDIT_PACKS: CreditPack[] = [
+  { id: "pack_100",  label: "Starter Pack",  credits: 100,  priceUSD: 4.99 },
+  { id: "pack_500",  label: "Creator Pack",  credits: 500,  priceUSD: 19.99, bonus: "+10%" },
+  { id: "pack_1500", label: "Pro Pack",      credits: 1500, priceUSD: 49.99, bonus: "+20%" },
+  { id: "pack_5000", label: "Studio Pack",   credits: 5000, priceUSD: 149.99, bonus: "+30%" },
+];
+
+
 export type PlanDef = {
   id: string; name: string; price: string; period: string;
   monthlyCredits: number; signupCredits?: number; features: string[]; cta: string; featured?: boolean;
