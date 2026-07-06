@@ -28,12 +28,13 @@ function parseDuration(d: string): number {
   return isNaN(n) ? 3 : Math.max(1.5, n);
 }
 
-async function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
+async function loadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    // Same-origin bundled assets don't need CORS; setting it can cause
+    // legitimate loads to be treated as errors in some setups.
     img.onload = () => resolve(img);
-    img.onerror = reject;
+    img.onerror = () => resolve(null);
     img.src = src;
   });
 }
