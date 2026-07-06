@@ -44,8 +44,22 @@ function ContactPage() {
     setTimeout(() => setCopied(false), 1800);
   }
 
+  const router = useRouter();
+  const canGoBack = typeof window !== "undefined" && window.history.length > 1;
+
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-12">
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={() => (canGoBack ? router.history.back() : router.navigate({ to: "/" }))}
+          className="inline-flex items-center gap-2 rounded-lg glass hover:bg-white/10 px-3 py-2 text-sm">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+        <Link to="/" className="inline-flex items-center gap-2 rounded-lg glass hover:bg-white/10 px-3 py-2 text-sm">
+          <Home className="w-4 h-4" /> Home
+        </Link>
+      </div>
+
       <div className="text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass text-xs text-muted-foreground mb-4">
           <Building2 className="w-3 h-3 text-[color:var(--brand-orange)]" /> {BRAND} · Digital Products Marketplace
@@ -55,6 +69,7 @@ function ContactPage() {
           Questions, feedback, team pricing or partnership? Reach the {BRAND} team directly.
         </p>
       </div>
+
 
       <div className="grid md:grid-cols-5 gap-6">
         {/* Left: Contact card */}
