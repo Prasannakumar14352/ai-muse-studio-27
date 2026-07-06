@@ -134,22 +134,48 @@ function CreditsEstimator({ plan, onChangePlan }: { plan: PlanDef; onChangePlan:
             <Calculator className="w-5 h-5 text-[color:var(--neon-purple)]" /> Credits estimator
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Mix and match to see exactly what you can generate with a plan's monthly credits.
+            Pick a plan, then mix and match to see what you can generate.
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {PLANS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => { onChangePlan(p); reset(); }}
-              className={`px-3 py-1.5 rounded-lg text-xs border ${
-                plan.id === p.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:bg-white/5"
-              }`}>
-              {p.name} · {(p.monthlyCredits + (p.signupCredits ?? 0)).toLocaleString()}
-            </button>
-          ))}
+          {PLANS.map((p) => {
+            const active = plan.id === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => { onChangePlan(p); reset(); }}
+                aria-pressed={active}
+                className={`px-3 py-1.5 rounded-lg text-xs border cursor-pointer transition ${
+                  active
+                    ? "gradient-primary text-white border-transparent shadow-lg shadow-fuchsia-500/20"
+                    : "glass border-border hover:bg-white/10 hover:border-white/30"
+                }`}>
+                {p.name} · {(p.monthlyCredits + (p.signupCredits ?? 0)).toLocaleString()}
+              </button>
+            );
+          })}
         </div>
       </div>
+
+      {/* Live plan summary — makes the switch visible even before adding items */}
+      <div className="mt-4 rounded-xl border border-border/60 bg-black/20 p-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Selected plan</div>
+          <div className="mt-0.5 flex items-baseline gap-2 flex-wrap">
+            <span className="text-lg font-semibold">{plan.name}</span>
+            <span className="text-sm text-muted-foreground">{plan.price}</span>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Credits available</div>
+          <div className="mt-0.5 text-lg font-bold gradient-text">
+            {totalCredits.toLocaleString()}
+            <span className="text-xs text-muted-foreground font-normal ml-1">/ month</span>
+          </div>
+        </div>
+      </div>
+
 
       <div className="mt-5 grid md:grid-cols-2 gap-4">
         {(Object.keys(ASSET_META) as AssetKey[]).map((k) => {
