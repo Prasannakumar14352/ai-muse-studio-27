@@ -408,7 +408,7 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
       opts.scenes.map(async (scene, i) => {
         const promptRow = opts.imagePrompts?.[i];
         const prompt = promptRow?.prompt || scene.visual;
-        const url = await fetchSceneImage(prompt, style.descriptor, ratio);
+        const url = await fetchSceneImage(prompt, style.descriptor, ratio, opts.projectId);
         imgDone += 1;
         opts.onStage?.({ kind: "images", done: imgDone, total });
         return url;
