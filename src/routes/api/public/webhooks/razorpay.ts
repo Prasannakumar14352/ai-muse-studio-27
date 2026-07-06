@@ -41,7 +41,7 @@ export const Route = createFileRoute("/api/public/webhooks/razorpay")({
               signature_verified: fields.verified,
               http_status: fields.status,
               error_message: fields.error ?? null,
-              raw_payload: fields.payload ?? null,
+              raw_payload: (fields.payload ?? null) as never,
               headers: headersObj,
             });
           } catch (e) {
