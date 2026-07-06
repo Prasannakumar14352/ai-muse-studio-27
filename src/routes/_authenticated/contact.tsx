@@ -95,26 +95,26 @@ function ContactPage() {
               <input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="input-base" placeholder="Jane Doe" maxLength={100} />
+                className="w-full rounded-lg bg-black/30 border border-border/60 px-3 py-2.5 text-sm outline-none focus:border-[color:var(--neon-purple)]/70 transition" placeholder="Jane Doe" maxLength={100} />
             </Field>
             <Field label="Email" error={errors.email}>
               <input
                 value={form.email} type="email"
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="input-base" placeholder="you@company.com" maxLength={255} />
+                className="w-full rounded-lg bg-black/30 border border-border/60 px-3 py-2.5 text-sm outline-none focus:border-[color:var(--neon-purple)]/70 transition" placeholder="you@company.com" maxLength={255} />
             </Field>
           </div>
           <Field label="Subject" error={errors.subject}>
             <input
               value={form.subject}
               onChange={(e) => setForm({ ...form, subject: e.target.value })}
-              className="input-base" placeholder="Team plan enquiry" maxLength={150} />
+              className="w-full rounded-lg bg-black/30 border border-border/60 px-3 py-2.5 text-sm outline-none focus:border-[color:var(--neon-purple)]/70 transition" placeholder="Team plan enquiry" maxLength={150} />
           </Field>
           <Field label="Message" error={errors.message}>
             <textarea
               value={form.message} rows={6}
               onChange={(e) => setForm({ ...form, message: e.target.value })}
-              className="input-base resize-y" placeholder="Tell us what you need…" maxLength={2000} />
+              className="w-full rounded-lg bg-black/30 border border-border/60 px-3 py-2.5 text-sm outline-none focus:border-[color:var(--neon-purple)]/70 transition resize-y" placeholder="Tell us what you need…" maxLength={2000} />
           </Field>
           <button
             type="submit"
