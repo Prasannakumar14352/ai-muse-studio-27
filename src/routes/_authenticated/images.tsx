@@ -14,7 +14,7 @@ function ImagesPage() {
   const [style, setStyle] = useState("cinematic");
   const [ratio, setRatio] = useState("1:1");
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<Array<{ id: string; prompt: string; style: string; ratio: string; grad: string }>>([]);
+  const [results, setResults] = useState<Array<{ id: string; prompt: string; style: string; ratio: string; image: string }>>([]);
 
   async function generate() {
     if (!prompt.trim()) return toast.error("Enter a prompt");
@@ -22,8 +22,8 @@ function ImagesPage() {
     await new Promise((r) => setTimeout(r, 900));
     const chosen = STYLES.find((s) => s.id === style)!;
     setResults((prev) => [
-      ...Array.from({ length: 4 }).map((_, i) => ({
-        id: crypto.randomUUID(), prompt, style, ratio, grad: chosen.grad,
+      ...Array.from({ length: 4 }).map(() => ({
+        id: crypto.randomUUID(), prompt, style, ratio, image: chosen.image,
       })),
       ...prev,
     ]);
@@ -92,8 +92,9 @@ function ImagesPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {results.map((r) => (
             <div key={r.id} className="glass rounded-xl overflow-hidden group">
-              <div className={`${aspectClass[r.ratio]} bg-gradient-to-br ${r.grad} relative flex items-end p-3`}>
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.25),transparent_60%)]" />
+              <div className={`${aspectClass[r.ratio]} relative overflow-hidden flex items-end p-3`}>
+                <img src={r.image} alt={r.prompt} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                 <span className="relative text-white text-xs glass px-2 py-1 rounded">{r.style} · {r.ratio}</span>
               </div>
               <div className="p-3">

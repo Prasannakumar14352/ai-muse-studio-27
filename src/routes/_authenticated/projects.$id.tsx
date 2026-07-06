@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getStyleImage } from "@/lib/constants";
 import { toast } from "sonner";
-import { Copy, Download, ArrowLeft, Loader2 } from "lucide-react";
+import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
 
@@ -70,6 +72,18 @@ function ProjectView() {
           <button onClick={download} className="rounded-lg gradient-primary text-white px-4 py-2 text-sm flex items-center gap-2"><Download className="w-4 h-4" /> Download JSON</button>
         </div>
       </div>
+
+      {/* Video Preview — auto-playing storyboard reel */}
+      <VideoPreview
+        scenes={scenes}
+        title={output?.title ?? project.title}
+        styleImage={getStyleImage(project.style)}
+        platform={project.platform}
+        contentType={project.content_type}
+        music={project.music}
+      />
+
+
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Script */}
@@ -139,6 +153,120 @@ function ProjectView() {
         <div><div className="text-xs text-muted-foreground">Music</div><div className="font-medium">{project.music}</div></div>
         <div><div className="text-xs text-muted-foreground">Topic</div><div className="font-medium">{project.topic}</div></div>
         <div><div className="text-xs text-muted-foreground">Audience</div><div className="font-medium">{project.audience || "—"}</div></div>
+      </div>
+    </div>
+  );
+}
+
+type Scene = { n: number; visual: string; voiceover: string; duration: string };
+
+function VideoPreview({
+  scenes, title, styleImage, platform, contentType, music,
+}: {
+  scenes: Scene[]; title: string; styleImage: string;
+  platform?: string | null; contentType?: string | null; music?: string | null;
+}) {
+  const [idx, setIdx] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  const startRef = useRef<number>(0);
+
+  const isVertical = contentType === "short_reel" || platform === "tiktok" || platform === "instagram";
+  const aspect = isVertical ? "aspect-[9/16] max-w-[340px]" : "aspect-video w-full";
+  const totalScenes = scenes.length;
+
+  const currentDurationMs = useMemo(() => {
+    const raw = scenes[idx]?.duration ?? "3s";
+    const n = parseFloat(raw);
+    return Math.max(1500, (isNaN(n) ? 3 : n) * 1000);
+  }, [scenes, idx]);
+
+  useEffect(() => {
+    if (!playing || totalScenes === 0) return;
+    startRef.current = performance.now();
+    const tick = (t: number) => {
+      const elapsed = t - startRef.current;
+      const p = Math.min(1, elapsed / currentDurationMs);
+      setProgress(p);
+      if (p >= 1) {
+        setIdx((i) => (i + 1) % totalScenes);
+        setProgress(0);
+      } else {
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [playing, idx, currentDurationMs, totalScenes]);
+
+  if (totalScenes === 0) return null;
+  const scene = scenes[idx];
+
+  return (
+    <div className="glass rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <div>
+          <h2 className="font-semibold flex items-center gap-2"><Film className="w-4 h-4 text-[color:var(--neon-pink)]" /> Video Preview</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Auto-playing storyboard reel · {isVertical ? "9:16 vertical" : "16:9 landscape"} · {totalScenes} scenes · {music ?? "No music"}
+          </p>
+        </div>
+        <button
+          onClick={() => toast.success("Full MP4 render queued — you'll be notified when it's ready.")}
+          className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)]">
+          Render MP4
+        </button>
+      </div>
+
+      <div className={`relative ${aspect} mx-auto rounded-xl overflow-hidden bg-black`}>
+        <img
+          key={idx}
+          src={styleImage}
+          alt={scene.visual}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ transform: `scale(${1.05 + progress * 0.08})`, transition: "transform 100ms linear" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+
+        <div className="absolute top-0 left-0 right-0 p-3 flex gap-1">
+          {scenes.map((_, i) => (
+            <div key={i} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
+              <div className="h-full bg-white" style={{ width: `${i < idx ? 100 : i === idx ? progress * 100 : 0}%` }} />
+            </div>
+          ))}
+        </div>
+
+        <div className="absolute top-6 left-4 right-4">
+          <div className="text-[10px] uppercase tracking-widest text-white/70">{platform ?? "preview"}</div>
+          <div className="text-sm text-white font-semibold line-clamp-1">{title}</div>
+        </div>
+
+        <div className="absolute bottom-16 left-4 right-4 text-white">
+          <div className="inline-block text-[10px] uppercase tracking-widest bg-white/15 backdrop-blur px-2 py-0.5 rounded">
+            Scene {scene.n} · {scene.duration}
+          </div>
+          <div className="mt-2 text-lg md:text-xl font-semibold leading-snug drop-shadow-lg">{scene.visual}</div>
+          <div className="mt-1 text-xs md:text-sm text-white/80 italic">🎙 {scene.voiceover}</div>
+        </div>
+
+        <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-3">
+          <button
+            onClick={() => { setIdx((i) => (i - 1 + totalScenes) % totalScenes); setProgress(0); }}
+            className="w-9 h-9 rounded-full bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center text-white">
+            <SkipBack className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setPlaying((p) => !p)}
+            className="w-11 h-11 rounded-full gradient-primary text-white flex items-center justify-center shadow-lg">
+            {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+          </button>
+          <button
+            onClick={() => { setIdx((i) => (i + 1) % totalScenes); setProgress(0); }}
+            className="w-9 h-9 rounded-full bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center text-white">
+            <SkipForward className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
