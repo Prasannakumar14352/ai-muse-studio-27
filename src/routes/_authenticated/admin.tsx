@@ -112,6 +112,8 @@ function AdminPanel() {
 
       <CreditCostCard />
 
+      <TeamPlanSalesCard />
+
       <CreditGuide />
 
 
