@@ -196,7 +196,7 @@ function ProjectView() {
   }
 
 
-  const scenes = (output?.scenes as Array<{ n: number; visual: string; voiceover: string; duration: string }>) ?? [];
+  const scenes = (output?.scenes as Array<{ n: number; visual: string; voiceover: string; duration: string; on_screen_text?: string }>) ?? [];
   const prompts = (output?.image_prompts as Array<{ n: number; prompt: string; style: string }>) ?? [];
   const thumbs = (output?.thumbnail_ideas as string[]) ?? [];
 
