@@ -468,7 +468,6 @@ function CarouselsPage() {
             const generating = generatingId === row.id;
             const slides = row.display_images ?? [];
             const expectedCount = Math.max(row.image_prompts.length, slides.length);
-            const failedCount = Object.values(row.slide_diagnostics).filter((d) => !d.ok).length;
             const missingCount = Array.from({ length: expectedCount }).filter((_, i) => {
               const src = row.carousel_images?.[i];
               const diag = row.slide_diagnostics[String(i)];
