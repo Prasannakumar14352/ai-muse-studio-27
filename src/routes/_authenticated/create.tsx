@@ -53,11 +53,31 @@ function CreatePage() {
       }
 
       const isCarousel = form.content_type === "carousel";
+
+      // For carousels, try the AI-driven structured generator first (rich
+      // slides + baked-in infographic image prompts). Fall back to the local
+      // template if the AI call fails so the user still gets output.
+      let aiCarousel: Awaited<ReturnType<typeof generateAiCarousel>> | null = null;
+      if (isCarousel) {
+        try {
+          const styleLabel = STYLES.find((s) => s.id === form.style)?.label ?? form.style;
+          aiCarousel = await generateAiCarousel({
+            data: {
+              topic: form.topic, tone: form.tone, platform: form.platform,
+              styleLabel, slideCount: form.slide_count, aspectRatio: form.aspect_ratio,
+            },
+          });
+        } catch (e) {
+          console.warn("AI carousel generation failed, using template:", e);
+          toast.warning("AI carousel generator unavailable — using template.");
+        }
+      }
+
       const output = isCarousel
-        ? generateCarousel({
+        ? (aiCarousel ?? generateCarousel({
             topic: form.topic, tone: form.tone, platform: form.platform, style: form.style,
             slideCount: form.slide_count, aspectRatio: form.aspect_ratio,
-          })
+          }))
         : generateProject({
             topic: form.topic, tone: form.tone, platform: form.platform,
             style: form.style, contentType: form.content_type,
@@ -79,20 +99,49 @@ function CreatePage() {
       if (pErr) throw pErr;
 
       if (isCarousel) {
-        const c = output as ReturnType<typeof generateCarousel>;
-        await saveOutput(project.id, {
-          title: c.title,
-          hook: "",
-          script: c.script,
-          captions: c.captions,
-          hashtags: c.hashtags,
-          scenes: [],
-          image_prompts: c.image_prompts,
-          thumbnail_ideas: [],
-          carousel_slides: c.slides,
-          aspect_ratio: form.aspect_ratio,
-          slide_count: form.slide_count,
-        });
+        const styleLabel = STYLES.find((s) => s.id === form.style)?.label ?? form.style;
+        if (aiCarousel) {
+          const slides = aiCarousel.slides;
+          const script = slides.map((s) =>
+            `Slide ${s.n} — ${s.role} [${s.label}]\n${s.emoji ? s.emoji + " " : ""}${s.headline}\n\n${s.body}\n${(s.bullets ?? []).map((b) => `• ${b}`).join("\n")}\n\nKey takeaway: ${s.bottom_highlight}\nVisual: ${s.visual}`
+          ).join("\n\n---\n\n");
+          const captions = `${aiCarousel.title}\n\n${slides[0]?.headline ?? ""}\n${slides[0]?.body ?? ""}\n\nSave this — share with someone who needs it.`;
+          const hashtags = generateCarousel({
+            topic: form.topic, tone: form.tone, platform: form.platform, style: form.style,
+            slideCount: form.slide_count, aspectRatio: form.aspect_ratio,
+          }).hashtags;
+          await saveOutput(project.id, {
+            title: aiCarousel.title,
+            hook: slides[0]?.headline ?? "",
+            script,
+            captions,
+            hashtags,
+            scenes: [],
+            image_prompts: slides.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel })),
+            thumbnail_ideas: [],
+            carousel_slides: slides.map((s) => ({
+              n: s.n, role: s.role, headline: s.headline, body: s.body, visual: s.visual,
+              label: s.label, emoji: s.emoji, bullets: s.bullets, bottom_highlight: s.bottom_highlight,
+            })),
+            aspect_ratio: form.aspect_ratio,
+            slide_count: form.slide_count,
+          });
+        } else {
+          const c = output as ReturnType<typeof generateCarousel>;
+          await saveOutput(project.id, {
+            title: c.title,
+            hook: "",
+            script: c.script,
+            captions: c.captions,
+            hashtags: c.hashtags,
+            scenes: [],
+            image_prompts: c.image_prompts,
+            thumbnail_ideas: [],
+            carousel_slides: c.slides,
+            aspect_ratio: form.aspect_ratio,
+            slide_count: form.slide_count,
+          });
+        }
       } else {
         const p = output as ReturnType<typeof generateProject>;
         await saveOutput(project.id, {
