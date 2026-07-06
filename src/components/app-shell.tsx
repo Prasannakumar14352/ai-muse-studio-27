@@ -2,12 +2,13 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
-  Settings, CreditCard, Sparkles, LogOut, Menu, X, Crown, Film, Layers,
+  Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAccess } from "@/lib/access";
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
+import brandLogo from "@/assets/prodxstore-logo.png.asset.json";
 
 const BASE_NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -17,6 +18,7 @@ const BASE_NAV = [
   { to: "/images", label: "Images", icon: ImageIcon },
   { to: "/captions", label: "Captions", icon: Type },
   { to: "/pricing", label: "Pricing", icon: CreditCard },
+  { to: "/contact", label: "Contact Us", icon: Mail },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
