@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      payments: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          credits: number
+          currency: string
+          id: string
+          metadata: Json | null
+          pack_id: string
+          razorpay_order_id: string
+          razorpay_payment_id: string | null
+          receipt_number: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          credits: number
+          currency?: string
+          id?: string
+          metadata?: Json | null
+          pack_id: string
+          razorpay_order_id: string
+          razorpay_payment_id?: string | null
+          receipt_number?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          credits?: number
+          currency?: string
+          id?: string
+          metadata?: Json | null
+          pack_id?: string
+          razorpay_order_id?: string
+          razorpay_payment_id?: string | null
+          receipt_number?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           brand_name: string | null
