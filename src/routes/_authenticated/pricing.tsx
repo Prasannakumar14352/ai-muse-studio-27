@@ -403,9 +403,33 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
             <div className="flex justify-between text-sm mb-2"><span>Signup bonus</span><span className="font-medium">+{plan.signupCredits.toLocaleString()}</span></div>
           ) : null}
           <div className="flex justify-between text-base pt-2 border-t border-border/40">
-            <span className="font-semibold">Total</span><span className="font-bold gradient-text">{plan.price}</span>
+            <span className="font-semibold">Total</span><span className="font-bold gradient-text">{displayAmount}</span>
           </div>
         </div>
+
+        {!isFree && (
+          <div className="mb-3">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Pay in</div>
+            <div className="flex rounded-lg border border-border/60 p-1 text-sm">
+              {(["USD", "INR"] as const).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCurrency(c)}
+                  className={`flex-1 rounded-md py-1.5 font-medium transition ${
+                    currency === c ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}>
+                  {c === "USD" ? "🇺🇸 USD" : "🇮🇳 INR"}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[10px] text-muted-foreground">
+              {currency === "USD"
+                ? "Charged in USD. If your Razorpay account doesn't allow international payments, we'll auto-switch to INR."
+                : `Charged in INR at ~₹${INR_PER_USD}/$1.`}
+            </p>
+          </div>
+        )}
 
         {estimate && (
           <div className="rounded-xl border border-border/60 bg-black/20 p-3 mb-3 text-xs">
