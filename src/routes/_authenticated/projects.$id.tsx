@@ -73,6 +73,18 @@ function ProjectView() {
         </div>
       </div>
 
+      {/* Video Preview — auto-playing storyboard reel */}
+      <VideoPreview
+        scenes={scenes}
+        title={output?.title ?? project.title}
+        styleImage={getStyleImage(project.style)}
+        platform={project.platform}
+        contentType={project.content_type}
+        music={project.music}
+      />
+
+
+
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Script */}
         <div className="glass rounded-2xl p-6">
