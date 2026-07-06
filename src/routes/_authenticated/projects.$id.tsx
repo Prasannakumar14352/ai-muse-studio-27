@@ -552,6 +552,88 @@ function VideoPreview({
     toast.success(`Rendered ${durationSec.toFixed(1)}s ${extension.toUpperCase()} — saved to your library.`);
   }
 
+  // Prefer the user's edits (already saved) over the underlying scenes prop.
+  const effectiveScenes: Scene[] = scenesDirty ? editedScenes : scenes;
+
+  async function saveEditedScenes() {
+    try {
+      await saveOutput(projectId, { scenes: editedScenes });
+      qc.invalidateQueries({ queryKey: ["project", projectId] });
+      setScenesDirty(false);
+      setEditing(false);
+      toast.success("Script updated");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    }
+  }
+
+  function styleForScene(i: number): string {
+    return imagePrompts?.[i]?.style || styleId || "cinematic";
+  }
+  function promptForScene(i: number): string {
+    return imagePrompts?.[i]?.prompt || effectiveScenes[i]?.visual || "";
+  }
+
+  async function generateOne(i: number) {
+    if (imgBusy.has(i)) return;
+    setImgBusy((s) => { const n = new Set(s); n.add(i); return n; });
+    setImageErrors((prev) => { const n = [...prev]; n[i] = null; return n; });
+    try {
+      const url = await generateSceneImage(promptForScene(i), styleForScene(i), ratio);
+      if (!url) throw new Error("Image service returned nothing");
+      setSceneImages((prev) => { const n = [...prev]; n[i] = url; return n; });
+    } catch (e) {
+      setImageErrors((prev) => { const n = [...prev]; n[i] = e instanceof Error ? e.message : String(e); return n; });
+    } finally {
+      setImgBusy((s) => { const n = new Set(s); n.delete(i); return n; });
+    }
+  }
+
+  async function validateAllImages() {
+    if (totalScenes === 0) return;
+    setValidating(true);
+    try {
+      await Promise.all(effectiveScenes.map((_, i) => (sceneImages[i] ? Promise.resolve() : generateOne(i))));
+      const remaining = sceneImages.filter((v, i) => !v && !imageErrors[i]).length;
+      toast.success(remaining === 0 ? "All scene images validated" : "Some scenes still failed — retry them below");
+    } finally {
+      setValidating(false);
+    }
+  }
+
+  async function retryFailed() {
+    const failed = effectiveScenes.map((_, i) => i).filter((i) => !sceneImages[i]);
+    if (failed.length === 0) { toast.message("Nothing to retry"); return; }
+    await Promise.all(failed.map((i) => generateOne(i)));
+  }
+
+  async function playSceneVoiceover(i: number) {
+    const text = (effectiveScenes[i]?.voiceover ?? "").trim();
+    if (!text) { toast.error("No voiceover text for this scene"); return; }
+    try {
+      if (audioElRef.current) { audioElRef.current.pause(); audioElRef.current = null; }
+      setPlayingScene(i);
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, voice: "alloy" }),
+      });
+      if (!res.ok) throw new Error(await res.text() || `TTS ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioElRef.current = audio;
+      audio.onended = () => { setPlayingScene(null); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setPlayingScene(null); URL.revokeObjectURL(url); toast.error("Playback failed"); };
+      await audio.play();
+    } catch (e) {
+      setPlayingScene(null);
+      toast.error(e instanceof Error ? e.message : "Voiceover failed");
+    }
+  }
+
+  const missingImages = effectiveScenes.map((_, i) => !sceneImages[i]).filter(Boolean).length;
+
   async function handleRender(container?: "webm" | "mp4") {
     if (rendering || ugcRendering || totalScenes === 0) return;
     lastRenderKindRef.current = "storyboard";
@@ -564,7 +646,8 @@ function VideoPreview({
     abortRef.current = controller;
     try {
       const result = await renderVideo({
-        title, platform, scenes, styleId, contentType,
+        title, platform, scenes: effectiveScenes, styleId, contentType,
+        showOnScreenText,
         onProgress: setRenderProgress,
         signal: controller.signal,
         preferredContainer: container,
