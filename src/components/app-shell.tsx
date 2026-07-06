@@ -39,9 +39,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen flex overflow-hidden">
       {/* Sidebar desktop */}
-      <aside className="hidden md:flex md:w-64 shrink-0 flex-col border-r border-border/50 bg-sidebar/60 backdrop-blur-xl">
+      <aside className="hidden md:flex md:w-64 shrink-0 flex-col border-r border-border/50 bg-sidebar/60 backdrop-blur-xl overflow-y-auto">
         <Link to="/dashboard" className="flex items-center gap-2 px-6 py-5 border-b border-border/50">
           <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-white" />
@@ -82,7 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile sheet */}
       {open && (
-        <div className="md:hidden fixed inset-0 z-30 pt-14 bg-background/95 backdrop-blur-xl">
+        <div className="md:hidden fixed inset-0 z-30 pt-14 bg-background/95 backdrop-blur-xl overflow-y-auto">
           <nav className="p-4 space-y-1">
             {NAV.map((n) => (
               <Link key={n.to} to={n.to} onClick={() => setOpen(false)}
@@ -99,7 +99,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       {/* Main */}
-      <main className="flex-1 min-w-0 pt-14 md:pt-0">
+      <main className="flex-1 min-w-0 pt-14 md:pt-0 overflow-y-auto">
         <div className="max-w-7xl mx-auto p-6 md:p-10">{children}</div>
       </main>
       <ConfirmDialogHost />
