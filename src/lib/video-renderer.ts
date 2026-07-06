@@ -113,7 +113,7 @@ function drawScene(
 
   // Optional on-screen text — big bold headline near the top, only when the
   // script explicitly provides one. No scene numbers, no chips, no titles.
-  const onScreen = (scene.on_screen_text ?? "").trim();
+  const onScreen = opts.showOnScreenText === false ? "" : (scene.on_screen_text ?? "").trim();
   if (onScreen) {
     const topGrad = ctx.createLinearGradient(0, 0, 0, H * 0.35);
     topGrad.addColorStop(0, "rgba(0,0,0,0.55)");
