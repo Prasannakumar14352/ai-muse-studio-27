@@ -128,6 +128,7 @@ export const GENERATION_COST = 1; // credits per project generation
 export type PlanDef = {
   id: string; name: string; price: string; period: string;
   monthlyCredits: number; signupCredits?: number; features: string[]; cta: string; featured?: boolean;
+  contactSales?: boolean;
 };
 
 export const PLANS: PlanDef[] = [
@@ -155,5 +156,19 @@ export const PLANS: PlanDef[] = [
     monthlyCredits: 3000,
     features: ["3,000 credits / month", "Advanced styles + presets", "Brand kits", "Priority rendering"],
     cta: "Go Pro",
+  },
+  {
+    id: "team", name: "Team", price: "Custom", period: "contact sales",
+    monthlyCredits: 0,
+    contactSales: true,
+    features: [
+      "Multi-seat workspace",
+      "Shared brand kits & presets",
+      "Custom monthly credit pool",
+      "Dedicated priority rendering",
+      "Onboarding & Slack support",
+      "Invoiced billing available",
+    ],
+    cta: "Contact sales",
   },
 ];
