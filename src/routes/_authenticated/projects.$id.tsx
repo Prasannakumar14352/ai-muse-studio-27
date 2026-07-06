@@ -637,7 +637,7 @@ function VideoPreview({
     return imagePrompts?.[i]?.style || styleId || "cinematic";
   }
   function promptForScene(i: number): string {
-    return imagePrompts?.[i]?.prompt || effectiveScenes[i]?.visual || "";
+    return (editedPrompts[i] ?? "").trim() || imagePrompts?.[i]?.prompt || effectiveScenes[i]?.visual || "";
   }
 
   async function generateOne(i: number) {
