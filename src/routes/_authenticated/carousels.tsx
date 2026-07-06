@@ -81,7 +81,10 @@ function CarouselsPage() {
           id: p.id, title: p.title, style: p.style, platform: p.platform, tone: p.tone,
           image_prompts: out?.image_prompts ?? [],
           carousel_images: out?.carousel_images ?? null,
+          carousel_slides: out?.carousel_slides ?? null,
           slide_diagnostics: (rd?.slide_diagnostics ?? {}) as SlideDiagMap,
+          saved_ratio: (out?.aspect_ratio ?? null) as LayoutSettings["ratio"] | null,
+          saved_slide_count: out?.slide_count ?? null,
         };
       });
     },
@@ -89,7 +92,11 @@ function CarouselsPage() {
 
 
   function getLayout(row: CarouselRow): LayoutSettings {
-    return layout[row.id] ?? { ratio: "1:1", slideCount: row.image_prompts.length, spacing: 8 };
+    return layout[row.id] ?? {
+      ratio: row.saved_ratio ?? "4:5",
+      slideCount: row.saved_slide_count ?? row.image_prompts.length,
+      spacing: 8,
+    };
   }
   function updateLayout(rowId: string, patch: Partial<LayoutSettings>) {
     setLayout((prev) => ({ ...prev, [rowId]: { ...(prev[rowId] ?? { ratio: "1:1", slideCount: 5, spacing: 8 }), ...patch } }));
