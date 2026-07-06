@@ -99,8 +99,8 @@ function PricingPage() {
   );
 }
 
-/* Razorpay placeholder — pretends to run checkout and activates the plan locally. */
-function RazorpayModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }) {
+/* Checkout placeholder — pretends to run payment and activates the plan locally. */
+function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }) {
   const { data: access } = useAccess();
   const qc = useQueryClient();
   const [processing, setProcessing] = useState(false);
@@ -108,7 +108,7 @@ function RazorpayModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
   async function simulatePayment() {
     if (!access) return;
     setProcessing(true);
-    // Fake Razorpay call
+    // Fake payment call
     await new Promise((r) => setTimeout(r, 1400));
 
     // Activate the plan in our DB (client-side because RLS allows the owner)
@@ -145,9 +145,9 @@ function RazorpayModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
           <X className="w-4 h-4" />
         </button>
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">R</div>
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">$</div>
           <div>
-            <div className="font-semibold">Razorpay Checkout</div>
+            <div className="font-semibold">Checkout</div>
             <div className="text-xs text-muted-foreground">Secure payment (demo)</div>
           </div>
         </div>
@@ -160,7 +160,7 @@ function RazorpayModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
         </div>
         <p className="text-xs text-muted-foreground mb-4">
           This is a demo checkout. Clicking "Pay" will activate the {plan.name} plan on your account without charging you.
-          Live Razorpay integration can be wired later using their Orders API + webhook.
+          Live payment integration can be wired later using Stripe, Paddle, or any payment provider.
         </p>
         <button
           onClick={simulatePayment}
