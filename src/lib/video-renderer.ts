@@ -190,8 +190,9 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas 2D not supported");
+  const rawCtx = canvas.getContext("2d");
+  if (!rawCtx) throw new Error("Canvas 2D not supported");
+  const ctx: CanvasRenderingContext2D = rawCtx;
 
   const img = await loadImage(style.image);
 
