@@ -251,6 +251,49 @@ function CreatePage() {
             </div>
           )}
 
+          {form.content_type === "long_video" && (
+            <Section title="1b. Long video length">
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {[60, 90, 120, 180, 240, 300, 420, 600].map((sec) => (
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => update("long_video_length_sec", sec)}
+                      className={`px-4 py-2 rounded-full text-sm border transition ${
+                        form.long_video_length_sec === sec
+                          ? "gradient-primary text-white border-transparent shadow-lg"
+                          : "glass border-border hover:border-white/20"
+                      }`}
+                    >
+                      {sec >= 60 ? `${Math.round(sec / 60)}${sec % 60 ? `:${String(sec % 60).padStart(2, "0")}` : " min"}` : `${sec}s`}
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground mb-2">
+                    Custom length: {form.long_video_length_sec}s
+                    {form.long_video_length_sec >= 60
+                      ? ` (~${Math.floor(form.long_video_length_sec / 60)}m ${form.long_video_length_sec % 60}s)`
+                      : ""}
+                  </div>
+                  <input
+                    type="range"
+                    min={30}
+                    max={600}
+                    step={15}
+                    value={form.long_video_length_sec}
+                    onChange={(e) => update("long_video_length_sec", parseInt(e.target.value))}
+                    className="w-full max-w-md"
+                  />
+                  <div className="text-[11px] text-muted-foreground mt-1">
+                    We'll auto-scale the number of scenes to fit the length you pick (30s – 10 min).
+                  </div>
+                </div>
+              </div>
+            </Section>
+          )}
+
           <Section title="2. Pick a niche (optional — for topic ideas)">
             <div className="flex flex-wrap gap-2">
               {NICHES.map((n) => (
