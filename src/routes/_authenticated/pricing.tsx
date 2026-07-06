@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PLANS, type PlanDef } from "@/lib/constants";
-import { getPlanGenerationEstimate, ASSET_CREDIT_COST, ASSET_META, type AssetKey } from "@/lib/credit-costs";
+import { getPlanGenerationEstimate, ASSET_META, type AssetKey } from "@/lib/credit-costs";
 import { useAccess } from "@/lib/access";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -49,19 +49,10 @@ function PricingPage() {
                 <span className="text-sm text-muted-foreground">{p.period}</span>
               </div>
 
-              {/* Exact per-asset cost — same for every plan */}
-              <div className="mt-4 rounded-lg border border-border/60 bg-black/20 p-3 text-xs">
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Credit cost per asset</div>
-                <div className="space-y-1">
-                  <CostRow icon={<ImageIcon className="w-3.5 h-3.5 text-[color:var(--neon-pink)]" />} label="AI image" cost={ASSET_CREDIT_COST.image} />
-                  <CostRow icon={<Layers className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />} label="Carousel (≈5 slides)" cost={ASSET_CREDIT_COST.carousel} />
-                  <CostRow icon={<Film className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />} label="Short reel (≤ 60s)" cost={ASSET_CREDIT_COST.shortReel} />
-                  <CostRow icon={<Video className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />} label="5-min long video" cost={ASSET_CREDIT_COST.longVideo} />
-                </div>
-              </div>
 
               {estimate && (
-                <div className="mt-3 rounded-lg border border-border/60 bg-black/20 p-3 text-xs">
+                <div className="mt-4 rounded-lg border border-border/60 bg-black/20 p-3 text-xs">
+
                   <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Up to (single-type only)</div>
                   <p className="text-[10px] text-muted-foreground mb-2">
                     Each row is a separate "up to" — not a bundle. Mixed usage splits the same {totalCredits.toLocaleString()} credits.
@@ -107,14 +98,6 @@ function PricingPage() {
   );
 }
 
-function CostRow({ icon, label, cost }: { icon: React.ReactNode; label: string; cost: number }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="flex items-center gap-1.5 text-muted-foreground">{icon} {label}</span>
-      <strong className="text-foreground">{cost} {cost === 1 ? "credit" : "credits"}</strong>
-    </div>
-  );
-}
 
 function EstRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
@@ -134,7 +117,7 @@ function CreditsEstimator({ plan, onChangePlan }: { plan: PlanDef; onChangePlan:
   });
 
   const spent = useMemo(
-    () => (Object.keys(mix) as AssetKey[]).reduce((s, k) => s + mix[k] * ASSET_CREDIT_COST[k], 0),
+    () => (Object.keys(mix) as AssetKey[]).reduce((s, k) => s + mix[k] * ASSET_META[k].cost, 0),
     [mix]
   );
   const remaining = totalCredits - spent;

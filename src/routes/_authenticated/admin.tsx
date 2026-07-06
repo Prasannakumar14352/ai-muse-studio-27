@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccess } from "@/lib/access";
 import { confirmDialog } from "@/components/confirm-dialog";
-import { CREDIT_COSTS, CREDIT_GUIDE_INTRO } from "@/lib/credit-costs";
-import { Crown, Users, Layers, Zap, Plus, Shield, ShieldOff, Ban, Loader2, ChevronDown, ChevronRight, Coins, FileText, FileDown, Printer } from "lucide-react";
+import { CREDIT_COSTS, CREDIT_GUIDE_INTRO, ASSET_CREDIT_COST } from "@/lib/credit-costs";
+import { Crown, Users, Layers, Zap, Plus, Shield, ShieldOff, Ban, Loader2, ChevronDown, ChevronRight, Coins, FileText, FileDown, Printer, Image as ImageIcon, Film, Video } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({ component: AdminPanel });
 
@@ -110,7 +110,10 @@ function AdminPanel() {
         <Metric icon={Zap} label="Active subs" value={users?.filter((u) => u.sub).length ?? 0} />
       </div>
 
+      <CreditCostCard />
+
       <CreditGuide />
+
 
       <div className="glass rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
@@ -195,7 +198,36 @@ function IconBtn({ children, title, onClick }: { children: React.ReactNode; titl
   );
 }
 
+// -------------------- Credit Cost Per Asset (admin-only) --------------------
+
+function CreditCostCard() {
+  return (
+    <div className="glass rounded-2xl p-6 border border-[color:var(--neon-pink)]/30">
+      <h2 className="font-semibold flex items-center gap-2 mb-4">
+        <Coins className="w-4 h-4 text-[color:var(--neon-pink)]" />
+        Credit cost per asset
+      </h2>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <AssetCost icon={<ImageIcon className="w-4 h-4 text-[color:var(--neon-pink)]" />} label="AI image" cost={ASSET_CREDIT_COST.image} />
+        <AssetCost icon={<Layers className="w-4 h-4 text-[color:var(--neon-purple)]" />} label="Carousel (≈5 slides)" cost={ASSET_CREDIT_COST.carousel} />
+        <AssetCost icon={<Film className="w-4 h-4 text-[color:var(--neon-purple)]" />} label="Short reel (≤ 60s)" cost={ASSET_CREDIT_COST.shortReel} />
+        <AssetCost icon={<Video className="w-4 h-4 text-[color:var(--neon-purple)]" />} label="5-min long video" cost={ASSET_CREDIT_COST.longVideo} />
+      </div>
+    </div>
+  );
+}
+
+function AssetCost({ icon, label, cost }: { icon: React.ReactNode; label: string; cost: number }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-black/20 p-4 flex items-center justify-between">
+      <span className="flex items-center gap-2 text-sm text-muted-foreground">{icon} {label}</span>
+      <strong className="text-foreground">{cost} {cost === 1 ? "credit" : "credits"}</strong>
+    </div>
+  );
+}
+
 // -------------------- Credits & Pricing Guide --------------------
+
 
 function CreditGuide() {
   const [open, setOpen] = useState<boolean>(() => {
