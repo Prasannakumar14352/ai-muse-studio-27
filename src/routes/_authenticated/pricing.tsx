@@ -1,11 +1,16 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { PLANS, type PlanDef } from "@/lib/constants";
+import { PLANS, type PlanDef, CREDIT_PACKS, type CreditPack } from "@/lib/constants";
 import { getPlanGenerationEstimate, ASSET_META, type AssetKey } from "@/lib/credit-costs";
 import { useAccess } from "@/lib/access";
-import { Check, Sparkles, Crown, X, Image as ImageIcon, Layers, Film, Video, ChevronDown, Calculator, Minus, Plus } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
+import { createRazorpayOrder, verifyRazorpayPayment } from "@/lib/razorpay.functions";
+import { toast } from "sonner";
+import { Check, Sparkles, Crown, X, Image as ImageIcon, Layers, Film, Video, ChevronDown, Calculator, Minus, Plus, Zap, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/pricing")({ component: PricingPage });
+
 
 function PricingPage() {
   const { data: access } = useAccess();
