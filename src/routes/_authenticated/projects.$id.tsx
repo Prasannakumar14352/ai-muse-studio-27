@@ -718,6 +718,16 @@ function VideoPreview({
 
 // ---------- diagnostics helpers ----------
 
+type RetryEntry = {
+  at: string;
+  phase: "render" | "upload" | "playback" | "canceled";
+  container?: "webm" | "mp4";
+  mimeType?: string;
+  blobSize?: number;
+  error?: string;
+  ok?: boolean;
+};
+
 type VideoDiagnostics = {
   renderedAt: string | null;
   mimeType: string | null;
@@ -737,6 +747,7 @@ type VideoDiagnostics = {
   videoHeight: number | null;
   playableDurationSec: number | null;
   codecSupport: Record<string, string> | null;
+  retries?: RetryEntry[];
 };
 
 function emptyDiag(): VideoDiagnostics {
@@ -747,7 +758,7 @@ function emptyDiag(): VideoDiagnostics {
     signedUrl: null, currentSrc: null,
     networkState: null, readyState: null,
     videoWidth: null, videoHeight: null, playableDurationSec: null,
-    codecSupport: null,
+    codecSupport: null, retries: [],
   };
 }
 
