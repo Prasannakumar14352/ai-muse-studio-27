@@ -259,24 +259,21 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   videoStream.getVideoTracks().forEach((t) => combined.addTrack(t));
   if (audioDest) audioDest.stream.getAudioTracks().forEach((t) => combined.addTrack(t));
 
-  const { mime, ext } = pickRecorderMime();
+  const { mime, ext } = pickRecorderMime(opts.preferredContainer);
   const recorder = new MediaRecorder(combined, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
   const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
 
-  // Draw an initial frame BEFORE recording so the first captured frame isn't black.
   drawScene(ctx, sceneImgs[0] ?? fallbackImg, opts.scenes[0], {
     title: opts.title, platform: opts.platform ?? "preview",
     sceneIdx: 0, totalScenes: opts.scenes.length,
     progress: 0, accent: style.accent, styleLabel: style.label,
   });
 
-  // Emit chunks every 250ms so the final blob is well-formed even on short renders.
   recorder.start(250);
 
-  // Schedule all voiceover buffers now that the recorder is running.
   if (audioCtx && audioDest && opts.sceneAudio) {
     const t0 = audioCtx.currentTime + 0.05;
     let offset = 0;
@@ -284,34 +281,27 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       const buf = opts.sceneAudio[i];
       if (buf) {
         const src = audioCtx.createBufferSource();
-        src.buffer = buf;
-        src.connect(audioDest);
-        src.start(t0 + offset);
+        src.buffer = buf; src.connect(audioDest); src.start(t0 + offset);
       }
       offset += durations[i];
     }
   }
 
   const startedAt = performance.now();
+  let aborted = false;
+  const abortHandler = () => { aborted = true; };
+  opts.signal?.addEventListener("abort", abortHandler);
 
-  // Animation loop using rAF; MediaRecorder captures whatever the canvas shows.
   await new Promise<void>((resolve) => {
     function tick() {
+      if (aborted) { resolve(); return; }
       const elapsed = (performance.now() - startedAt) / 1000;
       const clamped = Math.min(elapsed, totalDuration);
-      let acc = 0;
-      let sceneIdx = 0;
-      let localProgress = 0;
+      let acc = 0, sceneIdx = 0, localProgress = 0;
       for (let i = 0; i < opts.scenes.length; i++) {
         const d = durations[i];
-        if (clamped <= acc + d) {
-          sceneIdx = i;
-          localProgress = (clamped - acc) / d;
-          break;
-        }
-        acc += d;
-        sceneIdx = i;
-        localProgress = 1;
+        if (clamped <= acc + d) { sceneIdx = i; localProgress = (clamped - acc) / d; break; }
+        acc += d; sceneIdx = i; localProgress = 1;
       }
       drawScene(ctx, sceneImgs[sceneIdx] ?? fallbackImg, opts.scenes[sceneIdx], {
         title: opts.title, platform: opts.platform ?? "preview",
@@ -325,12 +315,19 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
     requestAnimationFrame(tick);
   });
 
-  recorder.stop();
+  opts.signal?.removeEventListener("abort", abortHandler);
+  try { recorder.stop(); } catch { /* already stopped */ }
   await done;
   combined.getTracks().forEach((t) => t.stop());
   videoStream.getTracks().forEach((t) => t.stop());
   if (audioDest) audioDest.stream.getTracks().forEach((t) => t.stop());
   if (audioCtx) await audioCtx.close().catch(() => {});
+
+  if (aborted) {
+    const err = new Error("Render canceled");
+    err.name = "AbortError";
+    throw err;
+  }
 
   const blob = new Blob(chunks, { type: mime });
   return { blob, mimeType: mime, extension: ext, durationSec: totalDuration };
