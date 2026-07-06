@@ -28,6 +28,24 @@ export const CREDIT_GUIDE_INTRO = [
   "Regeneration of a single asset (one image, one scene) only costs that asset — not the whole project.",
 ];
 
+// Per-asset credit costs used across the pricing page + estimator.
+// Kept in sync with CREDIT_COSTS above.
+export const ASSET_CREDIT_COST = {
+  image: 1,          // 1 credit per AI image
+  carousel: 5,       // 1 script + ~4 slides (avg 5)
+  shortReel: 9,      // 1 script + ~8 scene images
+  longVideo: 38,     // 5-minute video: 1 script + ~37 scene images
+} as const;
+
+export type AssetKey = keyof typeof ASSET_CREDIT_COST;
+
+export const ASSET_META: Record<AssetKey, { label: string; cost: number; unit: string }> = {
+  image:     { label: "AI image",           cost: ASSET_CREDIT_COST.image,     unit: "per image" },
+  carousel:  { label: "Carousel (5 slides)", cost: ASSET_CREDIT_COST.carousel,  unit: "per carousel" },
+  shortReel: { label: "Short reel (≤ 60s)",  cost: ASSET_CREDIT_COST.shortReel, unit: "per reel" },
+  longVideo: { label: "5-minute long video", cost: ASSET_CREDIT_COST.longVideo, unit: "per video" },
+};
+
 export function getPlanGenerationEstimate(credits: number): {
   images: number;
   carousels: number;
@@ -35,15 +53,11 @@ export function getPlanGenerationEstimate(credits: number): {
   longVideos: number;
 } | null {
   if (credits <= 0) return null;
-  // Estimates based on CREDIT_COSTS:
-  //   - AI image: 1 credit per image
-  //   - Carousel: 1 script + 1 per slide (avg 5 slides = 5 credits)
-  //   - Short reel: 1 script + 1 per scene image (avg 8 scenes = 9 credits)
-  //   - Long video: 1 script + 1 per scene image (~1 scene per 8s; 5 min ≈ 38 scenes = 38 credits)
   return {
-    images: credits,
-    carousels: Math.floor(credits / 5),
-    shortReels: Math.floor(credits / 9),
-    longVideos: Math.floor(credits / 38),
+    images: Math.floor(credits / ASSET_CREDIT_COST.image),
+    carousels: Math.floor(credits / ASSET_CREDIT_COST.carousel),
+    shortReels: Math.floor(credits / ASSET_CREDIT_COST.shortReel),
+    longVideos: Math.floor(credits / ASSET_CREDIT_COST.longVideo),
   };
 }
+
