@@ -14,6 +14,15 @@ export type RenderOptions = {
   contentType?: string | null; // "long_video" | "short_reel" | ...
   fps?: number;
   onProgress?: (p: number) => void; // 0..1
+  // Optional per-scene AI-generated background images (data URLs or same-origin URLs).
+  // When provided, each scene uses its own image instead of the style stock image.
+  sceneImages?: Array<string | null>;
+  // Optional per-scene voiceover audio buffers (already decoded).
+  // Each buffer is scheduled at that scene's start time and mixed into the recorder audio track.
+  sceneAudio?: Array<AudioBuffer | null>;
+  // When true, scene durations are stretched to at least the length of the
+  // corresponding scene audio so no voiceover is cut off mid-sentence.
+  fitToAudio?: boolean;
 };
 
 export type RenderResult = {
@@ -210,42 +219,89 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   if (!rawCtx) throw new Error("Canvas 2D not supported");
   const ctx: CanvasRenderingContext2D = rawCtx;
 
-  const img = await loadImage(style.image);
+  // Load style fallback + per-scene AI images in parallel.
+  const [fallbackImg, ...sceneImgs] = await Promise.all([
+    loadImage(style.image),
+    ...opts.scenes.map((_, i) => {
+      const src = opts.sceneImages?.[i];
+      return src ? loadImage(src) : Promise.resolve<HTMLImageElement | null>(null);
+    }),
+  ]);
 
-  const stream = canvas.captureStream(fps);
+  // Scene durations — stretched to fit voiceover audio when requested so the
+  // audio never cuts off mid-sentence.
+  const durations = opts.scenes.map((s, i) => {
+    const base = parseDuration(s.duration);
+    if (opts.fitToAudio && opts.sceneAudio?.[i]) {
+      return Math.max(base, opts.sceneAudio[i]!.duration + 0.25);
+    }
+    return base;
+  });
+  const totalDuration = durations.reduce((a, b) => a + b, 0);
+
+  // Build a mixed audio stream from per-scene voiceover buffers.
+  // We schedule each buffer at that scene's start on a single AudioContext,
+  // route through a MediaStreamAudioDestinationNode, and pass that stream's
+  // audio track into the MediaRecorder alongside the video track.
+  const hasAudio = !!opts.sceneAudio?.some((b) => b);
+  let audioCtx: AudioContext | null = null;
+  let audioDest: MediaStreamAudioDestinationNode | null = null;
+  if (hasAudio) {
+    audioCtx = new AudioContext();
+    if (audioCtx.state === "suspended") await audioCtx.resume().catch(() => {});
+    audioDest = audioCtx.createMediaStreamDestination();
+  }
+
+  const videoStream = canvas.captureStream(fps);
+  const combined = new MediaStream();
+  videoStream.getVideoTracks().forEach((t) => combined.addTrack(t));
+  if (audioDest) audioDest.stream.getAudioTracks().forEach((t) => combined.addTrack(t));
+
   const { mime, ext } = pickRecorderMime();
-  const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
+  const recorder = new MediaRecorder(combined, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
-  const totalDuration = opts.scenes.reduce((sum, s) => sum + parseDuration(s.duration), 0);
-  const startedAt = performance.now();
+  const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
 
-  const done = new Promise<void>((resolve) => {
-    recorder.onstop = () => resolve();
+  // Draw an initial frame BEFORE recording so the first captured frame isn't black.
+  drawScene(ctx, sceneImgs[0] ?? fallbackImg, opts.scenes[0], {
+    title: opts.title, platform: opts.platform ?? "preview",
+    sceneIdx: 0, totalScenes: opts.scenes.length,
+    progress: 0, accent: style.accent, styleLabel: style.label,
   });
 
   // Emit chunks every 250ms so the final blob is well-formed even on short renders.
   recorder.start(250);
 
-  // Draw an initial frame before recording starts capturing.
-  drawScene(ctx, img, opts.scenes[0], {
-    title: opts.title, platform: opts.platform ?? "preview",
-    sceneIdx: 0, totalScenes: opts.scenes.length,
-    progress: 0, accent: style.accent, styleLabel: style.label,
-  });
+  // Schedule all voiceover buffers now that the recorder is running.
+  if (audioCtx && audioDest && opts.sceneAudio) {
+    const t0 = audioCtx.currentTime + 0.05;
+    let offset = 0;
+    for (let i = 0; i < opts.scenes.length; i++) {
+      const buf = opts.sceneAudio[i];
+      if (buf) {
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(audioDest);
+        src.start(t0 + offset);
+      }
+      offset += durations[i];
+    }
+  }
+
+  const startedAt = performance.now();
 
   // Animation loop using rAF; MediaRecorder captures whatever the canvas shows.
   await new Promise<void>((resolve) => {
     function tick() {
       const elapsed = (performance.now() - startedAt) / 1000;
       const clamped = Math.min(elapsed, totalDuration);
-      // find current scene + local progress
       let acc = 0;
       let sceneIdx = 0;
       let localProgress = 0;
       for (let i = 0; i < opts.scenes.length; i++) {
-        const d = parseDuration(opts.scenes[i].duration);
+        const d = durations[i];
         if (clamped <= acc + d) {
           sceneIdx = i;
           localProgress = (clamped - acc) / d;
@@ -255,7 +311,7 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
         sceneIdx = i;
         localProgress = 1;
       }
-      drawScene(ctx, img, opts.scenes[sceneIdx], {
+      drawScene(ctx, sceneImgs[sceneIdx] ?? fallbackImg, opts.scenes[sceneIdx], {
         title: opts.title, platform: opts.platform ?? "preview",
         sceneIdx, totalScenes: opts.scenes.length,
         progress: localProgress, accent: style.accent, styleLabel: style.label,
@@ -269,8 +325,122 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
 
   recorder.stop();
   await done;
-  stream.getTracks().forEach((t) => t.stop());
+  combined.getTracks().forEach((t) => t.stop());
+  videoStream.getTracks().forEach((t) => t.stop());
+  if (audioDest) audioDest.stream.getTracks().forEach((t) => t.stop());
+  if (audioCtx) await audioCtx.close().catch(() => {});
 
   const blob = new Blob(chunks, { type: mime });
   return { blob, mimeType: mime, extension: ext, durationSec: totalDuration };
+}
+
+// -------------------------------------------------------------------------
+// UGC orchestration: for each scene, generate an AI image + voiceover, then
+// render the composed MP4/WebM. All network work runs in parallel; a
+// per-stage progress callback surfaces status to the UI.
+// -------------------------------------------------------------------------
+
+export type UgcStage =
+  | { kind: "images"; done: number; total: number }
+  | { kind: "audio"; done: number; total: number }
+  | { kind: "render"; progress: number }
+  | { kind: "upload" };
+
+export type UgcOptions = {
+  title: string;
+  platform?: string | null;
+  contentType?: string | null;
+  styleId?: string | null;
+  scenes: RenderScene[];
+  imagePrompts?: Array<{ n: number; prompt: string; style: string } | undefined>;
+  voice?: string; // TTS voice id
+  onStage?: (stage: UgcStage) => void;
+};
+
+async function fetchSceneImage(prompt: string, style: string, ratio: string): Promise<string | null> {
+  try {
+    const res = await fetch("/api/generate-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, style, ratio }),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { image?: string };
+    return json.image ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchSceneAudio(text: string, voice: string, ctx: AudioContext): Promise<AudioBuffer | null> {
+  try {
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, voice }),
+    });
+    if (!res.ok) return null;
+    const arr = await res.arrayBuffer();
+    // decodeAudioData mutates the buffer in some browsers — copy first.
+    return await ctx.decodeAudioData(arr.slice(0));
+  } catch {
+    return null;
+  }
+}
+
+export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
+  const style = getStyle(opts.styleId);
+  const isVertical =
+    opts.contentType === "short_reel" ||
+    opts.platform === "tiktok" ||
+    opts.platform === "instagram";
+  const ratio = isVertical ? "9:16" : "16:9";
+  const total = opts.scenes.length;
+
+  // 1) Images — in parallel, report as they land.
+  let imgDone = 0;
+  opts.onStage?.({ kind: "images", done: 0, total });
+  const sceneImages = await Promise.all(
+    opts.scenes.map(async (scene, i) => {
+      const promptRow = opts.imagePrompts?.[i];
+      const prompt = promptRow?.prompt || scene.visual;
+      const url = await fetchSceneImage(prompt, style.descriptor, ratio);
+      imgDone += 1;
+      opts.onStage?.({ kind: "images", done: imgDone, total });
+      return url;
+    }),
+  );
+
+  // 2) Audio — decode using a shared AudioContext.
+  const decodeCtx = new AudioContext();
+  if (decodeCtx.state === "suspended") await decodeCtx.resume().catch(() => {});
+  let audDone = 0;
+  opts.onStage?.({ kind: "audio", done: 0, total });
+  const voice = opts.voice || "alloy";
+  const sceneAudio = await Promise.all(
+    opts.scenes.map(async (scene) => {
+      const buf = await fetchSceneAudio(scene.voiceover, voice, decodeCtx);
+      audDone += 1;
+      opts.onStage?.({ kind: "audio", done: audDone, total });
+      return buf;
+    }),
+  );
+  // Keep decodeCtx alive until render swaps in its own context — nothing else uses it.
+  await decodeCtx.close().catch(() => {});
+
+  // 3) Render
+  opts.onStage?.({ kind: "render", progress: 0 });
+  const result = await renderVideo({
+    title: opts.title,
+    platform: opts.platform,
+    contentType: opts.contentType,
+    styleId: opts.styleId,
+    scenes: opts.scenes,
+    sceneImages,
+    sceneAudio,
+    fitToAudio: true,
+    onProgress: (p) => opts.onStage?.({ kind: "render", progress: p }),
+  });
+  opts.onStage?.({ kind: "upload" });
+  return result;
 }

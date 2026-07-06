@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getStyleImage } from "@/lib/constants";
 import { generateProject } from "@/lib/generators";
-import { renderVideo } from "@/lib/video-renderer";
+import { renderVideo, renderUgcVideo, type UgcStage } from "@/lib/video-renderer";
 import { toast } from "sonner";
-import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon } from "lucide-react";
+import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
 
@@ -189,7 +189,9 @@ function ProjectView() {
         userId={project.user_id}
         outputId={output?.id ?? null}
         existingVideoUrl={output?.video_url ?? null}
+        imagePrompts={prompts}
       />
+
 
 
 
@@ -272,12 +274,13 @@ type Scene = { n: number; visual: string; voiceover: string; duration: string };
 
 function VideoPreview({
   scenes, title, styleImage, styleId, platform, contentType, music,
-  projectId, userId, outputId, existingVideoUrl,
+  projectId, userId, outputId, existingVideoUrl, imagePrompts,
 }: {
   scenes: Scene[]; title: string; styleImage: string;
   styleId?: string | null;
   platform?: string | null; contentType?: string | null; music?: string | null;
   projectId: string; userId: string; outputId: string | null; existingVideoUrl: string | null;
+  imagePrompts?: Array<{ n: number; prompt: string; style: string }>;
 }) {
   const qc = useQueryClient();
   const [idx, setIdx] = useState(0);
@@ -286,6 +289,8 @@ function VideoPreview({
   const [rendering, setRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(existingVideoUrl);
+  const [ugcRendering, setUgcRendering] = useState(false);
+  const [ugcStage, setUgcStage] = useState<UgcStage | null>(null);
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number>(0);
 
@@ -319,8 +324,24 @@ function VideoPreview({
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [playing, idx, currentDurationMs, totalScenes]);
 
+  async function uploadRender(blob: Blob, mimeType: string, extension: string, durationSec: number) {
+    const path = `${userId}/${projectId}-${Date.now()}.${extension}`;
+    const { error: upErr } = await supabase.storage.from("renders").upload(path, blob, {
+      contentType: mimeType, upsert: true,
+    });
+    if (upErr) throw upErr;
+    const { data: signed } = await supabase.storage.from("renders").createSignedUrl(path, 60 * 60 * 24 * 7);
+    const url = signed?.signedUrl ?? null;
+    if (outputId && url) {
+      await supabase.from("generated_outputs").update({ video_url: url } as never).eq("id", outputId);
+    }
+    setVideoUrl(url);
+    qc.invalidateQueries({ queryKey: ["project", projectId] });
+    toast.success(`Rendered ${durationSec.toFixed(1)}s ${extension.toUpperCase()} — saved to your library.`);
+  }
+
   async function handleRender() {
-    if (rendering || totalScenes === 0) return;
+    if (rendering || ugcRendering || totalScenes === 0) return;
     setRendering(true);
     setRenderProgress(0);
     setPlaying(false);
@@ -329,27 +350,43 @@ function VideoPreview({
         title, platform, scenes, styleId, contentType,
         onProgress: setRenderProgress,
       });
-      // Upload to Supabase Storage under <userId>/<projectId>.<ext>
-      const path = `${userId}/${projectId}-${Date.now()}.${result.extension}`;
-      const { error: upErr } = await supabase.storage.from("renders").upload(path, result.blob, {
-        contentType: result.mimeType, upsert: true,
-      });
-      if (upErr) throw upErr;
-      const { data: signed } = await supabase.storage.from("renders").createSignedUrl(path, 60 * 60 * 24 * 7);
-      const url = signed?.signedUrl ?? null;
-      // Persist URL on the output row
-      if (outputId && url) {
-        await supabase.from("generated_outputs").update({ video_url: url } as never).eq("id", outputId);
-      }
-      setVideoUrl(url);
-      qc.invalidateQueries({ queryKey: ["project", projectId] });
-      toast.success(`Rendered ${result.durationSec.toFixed(1)}s ${result.extension.toUpperCase()} — saved to your library.`);
+      await uploadRender(result.blob, result.mimeType, result.extension, result.durationSec);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Render failed");
     } finally {
       setRendering(false);
     }
   }
+
+  async function handleUgcRender() {
+    if (rendering || ugcRendering || totalScenes === 0) return;
+    setUgcRendering(true);
+    setUgcStage({ kind: "images", done: 0, total: totalScenes });
+    setPlaying(false);
+    try {
+      const result = await renderUgcVideo({
+        title, platform, contentType, styleId, scenes,
+        imagePrompts,
+        voice: "alloy",
+        onStage: setUgcStage,
+      });
+      await uploadRender(result.blob, result.mimeType, result.extension, result.durationSec);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "UGC render failed");
+    } finally {
+      setUgcRendering(false);
+      setUgcStage(null);
+    }
+  }
+
+  function ugcLabel(stage: UgcStage | null): string {
+    if (!stage) return "Preparing…";
+    if (stage.kind === "images") return `Generating scene images ${stage.done}/${stage.total}`;
+    if (stage.kind === "audio") return `Generating voiceovers ${stage.done}/${stage.total}`;
+    if (stage.kind === "render") return `Recording ${Math.round(stage.progress * 100)}%`;
+    return "Uploading…";
+  }
+
 
   if (totalScenes === 0) return null;
   const scene = scenes[idx];
@@ -371,11 +408,19 @@ function VideoPreview({
           )}
           <button
             onClick={handleRender}
-            disabled={rendering}
-            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
+            disabled={rendering || ugcRendering}
+            className="rounded-lg glass hover:bg-white/5 px-4 py-2 text-sm font-medium disabled:opacity-60 flex items-center gap-2">
             {rendering
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Rendering {Math.round(renderProgress * 100)}%</>
-              : <><VideoIcon className="w-4 h-4" /> {videoUrl ? "Re-render video" : "Render video"}</>}
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Storyboard {Math.round(renderProgress * 100)}%</>
+              : <><VideoIcon className="w-4 h-4" /> Storyboard only</>}
+          </button>
+          <button
+            onClick={handleUgcRender}
+            disabled={rendering || ugcRendering}
+            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
+            {ugcRendering
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> {ugcLabel(ugcStage)}</>
+              : <><Sparkles className="w-4 h-4" /> {videoUrl ? "Re-generate UGC video" : "Generate UGC video"}</>}
           </button>
         </div>
       </div>
