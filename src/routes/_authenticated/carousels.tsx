@@ -6,7 +6,8 @@ import JSZip from "jszip";
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
-import { listOutputs, saveOutput, deleteOutput } from "@/lib/local-store";
+import { listOutputs, saveOutput, deleteOutput, type CarouselSlide } from "@/lib/local-store";
+import { LocalOnlyBanner } from "@/components/local-only-banner";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
   Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2,
@@ -28,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/carousels")({
 type Prompt = { n: number; prompt: string; style: string };
 type SlideDiag = { at: string; ok: boolean; durationMs: number; httpStatus?: number; error?: string };
 type SlideDiagMap = Record<string, SlideDiag>;
-type LayoutSettings = { ratio: "1:1" | "4:5" | "9:16"; slideCount: number; spacing: number };
+type LayoutSettings = { ratio: "1:1" | "4:5" | "9:16" | "16:9"; slideCount: number; spacing: number };
 
 type CarouselRow = {
   id: string;
@@ -38,14 +39,18 @@ type CarouselRow = {
   tone: string | null;
   image_prompts: Prompt[];
   carousel_images: (string | null)[] | null;
+  carousel_slides: CarouselSlide[] | null;
   slide_diagnostics: SlideDiagMap;
+  saved_ratio: LayoutSettings["ratio"] | null;
+  saved_slide_count: number | null;
 };
 
-const RATIOS: LayoutSettings["ratio"][] = ["1:1", "4:5", "9:16"];
+const RATIOS: LayoutSettings["ratio"][] = ["1:1", "4:5", "9:16", "16:9"];
 const ASPECT_CLASS: Record<LayoutSettings["ratio"], string> = {
   "1:1": "aspect-square",
   "4:5": "aspect-[4/5]",
   "9:16": "aspect-[9/16]",
+  "16:9": "aspect-video",
 };
 
 function CarouselsPage() {

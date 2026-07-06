@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { listOutputs, deleteOutput } from "@/lib/local-store";
-import { Plus, Film, Video as VideoIcon, Trash2, Loader2 } from "lucide-react";
+import { LocalOnlyBanner } from "@/components/local-only-banner";
+import { Plus, Film, Video as VideoIcon, Trash2, Loader2, Image as ImageIcon, Download, X, Wand2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/videos")({
   head: () => ({
@@ -65,6 +66,7 @@ function VideosPage() {
 
   return (
     <div className="space-y-6">
+      <LocalOnlyBanner />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold">Your <span className="gradient-text">Videos</span></h1>
@@ -74,6 +76,9 @@ function VideosPage() {
           <Plus className="w-4 h-4" /> New video
         </Link>
       </div>
+
+      <ImageToVideoCard />
+
 
       {isLoading ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -138,6 +143,144 @@ function VideosPage() {
           <Link to="/create" className="mt-5 inline-flex rounded-lg gradient-primary px-5 py-2.5 text-sm text-white font-medium">
             <Plus className="w-4 h-4 mr-2" /> New video
           </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Image → Video ----------
+
+function ImageToVideoCard() {
+  const [image, setImage] = useState<string | null>(null);
+  const [duration, setDuration] = useState(6);
+  const [ratio, setRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [rendering, setRendering] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function pickFile(f: File) {
+    if (!f.type.startsWith("image/")) return toast.error("Please pick an image file");
+    const reader = new FileReader();
+    reader.onload = () => setImage(reader.result as string);
+    reader.readAsDataURL(f);
+    setVideoUrl(null);
+  }
+
+  async function render() {
+    if (!image) return toast.error("Pick an image first");
+    if (!("MediaRecorder" in window)) return toast.error("MediaRecorder not supported in this browser");
+    setRendering(true); setProgress(0); setVideoUrl(null);
+    try {
+      const dims = ratio === "9:16" ? { w: 720, h: 1280 } : ratio === "1:1" ? { w: 1080, h: 1080 } : { w: 1280, h: 720 };
+      const canvas = document.createElement("canvas");
+      canvas.width = dims.w; canvas.height = dims.h;
+      const ctx = canvas.getContext("2d")!;
+      const img = new Image();
+      img.src = image;
+      await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error("Image load failed")); });
+
+      const stream = canvas.captureStream(30);
+      const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      const done = new Promise<Blob>((res) => { rec.onstop = () => res(new Blob(chunks, { type: rec.mimeType || "video/webm" })); });
+
+      const start = performance.now();
+      const durMs = duration * 1000;
+      rec.start();
+
+      function drawFrame(t: number) {
+        const p = Math.min(1, (t - start) / durMs);
+        setProgress(p);
+        // Ken Burns: pan + zoom
+        const zoom = 1 + p * 0.25;
+        const panX = (p - 0.5) * canvas.width * 0.1;
+        const iw = img.width, ih = img.height;
+        const scale = Math.max(canvas.width / iw, canvas.height / ih) * zoom;
+        const dw = iw * scale, dh = ih * scale;
+        const dx = (canvas.width - dw) / 2 + panX;
+        const dy = (canvas.height - dh) / 2;
+        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, dx, dy, dw, dh);
+        if (p < 1) requestAnimationFrame(drawFrame);
+        else rec.stop();
+      }
+      requestAnimationFrame(drawFrame);
+
+      const blob = await done;
+      const url = URL.createObjectURL(blob);
+      setVideoUrl(url);
+      toast.success("Video rendered");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Render failed");
+    } finally {
+      setRendering(false); setProgress(1);
+    }
+  }
+
+  return (
+    <div className="glass rounded-2xl p-5">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="font-semibold flex items-center gap-2"><ImageIcon className="w-4 h-4 text-[color:var(--neon-pink)]" /> Image → Video</h2>
+          <p className="text-xs text-muted-foreground mt-1">Turn any still into a Ken Burns pan-and-zoom clip. Rendered in your browser.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <input ref={fileRef} type="file" accept="image/*" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) pickFile(f); }} />
+          <button onClick={() => fileRef.current?.click()} className="rounded-lg glass border border-border px-3 py-2 text-sm flex items-center gap-2">
+            <ImageIcon className="w-4 h-4" /> {image ? "Change image" : "Pick image"}
+          </button>
+          <button onClick={render} disabled={!image || rendering}
+            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2 disabled:opacity-50">
+            {rendering ? <><Loader2 className="w-4 h-4 animate-spin" /> {Math.round(progress * 100)}%</> : <><Wand2 className="w-4 h-4" /> Render clip</>}
+          </button>
+        </div>
+      </div>
+      <div className="mt-4 grid md:grid-cols-3 gap-4">
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Aspect ratio</div>
+          <div className="flex gap-1">
+            {(["9:16", "1:1", "16:9"] as const).map((r) => (
+              <button key={r} onClick={() => setRatio(r)}
+                className={`px-3 py-1.5 rounded-lg text-xs border ${ratio === r ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>{r}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Duration ({duration}s)</div>
+          <input type="range" min={3} max={15} value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} className="w-full" />
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Output: WebM · in-browser only. Download to save.
+        </div>
+      </div>
+      {(image || videoUrl) && (
+        <div className="mt-4 grid md:grid-cols-2 gap-4">
+          {image && (
+            <div className="relative">
+              <div className="text-xs text-muted-foreground mb-1">Source</div>
+              <img src={image} alt="source" className="rounded-lg w-full max-h-72 object-contain bg-black" />
+              <button onClick={() => { setImage(null); setVideoUrl(null); }}
+                className="absolute top-6 right-2 rounded-md bg-black/70 hover:bg-rose-500/80 text-white p-1">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+          {videoUrl && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-1 flex items-center justify-between">
+                <span>Preview</span>
+                <a href={videoUrl} download="image-to-video.webm" className="text-[color:var(--neon-purple)] hover:underline flex items-center gap-1">
+                  <Download className="w-3 h-3" /> Download
+                </a>
+              </div>
+              <video src={videoUrl} controls className="rounded-lg w-full max-h-72 bg-black" />
+            </div>
+          )}
         </div>
       )}
     </div>
