@@ -128,14 +128,13 @@ function UserDashboard() {
   const { data: stats } = useQuery({
     queryKey: ["stats"],
     queryFn: async () => {
-      const { listAssets, listOutputs } = await import("@/lib/local-store");
-      const [{ count: total }, { count: videos }, assets, outputs] = await Promise.all([
+      const { listOutputs } = await import("@/lib/local-store");
+      const [{ count: total }, { count: videos }, outputs] = await Promise.all([
         supabase.from("projects").select("*", { count: "exact", head: true }),
         supabase.from("projects").select("*", { count: "exact", head: true }).in("content_type", ["long_video", "short_reel"]),
-        listAssets("image"),
         listOutputs(),
       ]);
-      const localImages = assets.length + outputs.reduce((n, o) => n + (o.carousel_images?.filter(Boolean).length ?? 0), 0);
+      const localImages = outputs.reduce((n, o) => n + (o.carousel_images?.filter(Boolean).length ?? 0), 0);
       return { total: total ?? 0, videos: videos ?? 0, images: localImages };
     },
   });
