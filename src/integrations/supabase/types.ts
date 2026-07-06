@@ -117,6 +117,54 @@ export type Database = {
           },
         ]
       }
+      image_generations: {
+        Row: {
+          created_at: string
+          duration_ms: number
+          errors: Json
+          failure_count: number
+          full_prompt: string | null
+          id: string
+          prompt: string
+          ratio: string | null
+          request: Json
+          response: Json
+          style: string | null
+          success_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number
+          errors?: Json
+          failure_count?: number
+          full_prompt?: string | null
+          id?: string
+          prompt: string
+          ratio?: string | null
+          request?: Json
+          response?: Json
+          style?: string | null
+          success_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number
+          errors?: Json
+          failure_count?: number
+          full_prompt?: string | null
+          id?: string
+          prompt?: string
+          ratio?: string | null
+          request?: Json
+          response?: Json
+          style?: string | null
+          success_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           brand_name: string | null
