@@ -32,7 +32,17 @@ export const Route = createFileRoute("/_authenticated/carousels")({
 });
 
 type Prompt = { n: number; prompt: string; style: string };
-type SlideDiag = { at: string; ok: boolean; durationMs: number; httpStatus?: number; error?: string };
+type SlideDiag = {
+  at: string;
+  ok: boolean;
+  durationMs: number;
+  httpStatus?: number;
+  error?: string;
+  attempts?: number;
+  prompt?: string;
+  style?: string;
+  ratio?: string;
+};
 type SlideDiagMap = Record<string, SlideDiag>;
 type LayoutSettings = { ratio: "1:1" | "4:5" | "9:16" | "16:9"; slideCount: number; spacing: number };
 
