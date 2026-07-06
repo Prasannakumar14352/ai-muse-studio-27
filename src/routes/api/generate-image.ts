@@ -37,23 +37,31 @@ export const Route = createFileRoute("/api/generate-image")({
         const stylePrefix = style ? `${style} style. ` : "";
         const fullPrompt = `${stylePrefix}${prompt}`;
 
-        const upstream = await fetch(
-          "https://ai.gateway.lovable.dev/v1/images/generations",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${key}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "openai/gpt-image-2",
-              prompt: fullPrompt,
-              size,
-              quality: "low",
-              n: 1,
-            }),
-          }
-        );
+        let upstream: Response;
+        try {
+          upstream = await fetch(
+            "https://ai.gateway.lovable.dev/v1/images/generations",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${key}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "openai/gpt-image-2",
+                prompt: fullPrompt,
+                size,
+                quality: "low",
+                n: 1,
+              }),
+            }
+          );
+        } catch (error) {
+          return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Image service unreachable" }), {
+            status: 502,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
 
         if (!upstream.ok) {
           const text = await upstream.text().catch(() => "");
@@ -76,9 +84,24 @@ export const Route = createFileRoute("/api/generate-image")({
           });
         }
 
+        let image = b64 ? `data:image/png;base64,${b64}` : url!;
+        if (!b64 && url) {
+          try {
+            const imageResponse = await fetch(url);
+            if (imageResponse.ok) {
+              const contentType = imageResponse.headers.get("content-type") || "image/png";
+              const bytes = await imageResponse.arrayBuffer();
+              const encoded = Buffer.from(bytes).toString("base64");
+              image = `data:${contentType};base64,${encoded}`;
+            }
+          } catch {
+            // Fall back to the provider URL. The client has a second fallback path.
+          }
+        }
+
         return new Response(
           JSON.stringify({
-            image: b64 ? `data:image/png;base64,${b64}` : url,
+            image,
             debug: {
               model: "openai/gpt-image-2",
               size,

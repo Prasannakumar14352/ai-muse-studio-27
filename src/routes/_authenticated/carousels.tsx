@@ -59,6 +59,13 @@ const ASPECT_CLASS: Record<LayoutSettings["ratio"], string> = {
   "16:9": "aspect-video",
 };
 
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+function shouldRetrySlide(diag: SlideDiag) {
+  if (!diag.ok && !diag.httpStatus) return true;
+  return Boolean(diag.httpStatus && [408, 409, 425, 429, 500, 502, 503, 504].includes(diag.httpStatus));
+}
+
 function CarouselsPage() {
   const qc = useQueryClient();
   const [generatingId, setGeneratingId] = useState<string | null>(null);
@@ -124,30 +131,43 @@ function CarouselsPage() {
     projectId: string, idx: number,
     prompt: Prompt, styleLabel: string, ratio: string,
   ): Promise<{ image: string | null; diag: SlideDiag }> {
-    const start = Date.now();
-    try {
-      const res = await fetch("/api/generate-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.prompt, style: styleLabel, ratio }),
-      });
-      const j = (await res.json().catch(() => ({}))) as { image?: string; error?: string };
-      if (!res.ok || !j.image) {
-        return {
-          image: null,
-          diag: { at: new Date().toISOString(), ok: false, durationMs: Date.now() - start, httpStatus: res.status, error: j.error ?? `HTTP ${res.status}` },
+    const maxAttempts = 3;
+    let last: SlideDiag | null = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const start = Date.now();
+      try {
+        const res = await fetch("/api/generate-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: prompt.prompt, style: styleLabel, ratio }),
+        });
+        const j = (await res.json().catch(() => ({}))) as { image?: string; error?: string };
+        if (!res.ok || !j.image) {
+          last = {
+            at: new Date().toISOString(),
+            ok: false,
+            durationMs: Date.now() - start,
+            httpStatus: res.status,
+            error: `${j.error ?? `HTTP ${res.status}`}${attempt < maxAttempts ? ` (attempt ${attempt}/${maxAttempts})` : ""}`,
+          };
+        } else {
+          // Persist bytes into IndexedDB and return a small reference key that
+          // fits in localStorage alongside other output metadata.
+          const key = await putDataURL(`carousel:${projectId}:${idx}`, j.image);
+          return { image: key, diag: { at: new Date().toISOString(), ok: true, durationMs: Date.now() - start, httpStatus: res.status } };
+        }
+      } catch (e) {
+        last = {
+          at: new Date().toISOString(),
+          ok: false,
+          durationMs: Date.now() - start,
+          error: `${e instanceof Error ? e.message : "Network error"}${attempt < maxAttempts ? ` (attempt ${attempt}/${maxAttempts})` : ""}`,
         };
       }
-      // Persist bytes into IndexedDB and return a small reference key that
-      // fits in localStorage alongside other output metadata.
-      const key = await putDataURL(`carousel:${projectId}:${idx}`, j.image);
-      return { image: key, diag: { at: new Date().toISOString(), ok: true, durationMs: Date.now() - start, httpStatus: res.status } };
-    } catch (e) {
-      return {
-        image: null,
-        diag: { at: new Date().toISOString(), ok: false, durationMs: Date.now() - start, error: e instanceof Error ? e.message : "Network error" },
-      };
+      if (!last || !shouldRetrySlide(last) || attempt === maxAttempts) break;
+      await sleep(900 * attempt);
     }
+    return { image: null, diag: last ?? { at: new Date().toISOString(), ok: false, durationMs: 0, error: "Image generation failed" } };
   }
 
   async function persistSlides(row: CarouselRow, images: (string | null)[], slideDiag: SlideDiagMap) {
@@ -169,15 +189,15 @@ function CarouselsPage() {
       const results: (string | null)[] = new Array(slice.length).fill(null);
       const diag: SlideDiagMap = {};
       let done = 0;
-      await Promise.all(
-        slice.map(async (p, i) => {
-          const r = await generateOneSlide(row.id, i, p, styleLabel, cfg.ratio);
-          results[i] = r.image;
-          diag[String(i)] = r.diag;
-          done += 1;
-          setProgress({ done, total: slice.length });
-        }),
-      );
+      for (let i = 0; i < slice.length; i++) {
+        const r = await generateOneSlide(row.id, i, slice[i], styleLabel, cfg.ratio);
+        results[i] = r.image;
+        diag[String(i)] = r.diag;
+        done += 1;
+        setProgress({ done, total: slice.length });
+        await persistSlides(row, results, diag);
+        qc.invalidateQueries({ queryKey: ["carousels"] });
+      }
       await persistSlides(row, results, diag);
       const okCount = results.filter(Boolean).length;
       toast[okCount === slice.length ? "success" : "warning"](`${okCount}/${slice.length} slides generated`);
@@ -210,16 +230,16 @@ function CarouselsPage() {
       const nextImages = [...(slides.length ? slides : new Array(row.image_prompts.length).fill(null))];
       const nextDiag: SlideDiagMap = { ...row.slide_diagnostics };
       let done = 0;
-      await Promise.all(
-        failedIdxs.map(async (i) => {
-          const prompt = row.image_prompts[i];
-          const r = await generateOneSlide(row.id, i, prompt, styleLabel, cfg.ratio);
-          nextImages[i] = r.image;
-          nextDiag[String(i)] = r.diag;
-          done += 1;
-          setProgress({ done, total: failedIdxs.length });
-        }),
-      );
+      for (const i of failedIdxs) {
+        const prompt = row.image_prompts[i];
+        const r = await generateOneSlide(row.id, i, prompt, styleLabel, cfg.ratio);
+        nextImages[i] = r.image ?? nextImages[i] ?? null;
+        nextDiag[String(i)] = r.diag;
+        done += 1;
+        setProgress({ done, total: failedIdxs.length });
+        await persistSlides(row, nextImages, nextDiag);
+        qc.invalidateQueries({ queryKey: ["carousels"] });
+      }
       await persistSlides(row, nextImages, nextDiag);
       const okCount = failedIdxs.filter((i) => nextImages[i]).length;
       toast[okCount === failedIdxs.length ? "success" : "warning"](`${okCount}/${failedIdxs.length} slides regenerated`);
@@ -326,7 +346,7 @@ function CarouselsPage() {
     try {
       const r = await generateOneSlide(row.id, idx, prompt, styleLabel, cfg.ratio);
       const nextImages = [...(row.carousel_images ?? new Array(row.image_prompts.length).fill(null))];
-      nextImages[idx] = r.image;
+      nextImages[idx] = r.image ?? nextImages[idx] ?? null;
       const nextDiag: SlideDiagMap = { ...row.slide_diagnostics, [String(idx)]: r.diag };
       await persistSlides(row, nextImages, nextDiag);
       if (r.image) toast.success(`Slide ${idx + 1} re-generated`);
