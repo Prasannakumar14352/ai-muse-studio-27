@@ -199,6 +199,16 @@ function CreatePage() {
             </div>
           </Section>
 
+          {form.content_type === "carousel" && (
+            <div className="glass rounded-2xl p-4 border border-[color:var(--neon-purple)]/40 bg-[color:var(--neon-purple)]/5 flex items-center justify-between gap-4 flex-wrap">
+              <div className="text-sm">
+                <div className="font-semibold">Carousels now have a dedicated builder</div>
+                <div className="text-muted-foreground text-xs mt-0.5">Cover → point slides → CTA, each with AI text + matching visual.</div>
+              </div>
+              <a href="/create/carousel" className="rounded-lg gradient-primary text-white px-4 py-2 text-xs font-medium">Open carousel builder →</a>
+            </div>
+          )}
+
           <Section title="2. Pick a niche (optional — for topic ideas)">
             <div className="flex flex-wrap gap-2">
               {NICHES.map((n) => (
