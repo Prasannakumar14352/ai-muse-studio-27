@@ -223,15 +223,13 @@ function CarouselsPage() {
     if (!confirm(`Delete "${row.title}" and all its slides? This cannot be undone.`)) return;
     setDeletingId(row.id);
     try {
-      // Cascade: delete outputs first (FK), then project.
-      if (row.output_id) {
-        await supabase.from("generated_outputs").delete().eq("id", row.output_id);
-      }
+      await deleteOutput(row.id);
       const { error } = await supabase.from("projects").delete().eq("id", row.id);
       if (error) throw error;
       toast.success("Carousel deleted");
       qc.invalidateQueries({ queryKey: ["carousels"] });
       qc.invalidateQueries({ queryKey: ["projects"] });
+
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Delete failed");
     } finally {
