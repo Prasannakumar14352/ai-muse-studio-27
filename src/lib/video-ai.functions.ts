@@ -30,6 +30,8 @@ const Input = z.object({
   styleLabel: z.string(),
   contentType: z.string(),       // "short_reel" | "long_video" | ...
   audience: z.string().optional().default(""),
+  /** Target length in seconds — used to size long_video output (30-600). */
+  targetLengthSec: z.number().int().min(15).max(600).optional(),
 });
 
 export const generateAiVideoScript = createServerFn({ method: "POST" })
