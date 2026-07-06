@@ -287,7 +287,7 @@ function CreatePage() {
                     className="w-full max-w-md"
                   />
                   <div className="text-[11px] text-muted-foreground mt-1">
-                    We'll auto-scale the number of scenes to fit the length you pick (30s – 10 min).
+                    We'll auto-scale the number of scenes to fit the length you pick (30s – 30 min).
                   </div>
                 </div>
               </div>
