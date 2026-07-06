@@ -280,7 +280,7 @@ function CreatePage() {
                   <input
                     type="range"
                     min={30}
-                    max={600}
+                    max={1800}
                     step={15}
                     value={form.long_video_length_sec}
                     onChange={(e) => update("long_video_length_sec", parseInt(e.target.value))}
