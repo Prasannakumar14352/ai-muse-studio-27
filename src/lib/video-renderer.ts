@@ -14,6 +14,15 @@ export type RenderOptions = {
   contentType?: string | null; // "long_video" | "short_reel" | ...
   fps?: number;
   onProgress?: (p: number) => void; // 0..1
+  // Optional per-scene AI-generated background images (data URLs or same-origin URLs).
+  // When provided, each scene uses its own image instead of the style stock image.
+  sceneImages?: Array<string | null>;
+  // Optional per-scene voiceover audio buffers (already decoded).
+  // Each buffer is scheduled at that scene's start time and mixed into the recorder audio track.
+  sceneAudio?: Array<AudioBuffer | null>;
+  // When true, scene durations are stretched to at least the length of the
+  // corresponding scene audio so no voiceover is cut off mid-sentence.
+  fitToAudio?: boolean;
 };
 
 export type RenderResult = {
