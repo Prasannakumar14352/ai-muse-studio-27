@@ -50,22 +50,30 @@ function PricingPage() {
               {estimate && (
                 <div className="mt-4 rounded-lg border border-border/60 bg-black/20 p-3 text-xs">
                   <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Approximate generations</div>
-                  <div className="grid grid-cols-2 gap-y-2 gap-x-3">
-                    <div className="flex items-center gap-1.5">
-                      <ImageIcon className="w-3.5 h-3.5 text-[color:var(--neon-pink)]" />
-                      <span><strong>{estimate.images}</strong> images</span>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <ImageIcon className="w-3.5 h-3.5 text-[color:var(--neon-pink)]" /> AI images
+                      </span>
+                      <strong className="text-foreground">{estimate.images}</strong>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />
-                      <span><strong>{estimate.carousels}</strong> carousels</span>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <Layers className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" /> Carousels
+                      </span>
+                      <strong className="text-foreground">{estimate.carousels}</strong>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Film className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />
-                      <span><strong>{estimate.shortReels}</strong> short reels</span>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <Film className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" /> Short reels
+                      </span>
+                      <strong className="text-foreground">{estimate.shortReels}</strong>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Video className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />
-                      <span><strong>{estimate.longVideos}</strong> 5-min videos</span>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <Video className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" /> 5-min long videos
+                      </span>
+                      <strong className="text-foreground">{estimate.longVideos}</strong>
                     </div>
                   </div>
                 </div>
