@@ -19,6 +19,7 @@ const BASE_NAV = [
   { to: "/images", label: "Images", icon: ImageIcon },
   { to: "/captions", label: "Captions", icon: Type },
   { to: "/pricing", label: "Pricing", icon: CreditCard },
+  { to: "/billing", label: "Billing", icon: Wallet },
   { to: "/invoices", label: "Invoices", icon: Receipt },
   { to: "/contact", label: "Contact Us", icon: Mail },
   { to: "/settings", label: "Settings", icon: Settings },
