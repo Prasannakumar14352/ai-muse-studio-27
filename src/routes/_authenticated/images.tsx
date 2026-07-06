@@ -1,13 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
-import { Loader2, Wand2, Download, Save, Image as ImageIcon, RefreshCw, Bug, Copy } from "lucide-react";
+import { Loader2, Wand2, Download, Save, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 
 const RATIOS = ["1:1", "9:16", "16:9", "4:5"];
+const LS_STATE = "creatorvault:images:v2";
+
+type ResultItem = { id: string; prompt: string; style: string; ratio: string; image: string };
 
 type DebugInfo = {
   requestedAt: string;
@@ -32,10 +35,39 @@ function ImagesPage() {
   const [style, setStyle] = useState("cinematic");
   const [ratio, setRatio] = useState("1:1");
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<Array<{ id: string; prompt: string; style: string; ratio: string; image: string }>>([]);
+  const [results, setResults] = useState<ResultItem[]>([]);
   const [lastRun, setLastRun] = useState<{ prompt: string; style: string; ratio: string } | null>(null);
   const [debug, setDebug] = useState<DebugInfo | null>(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Restore last session from localStorage.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LS_STATE);
+      if (raw) {
+        const s = JSON.parse(raw) as {
+          prompt?: string; style?: string; ratio?: string;
+          results?: ResultItem[]; lastRun?: typeof lastRun; debug?: DebugInfo | null;
+        };
+        if (s.prompt) setPrompt(s.prompt);
+        if (s.style) setStyle(s.style);
+        if (s.ratio) setRatio(s.ratio);
+        if (s.results) setResults(s.results);
+        if (s.lastRun) setLastRun(s.lastRun);
+        if (s.debug) setDebug(s.debug);
+      }
+    } catch { /* ignore */ }
+    setHydrated(true);
+  }, []);
+
+  // Persist on change (skip first render before hydration).
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(LS_STATE, JSON.stringify({ prompt, style, ratio, results, lastRun, debug }));
+    } catch { /* quota exceeded — ignore */ }
+  }, [prompt, style, ratio, results, lastRun, debug, hydrated]);
 
   async function runGeneration(p: string, s: string, r: string) {
     setLoading(true);
@@ -52,9 +84,7 @@ function ImagesPage() {
             body: JSON.stringify({ prompt: p, style: styleLabel, ratio: r }),
           }).then(async (res) => {
             const json = (await res.json().catch(() => ({}))) as {
-              image?: string;
-              error?: string;
-              debug?: DebugInfo["response"];
+              image?: string; error?: string; debug?: DebugInfo["response"];
             };
             if (!res.ok || !json.image) throw new Error(json.error || `HTTP ${res.status}`);
             if (json.debug) lastMeta = json.debug;
@@ -73,14 +103,14 @@ function ImagesPage() {
         setResults((prev) => [
           ...ok.map((res) => ({ id: crypto.randomUUID(), prompt: p, style: s, ratio: r, image: res.image })),
           ...prev,
-        ]);
+        ].slice(0, 40)); // cap to avoid localStorage bloat
         setLastRun({ prompt: p, style: s, ratio: r });
         toast.success(`Generated ${ok.length} of 4 concepts`);
       } else {
         toast.error(errors[0] || "Generation failed");
       }
 
-      setDebug({
+      const info: DebugInfo = {
         requestedAt: new Date(startedAt).toISOString(),
         durationMs: Date.now() - startedAt,
         request: { prompt: p, style: styleLabel, ratio: r, endpoint: "/api/generate-image" },
@@ -88,7 +118,26 @@ function ImagesPage() {
         errors,
         successCount: ok.length,
         failureCount: errors.length,
-      });
+      };
+      setDebug(info);
+
+      // Log to Supabase so the debug panel can load history later.
+      const { data: u } = await supabase.auth.getUser();
+      if (u.user) {
+        await supabase.from("image_generations").insert({
+          user_id: u.user.id,
+          prompt: p,
+          style: s,
+          ratio: r,
+          full_prompt: lastMeta?.fullPrompt ?? `${styleLabel} style. ${p}`,
+          request: info.request,
+          response: info.response ?? {},
+          errors: info.errors,
+          success_count: info.successCount,
+          failure_count: info.failureCount,
+          duration_ms: info.durationMs,
+        } as never);
+      }
     } finally {
       setLoading(false);
     }
@@ -104,6 +153,23 @@ function ImagesPage() {
     await runGeneration(lastRun.prompt, lastRun.style, lastRun.ratio);
   }
 
+  async function loadHistory() {
+    const { data, error } = await supabase
+      .from("image_generations")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (error) return toast.error(error.message);
+    if (!data || data.length === 0) return toast.info("No saved debug logs yet");
+    downloadJson(`creatorvault-image-debug-history-${Date.now()}.json`, data);
+    toast.success(`Downloaded ${data.length} logs`);
+  }
+
+  function downloadCurrentDebug() {
+    if (!debug) return toast.error("No debug data yet");
+    downloadJson(`creatorvault-image-debug-${Date.now()}.json`, debug);
+  }
+
   async function save(item: { prompt: string; style: string; ratio: string }) {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
@@ -112,6 +178,12 @@ function ImagesPage() {
     });
     if (error) toast.error(error.message);
     else toast.success("Saved to library");
+  }
+
+  function clearSession() {
+    setResults([]); setLastRun(null); setDebug(null);
+    localStorage.removeItem(LS_STATE);
+    toast.success("Cleared saved session");
   }
 
   const aspectClass: Record<string, string> = {
@@ -123,9 +195,16 @@ function ImagesPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <div>
-        <h1 className="text-3xl md:text-4xl font-bold">AI <span className="gradient-text">Image</span> Generator</h1>
-        <p className="text-muted-foreground mt-1">Describe the shot. Pick a style. Generate.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold">AI <span className="gradient-text">Image</span> Generator</h1>
+          <p className="text-muted-foreground mt-1">Describe the shot. Pick a style. Generate.</p>
+        </div>
+        {(results.length > 0 || lastRun) && (
+          <button onClick={clearSession} className="text-xs text-muted-foreground hover:text-rose-400 flex items-center gap-1">
+            <Trash2 className="w-3 h-3" /> Clear saved session
+          </button>
+        )}
       </div>
 
       <div className="glass rounded-2xl p-6 space-y-4">
@@ -165,7 +244,6 @@ function ImagesPage() {
           </div>
         </div>
 
-        {/* Exact prompt preview — what actually gets sent to /api/generate-image */}
         {prompt && (
           <div className="rounded-lg border border-border bg-black/30 p-3">
             <div className="flex items-center justify-between mb-1">
@@ -173,10 +251,7 @@ function ImagesPage() {
                 Exact prompt sent to /api/generate-image
               </div>
               <button
-                onClick={() => {
-                  navigator.clipboard.writeText(previewFullPrompt);
-                  toast.success("Prompt copied");
-                }}
+                onClick={() => { navigator.clipboard.writeText(previewFullPrompt); toast.success("Prompt copied"); }}
                 className="text-xs text-muted-foreground hover:text-white flex items-center gap-1"
               >
                 <Copy className="w-3 h-3" /> Copy
@@ -191,10 +266,7 @@ function ImagesPage() {
 
       {/* Debug panel */}
       <div className="glass rounded-2xl">
-        <button
-          onClick={() => setShowDebug((v) => !v)}
-          className="w-full flex items-center justify-between px-6 py-3 text-sm"
-        >
+        <button onClick={() => setShowDebug((v) => !v)} className="w-full flex items-center justify-between px-6 py-3 text-sm">
           <span className="flex items-center gap-2">
             <Bug className="w-4 h-4" /> Debug panel
             {debug && (
@@ -207,6 +279,16 @@ function ImagesPage() {
         </button>
         {showDebug && (
           <div className="px-6 pb-6 space-y-3 text-xs">
+            <div className="flex flex-wrap gap-2">
+              <button onClick={downloadCurrentDebug} disabled={!debug}
+                className="rounded-lg gradient-primary text-white px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-40">
+                <FileDown className="w-3 h-3" /> Download debug JSON
+              </button>
+              <button onClick={loadHistory}
+                className="rounded-lg glass border border-border px-3 py-1.5 flex items-center gap-1.5">
+                <Download className="w-3 h-3" /> Download saved history (last 20)
+              </button>
+            </div>
             {!debug ? (
               <div className="text-muted-foreground">No generations yet.</div>
             ) : (
@@ -231,7 +313,7 @@ function ImagesPage() {
                   )}
                 </Section>
                 <div className="text-muted-foreground">
-                  Started {debug.requestedAt} · Took {debug.durationMs}ms
+                  Started {debug.requestedAt} · Took {debug.durationMs}ms · Logged to your account
                 </div>
               </>
             )}
@@ -276,4 +358,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       {children}
     </div>
   );
+}
+
+function downloadJson(name: string, obj: unknown) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
 }
