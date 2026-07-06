@@ -98,14 +98,6 @@ function PricingPage() {
   );
 }
 
-function CostRow({ icon, label, cost }: { icon: React.ReactNode; label: string; cost: number }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="flex items-center gap-1.5 text-muted-foreground">{icon} {label}</span>
-      <strong className="text-foreground">{cost} {cost === 1 ? "credit" : "credits"}</strong>
-    </div>
-  );
-}
 
 function EstRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
