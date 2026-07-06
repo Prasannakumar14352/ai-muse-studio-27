@@ -117,21 +117,16 @@ function CarouselsPage() {
   }
 
   async function persistSlides(row: CarouselRow, images: (string | null)[], slideDiag: SlideDiagMap) {
-    if (!row.output_id) return;
-    const { error } = await supabase
-      .from("generated_outputs")
-      .update({
-        carousel_images: images as never,
-        render_diagnostics: { slide_diagnostics: slideDiag } as never,
-      } as never)
-      .eq("id", row.output_id);
-    if (error) throw error;
+    await saveOutput(row.id, {
+      carousel_images: images,
+      render_diagnostics: { slide_diagnostics: slideDiag },
+    });
   }
 
   async function generateSlides(row: CarouselRow) {
-    if (!row.output_id) return toast.error("This project has no saved output yet.");
     if (row.image_prompts.length === 0) return toast.error("No image prompts on this carousel.");
     const styleLabel = STYLES.find((s) => s.id === (row.style ?? ""))?.label ?? row.style ?? "cinematic";
+
     const cfg = getLayout(row);
     const slice = row.image_prompts.slice(0, Math.max(1, Math.min(cfg.slideCount, row.image_prompts.length)));
     setGeneratingId(row.id);
