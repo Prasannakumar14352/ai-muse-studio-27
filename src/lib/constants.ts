@@ -125,6 +125,10 @@ export const MUSIC = [
 
 export const GENERATION_COST = 1; // credits per project generation
 
+export const BRAND = "Prodxstore";
+export const SUPPORT_EMAIL = "productsupport@prodxstore.com";
+
+
 export type CreditPack = { id: string; label: string; credits: number; priceUSD: number; bonus?: string };
 
 export const CREDIT_PACKS: CreditPack[] = [
