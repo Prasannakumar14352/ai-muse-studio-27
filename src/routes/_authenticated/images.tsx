@@ -131,6 +131,11 @@ function ImagesPage() {
           ...prev,
         ].slice(0, 40)); // cap to avoid localStorage bloat
         setLastRun({ prompt: p, style: s, ratio: r });
+        // Deduct 1 credit per successful image (admin bypass handled inside).
+        for (let i = 0; i < ok.length; i++) {
+          await deductUsage({ amount: 1, description: `AI image generated (${styleLabel})` }).catch(() => {});
+        }
+        qc.invalidateQueries({ queryKey: ["access"] });
         toast.success(`Generated ${ok.length} of 4 concepts`);
       } else {
         toast.error(errors[0] || "Generation failed");
