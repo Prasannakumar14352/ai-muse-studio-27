@@ -28,23 +28,29 @@ function parseDuration(d: string): number {
   return isNaN(n) ? 3 : Math.max(1.5, n);
 }
 
-async function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
+async function loadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    // Same-origin bundled assets don't need CORS; setting it can cause
+    // legitimate loads to be treated as errors in some setups.
     img.onload = () => resolve(img);
-    img.onerror = reject;
+    img.onerror = () => resolve(null);
     img.src = src;
   });
 }
 
 function pickRecorderMime(): { mime: string; ext: "mp4" | "webm" } {
+  // Prefer WebM — MediaRecorder's MP4 output in Chromium is fragmented and
+  // frequently refuses to play back in a plain <video> tag or QuickTime.
+  // WebM/VP9 is universally playable in every modern browser we render into.
   const candidates: Array<{ mime: string; ext: "mp4" | "webm" }> = [
+    { mime: "video/webm;codecs=vp9,opus", ext: "webm" },
+    { mime: "video/webm;codecs=vp9", ext: "webm" },
+    { mime: "video/webm;codecs=vp8,opus", ext: "webm" },
+    { mime: "video/webm;codecs=vp8", ext: "webm" },
+    { mime: "video/webm", ext: "webm" },
     { mime: "video/mp4;codecs=avc1.42E01E", ext: "mp4" },
     { mime: "video/mp4", ext: "mp4" },
-    { mime: "video/webm;codecs=vp9,opus", ext: "webm" },
-    { mime: "video/webm;codecs=vp8,opus", ext: "webm" },
-    { mime: "video/webm", ext: "webm" },
   ];
   for (const c of candidates) {
     if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(c.mime)) return c;
@@ -54,7 +60,7 @@ function pickRecorderMime(): { mime: string; ext: "mp4" | "webm" } {
 
 function drawScene(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  img: HTMLImageElement | null,
   scene: RenderScene,
   opts: {
     title: string; platform: string; sceneIdx: number; totalScenes: number;
@@ -65,14 +71,24 @@ function drawScene(
 
   // Ken Burns zoom
   const zoom = 1.05 + opts.progress * 0.1;
-  const iw = img.width;
-  const ih = img.height;
-  const ratio = Math.max(W / iw, H / ih) * zoom;
-  const dw = iw * ratio;
-  const dh = ih * ratio;
-  ctx.fillStyle = "#000";
+  ctx.fillStyle = "#0b0b16";
   ctx.fillRect(0, 0, W, H);
-  ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  if (img) {
+    const iw = img.width;
+    const ih = img.height;
+    const ratio = Math.max(W / iw, H / ih) * zoom;
+    const dw = iw * ratio;
+    const dh = ih * ratio;
+    ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  } else {
+    // Fallback: gradient backdrop tinted with the style accent so the render
+    // still looks intentional when the style image fails to load.
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, opts.accent);
+    g.addColorStop(1, "#0b0b16");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
 
   // Bottom gradient
   const grad = ctx.createLinearGradient(0, H * 0.45, 0, H);
@@ -209,7 +225,8 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
     recorder.onstop = () => resolve();
   });
 
-  recorder.start();
+  // Emit chunks every 250ms so the final blob is well-formed even on short renders.
+  recorder.start(250);
 
   // Draw an initial frame before recording starts capturing.
   drawScene(ctx, img, opts.scenes[0], {

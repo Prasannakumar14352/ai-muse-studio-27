@@ -366,7 +366,7 @@ function VideoPreview({
         <div className="flex flex-wrap gap-2">
           {videoUrl && (
             <a href={videoUrl} download className="rounded-lg glass hover:bg-white/5 px-4 py-2 text-sm font-medium flex items-center gap-2">
-              <Download className="w-4 h-4" /> Download MP4
+              <Download className="w-4 h-4" /> Download video
             </a>
           )}
           <button
@@ -375,7 +375,7 @@ function VideoPreview({
             className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
             {rendering
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Rendering {Math.round(renderProgress * 100)}%</>
-              : <><VideoIcon className="w-4 h-4" /> {videoUrl ? "Re-render MP4" : "Render MP4"}</>}
+              : <><VideoIcon className="w-4 h-4" /> {videoUrl ? "Re-render video" : "Render video"}</>}
           </button>
         </div>
       </div>
