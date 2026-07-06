@@ -725,6 +725,9 @@ function VideoPreview({
       });
       if (!res.ok) throw new Error(await res.text() || `TTS ${res.status}`);
       const blob = await res.blob();
+      // Deduct 1 credit per voiceover playback (admin bypass handled inside).
+      await deductUsage({ amount: 1, projectId, description: "Voiceover generated" }).catch(() => {});
+      qc.invalidateQueries({ queryKey: ["access"] });
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audioElRef.current = audio;
