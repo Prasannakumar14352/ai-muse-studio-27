@@ -691,6 +691,7 @@ function VideoPreview({
       setImageErrors((prev) => { const n = [...prev]; n[i] = e instanceof Error ? e.message : String(e); return n; });
     } finally {
       setImgBusy((s) => { const n = new Set(s); n.delete(i); return n; });
+      qc.invalidateQueries({ queryKey: ["access"] });
     }
   }
 
