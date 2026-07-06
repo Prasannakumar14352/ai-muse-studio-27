@@ -326,6 +326,12 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [paying, setPaying] = useState(false);
+  const [currency, setCurrency] = useState<"USD" | "INR">("USD");
+  const priceNum = Number(plan.price.replace(/[^0-9.]/g, "")) || 0;
+  const INR_PER_USD = 84;
+  const displayAmount = currency === "INR"
+    ? `₹${(priceNum * INR_PER_USD).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`
+    : plan.price;
 
   async function handlePay() {
     if (isFree) return;
@@ -333,7 +339,12 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
     try {
       const ok = await loadRazorpayScript();
       if (!ok || !window.Razorpay) throw new Error("Could not load Razorpay checkout");
-      const order = await createOrder({ data: { planId: plan.id } });
+      const order = await createOrder({ data: { planId: plan.id, currency } });
+      if (order.fellBackToINR) {
+        toast.message("Switched to INR", {
+          description: "Your Razorpay account doesn't have International Payments enabled — charging in INR instead.",
+        });
+      }
       await new Promise<void>((resolve, reject) => {
         const rzp = new window.Razorpay!({
           key: order.keyId,
@@ -350,6 +361,7 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
               toast.success(`Added ${result.credits.toLocaleString()} credits to your account`);
               await qc.invalidateQueries({ queryKey: ["access"] });
               await qc.invalidateQueries({ queryKey: ["my-payments"] });
+              await qc.invalidateQueries({ queryKey: ["my-subscription"] });
               onClose();
               navigate({ to: "/invoices" });
               resolve();
