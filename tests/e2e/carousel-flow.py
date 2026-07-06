@@ -156,7 +156,6 @@ async def main() -> None:
 
             # ─── Step 6: delete via in-app confirm dialog ───────────────────
             await card.locator("button[title='Delete carousel']").click()
-            # In-app AlertDialog appears; window.confirm is NOT used
             confirm_btn = page.get_by_test_id("confirm-dialog-confirm")
             try:
                 await confirm_btn.wait_for(state="visible", timeout=3000)
@@ -172,8 +171,10 @@ async def main() -> None:
                     break
             if not gone:
                 await page.screenshot(path=str(OUT / "03_delete_stuck.png"))
+                # Surface the last few console messages so failures are actionable
                 Path(OUT / "logs.txt").write_text("\n".join(logs))
-                _fail("delete", "card still present after confirm (20s)")
+                tail = "\n".join(logs[-20:])
+                _fail("delete", f"card still present after confirm (20s). recent logs:\n{tail}")
             print("[ok] delete via in-app dialog removed the card")
 
             Path(OUT / "logs.txt").write_text("\n".join(logs))
