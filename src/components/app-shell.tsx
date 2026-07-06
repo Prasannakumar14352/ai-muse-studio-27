@@ -2,11 +2,12 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
-  Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt,
+  Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAccess } from "@/lib/access";
+import { useAccess, getAvailableCredits } from "@/lib/access";
+
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import brandLogo from "@/assets/prodxstore-logo.png.asset.json";
 
