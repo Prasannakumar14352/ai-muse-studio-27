@@ -390,18 +390,24 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
   const total = opts.scenes.length;
 
   throwIfAborted(opts.signal);
-  let imgDone = 0;
-  opts.onStage?.({ kind: "images", done: 0, total });
-  const sceneImages = await Promise.all(
-    opts.scenes.map(async (scene, i) => {
-      const promptRow = opts.imagePrompts?.[i];
-      const prompt = promptRow?.prompt || scene.visual;
-      const url = await fetchSceneImage(prompt, style.descriptor, ratio);
-      imgDone += 1;
-      opts.onStage?.({ kind: "images", done: imgDone, total });
-      return url;
-    }),
-  );
+  let sceneImages: Array<string | null>;
+  if (opts.preloadedImages && opts.preloadedImages.length === total) {
+    opts.onStage?.({ kind: "images", done: total, total });
+    sceneImages = opts.preloadedImages;
+  } else {
+    let imgDone = 0;
+    opts.onStage?.({ kind: "images", done: 0, total });
+    sceneImages = await Promise.all(
+      opts.scenes.map(async (scene, i) => {
+        const promptRow = opts.imagePrompts?.[i];
+        const prompt = promptRow?.prompt || scene.visual;
+        const url = await fetchSceneImage(prompt, style.descriptor, ratio);
+        imgDone += 1;
+        opts.onStage?.({ kind: "images", done: imgDone, total });
+        return url;
+      }),
+    );
+  }
   throwIfAborted(opts.signal);
 
   const decodeCtx = new AudioContext();
@@ -432,6 +438,7 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
     fitToAudio: true,
     signal: opts.signal,
     preferredContainer: opts.preferredContainer,
+    showOnScreenText: opts.showOnScreenText,
     onProgress: (p) => opts.onStage?.({ kind: "render", progress: p }),
   });
   opts.onStage?.({ kind: "upload" });
