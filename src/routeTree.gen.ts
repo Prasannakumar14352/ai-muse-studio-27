@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
+import { Route as ApiGenerateVideoClipRouteImport } from './routes/api/generate-video-clip'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as AuthenticatedVideosRouteImport } from './routes/_authenticated/videos'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -53,6 +54,11 @@ const IndexRoute = IndexRouteImport.update({
 const ApiTtsRoute = ApiTtsRouteImport.update({
   id: '/api/tts',
   path: '/api/tts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGenerateVideoClipRoute = ApiGenerateVideoClipRouteImport.update({
+  id: '/api/generate-video-clip',
+  path: '/api/generate-video-clip',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
@@ -155,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/tts': typeof ApiTtsRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
@@ -177,6 +184,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/tts': typeof ApiTtsRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
@@ -201,6 +209,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/tts': typeof ApiTtsRoute
   '/_authenticated/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/_authenticated/create_/carousel': typeof AuthenticatedCreateCarouselRoute
@@ -225,6 +234,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/videos'
     | '/api/generate-image'
+    | '/api/generate-video-clip'
     | '/api/tts'
     | '/admin/webhooks'
     | '/create/carousel'
@@ -247,6 +257,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/videos'
     | '/api/generate-image'
+    | '/api/generate-video-clip'
     | '/api/tts'
     | '/admin/webhooks'
     | '/create/carousel'
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/videos'
     | '/api/generate-image'
+    | '/api/generate-video-clip'
     | '/api/tts'
     | '/_authenticated/admin/webhooks'
     | '/_authenticated/create_/carousel'
@@ -283,6 +295,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ContactRoute: typeof ContactRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
+  ApiGenerateVideoClipRoute: typeof ApiGenerateVideoClipRoute
   ApiTtsRoute: typeof ApiTtsRoute
   ApiPublicWebhooksRazorpayRoute: typeof ApiPublicWebhooksRazorpayRoute
 }
@@ -322,6 +335,13 @@ declare module '@tanstack/react-router' {
       path: '/api/tts'
       fullPath: '/api/tts'
       preLoaderRoute: typeof ApiTtsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/generate-video-clip': {
+      id: '/api/generate-video-clip'
+      path: '/api/generate-video-clip'
+      fullPath: '/api/generate-video-clip'
+      preLoaderRoute: typeof ApiGenerateVideoClipRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/generate-image': {
@@ -491,6 +511,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ContactRoute: ContactRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
+  ApiGenerateVideoClipRoute: ApiGenerateVideoClipRoute,
   ApiTtsRoute: ApiTtsRoute,
   ApiPublicWebhooksRazorpayRoute: ApiPublicWebhooksRazorpayRoute,
 }

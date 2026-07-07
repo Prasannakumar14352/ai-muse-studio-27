@@ -25,6 +25,12 @@ export type RenderOptions = {
   fps?: number;
   onProgress?: (p: number) => void; // 0..1
   sceneImages?: Array<string | null>;
+  /**
+   * Per-beat media. If `kind === "clip"`, the URL points to an mp4/webm that
+   * plays muted underneath the camera motion overlay; on load failure or when
+   * the entry is null, falls back to `sceneImages[i]` and then the style still.
+   */
+  sceneMedia?: Array<{ kind: "image" | "clip"; url: string } | null>;
   sceneAudio?: Array<AudioBuffer | null>;
   fitToAudio?: boolean;
   /** Cancel the render mid-flight — recorder stops and result rejects with AbortError. */
@@ -50,11 +56,30 @@ function parseDuration(d: string): number {
 async function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
-    // Same-origin bundled assets don't need CORS; setting it can cause
-    // legitimate loads to be treated as errors in some setups.
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
     img.src = src;
+  });
+}
+
+/** Preload a muted <video> element ready to play into the recorder canvas. */
+async function loadClip(src: string): Promise<HTMLVideoElement | null> {
+  return new Promise((resolve) => {
+    try {
+      const v = document.createElement("video");
+      v.muted = true;
+      v.playsInline = true;
+      v.loop = true;
+      v.preload = "auto";
+      v.crossOrigin = "anonymous";
+      const done = (ok: boolean) => resolve(ok ? v : null);
+      v.oncanplaythrough = () => done(true);
+      v.onloadeddata = () => done(true);
+      v.onerror = () => done(false);
+      v.src = src;
+      // Safety timeout — some encodings never fire canplaythrough.
+      setTimeout(() => done(v.readyState >= 2), 3000);
+    } catch { resolve(null); }
   });
 }
 
@@ -81,9 +106,16 @@ function pickRecorderMime(preferred?: "webm" | "mp4"): { mime: string; ext: "mp4
   return { mime: "video/webm", ext: "webm" };
 }
 
+type Drawable = HTMLImageElement | HTMLVideoElement | null;
+function drawableSize(d: Drawable): { w: number; h: number } {
+  if (!d) return { w: 0, h: 0 };
+  if (d instanceof HTMLVideoElement) return { w: d.videoWidth || 1280, h: d.videoHeight || 720 };
+  return { w: d.width, h: d.height };
+}
+
 function drawScene(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement | null,
+  media: Drawable,
   scene: RenderScene,
   opts: {
     progress: number; accent: string; showOnScreenText?: boolean;
@@ -110,13 +142,12 @@ function drawScene(
 
   ctx.fillStyle = "#0b0b16";
   ctx.fillRect(0, 0, W, H);
-  if (img) {
-    const iw = img.width;
-    const ih = img.height;
-    const ratio = Math.max(W / iw, H / ih) * scale;
-    const dw = iw * ratio;
-    const dh = ih * ratio;
-    ctx.drawImage(img, (W - dw) / 2 + panX * W, (H - dh) / 2 + panY * H, dw, dh);
+  const size = drawableSize(media);
+  if (media && size.w > 0 && size.h > 0) {
+    const ratio = Math.max(W / size.w, H / size.h) * scale;
+    const dw = size.w * ratio;
+    const dh = size.h * ratio;
+    ctx.drawImage(media, (W - dw) / 2 + panX * W, (H - dh) / 2 + panY * H, dw, dh);
   } else {
     const g = ctx.createLinearGradient(0, 0, W, H);
     g.addColorStop(0, opts.accent);
@@ -233,12 +264,21 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   if (!rawCtx) throw new Error("Canvas 2D not supported");
   const ctx: CanvasRenderingContext2D = rawCtx;
 
-  // Load style fallback + per-scene AI images in parallel.
-  const [fallbackImg, ...sceneImgs] = await Promise.all([
+  // Load style fallback + per-beat media in parallel. Clips are preloaded as
+  // muted <video> elements; images stay as <img>. Falls back to sceneImages
+  // when no clip is provided, then to the style still.
+  const beatCount = opts.scenes.length;
+  const [fallbackImg, ...sceneMedia] = await Promise.all([
     loadImage(style.image),
-    ...opts.scenes.map((_, i) => {
-      const src = opts.sceneImages?.[i];
-      return src ? loadImage(src) : Promise.resolve<HTMLImageElement | null>(null);
+    ...Array.from({ length: beatCount }, async (_, i): Promise<Drawable> => {
+      const m = opts.sceneMedia?.[i];
+      if (m?.kind === "clip") {
+        const v = await loadClip(m.url);
+        if (v) return v;
+        // clip failed to load — fall through to still image
+      }
+      const stillSrc = m?.kind === "image" ? m.url : opts.sceneImages?.[i];
+      return stillSrc ? await loadImage(stillSrc) : null;
     }),
   ]);
 
@@ -278,9 +318,25 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
 
   const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
 
-  drawScene(ctx, sceneImgs[0] ?? fallbackImg, opts.scenes[0], {
+  drawScene(ctx, sceneMedia[0] ?? fallbackImg, opts.scenes[0], {
     progress: 0, accent: style.accent, showOnScreenText: opts.showOnScreenText,
   });
+
+  // Kick off the first beat's clip playback if it's a video.
+  const currentPlaying = { idx: -1 };
+  const playIfClip = (i: number) => {
+    if (i === currentPlaying.idx) return;
+    // Pause previous
+    const prev = sceneMedia[currentPlaying.idx];
+    if (prev instanceof HTMLVideoElement) { try { prev.pause(); } catch { /* noop */ } }
+    currentPlaying.idx = i;
+    const next = sceneMedia[i];
+    if (next instanceof HTMLVideoElement) {
+      try { next.currentTime = 0; void next.play().catch(() => {}); } catch { /* noop */ }
+    }
+  };
+  playIfClip(0);
+
 
   recorder.start(250);
 
@@ -313,7 +369,8 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
         if (clamped <= acc + d) { sceneIdx = i; localProgress = (clamped - acc) / d; break; }
         acc += d; sceneIdx = i; localProgress = 1;
       }
-      drawScene(ctx, sceneImgs[sceneIdx] ?? fallbackImg, opts.scenes[sceneIdx], {
+      playIfClip(sceneIdx);
+      drawScene(ctx, sceneMedia[sceneIdx] ?? fallbackImg, opts.scenes[sceneIdx], {
         progress: localProgress, accent: style.accent, showOnScreenText: opts.showOnScreenText,
       });
       opts.onProgress?.(clamped / totalDuration);
@@ -330,6 +387,10 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   videoStream.getTracks().forEach((t) => t.stop());
   if (audioDest) audioDest.stream.getTracks().forEach((t) => t.stop());
   if (audioCtx) await audioCtx.close().catch(() => {});
+  // Stop any playing clip elements.
+  for (const m of sceneMedia) {
+    if (m instanceof HTMLVideoElement) { try { m.pause(); } catch { /* noop */ } }
+  }
 
   if (aborted) {
     const err = new Error("Render canceled");

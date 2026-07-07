@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
-  Wand2, Youtube, Play, RefreshCw, Send, Check,
+  Wand2, Youtube, Play, RefreshCw, Send, Check, Trash2, Clock,
 } from "lucide-react";
 import {
   runVideoPipeline,
@@ -12,6 +12,11 @@ import {
   type VideoBrief, type VideoType, type DurationSec, type StyleId, type VoiceId, type AspectRatio,
   type StepStatus, type PipelineResult,
 } from "@/lib/video-agents";
+import {
+  saveGeneratedVideo, getGeneratedVideos, deleteGeneratedVideo,
+  loadVideoObjectURL, loadThumbnailObjectURL,
+  type LocalVideo,
+} from "@/lib/videoLocalStore";
 import style3d from "@/assets/style-3d.jpg";
 import styleGhibli from "@/assets/style-ghibli.jpg";
 import styleAnime from "@/assets/style-anime.jpg";
@@ -211,29 +216,78 @@ const STYLE_CARDS: StyleCard[] = [
   { id: "futuristic", label: "Futuristic", image: style3d },
 ];
 
-type View = "input" | "processing" | "result";
+type View = "input" | "processing" | "result" | "library";
+type GenerateArgs = { brief: VideoBrief; niche: string; topic: string };
+type LibraryOpen = {
+  meta: LocalVideo;
+  videoUrl: string;
+  thumbnailUrl: string | null;
+};
 
 function VideosPage() {
   const [view, setView] = useState<View>("input");
-  const [brief, setBrief] = useState<VideoBrief | null>(null);
+  const [gen, setGen] = useState<GenerateArgs | null>(null);
   const [steps, setSteps] = useState<StepStatus[]>(
     PIPELINE_STEPS.map((s) => ({ id: s.id, label: s.label, state: "pending" }))
   );
   const [result, setResult] = useState<PipelineResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [library, setLibrary] = useState<LocalVideo[]>([]);
+  const [libraryOpen, setLibraryOpen] = useState<LibraryOpen | null>(null);
 
-  async function start(b: VideoBrief) {
-    setBrief(b);
+  const refreshLibrary = useCallback(async () => {
+    const items = await getGeneratedVideos();
+    setLibrary(items);
+  }, []);
+
+  useEffect(() => { void refreshLibrary(); }, [refreshLibrary]);
+
+  async function start(args: GenerateArgs) {
+    setGen(args);
     setError(null);
     setResult(null);
+    setLibraryOpen(null);
     setSteps(PIPELINE_STEPS.map((s) => ({ id: s.id, label: s.label, state: "pending" })));
     setView("processing");
     try {
-      const r = await runVideoPipeline(b, (id, state, note) => {
+      const r = await runVideoPipeline(args.brief, (id, state, note) => {
         setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, state, note } : s)));
       });
       setResult(r);
       setView("result");
+
+      // Persist to browser-local library — no backend, no upload.
+      try {
+        const videoBlob = await (await fetch(r.render.video_url)).blob();
+        const niche = args.niche;
+        const nicheLabel = NICHES.find((n) => n.id === niche)?.label ?? niche;
+        const styleLabel = STYLE_CARDS.find((s) => s.id === args.brief.style)?.label ?? args.brief.style;
+        await saveGeneratedVideo({
+          title: args.brief.title,
+          niche: nicheLabel,
+          topic: args.topic || args.brief.title,
+          styleId: args.brief.style,
+          styleLabel,
+          videoType: args.brief.videoType,
+          aspectRatio: args.brief.aspectRatio,
+          duration_sec: r.render.duration_sec,
+          extension: r.render.extension,
+          mime: r.render.mime,
+          youtube_title: r.seo.youtube_title,
+          youtube_description: r.seo.youtube_description,
+          hashtags: r.seo.hashtags,
+          tags: r.seo.tags,
+          pinned_comment: r.seo.pinned_comment,
+          chapters: r.seo.chapters,
+          subtitles_vtt: r.subtitles.content,
+          video_blob: videoBlob,
+          thumbnail: r.thumbnail.url,
+        });
+        await refreshLibrary();
+      } catch (saveErr) {
+        console.warn("Local video save failed:", saveErr);
+        toast.error("Couldn't save to your local library (storage full?)");
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Pipeline failed";
       setError(msg);
@@ -244,7 +298,28 @@ function VideosPage() {
   function reset() {
     setView("input");
     setResult(null);
+    setLibraryOpen(null);
     setError(null);
+  }
+
+  async function openFromLibrary(rec: LocalVideo) {
+    const videoUrl = await loadVideoObjectURL(rec);
+    if (!videoUrl) { toast.error("Video file missing from local storage"); return; }
+    const thumbnailUrl = await loadThumbnailObjectURL(rec);
+    setLibraryOpen({ meta: rec, videoUrl, thumbnailUrl });
+    setView("library");
+  }
+
+  async function removeFromLibrary(id: string) {
+    await deleteGeneratedVideo(id);
+    if (libraryOpen?.meta.id === id) {
+      URL.revokeObjectURL(libraryOpen.videoUrl);
+      if (libraryOpen.thumbnailUrl) URL.revokeObjectURL(libraryOpen.thumbnailUrl);
+      setLibraryOpen(null);
+      setView("input");
+    }
+    await refreshLibrary();
+    toast.success("Deleted");
   }
 
   return (
@@ -256,16 +331,32 @@ function VideosPage() {
         </p>
       </div>
 
-      {view === "input" && <InputScreen onGenerate={start} />}
+      {view === "input" && (
+        <>
+          <InputScreen onGenerate={start} />
+          {library.length > 0 && (
+            <LibrarySection items={library} onOpen={openFromLibrary} onDelete={removeFromLibrary} />
+          )}
+        </>
+      )}
       {view === "processing" && <ProcessingScreen steps={steps} error={error} onCancel={reset} />}
-      {view === "result" && result && <ResultScreen result={result} onAnother={() => brief && start(brief)} onNew={reset} />}
+      {view === "result" && result && (
+        <ResultScreen result={result} onAnother={() => gen && start(gen)} onNew={reset} />
+      )}
+      {view === "library" && libraryOpen && (
+        <LibraryViewer
+          entry={libraryOpen}
+          onBack={reset}
+          onDelete={() => removeFromLibrary(libraryOpen.meta.id)}
+        />
+      )}
     </div>
   );
 }
 
 // ---------------- Input ----------------
 
-function InputScreen({ onGenerate }: { onGenerate: (b: VideoBrief) => void }) {
+function InputScreen({ onGenerate }: { onGenerate: (args: GenerateArgs) => void }) {
   const [niche, setNiche] = useState<string>(NICHES[0].id);
   const [title, setTitle] = useState("");
   const [videoType, setVideoType] = useState<VideoType>("shorts");
@@ -282,7 +373,11 @@ function InputScreen({ onGenerate }: { onGenerate: (b: VideoBrief) => void }) {
 
   function submit() {
     if (!title.trim()) return toast.error("Enter a video title or idea");
-    onGenerate({ title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio });
+    onGenerate({
+      brief: { title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio },
+      niche,
+      topic: title.trim(),
+    });
   }
 
   return (
@@ -646,4 +741,211 @@ function CopyBtn({ onClick }: { onClick: () => void }) {
 
 function slug(s: string): string {
   return (s || "video").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "video";
+}
+
+function fmtDuration(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return `${m}:${String(rem).padStart(2, "0")}`;
+}
+
+function fmtDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  } catch { return ""; }
+}
+
+// ---------------- Local library ----------------
+
+function LibrarySection({
+  items, onOpen, onDelete,
+}: { items: LocalVideo[]; onOpen: (rec: LocalVideo) => void; onDelete: (id: string) => void }) {
+  return (
+    <div className="glass rounded-2xl p-6 space-y-4">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-xl font-semibold">Your videos</h2>
+        <span className="text-xs text-muted-foreground">
+          Stored locally in your browser · {items.length} saved
+        </span>
+      </div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {items.map((rec) => (
+          <LibraryCard key={rec.id} rec={rec} onOpen={() => onOpen(rec)} onDelete={() => onDelete(rec.id)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LibraryCard({
+  rec, onOpen, onDelete,
+}: { rec: LocalVideo; onOpen: () => void; onDelete: () => void }) {
+  const [thumb, setThumb] = useState<string | null>(null);
+  useEffect(() => {
+    let url: string | null = null;
+    let cancelled = false;
+    void loadThumbnailObjectURL(rec).then((u) => {
+      if (cancelled) { if (u) URL.revokeObjectURL(u); return; }
+      url = u; setThumb(u);
+    });
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
+  }, [rec]);
+  const ratioClass =
+    rec.aspectRatio === "9:16" ? "aspect-[9/16]"
+    : rec.aspectRatio === "1:1" ? "aspect-square"
+    : "aspect-video";
+  return (
+    <div className="glass rounded-xl overflow-hidden border border-border flex flex-col">
+      <button onClick={onOpen} className={`${ratioClass} bg-black block relative overflow-hidden group`}>
+        {thumb ? (
+          <img src={thumb} alt={rec.youtube_title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">No preview</div>
+        )}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/40">
+          <Play className="w-10 h-10 text-white" />
+        </div>
+      </button>
+      <div className="p-3 space-y-2 flex-1 flex flex-col">
+        <div className="text-sm font-medium line-clamp-2 leading-snug">{rec.youtube_title || rec.title}</div>
+        <div className="flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
+          <span className="glass px-2 py-0.5 rounded">{rec.aspectRatio}</span>
+          <span className="glass px-2 py-0.5 rounded flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDuration(rec.duration_sec)}</span>
+          <span className="glass px-2 py-0.5 rounded">{rec.styleLabel}</span>
+        </div>
+        <div className="text-[11px] text-muted-foreground">{fmtDate(rec.created_at)} · {rec.niche ?? ""}</div>
+        <div className="flex gap-2 pt-1 mt-auto">
+          <button onClick={onOpen} className="flex-1 rounded-lg gradient-primary text-white text-xs py-1.5 flex items-center justify-center gap-1">
+            <Play className="w-3 h-3" /> Open
+          </button>
+          <button
+            onClick={async () => {
+              const url = await loadVideoObjectURL(rec);
+              if (!url) return toast.error("File missing");
+              const a = document.createElement("a");
+              a.href = url; a.download = `${slug(rec.youtube_title || rec.title)}.${rec.extension}`;
+              document.body.appendChild(a); a.click(); document.body.removeChild(a);
+              setTimeout(() => URL.revokeObjectURL(url), 5000);
+            }}
+            className="rounded-lg glass border border-border px-2 py-1.5 text-xs flex items-center gap-1"
+            title="Download"
+          >
+            <Download className="w-3 h-3" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="rounded-lg glass border border-border px-2 py-1.5 text-xs text-red-400 flex items-center gap-1"
+            title="Delete"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LibraryViewer({
+  entry, onBack, onDelete,
+}: { entry: LibraryOpen; onBack: () => void; onDelete: () => void }) {
+  const { meta, videoUrl, thumbnailUrl } = entry;
+  const isVertical = meta.aspectRatio === "9:16";
+  function download(url: string, filename: string) {
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+  function downloadText(text: string, filename: string, mime = "text/plain") {
+    const blob = new Blob([text], { type: mime });
+    download(URL.createObjectURL(blob), filename);
+  }
+  async function copy(text: string, label: string) {
+    try { await navigator.clipboard.writeText(text); toast.success(`${label} copied`); }
+    catch { toast.error("Copy failed"); }
+  }
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <button onClick={onBack} className="text-sm text-muted-foreground hover:text-white flex items-center gap-1">
+          ← Back to studio
+        </button>
+        <button onClick={onDelete} className="text-sm text-red-400 hover:text-red-300 flex items-center gap-1">
+          <Trash2 className="w-4 h-4" /> Delete
+        </button>
+      </div>
+      <div className="grid lg:grid-cols-[1fr_360px] gap-6">
+        <div className="glass rounded-2xl overflow-hidden">
+          <div className={`bg-black ${isVertical ? "aspect-[9/16]" : meta.aspectRatio === "1:1" ? "aspect-square" : "aspect-video"} max-h-[70vh] mx-auto`}>
+            <video src={videoUrl} controls autoPlay playsInline className="w-full h-full object-contain" />
+          </div>
+          <div className="p-4 flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => download(videoUrl, `${slug(meta.youtube_title || meta.title)}.${meta.extension}`)}
+              className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" /> Download video
+            </button>
+            {thumbnailUrl && (
+              <button
+                onClick={() => download(thumbnailUrl, `${slug(meta.youtube_title || meta.title)}-thumbnail.png`)}
+                className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" /> Thumbnail
+              </button>
+            )}
+            <button
+              onClick={() => downloadText(meta.subtitles_vtt, `${slug(meta.youtube_title || meta.title)}.vtt`, "text/vtt")}
+              className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" /> Subtitles
+            </button>
+          </div>
+        </div>
+        <div className="space-y-4">
+          {thumbnailUrl && (
+            <div className="glass rounded-2xl p-4">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Thumbnail</div>
+              <img src={thumbnailUrl} alt={meta.youtube_title} className="w-full rounded-lg bg-black" />
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="glass rounded-2xl p-5 space-y-4">
+        <h3 className="font-semibold">SEO &amp; metadata</h3>
+        <MetaBlock label="YouTube title" value={meta.youtube_title} onCopy={() => copy(meta.youtube_title, "Title")} />
+        <MetaBlock label="YouTube description" value={meta.youtube_description} onCopy={() => copy(meta.youtube_description, "Description")} pre />
+        <MetaChips label="Hashtags" items={meta.hashtags} onCopy={() => copy(meta.hashtags.join(" "), "Hashtags")} />
+        <MetaChips label="Tags" items={meta.tags} onCopy={() => copy(meta.tags.join(", "), "Tags")} />
+        <MetaBlock label="Pinned comment" value={meta.pinned_comment} onCopy={() => copy(meta.pinned_comment, "Pinned comment")} pre />
+      </div>
+    </div>
+  );
+}
+
+function MetaBlock({ label, value, onCopy, pre }: { label: string; value: string; onCopy: () => void; pre?: boolean }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+        <CopyBtn onClick={onCopy} />
+      </div>
+      <div className={`glass rounded-lg p-3 text-sm ${pre ? "whitespace-pre-wrap" : ""}`}>{value}</div>
+    </div>
+  );
+}
+
+function MetaChips({ label, items, onCopy }: { label: string; items: string[]; onCopy: () => void }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+        <CopyBtn onClick={onCopy} />
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((h) => <span key={h} className="glass px-2 py-1 rounded text-xs">{h}</span>)}
+      </div>
+    </div>
+  );
 }
