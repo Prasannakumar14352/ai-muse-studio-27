@@ -248,6 +248,27 @@ export type RetentionPlan = {
   average_gap_sec: number;       // avg seconds between retention beats
 };
 
+/**
+ * YouTube Retention Engine blueprint — produced BEFORE the Script Agent.
+ * Encodes the professional YouTube documentary structure the entire
+ * downstream pipeline (Script, Storyboard, Voice, Editing) must follow.
+ */
+export type RetentionBlueprint = {
+  hook: { time_sec: number; line: string; rationale: string };
+  intro: { start_sec: number; end_sec: number; promise: string; expectation: string };
+  curiosity_loops: Array<{ opens_at_sec: number; open_phrase: string; pays_off_at_sec: number }>;
+  chapters: Array<{ start_sec: number; label: string; goal: string }>;
+  retention_hooks: Array<{ time_sec: number; phrase: string }>;
+  pattern_interrupts: Array<{
+    time_sec: number;
+    kind: "stat" | "text_overlay" | "map" | "timeline" | "infographic" | "broll_change" | "transition";
+    note: string;
+  }>;
+  emotional_climax: { time_sec: number; scene_hint: string; note: string };
+  ending: { time_sec: number; summary: string; question: string };
+  cta: { time_sec: number; line: string; style: string };
+};
+
 export type PipelineResult = {
   brief: VideoBrief;
   research: ResearchBrief;
