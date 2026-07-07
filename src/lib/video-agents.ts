@@ -676,9 +676,15 @@ export async function runVideoPipeline(
   }));
   const storyboard = await mark("storyboard", () => StoryboardAgent.run(script));
   const direction = await mark("direction", () => DirectorAgent.run(brief, storyboard));
+
+  // Expand every script scene into short (2-5s) visual beats. Each beat gets
+  // its own AI image + camera motion so the final video cycles visuals every
+  // few seconds instead of holding one image for a whole paragraph.
+  const beats = expandScriptToBeats(script, brief.style);
+
   const visuals = await mark("visuals", () =>
-    VisualGenerationAgent.run(brief, script, (done, total) =>
-      onStep("visuals", "running", `${done}/${total} scenes`)
+    VisualGenerationAgent.run(brief, beats, (done, total) =>
+      onStep("visuals", "running", `${done}/${total} shots`)
     ),
   );
   const voiceover = await mark("voiceover", () =>
@@ -687,11 +693,11 @@ export async function runVideoPipeline(
     ),
   );
   const subtitles = await mark("subtitles", () => SubtitleAgent.run(script, voiceover));
-  const timeline = await mark("edit", () => VideoEditingAgent.run(script, visuals, voiceover));
+  const timeline = await mark("edit", () => VideoEditingAgent.run(script, voiceover));
   const music = await mark("music", () => MusicAgent.run(brief, timeline.total_sec));
   const sfx = await mark("sfx", () => SoundEffectsAgent.run(direction));
   const render = await mark("render", () =>
-    RenderAgent.run(brief, script, visuals, voiceover, (p) =>
+    RenderAgent.run(brief, script, beats, visuals, voiceover, (p: number) =>
       onStep("render", "running", `${Math.round(p * 100)}%`)
     ),
   );
