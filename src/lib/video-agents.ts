@@ -1501,6 +1501,7 @@ export async function runVideoJobPipeline(
   let job: JobRecord;
   let script: AiVideoScript;
   let research: ResearchBrief;
+  let retentionEngine: RetentionBlueprint;
   let storyboard: Storyboard;
   let direction: DirectorPlan;
 
@@ -1511,14 +1512,16 @@ export async function runVideoJobPipeline(
     // differ slightly from the original run, but shot prompts/motions come
     // from the persisted shot records so visuals stay consistent.
     research = await ResearchAgent.run(brief);
-    script = await ScriptAgent.run(brief, research);
+    retentionEngine = await RetentionEngineAgent.run(brief, research);
+    script = await ScriptAgent.run(brief, research, undefined, retentionEngine);
     storyboard = await StoryboardAgent.run(script);
     direction = await DirectorAgent.run(brief, storyboard);
     job = existing;
   } else {
     onEvent({ type: "phase", phase: "planning" });
     research = await ResearchAgent.run(brief);
-    script = await ScriptAgent.run(brief, research);
+    retentionEngine = await RetentionEngineAgent.run(brief, research);
+    script = await ScriptAgent.run(brief, research, undefined, retentionEngine);
     storyboard = await StoryboardAgent.run(script);
     direction = await DirectorAgent.run(brief, storyboard);
     const shots = planShots(script, brief.style);
