@@ -500,11 +500,14 @@ function VideosPage() {
 
       {view === "landing" && (
         <>
+          {inProgress.length > 0 && (
+            <InProgressJobs jobs={inProgress} onResume={resumeJob} onDiscard={discardJob} />
+          )}
           {library.length > 0 ? (
             <LibrarySection items={library} onOpen={openFromLibrary} onDelete={removeFromLibrary} />
-          ) : (
+          ) : inProgress.length === 0 ? (
             <EmptyLibrary onNew={() => setView("input")} />
-          )}
+          ) : null}
           {thumbLibrary.length > 0 && (
             <ThumbnailLibrarySection items={thumbLibrary} onDelete={removeThumb} />
           )}
@@ -524,7 +527,15 @@ function VideosPage() {
           <InputScreen onGenerate={start} />
         </>
       )}
-      {view === "processing" && <ProcessingScreen steps={steps} error={error} onCancel={reset} />}
+      {view === "processing" && (
+        <JobDashboard
+          dash={dash}
+          error={error}
+          onCancel={cancel}
+          onRetryFailed={retryFailed}
+          onBack={() => setView("landing")}
+        />
+      )}
       {view === "result" && result && (
         <ResultScreen result={result} onAnother={() => gen && start(gen)} onNew={reset} onSaveThumbnail={saveThumb} />
       )}
