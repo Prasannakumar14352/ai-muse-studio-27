@@ -387,6 +387,10 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   videoStream.getTracks().forEach((t) => t.stop());
   if (audioDest) audioDest.stream.getTracks().forEach((t) => t.stop());
   if (audioCtx) await audioCtx.close().catch(() => {});
+  // Stop any playing clip elements.
+  for (const m of sceneMedia) {
+    if (m instanceof HTMLVideoElement) { try { m.pause(); } catch { /* noop */ } }
+  }
 
   if (aborted) {
     const err = new Error("Render canceled");
