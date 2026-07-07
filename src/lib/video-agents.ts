@@ -17,6 +17,10 @@ import {
   createJob, getJob, saveJob, saveShotBlob, loadShotObjectURL,
   type JobRecord, type ShotRecord,
 } from "@/lib/video-job-store";
+import {
+  directBeatPrompt, buildContinuityCard,
+  type ContinuityCard, type ShotType, type VDStyle,
+} from "@/lib/visual-director";
 
 // ---------- Beat expansion (documentary-style visual density) ----------
 //
@@ -90,9 +94,12 @@ function splitVoiceoverIntoBeatTexts(vo: string, targetBeats: number): string[] 
   return chunks.length ? chunks : [clean];
 }
 
-function expandScriptToBeats(script: AiVideoScript, style: StyleId): Beat[] {
+function expandScriptToBeats(script: AiVideoScript, style: StyleId, title: string): Beat[] {
   const beats: Beat[] = [];
   let globalIdx = 0;
+  const continuity: ContinuityCard = buildContinuityCard(title);
+  const vdStyle = style as VDStyle;
+  let previousShot: ShotType | null = null;
   script.scenes.forEach((scene, sceneIndex) => {
     const sceneDur = parseSec(scene.duration);
     const targetBeats = Math.max(1, Math.round(sceneDur / TARGET_BEAT_SEC));
@@ -100,25 +107,34 @@ function expandScriptToBeats(script: AiVideoScript, style: StyleId): Beat[] {
     const baseVisual = scene.visual || scene.image_prompt || `${scene.voiceover?.slice(0, 80)}`;
     chunks.forEach((chunk, beatIndex) => {
       const words = chunk.split(/\s+/).filter(Boolean).length || 1;
+      const directed = directBeatPrompt({
+        title,
+        styleId: vdStyle,
+        ratio: "16:9",
+        beatText: chunk,
+        sceneContext: baseVisual,
+        sceneNumber: scene.n,
+        chapterLabel: scene.role ?? null,
+        scenePurpose: scene.role ?? null,
+        emotion: null,
+        beatIndex: globalIdx,
+        continuity,
+        previousShotType: previousShot,
+      });
+      previousShot = directed.shotType;
       beats.push({
         sceneIndex,
         beatIndex,
         isFirstOfScene: beatIndex === 0,
         text: chunk,
         words,
-        imagePrompt: buildBeatImagePrompt(chunk, baseVisual, style),
+        imagePrompt: directed.prompt,
         motion: MOTION_CYCLE[globalIdx % MOTION_CYCLE.length],
       });
       globalIdx += 1;
     });
   });
   return beats;
-}
-
-function buildBeatImagePrompt(beatText: string, sceneVisual: string, style: StyleId): string {
-  const descriptor = STYLE_DESCRIPTOR[style];
-  // Beat-specific visual grounded in the narration chunk, styled consistently.
-  return `${descriptor}. Cinematic documentary shot visualizing: "${beatText.trim()}". Context: ${sceneVisual}. Dynamic composition, dramatic lighting, cinematic depth of field, no text, no watermarks, no captions.`;
 }
 
 /**
@@ -623,12 +639,15 @@ export const DirectorAgent = {
 // ---------- Visual generation (real AI image per scene) ----------
 
 async function fetchSceneImage(prompt: string, style: StyleId, ratio: AspectRatio): Promise<string | null> {
-  const styledPrompt = `${STYLE_DESCRIPTOR[style]}. ${prompt}. No text, no watermarks, no captions in the image.`;
+  // The Visual Director already fully composes the cinematic prompt
+  // (subject, camera, lens, lighting, grade, negatives, continuity). Do NOT
+  // pre/post-fix it with another style descriptor — that would fight the
+  // Director's shot type + continuity anchor and produce generic images.
   try {
     const res = await fetch("/api/generate-image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: styledPrompt, style: STYLE_LABEL[style], ratio }),
+      body: JSON.stringify({ prompt, ratio }),
     });
     if (!res.ok) return null;
     const json = (await res.json()) as { image?: string };
@@ -645,8 +664,8 @@ async function fetchBeatClip(prompt: string, style: StyleId, ratio: AspectRatio,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        prompt: `${STYLE_DESCRIPTOR[style]}. ${prompt}`,
-        style: STYLE_LABEL[style],
+        // Visual Director already fully composed the prompt.
+        prompt,
         ratio,
         duration,
       }),
@@ -1263,7 +1282,7 @@ export async function runVideoPipeline(
   const storyboard = await mark("storyboard", () => StoryboardAgent.run(script));
   const direction = await mark("direction", () => DirectorAgent.run(brief, storyboard));
 
-  const beats = expandScriptToBeats(script, brief.style);
+  const beats = expandScriptToBeats(script, brief.style, brief.title);
 
   const visuals = await mark("visuals", () =>
     VisualGenerationAgent.run(brief, beats, (done, total) =>
@@ -1452,8 +1471,8 @@ function beatsFromShots(job: JobRecord, style: StyleId): Beat[] {
   } as unknown as Beat));
 }
 
-function planShots(script: AiVideoScript, style: StyleId): ShotRecord[] {
-  const beats = expandScriptToBeats(script, style);
+function planShots(script: AiVideoScript, style: StyleId, title: string): ShotRecord[] {
+  const beats = expandScriptToBeats(script, style, title);
   return beats.map<ShotRecord>((b, i) => ({
     id: `s${i + 1}`,
     index: i,
@@ -1530,7 +1549,7 @@ export async function runVideoJobPipeline(
     script = await ScriptAgent.run(brief, research, undefined, retentionEngine);
     storyboard = await StoryboardAgent.run(script);
     direction = await DirectorAgent.run(brief, storyboard);
-    const shots = planShots(script, brief.style);
+    const shots = planShots(script, brief.style, brief.title);
     job = await createJob({
       title: brief.title,
       niche: opts.niche,
