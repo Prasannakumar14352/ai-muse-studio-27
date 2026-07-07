@@ -1067,16 +1067,25 @@ function ResultScreen({
   }
 
   const isVertical = brief.aspectRatio === "9:16";
+  const aspectClass = isVertical ? "aspect-[9/16]" : brief.aspectRatio === "1:1" ? "aspect-square" : "aspect-video";
 
   return (
     <div className="space-y-6">
       <div className="grid lg:grid-cols-[1fr_360px] gap-6">
         <div className="glass rounded-2xl overflow-hidden">
-          <div className={`bg-black ${isVertical ? "aspect-[9/16]" : brief.aspectRatio === "1:1" ? "aspect-square" : "aspect-video"} max-h-[70vh] mx-auto`}>
-            <video src={render.video_url} controls autoPlay playsInline className="w-full h-full object-contain" />
-          </div>
+          <SafeVideoPreview
+            blob={render.blob}
+            requestedDurationSec={brief.duration}
+            aspectClass={aspectClass}
+            filename={`${slug(seo.youtube_title)}.${render.extension}`}
+            onRegenerate={onAnother}
+          />
           <div className="p-4 flex flex-wrap items-center gap-2">
-            <button onClick={() => download(render.video_url, `${slug(seo.youtube_title)}.${render.extension}`)} className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2">
+            <button
+              onClick={() => download(URL.createObjectURL(render.blob), `${slug(seo.youtube_title)}.${render.extension}`)}
+              disabled={!render.blob || render.blob.size === 0}
+              className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+            >
               <Download className="w-4 h-4" /> Download video
             </button>
             <button onClick={() => download(thumbnail.url, `${slug(seo.youtube_title)}-thumbnail.png`)} className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2">
