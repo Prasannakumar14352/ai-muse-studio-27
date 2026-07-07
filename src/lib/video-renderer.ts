@@ -369,7 +369,8 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
         if (clamped <= acc + d) { sceneIdx = i; localProgress = (clamped - acc) / d; break; }
         acc += d; sceneIdx = i; localProgress = 1;
       }
-      drawScene(ctx, sceneImgs[sceneIdx] ?? fallbackImg, opts.scenes[sceneIdx], {
+      playIfClip(sceneIdx);
+      drawScene(ctx, sceneMedia[sceneIdx] ?? fallbackImg, opts.scenes[sceneIdx], {
         progress: localProgress, accent: style.accent, showOnScreenText: opts.showOnScreenText,
       });
       opts.onProgress?.(clamped / totalDuration);
