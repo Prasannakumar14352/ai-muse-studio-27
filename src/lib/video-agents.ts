@@ -394,23 +394,22 @@ async function fetchSceneImage(prompt: string, style: StyleId, ratio: AspectRati
 export const VisualGenerationAgent = {
   async run(
     brief: VideoBrief,
-    script: AiVideoScript,
+    beats: Beat[],
     onProgress?: (done: number, total: number) => void,
   ): Promise<VisualAsset[]> {
-    const total = script.scenes.length;
+    const total = beats.length;
     let done = 0;
     onProgress?.(0, total);
     const results = await Promise.all(
-      script.scenes.map(async (s) => {
-        const prompt = s.image_prompt || s.visual || `${brief.title} — scene ${s.n}`;
-        const url = await fetchSceneImage(prompt, brief.style, brief.aspectRatio);
+      beats.map(async (b, i) => {
+        const url = await fetchSceneImage(b.imagePrompt, brief.style, brief.aspectRatio);
         done += 1;
         onProgress?.(done, total);
         return {
-          n: s.n,
+          n: i + 1,
           kind: "image" as const,
-          url: url ?? placeholderImage(brief.aspectRatio, `Scene ${s.n}`),
-          duration_sec: parseSec(s.duration),
+          url: url ?? placeholderImage(brief.aspectRatio, `Beat ${i + 1}`),
+          duration_sec: TARGET_BEAT_SEC,
           generated: !!url,
         };
       }),
@@ -419,9 +418,73 @@ export const VisualGenerationAgent = {
   },
 };
 
-// ---------- Voiceover (real TTS per scene) ----------
+// ---------- Render (real canvas + real audio, beat-driven) ----------
 
-async function fetchSceneAudio(text: string, voice: VoiceId, ctx: AudioContext): Promise<{ blobUrl: string; buffer: AudioBuffer } | null> {
+export const RenderAgent = {
+  async run(
+    brief: VideoBrief,
+    script: AiVideoScript,
+    beats: Beat[],
+    beatVisuals: VisualAsset[],
+    voice: VoiceoverClip[],
+    onProgress?: (p: number) => void,
+  ): Promise<RenderResult> {
+    // Distribute each scene's audio duration across its beats.
+    const beatDurations: number[] = new Array(beats.length).fill(TARGET_BEAT_SEC);
+    const beatAudio: Array<AudioBuffer | null> = new Array(beats.length).fill(null);
+
+    // Group beats by scene index.
+    const bySceneIdx = new Map<number, number[]>();
+    beats.forEach((b, i) => {
+      const arr = bySceneIdx.get(b.sceneIndex) ?? [];
+      arr.push(i);
+      bySceneIdx.set(b.sceneIndex, arr);
+    });
+
+    bySceneIdx.forEach((globalBeatIndices, sceneIdx) => {
+      const sceneBeats = globalBeatIndices.map((i) => beats[i]);
+      const vo = voice[sceneIdx];
+      const audioSec = vo?.buffer?.duration ?? vo?.duration_sec ?? sceneBeats.length * TARGET_BEAT_SEC;
+      const durations = distributeAudioAcrossBeats(sceneBeats, audioSec);
+      globalBeatIndices.forEach((gi, k) => {
+        beatDurations[gi] = durations[k];
+      });
+      // Attach the scene's continuous audio buffer to the FIRST beat only —
+      // it plays through the subsequent beats' visuals uninterrupted.
+      const firstGi = globalBeatIndices[0];
+      beatAudio[firstGi] = vo?.buffer ?? null;
+    });
+
+    const scenes: RenderScene[] = beats.map((b, i) => ({
+      n: i + 1,
+      visual: b.imagePrompt,
+      voiceover: b.text,
+      duration: `${beatDurations[i].toFixed(2)}s`,
+      // On-screen text only on the first beat of a scene, using the script's overlay when present.
+      on_screen_text: b.isFirstOfScene ? (script.scenes[b.sceneIndex]?.on_screen_text ?? "") : "",
+      motion: b.motion,
+    }));
+
+    const result = await renderVideo({
+      title: brief.title,
+      platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType],
+      contentType: contentTypeFor(brief),
+      styleId: mapStyleForRenderer(brief.style),
+      scenes,
+      sceneImages: beatVisuals.map((v) => v.url),
+      sceneAudio: beatAudio,
+      fitToAudio: false, // durations already sized to the audio timeline
+      onProgress,
+    });
+    return {
+      video_url: URL.createObjectURL(result.blob),
+      mime: result.mimeType,
+      extension: result.extension,
+      duration_sec: result.durationSec,
+      aspect_ratio: brief.aspectRatio,
+    };
+  },
+};
   try {
     const res = await fetch("/api/tts", {
       method: "POST",
