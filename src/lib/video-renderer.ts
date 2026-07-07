@@ -5,7 +5,16 @@
 import { getStyle } from "./constants";
 import { deductUsage } from "./access";
 
-export type RenderScene = { n: number; visual: string; voiceover: string; duration: string; on_screen_text?: string };
+export type CameraMotion = "zoomIn" | "zoomOut" | "panLeft" | "panRight" | "tiltDown" | "tiltUp" | "pushIn";
+export type RenderScene = {
+  n: number;
+  visual: string;
+  voiceover: string;
+  duration: string;
+  on_screen_text?: string;
+  /** Optional camera motion for this beat. Cycled by the pipeline for cinematic variety. */
+  motion?: CameraMotion;
+};
 
 export type RenderOptions = {
   title: string;
