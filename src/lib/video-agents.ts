@@ -248,9 +248,31 @@ export type RetentionPlan = {
   average_gap_sec: number;       // avg seconds between retention beats
 };
 
+/**
+ * YouTube Retention Engine blueprint — produced BEFORE the Script Agent.
+ * Encodes the professional YouTube documentary structure the entire
+ * downstream pipeline (Script, Storyboard, Voice, Editing) must follow.
+ */
+export type RetentionBlueprint = {
+  hook: { time_sec: number; line: string; rationale: string };
+  intro: { start_sec: number; end_sec: number; promise: string; expectation: string };
+  curiosity_loops: Array<{ opens_at_sec: number; open_phrase: string; pays_off_at_sec: number }>;
+  chapters: Array<{ start_sec: number; label: string; goal: string }>;
+  retention_hooks: Array<{ time_sec: number; phrase: string }>;
+  pattern_interrupts: Array<{
+    time_sec: number;
+    kind: "stat" | "text_overlay" | "map" | "timeline" | "infographic" | "broll_change" | "transition";
+    note: string;
+  }>;
+  emotional_climax: { time_sec: number; scene_hint: string; note: string };
+  ending: { time_sec: number; summary: string; question: string };
+  cta: { time_sec: number; line: string; style: string };
+};
+
 export type PipelineResult = {
   brief: VideoBrief;
   research: ResearchBrief;
+  retentionEngine: RetentionBlueprint;
   titles: VideoTitleVariants;
   hook: VideoHook;
   intro: IntroPlan;
@@ -275,6 +297,7 @@ export type PipelineResult = {
 
 export const PIPELINE_STEPS = [
   { id: "research", label: "Researching topic" },
+  { id: "retention_engine", label: "Building YouTube retention blueprint" },
   { id: "title", label: "Optimizing title" },
   { id: "hook", label: "Writing hook" },
   { id: "intro", label: "Shaping intro" },
@@ -378,8 +401,166 @@ export const ResearchAgent = {
   },
 };
 
+// ---------- YouTube Retention Engine (runs BEFORE the Script Agent) ----------
+//
+// Produces a professional YouTube documentary blueprint that the Script,
+// Storyboard, Voice, and Editing agents ALL follow. Everything downstream
+// keys off of this — hook, intro promise, curiosity loops, chapter beats,
+// retention hooks (curiosity statements every 30-60s), pattern interrupts
+// (dramatic overlays / stats / maps / timelines / infographics / b-roll
+// changes / transitions every 20-40s), emotional climax at 80-90%, ending
+// question, and a natural CTA.
+
+const RETENTION_PHRASES = [
+  "But that's only the beginning…",
+  "Then everything changed…",
+  "What happened next shocked everyone…",
+  "And that was the smallest part of the story…",
+  "But here's the twist most people miss…",
+  "The real reason wasn't what anyone expected…",
+  "And then — everything fell apart…",
+  "The moment nobody saw coming…",
+];
+
+const PATTERN_INTERRUPT_KINDS = [
+  "stat", "text_overlay", "map", "timeline", "infographic", "broll_change", "transition",
+] as const;
+
+export const RetentionEngineAgent = {
+  async run(brief: VideoBrief, research: ResearchBrief): Promise<RetentionBlueprint> {
+    const total = brief.duration;
+    const topic = research.topic || brief.title;
+
+    // Hook = 0-30s (or first 15% for shorter formats)
+    const hookEnd = Math.min(30, Math.max(3, total * 0.1));
+
+    // Intro = 30-60s (or 10-20% for shorter formats)
+    const introStart = hookEnd;
+    const introEnd = Math.min(60, Math.max(introStart + 5, total * 0.15));
+
+    // Retention hooks every 30-60s (30s for long videos, 20s for shorts)
+    const retentionEvery = total <= 60 ? 15 : total <= 300 ? 30 : 45;
+    const retention_hooks: RetentionBlueprint["retention_hooks"] = [];
+    for (let t = introEnd + retentionEvery; t < total * 0.85; t += retentionEvery) {
+      retention_hooks.push({
+        time_sec: Math.round(t),
+        phrase: RETENTION_PHRASES[retention_hooks.length % RETENTION_PHRASES.length],
+      });
+    }
+
+    // Pattern interrupts every 20-40s
+    const interruptEvery = total <= 60 ? 12 : total <= 300 ? 25 : 35;
+    const pattern_interrupts: RetentionBlueprint["pattern_interrupts"] = [];
+    for (let t = introEnd + interruptEvery / 2; t < total * 0.9; t += interruptEvery) {
+      const kind = PATTERN_INTERRUPT_KINDS[pattern_interrupts.length % PATTERN_INTERRUPT_KINDS.length];
+      pattern_interrupts.push({
+        time_sec: Math.round(t),
+        kind,
+        note: `Cut to a ${kind.replace("_", " ")} that reframes ${topic} — break the visual pattern.`,
+      });
+    }
+
+    // Curiosity loops: open near start of each third, pay off later
+    const curiosity_loops: RetentionBlueprint["curiosity_loops"] = [];
+    const loopCount = total <= 60 ? 1 : total <= 300 ? 2 : 3;
+    for (let i = 0; i < loopCount; i++) {
+      const opens = Math.round(introEnd + ((total * 0.7 - introEnd) * i) / Math.max(1, loopCount));
+      const pays = Math.round(opens + (total - opens) * 0.55);
+      curiosity_loops.push({
+        opens_at_sec: opens,
+        open_phrase: i === 0
+          ? `But before we get to the biggest reveal about ${topic}, you need to understand this first…`
+          : `And there's one more twist I promised I'd come back to…`,
+        pays_off_at_sec: Math.min(Math.round(total * 0.9), pays),
+      });
+    }
+
+    // Chapters: hook, intro, N main-story chapters, climax, ending, cta
+    const climaxTime = Math.round(total * 0.85);
+    const endingTime = Math.round(total * 0.93);
+    const ctaTime = Math.round(total * 0.97);
+    const mainCount = Math.max(2, Math.min(5, Math.round(total / 90)));
+    const mainSpan = climaxTime - introEnd;
+    const chapters: RetentionBlueprint["chapters"] = [
+      { start_sec: 0, label: "Hook", goal: `Stop the scroll — pose the irresistible question about ${topic}.` },
+      { start_sec: Math.round(introStart), label: "Intro", goal: "Set expectations and promise the payoff." },
+    ];
+    for (let i = 0; i < mainCount; i++) {
+      chapters.push({
+        start_sec: Math.round(introEnd + (mainSpan * i) / mainCount),
+        label: `Chapter ${i + 1}`,
+        goal: "Advance the main story with a clean transition from the previous chapter.",
+      });
+    }
+    chapters.push({ start_sec: climaxTime, label: "Climax", goal: "Land the strongest emotional moment of the video." });
+    chapters.push({ start_sec: endingTime, label: "Ending", goal: "Summarize and leave the viewer with a question." });
+    chapters.push({ start_sec: ctaTime, label: "CTA", goal: "Natural, channel-fit subscribe prompt." });
+
+    return {
+      hook: {
+        time_sec: 0,
+        line: `What if everything you thought you knew about ${topic} was wrong?`,
+        rationale: "Contrarian curiosity gap — promises a payoff and forces the viewer to keep watching.",
+      },
+      intro: {
+        start_sec: Math.round(introStart),
+        end_sec: Math.round(introEnd),
+        promise: `By the end of this video you'll understand the real story behind ${topic} — and why almost everyone gets it wrong.`,
+        expectation: `Set up 3 things the viewer will learn about ${topic}, without giving away the payoff.`,
+      },
+      curiosity_loops,
+      chapters,
+      retention_hooks,
+      pattern_interrupts,
+      emotional_climax: {
+        time_sec: climaxTime,
+        scene_hint: `The single most emotional moment of the ${topic} story — the reveal, the collapse, the turning point.`,
+        note: "This is where retention peaks. Slow the pacing, drop the music, land the line.",
+      },
+      ending: {
+        time_sec: endingTime,
+        summary: `Recap the arc of ${topic} in two short sentences.`,
+        question: `So — what would YOU have done differently?`,
+      },
+      cta: {
+        time_sec: ctaTime,
+        line: `If this changed the way you see ${topic}, there's a follow-up video I made just for you — it's linked right here.`,
+        style: "Conversational, no shouting, references the next video rather than begging for a subscribe.",
+      },
+    };
+  },
+};
+
+/** Serialize a blueprint into the compact brief the Script Agent prompt injects. */
+export function formatRetentionBrief(bp: RetentionBlueprint): string {
+  const secs = (n: number) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
+  const lines: string[] = [];
+  lines.push(`HOOK (${secs(bp.hook.time_sec)}): "${bp.hook.line}"`);
+  lines.push(`INTRO (${secs(bp.intro.start_sec)}-${secs(bp.intro.end_sec)}): promise = ${bp.intro.promise}`);
+  lines.push(`CURIOSITY LOOPS:`);
+  bp.curiosity_loops.forEach((l, i) => {
+    lines.push(`  ${i + 1}. open at ${secs(l.opens_at_sec)}: "${l.open_phrase}" — pay off by ${secs(l.pays_off_at_sec)}`);
+  });
+  lines.push(`CHAPTERS:`);
+  bp.chapters.forEach((c) => lines.push(`  ${secs(c.start_sec)} — ${c.label}: ${c.goal}`));
+  lines.push(`RETENTION HOOKS (insert these curiosity statements at the times below):`);
+  bp.retention_hooks.forEach((h) => lines.push(`  ${secs(h.time_sec)}: "${h.phrase}"`));
+  lines.push(`PATTERN INTERRUPTS (every 20-40s — mark visually in on_screen_text/visual):`);
+  bp.pattern_interrupts.forEach((p) => lines.push(`  ${secs(p.time_sec)} [${p.kind}]: ${p.note}`));
+  lines.push(`EMOTIONAL CLIMAX at ${secs(bp.emotional_climax.time_sec)} (~85% mark): ${bp.emotional_climax.scene_hint}`);
+  lines.push(`ENDING at ${secs(bp.ending.time_sec)}: ${bp.ending.summary} Close with the question: "${bp.ending.question}"`);
+  lines.push(`CTA at ${secs(bp.cta.time_sec)}: "${bp.cta.line}" (${bp.cta.style})`);
+  return lines.join("\n");
+}
+
 export const ScriptAgent = {
-  async run(brief: VideoBrief, research: ResearchBrief, onRetry?: (attempt: number, error: unknown) => void): Promise<AiVideoScript> {
+  async run(
+    brief: VideoBrief,
+    research: ResearchBrief,
+    onRetry?: (attempt: number, error: unknown) => void,
+    blueprint?: RetentionBlueprint,
+  ): Promise<AiVideoScript> {
+    const retentionBrief = blueprint ? formatRetentionBrief(blueprint) : "";
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const script = await generateAiVideoScript({
@@ -391,6 +572,7 @@ export const ScriptAgent = {
             contentType: contentTypeFor(brief),
             audience: research.audience,
             targetLengthSec: brief.duration,
+            retentionBrief,
           },
         });
         logScriptJsonDebug(script);
@@ -1034,24 +1216,35 @@ export async function runVideoPipeline(
 
   const research = await mark("research", () => ResearchAgent.run(brief));
 
-  // New pre-script agents (Title / Hook run in parallel — independent).
+  // YouTube Retention Engine — builds the professional documentary blueprint
+  // FIRST so every downstream agent (script, storyboard, voice, editing)
+  // renders against the same structural plan.
+  const retentionEngine = await mark("retention_engine", () => RetentionEngineAgent.run(brief, research));
+
+  // Pre-script agents (Title / Hook run in parallel — independent).
   const [titles, hook] = await Promise.all([
     mark("title", () => TitleOptimizerAgent.run(brief, research)),
     mark("hook", () => HookAgent.run(brief, research)),
   ]);
 
+  // Prefer the retention engine's hook line — that's the source of truth.
+  const effectiveHook: VideoHook = {
+    ...hook,
+    voiceover: retentionEngine.hook.line || hook.voiceover,
+  };
+
   const script = await mark("script", () => ScriptAgent.run(brief, research, () => {
     onStep("script", "running", "Script generation failed. Retrying...");
-  }));
+  }, retentionEngine));
 
-  // Apply the Hook Agent's opening line to scene 1 so the video starts with
-  // the CTR-optimized hook rather than whatever the Script Agent wrote there.
-  if (script.scenes[0] && hook.voiceover.trim().length > 0) {
+  // Apply the retention engine's hook line to scene 1 so the video opens
+  // with the blueprint's hook verbatim.
+  if (script.scenes[0] && effectiveHook.voiceover.trim().length > 0) {
     script.scenes[0] = {
       ...script.scenes[0],
-      voiceover: hook.voiceover,
-      on_screen_text: hook.on_screen_text || script.scenes[0].on_screen_text,
-      visual: hook.visual || script.scenes[0].visual,
+      voiceover: effectiveHook.voiceover,
+      on_screen_text: effectiveHook.on_screen_text || script.scenes[0].on_screen_text,
+      visual: effectiveHook.visual || script.scenes[0].visual,
     };
   }
 
@@ -1096,7 +1289,7 @@ export async function runVideoPipeline(
   });
 
   return {
-    brief, research, titles, hook, intro, curiosity, script, retention, chapters,
+    brief, research, retentionEngine, titles, hook: effectiveHook, intro, curiosity, script, retention, chapters,
     storyboard, direction, visuals, voiceover, subtitles, music, sfx, timeline,
     render, thumbnail, seo,
   };
@@ -1308,6 +1501,7 @@ export async function runVideoJobPipeline(
   let job: JobRecord;
   let script: AiVideoScript;
   let research: ResearchBrief;
+  let retentionEngine: RetentionBlueprint;
   let storyboard: Storyboard;
   let direction: DirectorPlan;
 
@@ -1318,14 +1512,16 @@ export async function runVideoJobPipeline(
     // differ slightly from the original run, but shot prompts/motions come
     // from the persisted shot records so visuals stay consistent.
     research = await ResearchAgent.run(brief);
-    script = await ScriptAgent.run(brief, research);
+    retentionEngine = await RetentionEngineAgent.run(brief, research);
+    script = await ScriptAgent.run(brief, research, undefined, retentionEngine);
     storyboard = await StoryboardAgent.run(script);
     direction = await DirectorAgent.run(brief, storyboard);
     job = existing;
   } else {
     onEvent({ type: "phase", phase: "planning" });
     research = await ResearchAgent.run(brief);
-    script = await ScriptAgent.run(brief, research);
+    retentionEngine = await RetentionEngineAgent.run(brief, research);
+    script = await ScriptAgent.run(brief, research, undefined, retentionEngine);
     storyboard = await StoryboardAgent.run(script);
     direction = await DirectorAgent.run(brief, storyboard);
     const shots = planShots(script, brief.style);
@@ -1484,7 +1680,7 @@ export async function runVideoJobPipeline(
   onEvent({ type: "phase", phase: "complete" });
 
   const result: PipelineResult = {
-    brief, research, titles, hook, intro, curiosity, script, retention, chapters,
+    brief, research, retentionEngine, titles, hook, intro, curiosity, script, retention, chapters,
     storyboard, direction, visuals, voiceover, subtitles, music, sfx, timeline,
     render, thumbnail, seo,
   };

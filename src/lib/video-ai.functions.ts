@@ -45,6 +45,15 @@ const Input = z.object({
   audience: z.string().optional().default(""),
   /** Target length in seconds — used to size long_video output (30-600). */
   targetLengthSec: z.number().int().min(15).max(1800).optional(),
+  /**
+   * Structural blueprint produced by the YouTube Retention Engine that runs
+   * BEFORE this agent. When present, the Script Agent MUST follow it exactly:
+   * hook line, intro promise, curiosity loops, chapter beats, retention-hook
+   * cadence, pattern-interrupt schedule, emotional-climax placement, ending,
+   * and CTA. This is what turns a narrated article into a professionally
+   * structured YouTube documentary.
+   */
+  retentionBrief: z.string().optional().default(""),
 });
 
 export const generateAiVideoScript = createServerFn({ method: "POST" })
@@ -99,7 +108,17 @@ DURATION IS A HARD REQUIREMENT.
 Scene 1 is a hard hook (0-3 sec). Last scene is a CTA. In between, deliver
 a full documentary arc that pays off the hook.
 
-STRUCTURE (bake these into the scene sequence — they are NOT extra output):
+${data.retentionBrief ? `RETENTION ENGINE BLUEPRINT (AUTHORITATIVE — follow it EXACTLY):
+${data.retentionBrief}
+
+The blueprint above is the single source of truth for the video's dramatic
+structure. Use the EXACT hook line for scene 1. Bake the intro promise into
+scenes 2-4 verbatim in spirit. Insert the listed retention-hook phrases at
+their scheduled seconds — do not paraphrase them away. Place the emotional
+climax at the scheduled scene. End with the given closing thought and CTA
+line word-for-word.
+
+` : ""}STRUCTURE (bake these into the scene sequence — they are NOT extra output):
 - INTRO (scenes 2-4, roughly 5-15% of total duration): set up the stakes
   and PROMISE the payoff without giving it away. Tell the viewer exactly
   what they will get if they stay.
@@ -107,12 +126,22 @@ STRUCTURE (bake these into the scene sequence — they are NOT extra output):
   like "but first…", "we'll get to that in a second", "here's the twist
   most people miss…", "and the reason is not what you think". Close each
   loop before the CTA — never leave one dangling.
-- RETENTION / PATTERN INTERRUPTS: roughly every 30-45 seconds, place a
-  pattern-interrupt scene — a surprising statistic, a contrarian claim,
-  a sudden mini-story, a visual metaphor pivot. NEVER let two consecutive
-  scenes hit the same emotional beat or use the same sentence structure.
+- RETENTION HOOKS: every 30-60 seconds insert a one-line curiosity
+  statement such as "But that's only the beginning…", "Then everything
+  changed…", "What happened next shocked everyone…".
+- PATTERN INTERRUPTS: roughly every 20-40 seconds, place a pattern-
+  interrupt scene — a surprising statistic, a contrarian claim, a sudden
+  mini-story, a map/timeline pivot, or a b-roll change. NEVER let two
+  consecutive scenes hit the same emotional beat or use the same sentence
+  structure. Flag these visually via on_screen_text and visual.
+- EMOTIONAL CLIMAX: the strongest, most emotional moment of the video
+  MUST land at 80-90% of total duration. Build tension toward it.
+- ENDING: summarize the story and leave the viewer with a thought-
+  provoking question.
+- CTA: a natural, channel-appropriate subscribe prompt — never a generic
+  "like and subscribe". Reward viewers who stayed.
 - PAYOFFS: every promise the intro or a loop makes MUST be explicitly
-  paid off in a later scene. Reward the viewer.
+  paid off in a later scene.
 
 
 For EACH scene, produce:
