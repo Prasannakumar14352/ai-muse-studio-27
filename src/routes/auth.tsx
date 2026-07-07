@@ -93,6 +93,15 @@ function AuthPage() {
           error: error?.message ?? null,
         });
         if (error) throw error;
+        if (isLocalHost) {
+          toast.info("Google auth is configured, but localhost must be added to the backend redirect URLs.");
+          console.info("[auth] localhost redirect allow-list required", {
+            addRedirectUrl: `${window.location.origin}/auth`,
+            providerUrl: data?.url ?? null,
+          });
+          setLoading(false);
+          return;
+        }
         // Supabase returns a URL to redirect to.
         if (data?.url) window.location.href = data.url;
       }
