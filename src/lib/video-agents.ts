@@ -12,12 +12,18 @@ import { generateAiVideoScript, type AiVideoScript, type AiVideoScene } from "@/
 export type VideoType = "youtube_long" | "shorts" | "reels" | "tiktok";
 export type DurationSec = 30 | 60 | 180 | 300 | 540 | 720;
 export type StyleId =
-  | "cinematic_documentary"
+  | "3d"
+  | "ghibli"
+  | "anime"
   | "realistic"
-  | "futuristic"
-  | "business"
-  | "educational"
-  | "dark_mystery";
+  | "pixar"
+  | "cinematic"
+  | "documentary"
+  | "dark_mystery"
+  | "luxury"
+  | "cyberpunk"
+  | "minimal_product"
+  | "futuristic";
 export type VoiceId = "male" | "female" | "documentary_narrator";
 export type AspectRatio = "16:9" | "9:16" | "1:1";
 
@@ -132,12 +138,18 @@ export type StepStatus = { id: StepId; label: string; state: StepState; note?: s
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const STYLE_LABEL: Record<StyleId, string> = {
-  cinematic_documentary: "Cinematic Documentary",
+  "3d": "3D",
+  ghibli: "Ghibli-inspired",
+  anime: "Anime",
   realistic: "Realistic",
-  futuristic: "Futuristic",
-  business: "Business",
-  educational: "Educational",
+  pixar: "Pixar-like",
+  cinematic: "Cinematic",
+  documentary: "Documentary",
   dark_mystery: "Dark Mystery",
+  luxury: "Luxury",
+  cyberpunk: "Cyberpunk",
+  minimal_product: "Minimal Product",
+  futuristic: "Futuristic",
 };
 
 const VOICE_LABEL: Record<VoiceId, string> = {

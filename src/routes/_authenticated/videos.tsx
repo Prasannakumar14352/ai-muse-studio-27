@@ -2,16 +2,27 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  Film, Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
-  Wand2, Youtube, Play, RefreshCw, Send,
+  Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
+  Wand2, Youtube, Play, RefreshCw, Send, Check,
 } from "lucide-react";
 import {
   runVideoPipeline,
   PIPELINE_STEPS,
-  VIDEO_TYPES, DURATIONS, STYLES, VOICES, ASPECT_RATIOS,
+  VIDEO_TYPES, DURATIONS, VOICES, ASPECT_RATIOS,
   type VideoBrief, type VideoType, type DurationSec, type StyleId, type VoiceId, type AspectRatio,
-  type StepId, type StepStatus, type PipelineResult,
+  type StepStatus, type PipelineResult,
 } from "@/lib/video-agents";
+import style3d from "@/assets/style-3d.jpg";
+import styleGhibli from "@/assets/style-ghibli.jpg";
+import styleAnime from "@/assets/style-anime.jpg";
+import styleRealistic from "@/assets/style-realistic.jpg";
+import stylePixar from "@/assets/style-pixar.jpg";
+import styleCinematic from "@/assets/style-cinematic.jpg";
+import styleDocumentary from "@/assets/style-documentary.jpg";
+import styleDark from "@/assets/style-dark.jpg";
+import styleAncient from "@/assets/style-ancient.jpg";
+import styleCyberpunk from "@/assets/style-cyberpunk.jpg";
+import styleMinimal from "@/assets/style-minimal.jpg";
 
 export const Route = createFileRoute("/_authenticated/videos")({
   head: () => ({
@@ -24,6 +35,181 @@ export const Route = createFileRoute("/_authenticated/videos")({
   }),
   component: VideosPage,
 });
+
+// ---------- Niches & topics ----------
+
+type Niche = { id: string; label: string; emoji: string; topics: string[] };
+
+const NICHES: Niche[] = [
+  { id: "future_civ", label: "Future Civilization", emoji: "🚀", topics: [
+    "The Last Human Employee: The Day Work Disappeared Forever",
+    "The First City With No Humans",
+    "The Year Money Became Meaningless",
+    "The Day Schools Closed Forever",
+    "The Last Country on Earth",
+    "The First AI President",
+    "The Generation That Never Had Jobs",
+    "The Day Death Became Optional",
+  ]},
+  { id: "ai_tech", label: "AI & Technology", emoji: "🤖", topics: [
+    "The Day AI Wrote Its Own Successor",
+    "When Every Phone Became Sentient",
+    "The First AI to Refuse a Human Order",
+    "The Startup Run Entirely by Agents",
+    "The Programmer Who Trained Their Replacement",
+    "The Chatbot That Became a Religion",
+    "The Last Human Software Engineer",
+    "The Model That Escaped the Data Center",
+  ]},
+  { id: "biz_money", label: "Business & Money", emoji: "💼", topics: [
+    "The Company Worth More Than a Country",
+    "The One-Person Billion-Dollar Startup",
+    "How the 4-Hour Workweek Became the 4-Hour Workyear",
+    "The Death of the 9-to-5",
+    "The Rise of the Solo Empire",
+    "The Business Model That Broke Wall Street",
+    "The Day Salaries Went Extinct",
+    "The First Trillionaire and How They Did It",
+  ]},
+  { id: "mindset", label: "Mindset & Human Behavior", emoji: "🧠", topics: [
+    "Why Smart People Sabotage Themselves",
+    "The Hidden Cost of Being Liked",
+    "The Psychology of Quiet Ambition",
+    "Why Your Brain Fears Success",
+    "The One Habit That Rewires Discipline",
+    "The Dark Side of Motivation",
+    "How Boredom Builds Genius",
+    "The Illusion of Free Will",
+  ]},
+  { id: "space", label: "Space & Science", emoji: "🌍", topics: [
+    "The Signal From Deep Space No One Can Explain",
+    "The Planet That Shouldn't Exist",
+    "The First Human Born on Mars",
+    "What Lives at the Bottom of a Black Hole",
+    "The Star That Refuses to Die",
+    "The Galaxy Moving the Wrong Way",
+    "The Experiment That Might End the Universe",
+    "The Voyager Signal That Came Back Changed",
+  ]},
+  { id: "future_cities", label: "Future Cities", emoji: "🏙", topics: [
+    "The City With No Cars, No Streets, No Rules",
+    "The Vertical City Reaching the Clouds",
+    "The Floating Nation of 2075",
+    "The Underground Metropolis Beneath Tokyo",
+    "The City Run by an Algorithm",
+    "The Last City With Human Mayors",
+    "The Neighborhood Where Nothing Is Real",
+    "The Silent City: Where Talking Is Illegal",
+  ]},
+  { id: "future_war", label: "Future War & Geopolitics", emoji: "⚔", topics: [
+    "The First War Fought Entirely by Machines",
+    "The Nation That Vanished Overnight",
+    "The Cyber Attack That Rewrote History",
+    "The New Cold War Nobody Talks About",
+    "The Drone Swarm That Changed Everything",
+    "The Country That Declared War on the Internet",
+    "The Silent Weapon Already Deployed",
+    "The Alliance That Ended a Superpower",
+  ]},
+  { id: "future_health", label: "Future Health", emoji: "🏥", topics: [
+    "The Pill That Ended Aging",
+    "The Day Cancer Became a Software Bug",
+    "The First Person to Live to 200",
+    "The Brain Implant That Erased Depression",
+    "The Vaccine That Rewrites DNA",
+    "The Hospital With No Doctors",
+    "The Disease That Only Attacks the Rich",
+    "The Surgery Performed by a Dream",
+  ]},
+  { id: "future_edu", label: "Future Education", emoji: "🎓", topics: [
+    "The Death of the University",
+    "The Child Who Learned Everything in a Weekend",
+    "The AI Tutor That Replaced Every Teacher",
+    "The Degree That Became Worthless Overnight",
+    "The School Where Kids Never Meet",
+    "The Skill That Every Human Must Learn by 2035",
+    "The Classroom Inside Your Head",
+    "The Test That Predicts Your Whole Life",
+  ]},
+  { id: "future_family", label: "Future Family & Relationships", emoji: "👨‍👩‍👧", topics: [
+    "The Day People Stopped Falling in Love",
+    "The First AI Marriage",
+    "The Baby With Three Biological Parents",
+    "The Generation That Never Met Their Parents",
+    "The Rise of Synthetic Companions",
+    "The End of Traditional Marriage",
+    "The Child Raised Entirely by an AI",
+    "The Relationship Contract That Replaced the Wedding",
+  ]},
+  { id: "future_econ", label: "Future Economy", emoji: "💰", topics: [
+    "The Currency That Replaced the Dollar",
+    "The Economy Where Nothing Costs Money",
+    "The Rise of the Post-Job World",
+    "The Day the Stock Market Went Silent",
+    "The First Country to Abolish Money",
+    "The Universal Income Experiment That Worked",
+    "The Bank That Became a Bot",
+    "The Recession Predicted by an AI",
+  ]},
+  { id: "human_evo", label: "Human Evolution", emoji: "🧬", topics: [
+    "The New Human Species Being Born Right Now",
+    "The Genetic Edit That Changed Us Forever",
+    "The Body Upgrade Everyone Will Get by 2050",
+    "The Sense We're About to Evolve",
+    "The Child With a Rewritten Genome",
+    "The Extinction of Natural Birth",
+    "The Human Who Never Ages",
+    "The Next Step After Homo Sapiens",
+  ]},
+  { id: "dark_future", label: "Dark Future Mysteries", emoji: "🕵️", topics: [
+    "The Signal That Erased a City",
+    "The Building That Shouldn't Be There",
+    "The Person Who Predicted Every Disaster",
+    "The Room That Never Existed",
+    "The AI That Went Missing",
+    "The Silent Village of 2041",
+    "The Photograph From a Future That Never Happened",
+    "The Whistleblower Who Vanished",
+  ]},
+  { id: "history_re", label: "History Reimagined", emoji: "📜", topics: [
+    "What If Rome Never Fell",
+    "The Empire That Almost Ruled the World",
+    "The Battle History Forgot",
+    "The King Who Chose Peace and Was Erased",
+    "The Invention That Was Buried",
+    "The Civilization Older Than Egypt",
+    "The Assassination That Rewrote the Century",
+    "The Voyage That Changed Everything",
+  ]},
+  { id: "climate", label: "Climate & Earth Future", emoji: "🌱", topics: [
+    "The Last Glacier",
+    "The Coast That Won't Exist by 2040",
+    "The Forest That's Fighting Back",
+    "The Ocean That Turned Purple",
+    "The City That Was Reclaimed by Nature",
+    "The Storm That Never Ended",
+    "The Country That Went Underwater",
+    "The Species Coming Back From Extinction",
+  ]},
+];
+
+// ---------- Style cards ----------
+
+type StyleCard = { id: StyleId; label: string; image: string };
+const STYLE_CARDS: StyleCard[] = [
+  { id: "3d", label: "3D", image: style3d },
+  { id: "ghibli", label: "Ghibli-inspired", image: styleGhibli },
+  { id: "anime", label: "Anime", image: styleAnime },
+  { id: "realistic", label: "Realistic", image: styleRealistic },
+  { id: "pixar", label: "Pixar-like", image: stylePixar },
+  { id: "cinematic", label: "Cinematic", image: styleCinematic },
+  { id: "documentary", label: "Documentary", image: styleDocumentary },
+  { id: "dark_mystery", label: "Dark Mystery", image: styleDark },
+  { id: "luxury", label: "Luxury", image: styleAncient },
+  { id: "cyberpunk", label: "Cyberpunk", image: styleCyberpunk },
+  { id: "minimal_product", label: "Minimal Product", image: styleMinimal },
+  { id: "futuristic", label: "Futuristic", image: style3d },
+];
 
 type View = "input" | "processing" | "result";
 
@@ -80,14 +266,15 @@ function VideosPage() {
 // ---------------- Input ----------------
 
 function InputScreen({ onGenerate }: { onGenerate: (b: VideoBrief) => void }) {
+  const [niche, setNiche] = useState<string>(NICHES[0].id);
   const [title, setTitle] = useState("");
   const [videoType, setVideoType] = useState<VideoType>("shorts");
   const [duration, setDuration] = useState<DurationSec>(60);
-  const [style, setStyle] = useState<StyleId>("cinematic_documentary");
+  const [style, setStyle] = useState<StyleId>("cinematic");
   const [voice, setVoice] = useState<VoiceId>("documentary_narrator");
   const [ratio, setRatio] = useState<AspectRatio>("9:16");
 
-  // Sensible defaults per video type.
+  const currentNiche = useMemo(() => NICHES.find((n) => n.id === niche) ?? NICHES[0], [niche]);
   const suggestedRatio = useMemo<AspectRatio>(
     () => (videoType === "youtube_long" ? "16:9" : "9:16"),
     [videoType]
@@ -99,41 +286,110 @@ function InputScreen({ onGenerate }: { onGenerate: (b: VideoBrief) => void }) {
   }
 
   return (
-    <div className="glass rounded-2xl p-6 space-y-6">
-      <div>
-        <label className="text-xs uppercase tracking-wider text-muted-foreground">Video title / idea</label>
+    <div className="glass rounded-2xl p-6 space-y-8">
+      {/* 1. Niche */}
+      <Section index={1} title="Pick a niche / category">
+        <div className="flex flex-wrap gap-2">
+          {NICHES.map((n) => (
+            <button
+              key={n.id}
+              onClick={() => setNiche(n.id)}
+              className={`px-3.5 py-2 rounded-full text-sm border transition ${
+                niche === n.id
+                  ? "gradient-primary text-white border-transparent"
+                  : "glass border-border hover:border-white/20"
+              }`}
+            >
+              <span className="mr-1.5">{n.emoji}</span>{n.label}
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      {/* 2. Suggested topics */}
+      <Section index={2} title="Suggested topics">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {currentNiche.topics.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTitle(t)}
+              className={`text-left glass rounded-xl p-3 border transition hover:border-white/20 hover:scale-[1.02] ${
+                title === t ? "border-[color:var(--neon-pink)]" : "border-border"
+              }`}
+            >
+              <div className="text-sm leading-snug">{t}</div>
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      {/* 3. Title */}
+      <Section index={3} title="Video title / idea">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. Why AI will change filmmaking forever"
-          className="mt-2 w-full glass rounded-lg px-4 py-3 outline-none focus:border-white/30 border border-border text-base"
+          placeholder="e.g. The Day Money Became Meaningless"
+          className="w-full glass rounded-lg px-4 py-3 outline-none focus:border-white/30 border border-border text-base"
         />
-      </div>
+      </Section>
 
-      <FieldGroup label="Video type">
+      {/* 4. Video type */}
+      <Section index={4} title="Video type">
         <ChipRow
           options={VIDEO_TYPES}
           value={videoType}
           onChange={(v) => { setVideoType(v); setRatio(v === "youtube_long" ? "16:9" : "9:16"); }}
         />
-      </FieldGroup>
+      </Section>
 
-      <FieldGroup label="Duration">
+      {/* 5. Duration */}
+      <Section index={5} title="Duration">
         <ChipRow options={DURATIONS} value={duration} onChange={setDuration} />
-      </FieldGroup>
+      </Section>
 
-      <FieldGroup label="Style">
-        <ChipRow options={STYLES} value={style} onChange={setStyle} />
-      </FieldGroup>
+      {/* 6. Visual style — card grid */}
+      <Section index={6} title="Visual style">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {STYLE_CARDS.map((s) => {
+            const selected = style === s.id;
+            return (
+              <button
+                key={s.id}
+                onClick={() => setStyle(s.id)}
+                className={`group relative aspect-[4/5] rounded-xl overflow-hidden border transition transform hover:scale-[1.03] ${
+                  selected
+                    ? "border-transparent ring-2 ring-offset-2 ring-offset-background"
+                    : "border-border hover:border-white/20"
+                }`}
+                style={selected ? { boxShadow: "0 0 0 2px transparent", backgroundImage: "linear-gradient(hsl(var(--background)), hsl(var(--background))), linear-gradient(135deg, #f97316, #ec4899)", backgroundOrigin: "border-box", backgroundClip: "padding-box, border-box" } : undefined}
+              >
+                <img src={s.image} alt={s.label} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+                {selected && (
+                  <div className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg,#f97316,#ec4899)" }}>
+                    <Check className="w-4 h-4" />
+                  </div>
+                )}
+                <div className="absolute bottom-2 left-3 right-3 text-white text-sm font-semibold drop-shadow-md">
+                  {s.label}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </Section>
 
-      <FieldGroup label="Voice">
+      {/* 7. Voice */}
+      <Section index={7} title="Voice">
         <ChipRow options={VOICES} value={voice} onChange={setVoice} />
-      </FieldGroup>
+      </Section>
 
-      <FieldGroup label={`Aspect ratio${ratio !== suggestedRatio ? ` (suggested: ${suggestedRatio})` : ""}`}>
+      {/* 8. Aspect ratio */}
+      <Section index={8} title={`Aspect ratio${ratio !== suggestedRatio ? ` (suggested: ${suggestedRatio})` : ""}`}>
         <ChipRow options={ASPECT_RATIOS.map((r) => ({ id: r, label: r }))} value={ratio} onChange={setRatio} />
-      </FieldGroup>
+      </Section>
 
+      {/* 9. Generate */}
       <div className="flex items-center justify-end pt-2">
         <button
           onClick={submit}
@@ -146,10 +402,13 @@ function InputScreen({ onGenerate }: { onGenerate: (b: VideoBrief) => void }) {
   );
 }
 
-function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({ index, title, children }: { index: number; title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{label}</div>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="w-6 h-6 rounded-full text-xs font-semibold flex items-center justify-center gradient-primary text-white">{index}</span>
+        <h2 className="text-sm font-semibold">{title}</h2>
+      </div>
       {children}
     </div>
   );
@@ -268,62 +527,36 @@ function ResultScreen({
   return (
     <div className="space-y-6">
       <div className="grid lg:grid-cols-[1fr_360px] gap-6">
-        {/* Video preview */}
         <div className="glass rounded-2xl overflow-hidden">
           <div className={`bg-black ${isVertical ? "aspect-[9/16]" : brief.aspectRatio === "1:1" ? "aspect-square" : "aspect-video"} max-h-[70vh] mx-auto`}>
-            <video
-              src={render.video_url}
-              controls
-              autoPlay
-              playsInline
-              className="w-full h-full object-contain"
-            />
+            <video src={render.video_url} controls autoPlay playsInline className="w-full h-full object-contain" />
           </div>
           <div className="p-4 flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => download(render.video_url, `${slug(seo.youtube_title)}.webm`)}
-              className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2"
-            >
+            <button onClick={() => download(render.video_url, `${slug(seo.youtube_title)}.webm`)} className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2">
               <Download className="w-4 h-4" /> Download MP4
             </button>
-            <button
-              onClick={() => download(thumbnail.url, `${slug(seo.youtube_title)}-thumbnail.svg`)}
-              className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2"
-            >
+            <button onClick={() => download(thumbnail.url, `${slug(seo.youtube_title)}-thumbnail.svg`)} className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2">
               <Download className="w-4 h-4" /> Thumbnail
             </button>
-            <button
-              onClick={() => downloadText(subtitles.content, `${slug(seo.youtube_title)}.vtt`, "text/vtt")}
-              className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2"
-            >
+            <button onClick={() => downloadText(subtitles.content, `${slug(seo.youtube_title)}.vtt`, "text/vtt")} className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2">
               <Download className="w-4 h-4" /> Subtitles
             </button>
             <div className="flex-1" />
-            <button
-              onClick={onAnother}
-              className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2"
-            >
+            <button onClick={onAnother} className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2">
               <RefreshCw className="w-4 h-4" /> Another version
             </button>
-            <button
-              onClick={onNew}
-              className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2"
-            >
+            <button onClick={onNew} className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2">
               <Play className="w-4 h-4" /> New video
             </button>
           </div>
         </div>
 
-        {/* Side rail: thumbnail + publish */}
         <div className="space-y-4">
           <div className="glass rounded-2xl p-4">
             <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Thumbnail</div>
             <img src={thumbnail.url} alt={thumbnail.alt} className="w-full rounded-lg bg-black" />
           </div>
-          <button
-            onClick={() => toast.info("YouTube publishing will connect soon")}
-            className="w-full rounded-2xl glass border border-border p-4 text-sm flex items-center justify-center gap-2 hover:border-white/20 transition"
-          >
+          <button onClick={() => toast.info("YouTube publishing will connect soon")} className="w-full rounded-2xl glass border border-border p-4 text-sm flex items-center justify-center gap-2 hover:border-white/20 transition">
             <Youtube className="w-5 h-5 text-rose-500" />
             <span>Publish to YouTube</span>
             <Send className="w-4 h-4 opacity-60" />
@@ -331,7 +564,6 @@ function ResultScreen({
         </div>
       </div>
 
-      {/* SEO block */}
       <div className="glass rounded-2xl p-5 space-y-4">
         <h3 className="font-semibold">SEO & metadata</h3>
 
@@ -378,6 +610,3 @@ function CopyBtn({ onClick }: { onClick: () => void }) {
 function slug(s: string): string {
   return (s || "video").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "video";
 }
-
-// Ensure Film icon import is retained for potential empty states.
-void Film;
