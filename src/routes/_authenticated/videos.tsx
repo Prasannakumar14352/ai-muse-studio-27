@@ -361,24 +361,66 @@ function VideosPage() {
     toast.success("Thumbnail deleted");
   }
 
+  const showHeaderNewBtn = view === "landing" || view === "input";
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl md:text-4xl font-bold">AI <span className="gradient-text">Video Studio</span></h1>
-        <p className="text-muted-foreground mt-1">
-          One idea in, a ready-to-post video out — script, visuals, voice, music, subtitles, thumbnail, SEO.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          {view === "input" ? (
+            <>
+              <h1 className="text-3xl md:text-4xl font-bold">
+                AI <span className="gradient-text">Video Studio</span>
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                One idea in, a ready-to-post video out — script, visuals, voice, music, subtitles, thumbnail, SEO.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-3xl md:text-4xl font-bold">
+                Your <span className="gradient-text">Videos</span>
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                AI-generated shorts and long-form videos with thumbnails, subtitles, and SEO.
+              </p>
+            </>
+          )}
+        </div>
+        {showHeaderNewBtn && (
+          <button
+            onClick={() => setView("input")}
+            className="rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-2 shrink-0"
+          >
+            <Plus className="w-4 h-4" /> New video
+          </button>
+        )}
       </div>
 
-      {view === "input" && (
+      {view === "landing" && (
         <>
-          <InputScreen onGenerate={start} />
-          {library.length > 0 && (
+          {library.length > 0 ? (
             <LibrarySection items={library} onOpen={openFromLibrary} onDelete={removeFromLibrary} />
+          ) : (
+            <EmptyLibrary onNew={() => setView("input")} />
           )}
           {thumbLibrary.length > 0 && (
             <ThumbnailLibrarySection items={thumbLibrary} onDelete={removeThumb} />
           )}
+        </>
+      )}
+
+      {view === "input" && (
+        <>
+          <div className="flex items-center">
+            <button
+              onClick={() => setView("landing")}
+              className="text-sm text-muted-foreground hover:text-white flex items-center gap-1"
+            >
+              ← Back to your videos
+            </button>
+          </div>
+          <InputScreen onGenerate={start} />
         </>
       )}
       {view === "processing" && <ProcessingScreen steps={steps} error={error} onCancel={reset} />}
@@ -392,6 +434,26 @@ function VideosPage() {
           onDelete={() => removeFromLibrary(libraryOpen.meta.id)}
         />
       )}
+    </div>
+  );
+}
+
+function EmptyLibrary({ onNew }: { onNew: () => void }) {
+  return (
+    <div className="glass rounded-2xl p-16 flex flex-col items-center justify-center text-center border border-border">
+      <div className="w-14 h-14 rounded-full glass flex items-center justify-center mb-4 border border-border">
+        <Video className="w-6 h-6 text-muted-foreground" />
+      </div>
+      <h2 className="text-lg font-semibold">No videos yet</h2>
+      <p className="text-sm text-muted-foreground mt-1 max-w-md">
+        Generate your first AI video — script, visuals, voice, subtitles and SEO in one flow.
+      </p>
+      <button
+        onClick={onNew}
+        className="mt-5 rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-2"
+      >
+        <Plus className="w-4 h-4" /> New video
+      </button>
     </div>
   );
 }
