@@ -216,29 +216,78 @@ const STYLE_CARDS: StyleCard[] = [
   { id: "futuristic", label: "Futuristic", image: style3d },
 ];
 
-type View = "input" | "processing" | "result";
+type View = "input" | "processing" | "result" | "library";
+type GenerateArgs = { brief: VideoBrief; niche: string; topic: string };
+type LibraryOpen = {
+  meta: LocalVideo;
+  videoUrl: string;
+  thumbnailUrl: string | null;
+};
 
 function VideosPage() {
   const [view, setView] = useState<View>("input");
-  const [brief, setBrief] = useState<VideoBrief | null>(null);
+  const [gen, setGen] = useState<GenerateArgs | null>(null);
   const [steps, setSteps] = useState<StepStatus[]>(
     PIPELINE_STEPS.map((s) => ({ id: s.id, label: s.label, state: "pending" }))
   );
   const [result, setResult] = useState<PipelineResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [library, setLibrary] = useState<LocalVideo[]>([]);
+  const [libraryOpen, setLibraryOpen] = useState<LibraryOpen | null>(null);
 
-  async function start(b: VideoBrief) {
-    setBrief(b);
+  const refreshLibrary = useCallback(async () => {
+    const items = await getGeneratedVideos();
+    setLibrary(items);
+  }, []);
+
+  useEffect(() => { void refreshLibrary(); }, [refreshLibrary]);
+
+  async function start(args: GenerateArgs) {
+    setGen(args);
     setError(null);
     setResult(null);
+    setLibraryOpen(null);
     setSteps(PIPELINE_STEPS.map((s) => ({ id: s.id, label: s.label, state: "pending" })));
     setView("processing");
     try {
-      const r = await runVideoPipeline(b, (id, state, note) => {
+      const r = await runVideoPipeline(args.brief, (id, state, note) => {
         setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, state, note } : s)));
       });
       setResult(r);
       setView("result");
+
+      // Persist to browser-local library — no backend, no upload.
+      try {
+        const videoBlob = await (await fetch(r.render.video_url)).blob();
+        const niche = args.niche;
+        const nicheLabel = NICHES.find((n) => n.id === niche)?.label ?? niche;
+        const styleLabel = STYLE_CARDS.find((s) => s.id === args.brief.style)?.label ?? args.brief.style;
+        await saveGeneratedVideo({
+          title: args.brief.title,
+          niche: nicheLabel,
+          topic: args.topic || args.brief.title,
+          styleId: args.brief.style,
+          styleLabel,
+          videoType: args.brief.videoType,
+          aspectRatio: args.brief.aspectRatio,
+          duration_sec: r.render.duration_sec,
+          extension: r.render.extension,
+          mime: r.render.mime,
+          youtube_title: r.seo.youtube_title,
+          youtube_description: r.seo.youtube_description,
+          hashtags: r.seo.hashtags,
+          tags: r.seo.tags,
+          pinned_comment: r.seo.pinned_comment,
+          chapters: r.seo.chapters,
+          subtitles_vtt: r.subtitles.content,
+          video_blob: videoBlob,
+          thumbnail: r.thumbnail.url,
+        });
+        await refreshLibrary();
+      } catch (saveErr) {
+        console.warn("Local video save failed:", saveErr);
+        toast.error("Couldn't save to your local library (storage full?)");
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Pipeline failed";
       setError(msg);
@@ -249,7 +298,28 @@ function VideosPage() {
   function reset() {
     setView("input");
     setResult(null);
+    setLibraryOpen(null);
     setError(null);
+  }
+
+  async function openFromLibrary(rec: LocalVideo) {
+    const videoUrl = await loadVideoObjectURL(rec);
+    if (!videoUrl) { toast.error("Video file missing from local storage"); return; }
+    const thumbnailUrl = await loadThumbnailObjectURL(rec);
+    setLibraryOpen({ meta: rec, videoUrl, thumbnailUrl });
+    setView("library");
+  }
+
+  async function removeFromLibrary(id: string) {
+    await deleteGeneratedVideo(id);
+    if (libraryOpen?.meta.id === id) {
+      URL.revokeObjectURL(libraryOpen.videoUrl);
+      if (libraryOpen.thumbnailUrl) URL.revokeObjectURL(libraryOpen.thumbnailUrl);
+      setLibraryOpen(null);
+      setView("input");
+    }
+    await refreshLibrary();
+    toast.success("Deleted");
   }
 
   return (
@@ -261,9 +331,25 @@ function VideosPage() {
         </p>
       </div>
 
-      {view === "input" && <InputScreen onGenerate={start} />}
+      {view === "input" && (
+        <>
+          <InputScreen onGenerate={start} />
+          {library.length > 0 && (
+            <LibrarySection items={library} onOpen={openFromLibrary} onDelete={removeFromLibrary} />
+          )}
+        </>
+      )}
       {view === "processing" && <ProcessingScreen steps={steps} error={error} onCancel={reset} />}
-      {view === "result" && result && <ResultScreen result={result} onAnother={() => brief && start(brief)} onNew={reset} />}
+      {view === "result" && result && (
+        <ResultScreen result={result} onAnother={() => gen && start(gen)} onNew={reset} />
+      )}
+      {view === "library" && libraryOpen && (
+        <LibraryViewer
+          entry={libraryOpen}
+          onBack={reset}
+          onDelete={() => removeFromLibrary(libraryOpen.meta.id)}
+        />
+      )}
     </div>
   );
 }
