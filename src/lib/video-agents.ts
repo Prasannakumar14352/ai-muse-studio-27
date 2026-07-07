@@ -567,15 +567,15 @@ export const SoundEffectsAgent = {
 };
 
 export const VideoEditingAgent = {
-  async run(script: AiVideoScript, visuals: VisualAsset[], voice: VoiceoverClip[]): Promise<Timeline> {
+  async run(script: AiVideoScript, voice: VoiceoverClip[]): Promise<Timeline> {
     let t = 0;
     const scenes = script.scenes.map((s, i) => {
-      const v = visuals[i];
       const vo = voice[i];
-      const dur = Math.max(v?.duration_sec ?? 3, (vo?.duration_sec ?? 0) + 0.25);
+      const dur = Math.max(2, (vo?.duration_sec ?? parseSec(s.duration)) + 0.25);
       const item = {
         n: s.n, start_sec: t, end_sec: t + dur,
-        voiceover: s.voiceover, on_screen_text: s.on_screen_text ?? "", visual: v!,
+        voiceover: s.voiceover, on_screen_text: s.on_screen_text ?? "",
+        visual: { n: s.n, kind: "image" as const, url: "", duration_sec: dur, generated: false },
       };
       t += dur;
       return item;
