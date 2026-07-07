@@ -6,6 +6,7 @@
 // in later without touching the UI.
 
 import { generateAiVideoScript, type AiVideoScript, type AiVideoScene } from "@/lib/video-ai.functions";
+import { buildFallbackVideoScript } from "@/lib/video-fallback";
 
 // ---------- Shared types ----------
 
@@ -191,20 +192,42 @@ export const ResearchAgent = {
 };
 
 export const ScriptAgent = {
-  async run(brief: VideoBrief, research: ResearchBrief): Promise<AiVideoScript> {
-    // Real AI call via existing server function.
-    const script = await generateAiVideoScript({
-      data: {
-        topic: research.topic,
-        tone: STYLE_LABEL[brief.style],
-        platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType],
-        styleLabel: STYLE_LABEL[brief.style],
-        contentType: contentTypeFor(brief),
-        audience: research.audience,
-        targetLengthSec: brief.duration,
+  async run(brief: VideoBrief, research: ResearchBrief, onRetry?: (attempt: number, error: unknown) => void): Promise<AiVideoScript> {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const script = await generateAiVideoScript({
+          data: {
+            topic: research.topic,
+            tone: STYLE_LABEL[brief.style],
+            platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType],
+            styleLabel: STYLE_LABEL[brief.style],
+            contentType: contentTypeFor(brief),
+            audience: research.audience,
+            targetLengthSec: brief.duration,
+          },
+        });
+        logScriptJsonDebug(script);
+        return script;
+      } catch (error) {
+        if (isHardAiFailure(error)) throw error;
+        console.error("Script generation failed. Retrying...", error);
+        onRetry?.(attempt, error);
+        if (attempt < 3) await wait(700 * attempt);
+      }
+    }
+
+    const sceneCount = Math.max(3, Math.min(120, Math.round(brief.duration / (brief.videoType === "youtube_long" ? 8 : 5))));
+    const fallback = buildFallbackVideoScript(brief.title, sceneCount, brief.duration, brief.aspectRatio, STYLE_LABEL[brief.style]);
+    return {
+      ...fallback,
+      debug_json: {
+        raw_responses: [],
+        parse_errors: ["Script generation used a structured fallback after 3 failed attempts."],
+        attempts: 3,
+        used_repair: false,
+        used_fallback: true,
       },
-    });
-    return script;
+    };
   },
 };
 
@@ -422,7 +445,9 @@ export async function runVideoPipeline(
   };
 
   const research = await mark("research", () => ResearchAgent.run(brief));
-  const script = await mark("script", () => ScriptAgent.run(brief, research));
+  const script = await mark("script", () => ScriptAgent.run(brief, research, () => {
+    onStep("script", "running", "Script generation failed. Retrying...");
+  }));
   const storyboard = await mark("storyboard", () => StoryboardAgent.run(script));
   const direction = await mark("direction", () => DirectorAgent.run(brief, storyboard));
   const visuals = await mark("visuals", () => VisualGenerationAgent.run(brief, script));
@@ -444,6 +469,20 @@ function parseSec(d: string): number {
   const m = /([\d.]+)/.exec(d ?? "");
   const n = m ? parseFloat(m[1]) : 3;
   return Number.isFinite(n) && n > 0 ? n : 3;
+}
+
+function logScriptJsonDebug(script: AiVideoScript) {
+  const debug = script.debug_json;
+  if (!debug) return;
+  debug.raw_responses.forEach((raw, i) => {
+    console.error(`[Script Agent raw AI response ${i + 1}]`, raw);
+  });
+  debug.parse_errors.forEach((error) => console.error("[Script Agent JSON validation]", error));
+}
+
+function isHardAiFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("AI gateway 402") || message.includes("AI gateway 429") || message.includes("Unauthorized") || message.includes("Missing LOVABLE_API_KEY");
 }
 
 function vtt(sec: number): string {

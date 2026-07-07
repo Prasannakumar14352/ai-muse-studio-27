@@ -473,8 +473,8 @@ function ProcessingScreen({
             {s.state === "pending" && <Circle className="w-5 h-5 text-muted-foreground/50 shrink-0" />}
             {s.state === "error" && <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />}
             <span className={s.state === "pending" ? "text-muted-foreground" : ""}>{s.label}</span>
-            {s.note && s.state === "error" && (
-              <span className="text-xs text-rose-400">— {s.note}</span>
+            {s.note && (
+              <span className={`text-xs ${s.state === "error" ? "text-rose-400" : "text-muted-foreground"}`}>— {s.note}</span>
             )}
           </li>
         ))}
