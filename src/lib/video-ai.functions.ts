@@ -310,4 +310,67 @@ Return JSON EXACTLY:
     }));
 
     return { scenes, image_prompts };
+    return { scenes, image_prompts };
   });
+
+// ---------------------------------------------------------------------------
+// Tolerant JSON repair for truncated model output.
+// Gemini/Flash sometimes hits its output token cap mid-scene, leaving JSON
+// like `{"scenes":[{...},{...},{"n":42,"voice`. We salvage as much of the
+// scenes array as we can by trimming back to the last complete object and
+// closing any open brackets, so the pipeline can proceed.
+// ---------------------------------------------------------------------------
+function repairTruncatedJson(raw: string): unknown | null {
+  const start = raw.indexOf("{");
+  if (start < 0) return null;
+  const s = raw.slice(start);
+
+  // Fast path: matched braces already.
+  try { return JSON.parse(s); } catch { /* fall through */ }
+
+  // Walk through the string tracking string state and bracket depth. Remember
+  // the last position where we could cleanly close everything.
+  let inStr = false;
+  let esc = false;
+  const stack: string[] = [];
+  let lastGoodCut = -1;
+  let lastGoodClose = "";
+
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (esc) { esc = false; continue; }
+    if (c === "\\") { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+
+    if (c === "{" || c === "[") stack.push(c === "{" ? "}" : "]");
+    else if (c === "}" || c === "]") stack.pop();
+
+    // After a value-ending character at the top of the scenes array, remember
+    // this as a safe truncation point.
+    if ((c === "}" || c === "]") && stack.length > 0) {
+      lastGoodCut = i;
+      lastGoodClose = stack.slice().reverse().join("");
+    }
+  }
+
+  const tryParse = (candidate: string): unknown | null => {
+    try { return JSON.parse(candidate); } catch { return null; }
+  };
+
+  if (lastGoodCut > 0) {
+    // Trim trailing whitespace/comma after the last complete value, then close.
+    let end = lastGoodCut + 1;
+    while (end < s.length && /\s/.test(s[end])) end++;
+    // Drop a trailing comma if any got included.
+    let candidate = s.slice(0, end).replace(/,\s*$/, "") + lastGoodClose;
+    const parsed = tryParse(candidate);
+    if (parsed) return parsed;
+    // Fallback: close whatever stack is open right now.
+    candidate = s.slice(0, end).replace(/,\s*$/, "") + stack.slice().reverse().join("");
+    const parsed2 = tryParse(candidate);
+    if (parsed2) return parsed2;
+  }
+
+  return null;
+}
