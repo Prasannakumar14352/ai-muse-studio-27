@@ -234,17 +234,43 @@ type LibraryOpen = {
   thumbnailUrl: string | null;
 };
 
+type DashState = {
+  phase: JobPhaseId;
+  shots: ShotProgress[];
+  shotsDone: number;
+  shotsFailed: number;
+  shotsTotal: number;
+  voiceoverDone: number;
+  voiceoverTotal: number;
+  renderProgress: number;
+  jobId: string | null;
+};
+
+const initialDash: DashState = {
+  phase: "planning",
+  shots: [],
+  shotsDone: 0,
+  shotsFailed: 0,
+  shotsTotal: 0,
+  voiceoverDone: 0,
+  voiceoverTotal: 0,
+  renderProgress: 0,
+  jobId: null,
+};
+
 function VideosPage() {
   const [view, setView] = useState<View>("landing");
   const [gen, setGen] = useState<GenerateArgs | null>(null);
-  const [steps, setSteps] = useState<StepStatus[]>(
-    PIPELINE_STEPS.map((s) => ({ id: s.id, label: s.label, state: "pending" }))
-  );
+  const [dash, setDash] = useState<DashState>(initialDash);
   const [result, setResult] = useState<PipelineResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [library, setLibrary] = useState<LocalVideo[]>([]);
   const [libraryOpen, setLibraryOpen] = useState<LibraryOpen | null>(null);
   const [thumbLibrary, setThumbLibrary] = useState<LocalThumbnail[]>([]);
+  const [inProgress, setInProgress] = useState<JobRecord[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
+  const dashRef = useRef<DashState>(initialDash);
+  dashRef.current = dash;
 
   const refreshLibrary = useCallback(async () => {
     const items = await getGeneratedVideos();
@@ -254,22 +280,63 @@ function VideosPage() {
     const items = await getGeneratedThumbnails();
     setThumbLibrary(items);
   }, []);
+  const refreshInProgress = useCallback(async () => {
+    const jobs = await listJobs();
+    setInProgress(jobs.filter((j) => j.phase !== "complete"));
+  }, []);
 
-  useEffect(() => { void refreshLibrary(); void refreshThumbLibrary(); }, [refreshLibrary, refreshThumbLibrary]);
+  useEffect(() => {
+    void refreshLibrary();
+    void refreshThumbLibrary();
+    void refreshInProgress();
+  }, [refreshLibrary, refreshThumbLibrary, refreshInProgress]);
 
-  async function start(args: GenerateArgs) {
+  const handleJobEvent = useCallback((ev: JobEvent) => {
+    setDash((prev) => {
+      switch (ev.type) {
+        case "phase":
+          return { ...prev, phase: ev.phase };
+        case "shots-init":
+          return { ...prev, shotsTotal: ev.total, shots: ev.shots,
+            shotsDone: ev.shots.filter((s) => s.status === "done").length,
+            shotsFailed: ev.shots.filter((s) => s.status === "failed").length };
+        case "shot": {
+          const shots = prev.shots.slice();
+          const idx = shots.findIndex((s) => s.id === ev.shot.id);
+          if (idx >= 0) shots[idx] = ev.shot; else shots.push(ev.shot);
+          return { ...prev, shots, shotsDone: ev.done, shotsFailed: ev.failed, shotsTotal: ev.total };
+        }
+        case "voiceover":
+          return { ...prev, voiceoverDone: ev.done, voiceoverTotal: ev.total };
+        case "render":
+          return { ...prev, renderProgress: ev.progress };
+        case "error":
+          return prev;
+      }
+    });
+  }, []);
+
+  async function start(args: GenerateArgs, resumeJobId?: string) {
     setGen(args);
     setError(null);
     setResult(null);
     setLibraryOpen(null);
-    setSteps(PIPELINE_STEPS.map((s) => ({ id: s.id, label: s.label, state: "pending" })));
+    setDash({ ...initialDash, jobId: resumeJobId ?? null });
     setView("processing");
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      const r = await runVideoPipeline(args.brief, (id, state, note) => {
-        setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, state, note } : s)));
+      const { job, result: r } = await runVideoJobPipeline(args.brief, {
+        jobId: resumeJobId,
+        niche: args.niche,
+        topic: args.topic,
+        onEvent: handleJobEvent,
+        signal: controller.signal,
       });
+      setDash((prev) => ({ ...prev, jobId: job.id }));
       setResult(r);
       setView("result");
+      await refreshInProgress();
 
       // Persist to browser-local library — no backend, no upload.
       try {
@@ -304,10 +371,36 @@ function VideosPage() {
         toast.error("Couldn't save to your local library (storage full?)");
       }
     } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        toast.info("Generation paused. You can resume from your videos list.");
+        setView("landing");
+        await refreshInProgress();
+        return;
+      }
       const msg = e instanceof Error ? e.message : "Pipeline failed";
       setError(msg);
       toast.error(msg);
     }
+  }
+
+  function cancel() {
+    abortRef.current?.abort();
+  }
+
+  async function resumeJob(job: JobRecord) {
+    const brief = JSON.parse(job.briefJson) as VideoBrief;
+    await start({ brief, niche: job.niche, topic: job.topic }, job.id);
+  }
+
+  async function discardJob(id: string) {
+    await deleteJobRec(id);
+    await refreshInProgress();
+    toast.success("Job discarded");
+  }
+
+  async function retryFailed() {
+    if (!gen || !dash.jobId) return;
+    await retryFailedShots(dash.jobId, gen.brief, handleJobEvent, abortRef.current?.signal);
   }
 
   function reset() {
@@ -315,7 +408,10 @@ function VideosPage() {
     setResult(null);
     setLibraryOpen(null);
     setError(null);
+    void refreshInProgress();
   }
+
+
 
   async function openFromLibrary(rec: LocalVideo) {
     const videoUrl = await loadVideoObjectURL(rec);
