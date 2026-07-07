@@ -639,12 +639,15 @@ export const DirectorAgent = {
 // ---------- Visual generation (real AI image per scene) ----------
 
 async function fetchSceneImage(prompt: string, style: StyleId, ratio: AspectRatio): Promise<string | null> {
-  const styledPrompt = `${STYLE_DESCRIPTOR[style]}. ${prompt}. No text, no watermarks, no captions in the image.`;
+  // The Visual Director already fully composes the cinematic prompt
+  // (subject, camera, lens, lighting, grade, negatives, continuity). Do NOT
+  // pre/post-fix it with another style descriptor — that would fight the
+  // Director's shot type + continuity anchor and produce generic images.
   try {
     const res = await fetch("/api/generate-image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: styledPrompt, style: STYLE_LABEL[style], ratio }),
+      body: JSON.stringify({ prompt, ratio }),
     });
     if (!res.ok) return null;
     const json = (await res.json()) as { image?: string };
