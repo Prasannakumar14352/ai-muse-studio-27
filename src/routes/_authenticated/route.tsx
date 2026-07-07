@@ -5,9 +5,29 @@ import { AppShell } from "@/components/app-shell";
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/auth" });
-    return { user: data.user };
+    // Wait for Supabase to finish parsing OAuth tokens from the URL
+    // (INITIAL_SESSION fires once auth is fully initialized).
+    const session = await new Promise<import("@supabase/supabase-js").Session | null>((resolve) => {
+      let settled = false;
+      const done = (s: import("@supabase/supabase-js").Session | null) => {
+        if (settled) return;
+        settled = true;
+        sub.data.subscription.unsubscribe();
+        resolve(s);
+      };
+      const sub = supabase.auth.onAuthStateChange((event, s) => {
+        if (event === "INITIAL_SESSION" || s) done(s);
+      });
+      // Safety: if getSession already has a value, resolve immediately.
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) done(data.session);
+      });
+      // Hard timeout so we don't hang forever.
+      setTimeout(() => done(null), 3000);
+    });
+
+    if (!session?.user) throw redirect({ to: "/auth" });
+    return { user: session.user };
   },
   component: () => (
     <AppShell>
