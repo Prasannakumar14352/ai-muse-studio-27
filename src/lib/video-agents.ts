@@ -7,6 +7,11 @@
 import { generateAiVideoScript, generateAiVideoSeo, type AiVideoScript, type AiVideoScene, type AiVideoSeo } from "@/lib/video-ai.functions";
 import { buildFallbackVideoScript } from "@/lib/video-fallback";
 import { renderVideo, type RenderScene, type CameraMotion } from "@/lib/video-renderer";
+import { runShotPool } from "@/lib/video-shot-runner";
+import {
+  createJob, getJob, saveJob, saveShotBlob, loadShotObjectURL,
+  type JobRecord, type ShotRecord,
+} from "@/lib/video-job-store";
 
 // ---------- Beat expansion (documentary-style visual density) ----------
 //
