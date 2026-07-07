@@ -221,7 +221,7 @@ function Landing() {
       <footer className="border-t border-border/40 py-10 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-3">
-            <img src={brandLogo.url} alt="CreatorVault AI" className="h-7 w-auto object-contain" />
+            <BrandLogo alt="CreatorVault AI" className="h-7 w-auto object-contain" />
             <span>© 2026 CreatorVault AI · Digital Products Marketplace</span>
           </div>
           <div className="flex items-center gap-5">
