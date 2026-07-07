@@ -56,9 +56,32 @@ function parseDuration(d: string): number {
 async function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
-    // Same-origin bundled assets don't need CORS; setting it can cause
-    // legitimate loads to be treated as errors in some setups.
     img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+/** Preload a muted <video> element ready to play into the recorder canvas. */
+async function loadClip(src: string): Promise<HTMLVideoElement | null> {
+  return new Promise((resolve) => {
+    try {
+      const v = document.createElement("video");
+      v.muted = true;
+      v.playsInline = true;
+      v.loop = true;
+      v.preload = "auto";
+      v.crossOrigin = "anonymous";
+      const done = (ok: boolean) => resolve(ok ? v : null);
+      v.oncanplaythrough = () => done(true);
+      v.onloadeddata = () => done(true);
+      v.onerror = () => done(false);
+      v.src = src;
+      // Safety timeout — some encodings never fire canplaythrough.
+      setTimeout(() => done(v.readyState >= 2), 3000);
+    } catch { resolve(null); }
+  });
+}
     img.onerror = () => resolve(null);
     img.src = src;
   });
