@@ -306,7 +306,7 @@ function VideosPage() {
   }
 
   function reset() {
-    setView("input");
+    setView("landing");
     setResult(null);
     setLibraryOpen(null);
     setError(null);
