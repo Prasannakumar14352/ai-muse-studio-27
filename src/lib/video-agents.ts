@@ -94,9 +94,12 @@ function splitVoiceoverIntoBeatTexts(vo: string, targetBeats: number): string[] 
   return chunks.length ? chunks : [clean];
 }
 
-function expandScriptToBeats(script: AiVideoScript, style: StyleId): Beat[] {
+function expandScriptToBeats(script: AiVideoScript, style: StyleId, title: string): Beat[] {
   const beats: Beat[] = [];
   let globalIdx = 0;
+  const continuity: ContinuityCard = buildContinuityCard(title);
+  const vdStyle = style as VDStyle;
+  let previousShot: ShotType | null = null;
   script.scenes.forEach((scene, sceneIndex) => {
     const sceneDur = parseSec(scene.duration);
     const targetBeats = Math.max(1, Math.round(sceneDur / TARGET_BEAT_SEC));
@@ -104,25 +107,34 @@ function expandScriptToBeats(script: AiVideoScript, style: StyleId): Beat[] {
     const baseVisual = scene.visual || scene.image_prompt || `${scene.voiceover?.slice(0, 80)}`;
     chunks.forEach((chunk, beatIndex) => {
       const words = chunk.split(/\s+/).filter(Boolean).length || 1;
+      const directed = directBeatPrompt({
+        title,
+        styleId: vdStyle,
+        ratio: "16:9",
+        beatText: chunk,
+        sceneContext: baseVisual,
+        sceneNumber: scene.n,
+        chapterLabel: scene.role ?? null,
+        scenePurpose: scene.role ?? null,
+        emotion: null,
+        beatIndex: globalIdx,
+        continuity,
+        previousShotType: previousShot,
+      });
+      previousShot = directed.shotType;
       beats.push({
         sceneIndex,
         beatIndex,
         isFirstOfScene: beatIndex === 0,
         text: chunk,
         words,
-        imagePrompt: buildBeatImagePrompt(chunk, baseVisual, style),
+        imagePrompt: directed.prompt,
         motion: MOTION_CYCLE[globalIdx % MOTION_CYCLE.length],
       });
       globalIdx += 1;
     });
   });
   return beats;
-}
-
-function buildBeatImagePrompt(beatText: string, sceneVisual: string, style: StyleId): string {
-  const descriptor = STYLE_DESCRIPTOR[style];
-  // Beat-specific visual grounded in the narration chunk, styled consistently.
-  return `${descriptor}. Cinematic documentary shot visualizing: "${beatText.trim()}". Context: ${sceneVisual}. Dynamic composition, dramatic lighting, cinematic depth of field, no text, no watermarks, no captions.`;
 }
 
 /**
