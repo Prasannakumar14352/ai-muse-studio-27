@@ -326,7 +326,7 @@ function VideosPage() {
       URL.revokeObjectURL(libraryOpen.videoUrl);
       if (libraryOpen.thumbnailUrl) URL.revokeObjectURL(libraryOpen.thumbnailUrl);
       setLibraryOpen(null);
-      setView("input");
+      setView("landing");
     }
     await refreshLibrary();
     toast.success("Deleted");
