@@ -58,15 +58,16 @@ function AuthPage() {
   async function handleGoogle() {
     setLoading(true);
     const host = window.location.hostname;
-    const isLovableHost = host.endsWith(".lovable.app") || host === "localhost" || host === "127.0.0.1";
-    const redirectTo = `${window.location.origin}/dashboard`;
+    const isLocalHost = host === "localhost" || host === "127.0.0.1";
+    const isLovableHost = host.endsWith(".lovable.app") && !isLocalHost;
+    const redirectTo = `${window.location.origin}/auth`;
 
     // Diagnostic: prints where the OAuth flow is starting and which path we take.
     // Look for [auth] entries in DevTools → Console to debug Google sign-in.
     console.info("[auth] google oauth start", {
       host,
       origin: window.location.origin,
-      path: isLovableHost ? "lovable-broker (/~oauth/initiate)" : "supabase (BYO credentials)",
+      path: isLovableHost ? "lovable-broker (/~oauth/initiate)" : "supabase direct oauth",
       redirectTo,
     });
 
