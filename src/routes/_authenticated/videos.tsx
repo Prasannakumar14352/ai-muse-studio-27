@@ -574,6 +574,7 @@ function EmptyLibrary({ onNew }: { onNew: () => void }) {
 
 function InputScreen({ onGenerate }: { onGenerate: (args: GenerateArgs) => void }) {
   const [niche, setNiche] = useState<string>(NICHES[0].id);
+  const [customNiche, setCustomNiche] = useState("");
   const [title, setTitle] = useState("");
   const [videoType, setVideoType] = useState<VideoType>("shorts");
   const [duration, setDuration] = useState<DurationSec>(60);
@@ -581,6 +582,7 @@ function InputScreen({ onGenerate }: { onGenerate: (args: GenerateArgs) => void 
   const [voice, setVoice] = useState<VoiceId>("documentary_narrator");
   const [ratio, setRatio] = useState<AspectRatio>("9:16");
 
+  const isCustom = niche === "custom";
   const currentNiche = useMemo(() => NICHES.find((n) => n.id === niche) ?? NICHES[0], [niche]);
   const suggestedRatio = useMemo<AspectRatio>(
     () => (videoType === "youtube_long" ? "16:9" : "9:16"),
@@ -589,9 +591,10 @@ function InputScreen({ onGenerate }: { onGenerate: (args: GenerateArgs) => void 
 
   function submit() {
     if (!title.trim()) return toast.error("Enter a video title or idea");
+    if (isCustom && !customNiche.trim()) return toast.error("Describe your custom niche or topic area");
     onGenerate({
       brief: { title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio },
-      niche,
+      niche: isCustom ? customNiche.trim() : niche,
       topic: title.trim(),
     });
   }
@@ -614,25 +617,50 @@ function InputScreen({ onGenerate }: { onGenerate: (args: GenerateArgs) => void 
               <span className="mr-1.5">{n.emoji}</span>{n.label}
             </button>
           ))}
+          <button
+            onClick={() => setNiche("custom")}
+            className={`px-3.5 py-2 rounded-full text-sm border transition ${
+              isCustom
+                ? "gradient-primary text-white border-transparent"
+                : "glass border-border hover:border-white/20"
+            }`}
+          >
+            <span className="mr-1.5">✨</span>Custom / Other
+          </button>
         </div>
+        {isCustom && (
+          <div className="mt-3">
+            <input
+              value={customNiche}
+              onChange={(e) => setCustomNiche(e.target.value)}
+              placeholder="e.g. Vintage watch restoration, Urban beekeeping, Quantum computing…"
+              className="w-full glass rounded-lg px-4 py-3 outline-none focus:border-white/30 border border-border text-sm"
+            />
+            <div className="text-xs text-muted-foreground mt-1.5">
+              Describe your niche in your own words — the AI will tailor research, script and visuals to it.
+            </div>
+          </div>
+        )}
       </Section>
 
       {/* 2. Suggested topics */}
-      <Section index={2} title="Suggested topics">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {currentNiche.topics.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTitle(t)}
-              className={`text-left glass rounded-xl p-3 border transition hover:border-white/20 hover:scale-[1.02] ${
-                title === t ? "border-[color:var(--neon-pink)]" : "border-border"
-              }`}
-            >
-              <div className="text-sm leading-snug">{t}</div>
-            </button>
-          ))}
-        </div>
-      </Section>
+      {!isCustom && (
+        <Section index={2} title="Suggested topics">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {currentNiche.topics.map((t) => (
+              <button
+                key={t}
+                onClick={() => setTitle(t)}
+                className={`text-left glass rounded-xl p-3 border transition hover:border-white/20 hover:scale-[1.02] ${
+                  title === t ? "border-[color:var(--neon-pink)]" : "border-border"
+                }`}
+              >
+                <div className="text-sm leading-snug">{t}</div>
+              </button>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* 3. Title */}
       <Section index={3} title="Video title / idea">
