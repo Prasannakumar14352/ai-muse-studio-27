@@ -230,7 +230,7 @@ type LibraryOpen = {
 };
 
 function VideosPage() {
-  const [view, setView] = useState<View>("input");
+  const [view, setView] = useState<View>("landing");
   const [gen, setGen] = useState<GenerateArgs | null>(null);
   const [steps, setSteps] = useState<StepStatus[]>(
     PIPELINE_STEPS.map((s) => ({ id: s.id, label: s.label, state: "pending" }))
