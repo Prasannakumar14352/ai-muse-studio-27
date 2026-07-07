@@ -195,7 +195,19 @@ export type RenderResult = {
   aspect_ratio: AspectRatio;
 };
 
-export type ThumbnailResult = { url: string; alt: string; generated: boolean };
+export type ThumbnailVariant = {
+  url: string;
+  alt: string;
+  headline: string;
+  concept: string;
+  generated: boolean;
+};
+export type ThumbnailResult = {
+  url: string;
+  alt: string;
+  generated: boolean;
+  variants: ThumbnailVariant[];
+};
 
 export type SeoResult = AiVideoSeo;
 
@@ -632,18 +644,77 @@ function mapStyleForRenderer(id: StyleId): string {
 
 export const ThumbnailAgent = {
   async run(brief: VideoBrief): Promise<ThumbnailResult> {
-    const prompt = `Ultra high CTR YouTube thumbnail, 1280x720, ${STYLE_DESCRIPTOR[brief.style]}. ` +
-      `Hero subject illustrating: "${brief.title}". Dramatic composition, extreme contrast, ` +
-      `bold rim lighting, one clear focal point, cinematic negative space on one side for a large headline. ` +
-      `Emotional face or striking scene, magazine-cover quality. Do not render any text or letters in the image.`;
-    const url = await fetchSceneImage(prompt, brief.style, "16:9");
-    if (url) {
-      return { url, alt: `${brief.title} — thumbnail`, generated: true };
-    }
+    // MrBeast / Ryan Trahan / Ruddy Rose / Colin & Samir school of thumbnail design:
+    // maximum contrast, one clear emotional focal point, saturated colors, giant
+    // object or shocked expressive face, extreme rim lighting, cinematic depth,
+    // massive negative space on ONE side for the headline the user will slap on.
+    // We deliberately ask the model NOT to render text — it almost always butchers it.
+    const styleDesc = STYLE_DESCRIPTOR[brief.style];
+    const topic = brief.title;
+
+    const concepts: Array<{ concept: string; headline: string; promptExtra: string }> = [
+      {
+        concept: "Shocked reaction hero",
+        headline: topic.toUpperCase().slice(0, 40),
+        promptExtra:
+          `Extreme close-up of a single expressive human face reacting in pure shock and awe — wide eyes, mouth slightly open, ` +
+          `dramatic key light from one side, colored rim light (neon pink or cyan) on the other. Face fills 40% of the frame on the LEFT third. ` +
+          `Right two thirds: bold, out-of-focus scene illustrating "${topic}" with heavy bokeh and saturated colors. ` +
+          `Extreme contrast, glossy magazine finish, MrBeast-tier CTR composition.`,
+      },
+      {
+        concept: "Giant object vs tiny human",
+        headline: topic.toUpperCase().slice(0, 40),
+        promptExtra:
+          `A giant hero object symbolizing "${topic}" dominating the center of the frame, dwarfing a small human silhouette in the foreground for scale. ` +
+          `Golden-hour cinematic lighting, volumetric god rays, saturated teal-and-orange color grade, ultra-detailed textures, ` +
+          `heavy atmospheric haze for depth. Wide 16:9 composition with a clean sky area on the top-left for a headline. ` +
+          `Ryan Trahan / Johnny Harris documentary poster energy.`,
+      },
+      {
+        concept: "High-contrast split scene",
+        headline: topic.toUpperCase().slice(0, 40),
+        promptExtra:
+          `A split-scene composition: left half depicts the "before" of "${topic}" in cold desaturated blue tones, ` +
+          `right half depicts the dramatic "after" in warm saturated red/orange tones. A single hero element bridges both halves in the center. ` +
+          `Insanely sharp, high dynamic range, cinematic, Vox / ColdFusion / MagnatesMedia thumbnail energy. ` +
+          `Vignette darkened corners so the eye locks on the center.`,
+      },
+    ];
+
+    const results = await Promise.all(
+      concepts.map(async (c) => {
+        const prompt =
+          `Ultra high-CTR YouTube thumbnail, 1280x720, ${styleDesc}. ` +
+          `${c.promptExtra} ` +
+          `Absolutely no text, no letters, no numbers, no watermarks, no logos in the image. ` +
+          `Photorealistic quality, poster-grade composition, maximum click-through appeal.`;
+        const url = await fetchSceneImage(prompt, brief.style, "16:9");
+        if (url) {
+          return {
+            url,
+            alt: `${topic} — ${c.concept}`,
+            headline: c.headline,
+            concept: c.concept,
+            generated: true,
+          };
+        }
+        return {
+          url: placeholderImage("16:9", topic),
+          alt: `${topic} — ${c.concept}`,
+          headline: c.headline,
+          concept: c.concept,
+          generated: false,
+        };
+      }),
+    );
+
+    const primary = results[0];
     return {
-      url: placeholderImage("16:9", brief.title),
-      alt: `${brief.title} — thumbnail`,
-      generated: false,
+      url: primary.url,
+      alt: primary.alt,
+      generated: results.some((r) => r.generated),
+      variants: results,
     };
   },
 };

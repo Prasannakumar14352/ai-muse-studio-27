@@ -17,6 +17,11 @@ import {
   loadVideoObjectURL, loadThumbnailObjectURL,
   type LocalVideo,
 } from "@/lib/videoLocalStore";
+import {
+  saveGeneratedThumbnail, getGeneratedThumbnails, deleteGeneratedThumbnail,
+  loadThumbnailImageURL,
+  type LocalThumbnail,
+} from "@/lib/thumbnailLocalStore";
 import style3d from "@/assets/style-3d.jpg";
 import styleGhibli from "@/assets/style-ghibli.jpg";
 import styleAnime from "@/assets/style-anime.jpg";
@@ -234,13 +239,18 @@ function VideosPage() {
   const [error, setError] = useState<string | null>(null);
   const [library, setLibrary] = useState<LocalVideo[]>([]);
   const [libraryOpen, setLibraryOpen] = useState<LibraryOpen | null>(null);
+  const [thumbLibrary, setThumbLibrary] = useState<LocalThumbnail[]>([]);
 
   const refreshLibrary = useCallback(async () => {
     const items = await getGeneratedVideos();
     setLibrary(items);
   }, []);
+  const refreshThumbLibrary = useCallback(async () => {
+    const items = await getGeneratedThumbnails();
+    setThumbLibrary(items);
+  }, []);
 
-  useEffect(() => { void refreshLibrary(); }, [refreshLibrary]);
+  useEffect(() => { void refreshLibrary(); void refreshThumbLibrary(); }, [refreshLibrary, refreshThumbLibrary]);
 
   async function start(args: GenerateArgs) {
     setGen(args);
@@ -322,6 +332,35 @@ function VideosPage() {
     toast.success("Deleted");
   }
 
+  async function saveThumb(v: { url: string; concept: string; headline: string; alt: string }) {
+    if (!gen) return;
+    try {
+      const nicheLabel = NICHES.find((n) => n.id === gen.niche)?.label ?? gen.niche;
+      const styleLabel = STYLE_CARDS.find((s) => s.id === gen.brief.style)?.label ?? gen.brief.style;
+      await saveGeneratedThumbnail({
+        title: gen.brief.title,
+        concept: v.concept,
+        headline: v.headline,
+        niche: nicheLabel,
+        topic: gen.topic || gen.brief.title,
+        styleId: gen.brief.style,
+        styleLabel,
+        image: v.url,
+      });
+      await refreshThumbLibrary();
+      toast.success("Thumbnail saved to your library");
+    } catch (e) {
+      console.warn(e);
+      toast.error("Couldn't save thumbnail (storage full?)");
+    }
+  }
+
+  async function removeThumb(id: string) {
+    await deleteGeneratedThumbnail(id);
+    await refreshThumbLibrary();
+    toast.success("Thumbnail deleted");
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -337,11 +376,14 @@ function VideosPage() {
           {library.length > 0 && (
             <LibrarySection items={library} onOpen={openFromLibrary} onDelete={removeFromLibrary} />
           )}
+          {thumbLibrary.length > 0 && (
+            <ThumbnailLibrarySection items={thumbLibrary} onDelete={removeThumb} />
+          )}
         </>
       )}
       {view === "processing" && <ProcessingScreen steps={steps} error={error} onCancel={reset} />}
       {view === "result" && result && (
-        <ResultScreen result={result} onAnother={() => gen && start(gen)} onNew={reset} />
+        <ResultScreen result={result} onAnother={() => gen && start(gen)} onNew={reset} onSaveThumbnail={saveThumb} />
       )}
       {view === "library" && libraryOpen && (
         <LibraryViewer
@@ -590,8 +632,13 @@ function ProcessingScreen({
 // ---------------- Result ----------------
 
 function ResultScreen({
-  result, onAnother, onNew,
-}: { result: PipelineResult; onAnother: () => void; onNew: () => void }) {
+  result, onAnother, onNew, onSaveThumbnail,
+}: {
+  result: PipelineResult;
+  onAnother: () => void;
+  onNew: () => void;
+  onSaveThumbnail: (v: { url: string; concept: string; headline: string; alt: string }) => void;
+}) {
   const { render, thumbnail, subtitles, seo, brief } = result;
 
   function download(url: string, filename: string) {
@@ -648,9 +695,42 @@ function ResultScreen({
         </div>
 
         <div className="space-y-4">
-          <div className="glass rounded-2xl p-4">
-            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Thumbnail</div>
-            <img src={thumbnail.url} alt={thumbnail.alt} className="w-full rounded-lg bg-black" />
+          <div className="glass rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                Thumbnails · pick your winner
+              </div>
+              <span className="text-[10px] text-muted-foreground">MrBeast-style · high CTR</span>
+            </div>
+            <div className="space-y-3">
+              {(thumbnail.variants && thumbnail.variants.length > 0
+                ? thumbnail.variants
+                : [{ url: thumbnail.url, alt: thumbnail.alt, concept: "Hero", headline: seo.youtube_title, generated: thumbnail.generated }]
+              ).map((v, i) => (
+                <div key={i} className="space-y-2">
+                  <img src={v.url} alt={v.alt} className="w-full rounded-lg bg-black" />
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[11px] text-muted-foreground truncate">{v.concept}</div>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => download(v.url, `${slug(seo.youtube_title)}-thumb-${i + 1}.png`)}
+                        className="rounded-md glass border border-border px-2 py-1 text-[11px] flex items-center gap-1"
+                        title="Download"
+                      >
+                        <Download className="w-3 h-3" /> Save file
+                      </button>
+                      <button
+                        onClick={() => onSaveThumbnail({ url: v.url, concept: v.concept, headline: v.headline, alt: v.alt })}
+                        className="rounded-md gradient-primary text-white px-2 py-1 text-[11px] flex items-center gap-1"
+                        title="Save to your library"
+                      >
+                        <Check className="w-3 h-3" /> Save
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
           <button onClick={() => toast.info("YouTube publishing will connect soon")} className="w-full rounded-2xl glass border border-border p-4 text-sm flex items-center justify-center gap-2 hover:border-white/20 transition">
             <Youtube className="w-5 h-5 text-rose-500" />
@@ -945,6 +1025,82 @@ function MetaChips({ label, items, onCopy }: { label: string; items: string[]; o
       </div>
       <div className="flex flex-wrap gap-1.5">
         {items.map((h) => <span key={h} className="glass px-2 py-1 rounded text-xs">{h}</span>)}
+      </div>
+    </div>
+  );
+}
+
+// ---------------- Saved thumbnails library ----------------
+
+function ThumbnailLibrarySection({
+  items, onDelete,
+}: { items: LocalThumbnail[]; onDelete: (id: string) => void }) {
+  return (
+    <div className="glass rounded-2xl p-6 space-y-4">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-xl font-semibold">Saved thumbnails</h2>
+        <span className="text-xs text-muted-foreground">
+          Stored locally in your browser · {items.length} saved
+        </span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {items.map((rec) => (
+          <ThumbnailCard key={rec.id} rec={rec} onDelete={() => onDelete(rec.id)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ThumbnailCard({ rec, onDelete }: { rec: LocalThumbnail; onDelete: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    let obj: string | null = null;
+    void loadThumbnailImageURL(rec).then((u) => {
+      if (!live) { if (u) URL.revokeObjectURL(u); return; }
+      obj = u; setUrl(u);
+    });
+    return () => { live = false; if (obj) URL.revokeObjectURL(obj); };
+  }, [rec]);
+  async function doDownload() {
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug(rec.headline || rec.title)}-thumbnail.${rec.extension}`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+  return (
+    <div className="glass rounded-xl overflow-hidden border border-border flex flex-col">
+      <div className="aspect-video bg-black">
+        {url ? (
+          <img src={url} alt={rec.title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">Loading…</div>
+        )}
+      </div>
+      <div className="p-3 space-y-2 flex-1 flex flex-col">
+        <div className="text-sm font-medium line-clamp-2 leading-snug">{rec.title}</div>
+        <div className="flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
+          <span className="glass px-2 py-0.5 rounded">{rec.concept}</span>
+          <span className="glass px-2 py-0.5 rounded">{rec.styleLabel}</span>
+        </div>
+        <div className="text-[11px] text-muted-foreground">{fmtDate(rec.created_at)} · {rec.niche ?? ""}</div>
+        <div className="flex gap-2 pt-1 mt-auto">
+          <button
+            onClick={doDownload}
+            className="flex-1 rounded-lg gradient-primary text-white text-xs py-1.5 flex items-center justify-center gap-1"
+          >
+            <Download className="w-3 h-3" /> Download
+          </button>
+          <button
+            onClick={onDelete}
+            className="rounded-lg glass border border-border px-2 py-1.5 text-xs text-red-400 flex items-center gap-1"
+            title="Delete"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
       </div>
     </div>
   );
