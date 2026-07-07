@@ -802,6 +802,218 @@ export const SeoAgent = {
   },
 };
 
+// ---------- New pipeline agents (Title / Hook / Intro / Curiosity / Retention / Chapters) ----------
+
+export const TitleOptimizerAgent = {
+  async run(brief: VideoBrief, research: ResearchBrief): Promise<VideoTitleVariants> {
+    try {
+      return await generateVideoTitleVariants({
+        data: { topic: research.topic || brief.title, styleLabel: STYLE_LABEL[brief.style], platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType] },
+      });
+    } catch (e) {
+      console.error("[TitleOptimizerAgent] failed, using fallback", e);
+      const t = brief.title;
+      return {
+        recommended: `5 Things Nobody Tells You About ${t}`.slice(0, 65),
+        variants: [
+          { title: `The Truth About ${t}`.slice(0, 65), angle: "Curiosity gap", ctr_score: 7 },
+          { title: `Why ${t} Is Not What You Think`.slice(0, 65), angle: "Contrarian", ctr_score: 7 },
+          { title: `5 Things Nobody Tells You About ${t}`.slice(0, 65), angle: "Numbered", ctr_score: 8 },
+        ],
+      };
+    }
+  },
+};
+
+export const HookAgent = {
+  async run(brief: VideoBrief, research: ResearchBrief): Promise<VideoHook> {
+    try {
+      return await generateVideoHook({
+        data: { topic: research.topic || brief.title, styleLabel: STYLE_LABEL[brief.style], platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType], currentHook: "" },
+      });
+    } catch (e) {
+      console.error("[HookAgent] failed, using fallback", e);
+      return {
+        voiceover: `What if everything you knew about ${brief.title} was wrong?`,
+        on_screen_text: "",
+        visual: `${STYLE_LABEL[brief.style]} cinematic opening shot on ${brief.title}, dramatic lighting.`,
+        rationale: "Contrarian curiosity gap that promises a payoff.",
+      };
+    }
+  },
+};
+
+/**
+ * IntroAgent — inspects the first N scenes the ScriptAgent produced and
+ * summarizes what the intro promises. Intro rewriting is baked into the
+ * Script Agent prompt (Hybrid mode), so this step is fast and deterministic.
+ */
+export const IntroAgent = {
+  async run(brief: VideoBrief, script: AiVideoScript): Promise<IntroPlan> {
+    // Intro = ~10% of duration, min 2 scenes, max 5.
+    const targetSec = Math.max(6, brief.duration * 0.1);
+    let acc = 0;
+    const scenesCovered: number[] = [];
+    for (const s of script.scenes) {
+      scenesCovered.push(s.n);
+      acc += parseSec(s.duration);
+      if (acc >= targetSec || scenesCovered.length >= 5) break;
+      if (scenesCovered.length >= 2 && acc >= targetSec * 0.8) break;
+    }
+    const introScenes = script.scenes.slice(0, scenesCovered.length);
+    const promise = introScenes.map((s) => s.voiceover).join(" ").slice(0, 200);
+    return {
+      scenes_covered: scenesCovered,
+      duration_sec: Math.round(acc),
+      promise: promise || `A deep look at ${brief.title}.`,
+      first_line: script.scenes[0]?.voiceover ?? "",
+    };
+  },
+};
+
+/**
+ * CuriosityLoopAgent — scans the finished script for open-loop language and
+ * pairs each open loop with the scene that most likely pays it off (by keyword
+ * overlap). Deterministic, no extra AI call.
+ */
+export const CuriosityLoopAgent = {
+  async run(script: AiVideoScript): Promise<CuriosityLoopPlan> {
+    const OPEN_MARKERS = [
+      /but first/i, /we'?ll get to that/i, /in a second/i, /the twist/i,
+      /here'?s the thing/i, /wait until you see/i, /you won'?t believe/i,
+      /the reason (?:why )?is/i, /that'?s not all/i, /before we get there/i,
+    ];
+    const PAYOFF_MARKERS = [
+      /that'?s why/i, /and the reason/i, /here'?s the payoff/i,
+      /which brings us back/i, /remember when/i, /the answer is/i,
+    ];
+
+    const loops: CuriosityLoop[] = [];
+    script.scenes.forEach((s) => {
+      const vo = s.voiceover ?? "";
+      const openHit = OPEN_MARKERS.find((r) => r.test(vo));
+      if (openHit) loops.push({ scene_index: s.n, loop_text: vo, kind: "open" });
+      const payoffHit = PAYOFF_MARKERS.find((r) => r.test(vo));
+      if (payoffHit) loops.push({ scene_index: s.n, loop_text: vo, kind: "payoff" });
+    });
+
+    // Pair each open loop with the nearest later payoff.
+    const payoffs = loops.filter((l) => l.kind === "payoff");
+    for (const loop of loops) {
+      if (loop.kind !== "open") continue;
+      const next = payoffs.find((p) => p.scene_index > loop.scene_index);
+      if (next) loop.paired_scene = next.scene_index;
+    }
+
+    return { loops };
+  },
+};
+
+/**
+ * RetentionAgent — annotates the script timeline with retention markers
+ * (hook, open loops, payoffs, pattern interrupts, cta) and flags the scene
+ * most at risk of losing viewers. Retention REWRITING is done inside the
+ * Script Agent; this agent handles the ANNOTATION half of "Both".
+ */
+export const RetentionAgent = {
+  async run(brief: VideoBrief, script: AiVideoScript, curiosity: CuriosityLoopPlan): Promise<RetentionPlan> {
+    const markers: RetentionMarker[] = [];
+    let t = 0;
+    const sceneStarts: number[] = [];
+    script.scenes.forEach((s) => {
+      sceneStarts.push(t);
+      t += parseSec(s.duration);
+    });
+
+    // Hook + CTA are always markers.
+    if (script.scenes[0]) {
+      markers.push({ scene_index: 1, time_sec: 0, kind: "hook", note: "Opening hook — stop the scroll." });
+    }
+    const lastIdx = script.scenes.length - 1;
+    if (lastIdx > 0) {
+      markers.push({
+        scene_index: lastIdx + 1,
+        time_sec: sceneStarts[lastIdx] ?? t,
+        kind: "cta",
+        note: "Closing CTA — subscribe / next video.",
+      });
+    }
+
+    // Curiosity loops → retention markers.
+    curiosity.loops.forEach((l) => {
+      const idx = l.scene_index - 1;
+      markers.push({
+        scene_index: l.scene_index,
+        time_sec: sceneStarts[idx] ?? 0,
+        kind: l.kind === "open" ? "open_loop" : "payoff",
+        note: l.kind === "open"
+          ? (l.paired_scene ? `Open loop, paid off at scene ${l.paired_scene}.` : "Open loop (unpaid) — consider adding a payoff.")
+          : "Payoff — closes an earlier loop.",
+      });
+    });
+
+    // Pattern interrupts every ~30-45 seconds (whichever scene straddles the boundary).
+    const interruptEvery = brief.duration <= 60 ? 15 : brief.duration <= 300 ? 30 : 45;
+    let nextInterruptAt = interruptEvery;
+    script.scenes.forEach((s, i) => {
+      const start = sceneStarts[i];
+      if (start >= nextInterruptAt && i !== 0 && i !== lastIdx) {
+        markers.push({
+          scene_index: s.n,
+          time_sec: start,
+          kind: "pattern_interrupt",
+          note: "Pattern interrupt — new visual, tone shift, or contrarian claim.",
+        });
+        nextInterruptAt += interruptEvery;
+      }
+    });
+
+    markers.sort((a, b) => a.time_sec - b.time_sec);
+
+    // Weakest scene = the longest gap between retention markers, choose midpoint scene.
+    let weakest: number | null = null;
+    let biggestGap = 0;
+    for (let i = 1; i < markers.length; i++) {
+      const gap = markers[i].time_sec - markers[i - 1].time_sec;
+      if (gap > biggestGap) {
+        biggestGap = gap;
+        const midT = markers[i - 1].time_sec + gap / 2;
+        const idx = sceneStarts.findIndex((st, k) => st <= midT && (sceneStarts[k + 1] ?? Infinity) > midT);
+        weakest = idx >= 0 ? script.scenes[idx].n : null;
+      }
+    }
+
+    const avgGap = markers.length > 1
+      ? (markers[markers.length - 1].time_sec - markers[0].time_sec) / (markers.length - 1)
+      : 0;
+
+    return {
+      markers,
+      weakest_scene: weakest,
+      average_gap_sec: Math.round(avgGap * 10) / 10,
+    };
+  },
+};
+
+export const ChapterAgent = {
+  async run(script: AiVideoScript): Promise<VideoChapters> {
+    try {
+      return await generateVideoChapters({
+        data: {
+          topic: script.title || script.reel_title || "Video",
+          scenes: script.scenes.map((s) => ({
+            voiceover: s.voiceover ?? "",
+            duration_sec: parseSec(s.duration),
+          })),
+        },
+      });
+    } catch (e) {
+      console.error("[ChapterAgent] failed, using fallback", e);
+      return { chapters: [{ time: "00:00", label: "Intro", description: script.scenes[0]?.voiceover.slice(0, 80) ?? "" }] };
+    }
+  },
+};
+
 // ---------- Orchestrator ----------
 
 export async function runVideoPipeline(
