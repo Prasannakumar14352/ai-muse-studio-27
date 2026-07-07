@@ -7,6 +7,11 @@
 import { generateAiVideoScript, generateAiVideoSeo, type AiVideoScript, type AiVideoScene, type AiVideoSeo } from "@/lib/video-ai.functions";
 import { buildFallbackVideoScript } from "@/lib/video-fallback";
 import { renderVideo, type RenderScene, type CameraMotion } from "@/lib/video-renderer";
+import { runShotPool } from "@/lib/video-shot-runner";
+import {
+  createJob, getJob, saveJob, saveShotBlob, loadShotObjectURL,
+  type JobRecord, type ShotRecord,
+} from "@/lib/video-job-store";
 
 // ---------- Beat expansion (documentary-style visual density) ----------
 //
@@ -881,3 +886,332 @@ export const VOICES: { id: VoiceId; label: string }[] = [
 ];
 
 export const ASPECT_RATIOS: AspectRatio[] = ["16:9", "9:16", "1:1"];
+
+// =========================================================================
+// Async parallel job pipeline (resumable, per-shot progress)
+// =========================================================================
+
+export type JobPhaseId =
+  | "planning"
+  | "generating_shots"
+  | "voiceover"
+  | "rendering"
+  | "complete"
+  | "failed";
+
+export type ShotProgress = {
+  id: string;
+  index: number;
+  status: "pending" | "running" | "done" | "failed";
+  kind: "clip" | "image" | null;
+  previewUrl: string | null; // object URL for the completed asset (or null)
+  error: string | null;
+  attempts: number;
+};
+
+export type JobEvent =
+  | { type: "phase"; phase: JobPhaseId; note?: string }
+  | { type: "shots-init"; total: number; shots: ShotProgress[] }
+  | { type: "shot"; shot: ShotProgress; done: number; failed: number; total: number }
+  | { type: "voiceover"; done: number; total: number }
+  | { type: "render"; progress: number }
+  | { type: "error"; message: string };
+
+export type JobRunOptions = {
+  jobId?: string;                       // resume existing job
+  niche: string;
+  topic: string;
+  onEvent: (ev: JobEvent) => void;
+  signal?: AbortSignal;
+};
+
+async function dataUrlToBlob(u: string): Promise<Blob> {
+  const res = await fetch(u);
+  return await res.blob();
+}
+
+function beatsFromShots(job: JobRecord, style: StyleId): Beat[] {
+  return job.shots.map<Beat>((s) => ({
+    sceneIndex: s.sceneIndex,
+    beatIndex: s.beatIndex,
+    isFirstOfScene: s.isFirstOfScene,
+    text: s.text,
+    words: s.words || Math.max(1, s.text.split(/\s+/).filter(Boolean).length),
+    imagePrompt: s.prompt,
+    motion: (s.motion as CameraMotion) || "zoomIn",
+    // Note: buildBeatImagePrompt already applied when the shot was created.
+    _styleHint: style,
+  } as unknown as Beat));
+}
+
+function planShots(script: AiVideoScript, style: StyleId): ShotRecord[] {
+  const beats = expandScriptToBeats(script, style);
+  return beats.map<ShotRecord>((b, i) => ({
+    id: `s${i + 1}`,
+    index: i,
+    sceneIndex: b.sceneIndex,
+    beatIndex: b.beatIndex,
+    isFirstOfScene: b.isFirstOfScene,
+    text: b.text,
+    words: b.words,
+    prompt: b.imagePrompt,
+    motion: b.motion,
+    status: "pending",
+    kind: null,
+    blobKey: null,
+    mime: null,
+    attempts: 0,
+    error: null,
+  }));
+}
+
+async function generateOneShot(
+  shot: ShotRecord,
+  brief: VideoBrief,
+  jobId: string,
+  signal: AbortSignal,
+): Promise<{ blobKey: string; kind: "clip" | "image"; mime: string; previewUrl: string }> {
+  if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+  // Try clip first; on any failure fall back to image. Both return data URLs
+  // today (see /api/generate-image and /api/generate-video-clip).
+  const clip = await fetchBeatClip(shot.prompt, brief.style, brief.aspectRatio, TARGET_BEAT_SEC);
+  if (clip) {
+    const blob = await dataUrlToBlob(clip);
+    const key = await saveShotBlob(jobId, shot.id, blob);
+    const url = await loadShotObjectURL(key);
+    return { blobKey: key, kind: "clip", mime: blob.type || "video/mp4", previewUrl: url ?? clip };
+  }
+  const img = await fetchSceneImage(shot.prompt, brief.style, brief.aspectRatio);
+  if (!img) throw new Error("Image generation failed");
+  const blob = await dataUrlToBlob(img);
+  const key = await saveShotBlob(jobId, shot.id, blob);
+  const url = await loadShotObjectURL(key);
+  return { blobKey: key, kind: "image", mime: blob.type || "image/png", previewUrl: url ?? img };
+}
+
+export async function runVideoJobPipeline(
+  brief: VideoBrief,
+  opts: JobRunOptions,
+): Promise<{ job: JobRecord; result: PipelineResult }> {
+  const { onEvent, signal } = opts;
+
+  // ---------- Phase 1: planning ----------
+  let job: JobRecord;
+  let script: AiVideoScript;
+  let research: ResearchBrief;
+  let storyboard: Storyboard;
+  let direction: DirectorPlan;
+
+  const existing = opts.jobId ? await getJob(opts.jobId) : null;
+  if (existing) {
+    onEvent({ type: "phase", phase: "planning", note: "Resuming saved job" });
+    // Rebuild planning artifacts by re-running the fast agents. Script may
+    // differ slightly from the original run, but shot prompts/motions come
+    // from the persisted shot records so visuals stay consistent.
+    research = await ResearchAgent.run(brief);
+    script = await ScriptAgent.run(brief, research);
+    storyboard = await StoryboardAgent.run(script);
+    direction = await DirectorAgent.run(brief, storyboard);
+    job = existing;
+  } else {
+    onEvent({ type: "phase", phase: "planning" });
+    research = await ResearchAgent.run(brief);
+    script = await ScriptAgent.run(brief, research);
+    storyboard = await StoryboardAgent.run(script);
+    direction = await DirectorAgent.run(brief, storyboard);
+    const shots = planShots(script, brief.style);
+    job = await createJob({
+      title: brief.title,
+      niche: opts.niche,
+      topic: opts.topic,
+      briefJson: JSON.stringify(brief),
+      shots,
+    });
+  }
+
+  // ---------- Phase 2: parallel shot generation (with resume) ----------
+  job.phase = "generating_shots";
+  await saveJob(job);
+  onEvent({ type: "phase", phase: "generating_shots" });
+
+  // Hydrate previews for shots already done (resume path).
+  const initial: ShotProgress[] = await Promise.all(job.shots.map(async (s) => {
+    let previewUrl: string | null = null;
+    if (s.status === "done" && s.blobKey) {
+      previewUrl = await loadShotObjectURL(s.blobKey);
+    }
+    return {
+      id: s.id, index: s.index,
+      status: s.status === "running" ? "pending" : s.status,
+      kind: s.kind, previewUrl, error: s.error, attempts: s.attempts,
+    };
+  }));
+  onEvent({ type: "shots-init", total: job.shots.length, shots: initial });
+
+  let done = job.shots.filter((s) => s.status === "done").length;
+  let failed = 0;
+  job.shotsDone = done; job.shotsFailed = 0;
+
+  const pending = job.shots.filter((s) => s.status !== "done");
+  const poolJobs = pending.map((shot) => ({
+    id: shot.id,
+    run: async (sig: AbortSignal) => {
+      shot.status = "running";
+      shot.attempts += 1;
+      return await generateOneShot(shot, brief, job.id, sig);
+    },
+  }));
+
+  await runShotPool(poolJobs, {
+    concurrency: 6,
+    maxAttempts: 2,
+    signal,
+    onShotSettled: (outcome) => {
+      const shot = job.shots.find((s) => s.id === outcome.id);
+      if (!shot) return;
+      if (outcome.ok) {
+        shot.status = "done";
+        shot.kind = outcome.value.kind;
+        shot.blobKey = outcome.value.blobKey;
+        shot.mime = outcome.value.mime;
+        shot.error = null;
+        done += 1;
+        onEvent({
+          type: "shot",
+          done, failed, total: job.shots.length,
+          shot: {
+            id: shot.id, index: shot.index, status: "done",
+            kind: shot.kind, previewUrl: outcome.value.previewUrl,
+            error: null, attempts: shot.attempts,
+          },
+        });
+      } else {
+        shot.status = "failed";
+        shot.error = outcome.error;
+        failed += 1;
+        onEvent({
+          type: "shot",
+          done, failed, total: job.shots.length,
+          shot: {
+            id: shot.id, index: shot.index, status: "failed",
+            kind: null, previewUrl: null, error: outcome.error, attempts: shot.attempts,
+          },
+        });
+      }
+      job.shotsDone = done; job.shotsFailed = failed;
+      // Fire-and-forget persist per shot for resumability.
+      void saveJob(job);
+    },
+  });
+
+  if (signal?.aborted) {
+    job.phase = "paused";
+    await saveJob(job);
+    throw new DOMException("Aborted", "AbortError");
+  }
+
+  // ---------- Phase 3: voiceover / subtitles / timeline ----------
+  job.phase = "voiceover";
+  await saveJob(job);
+  onEvent({ type: "phase", phase: "voiceover" });
+  const voiceover = await VoiceoverAgent.run(brief, script, (d, t) =>
+    onEvent({ type: "voiceover", done: d, total: t }),
+  );
+  const subtitles = await SubtitleAgent.run(script, voiceover);
+  const timeline = await VideoEditingAgent.run(script, voiceover);
+  const music = await MusicAgent.run(brief, timeline.total_sec);
+  const sfx = await SoundEffectsAgent.run(direction);
+
+  // ---------- Phase 4: render ----------
+  job.phase = "rendering";
+  await saveJob(job);
+  onEvent({ type: "phase", phase: "rendering" });
+
+  // Build VisualAsset[] from stored shots (hydrate object URLs from IDB).
+  const visuals: VisualAsset[] = await Promise.all(job.shots.map(async (s, i) => {
+    let url: string | null = null;
+    if (s.blobKey) url = await loadShotObjectURL(s.blobKey);
+    if (!url) url = placeholderImage(brief.aspectRatio, `Shot ${i + 1}`);
+    return {
+      n: i + 1,
+      kind: (s.kind ?? "image"),
+      url,
+      duration_sec: TARGET_BEAT_SEC,
+      generated: s.status === "done",
+    };
+  }));
+
+  const beats = beatsFromShots(job, brief.style);
+  const render = await RenderAgent.run(brief, script, beats, visuals, voiceover, (p) =>
+    onEvent({ type: "render", progress: p }),
+  );
+  job.renderProgress = 1;
+
+  const thumbnail = await ThumbnailAgent.run(brief);
+  const seo = await SeoAgent.run(brief, script, timeline);
+
+  job.phase = "complete";
+  await saveJob(job);
+  onEvent({ type: "phase", phase: "complete" });
+
+  const result: PipelineResult = {
+    brief, research, script, storyboard, direction,
+    visuals, voiceover, subtitles, music, sfx, timeline,
+    render, thumbnail, seo,
+  };
+  return { job, result };
+}
+
+/** Requeue only the failed shots on an existing job. Emits the same events. */
+export async function retryFailedShots(
+  jobId: string,
+  brief: VideoBrief,
+  onEvent: (ev: JobEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const job = await getJob(jobId);
+  if (!job) return;
+  const failedShots = job.shots.filter((s) => s.status === "failed");
+  if (failedShots.length === 0) return;
+
+  let done = job.shotsDone;
+  let failed = job.shotsFailed - failedShots.length; // will re-count as we go
+  failedShots.forEach((s) => { s.status = "pending"; s.error = null; });
+
+  const poolJobs = failedShots.map((shot) => ({
+    id: shot.id,
+    run: async (sig: AbortSignal) => {
+      shot.status = "running";
+      shot.attempts += 1;
+      return await generateOneShot(shot, brief, job.id, sig);
+    },
+  }));
+
+  await runShotPool(poolJobs, {
+    concurrency: 6, maxAttempts: 2, signal,
+    onShotSettled: (outcome) => {
+      const shot = job.shots.find((s) => s.id === outcome.id);
+      if (!shot) return;
+      if (outcome.ok) {
+        shot.status = "done"; shot.kind = outcome.value.kind;
+        shot.blobKey = outcome.value.blobKey; shot.mime = outcome.value.mime;
+        shot.error = null; done += 1;
+        onEvent({
+          type: "shot", done, failed, total: job.shots.length,
+          shot: { id: shot.id, index: shot.index, status: "done", kind: shot.kind,
+            previewUrl: outcome.value.previewUrl, error: null, attempts: shot.attempts },
+        });
+      } else {
+        shot.status = "failed"; shot.error = outcome.error; failed += 1;
+        onEvent({
+          type: "shot", done, failed, total: job.shots.length,
+          shot: { id: shot.id, index: shot.index, status: "failed", kind: null,
+            previewUrl: null, error: outcome.error, attempts: shot.attempts },
+        });
+      }
+      job.shotsDone = done; job.shotsFailed = failed;
+      void saveJob(job);
+    },
+  });
+}
+
