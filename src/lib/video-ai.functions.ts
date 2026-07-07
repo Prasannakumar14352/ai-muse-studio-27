@@ -57,18 +57,28 @@ export const generateAiVideoScript = createServerFn({ method: "POST" })
     const isLong = data.contentType === "long_video";
     const defaultLen = isLong ? 75 : 35;
     const lenSec = Math.max(15, Math.min(1800, data.targetLengthSec ?? defaultLen));
-    const targetLen = `${lenSec} seconds`;
-    // Roughly one scene per ~8 seconds for long form, ~5 for shorts. Allow up
-    // to 120 scenes so a 15+ minute long video isn't silently truncated to
-    // ~4 minutes worth of scenes.
-    const sceneCount = Math.max(3, Math.min(120, Math.round(lenSec / (isLong ? 8 : 5))));
-    const ratio = data.contentType === "long_video" ? "16:9" : "9:16";
 
-    const sys = `You are a senior short-form video creative director. You write
-premium, high-retention social video scripts in the style of top viral creators
-(Apple-style commercials, cinematic, punchy). Return ONLY valid JSON. No
-markdown. No explanations. No code fences. Escape quotation marks inside all
-generated strings so the response parses with JSON.parse.`;
+    // DURATION IS THE SOURCE OF TRUTH. Derive word count + scene count from it.
+    const targets = getDurationTargets(lenSec);
+    const wMin = targets.words.min;
+    const wMax = targets.words.max;
+    const wTarget = targets.words.target;
+    const sMin = targets.scenes.min;
+    const sMax = targets.scenes.max;
+    const sceneCount = targets.scenes.target;
+    const wpsTarget = targets.wordsPerScene.target;
+    const wpsMin = targets.wordsPerScene.min;
+    const wpsMax = targets.wordsPerScene.max;
+    const targetLen = `${lenSec} seconds`;
+    const ratio = isLong ? "16:9" : "9:16";
+
+    const sys = `You are a senior long-form video creative director. You write
+premium, high-retention documentary and social scripts in the style of top
+viral creators (Apple-style commercials, cinematic, punchy). You NEVER stop
+writing early — you deliver the FULL narration word budget you are given.
+Return ONLY valid JSON. No markdown. No explanations. No code fences. Escape
+quotation marks inside all generated strings so the response parses with
+JSON.parse.`;
 
     const user = `Write a ${targetLen} ${data.platform} video for the topic below.
 
@@ -78,53 +88,46 @@ AUDIENCE: ${data.audience || "general creators"}
 VISUAL STYLE: ${data.styleLabel}
 FORMAT: ${data.contentType} (${ratio})
 
-Structure it as ${sceneCount} scenes. Scene 1 is a hard hook (0-3 sec). Last
-scene is a CTA. In between, deliver 3-5 punchy beats that pay off the hook.
+DURATION IS A HARD REQUIREMENT.
+- Total video length: ${targetLen} (${lenSec}s).
+- Total narration MUST be ${wMin}-${wMax} words (target ~${wTarget}). Do NOT stop early.
+- Use ${sMin}-${sMax} scenes (target ~${sceneCount}). Do NOT stop after a handful.
+- Speaking rate is ~2.5 words/second, so ${wTarget} words ~= ${Math.round(wTarget / 2.5)}s of narration.
+- If you would otherwise be short, ADD real substance: more evidence, more
+  examples, a deeper "why", a counter-point, a case study — never filler.
+
+Scene 1 is a hard hook (0-3 sec). Last scene is a CTA. In between, deliver
+a full documentary arc that pays off the hook.
 
 For EACH scene, produce:
 - n: scene number (1..${sceneCount})
 - time_range: e.g. "0-3 sec"
 - role: "Hook" | "Beat 1"..."Beat N" | "CTA"
-- voiceover: the exact spoken line (1 sentence, conversational, max 20 words).
-  This is the ONLY text that will appear as subtitles on the video, so write it
-  cleanly with no stage directions, no brackets, no emojis.
+- voiceover: the exact spoken line for this scene. Aim for ${wpsMin}-${wpsMax}
+  words (target ~${wpsTarget}). Conversational, no stage directions, no
+  brackets, no emojis. This is the ONLY text used for subtitles.
 - on_screen_text: a very short caption (0-6 words) burned onto the frame at
   key moments, or empty string if the scene should be visual-only.
-  Use it sparingly — only when it adds punch (numbers, one-word reveals,
-  the payoff line). No hashtags, no emojis.
 - visual: 1-line description of what's on screen.
 - image_prompt: a rich, self-contained prompt for an AI image model. It MUST
   include: "${data.styleLabel} style, ${ratio}, photorealistic, cinematic,
-  premium commercial look, 8k, shallow depth of field". Describe the subject,
-  setting, lighting, and framing in detail. NO text overlays baked into the
-  image itself — text is added by the renderer.
-- duration: e.g. "3s" (integer seconds, 2-8s).
+  premium commercial look, 8k, shallow depth of field".
+- duration: e.g. "3s" (integer seconds, 2-5s per scene).
 
 Also produce:
-- title: internal project title
-- reel_title: the public reel/video title shown on the platform
-- length_sec: total seconds (sum of scene durations)
-- style_note: one-line style summary
-- caption: platform caption with a hook line + payoff (2-4 sentences)
-- hashtags: 8-15 relevant hashtags, each starting with #
+- title, reel_title, style_note, caption (2-4 sentences), hashtags (8-15).
+- length_sec: total seconds (MUST be ${Math.round(lenSec * 0.95)}-${lenSec}).
 
 Return ONLY this JSON object shape with no prose:
 {
   "title": "string",
   "reel_title": "string",
-  "length_sec": 34,
+  "length_sec": ${lenSec},
   "style_note": "string",
   "scenes": [
-    {
-      "n": 1,
-      "time_range": "0-3 sec",
-      "role": "Hook",
-      "voiceover": "string",
-      "on_screen_text": "string",
-      "visual": "string",
-      "image_prompt": "string",
-      "duration": "3s"
-    }
+    { "n": 1, "time_range": "0-3 sec", "role": "Hook", "voiceover": "string",
+      "on_screen_text": "string", "visual": "string", "image_prompt": "string",
+      "duration": "3s" }
   ],
   "caption": "string",
   "hashtags": ["#example"]
@@ -149,6 +152,10 @@ Return ONLY this JSON object shape with no prose:
       hashtags: z.array(z.string()).optional().default([]),
     });
 
+    // Token budget scales with target word count so long scripts aren't
+    // silently truncated. ~4 tokens per word covers JSON + prompts + overhead.
+    const maxTokens = Math.min(60000, 4000 + Math.round(wTarget * 4));
+
     const rawResponses: string[] = [];
     const parseErrors: string[] = [];
     let usedRepair = false;
@@ -171,7 +178,7 @@ Return ONLY this JSON object shape with no prose:
               { role: "user", content: user },
             ],
             response_format: { type: "json_object" },
-            max_tokens: Math.min(32000, 2000 + sceneCount * 400),
+            max_tokens: maxTokens,
           }),
         });
 
@@ -209,21 +216,88 @@ Return ONLY this JSON object shape with no prose:
     }
 
     let finalOut: z.infer<typeof Schema> & { debug_json?: AiJsonDebug };
+    let usedFallback = false;
     if (out) {
       finalOut = out;
     } else {
       finalOut = buildFallbackVideoScript(data.topic, sceneCount, lenSec, ratio, data.styleLabel) as z.infer<typeof Schema> & { debug_json?: AiJsonDebug };
       parseErrors.push("Used fallback script after 3 invalid JSON attempts");
+      usedFallback = true;
     }
 
     finalOut.scenes = finalOut.scenes.map((s, i) => ({ ...s, n: i + 1 }));
 
-    // Enforce the requested target length. AI models frequently return fewer
-    // or shorter scenes than asked; scale each scene's base duration so the
-    // total sum matches the user-selected length. The renderer uses
-    // max(base, voiceover+0.25s) per scene, so stretching base durations
-    // reliably extends the final video.
-    if (data.targetLengthSec && finalOut.scenes.length > 0) {
+    // ---------------------------------------------------------------
+    // EXTEND PASS — enforce word budget. If narration is short, ask the
+    // AI for additional scenes and append. Up to 2 extend passes.
+    // ---------------------------------------------------------------
+    if (!usedFallback) {
+      for (let ext = 0; ext < 2; ext++) {
+        const have = totalVoiceoverWords(finalOut.scenes);
+        if (have >= wMin) break;
+        const need = Math.max(wMin - have, wpsTarget * 4);
+        const addScenes = Math.max(4, Math.ceil(need / Math.max(1, wpsTarget)));
+        const startN = finalOut.scenes.length + 1;
+        const extendUser = `Continue the script below. It is currently only
+${have} words but must total ${wMin}-${wMax} words to fill ${lenSec} seconds
+of narration. Add ${addScenes} MORE scenes (numbered ${startN}..${startN + addScenes - 1})
+that keep the same topic, tone and visual style, deepen the argument, and
+add roughly ${need} more spoken words total. Aim for ${wpsMin}-${wpsMax}
+words per scene (~${wpsTarget}). The LAST new scene should be the CTA.
+
+TOPIC: ${data.topic}
+TONE: ${data.tone}
+VISUAL STYLE: ${data.styleLabel}
+
+EXISTING SCENES (voiceover only, for continuity):
+${finalOut.scenes.map((s) => `${s.n}. ${s.voiceover}`).join("\n")}
+
+Return ONLY this JSON shape with no prose:
+{ "scenes": [ { "n": ${startN}, "time_range": "", "role": "Beat", "voiceover": "...", "on_screen_text": "", "visual": "...", "image_prompt": "${data.styleLabel} style, ${ratio}, photorealistic, cinematic, premium commercial look, 8k, shallow depth of field. ...", "duration": "3s" } ] }`;
+        const ExtSchema = z.object({ scenes: z.array(Schema.shape.scenes.element) });
+        try {
+          const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash",
+              messages: [
+                { role: "system", content: sys },
+                { role: "user", content: extendUser },
+              ],
+              response_format: { type: "json_object" },
+              max_tokens: Math.min(60000, 2000 + Math.round(need * 6)),
+            }),
+          });
+          if (!upstream.ok) break;
+          const j = (await upstream.json()) as { choices?: Array<{ message?: { content?: string } }> };
+          const raw = j.choices?.[0]?.message?.content ?? "";
+          const parsed = parseStructuredJsonResponse(raw);
+          const checked = ExtSchema.safeParse(parsed.value);
+          if (!checked.success || checked.data.scenes.length === 0) break;
+          finalOut.scenes = [...finalOut.scenes, ...checked.data.scenes].map((s, i) => ({ ...s, n: i + 1 }));
+        } catch (e) {
+          parseErrors.push(`Extend pass ${ext + 1} failed: ${e instanceof Error ? e.message : String(e)}`);
+          break;
+        }
+      }
+
+      // Last-resort: if still short after AI extend passes, top up with
+      // fallback scenes so the word budget is met no matter what.
+      const have = totalVoiceoverWords(finalOut.scenes);
+      if (have < wMin) {
+        const missingWords = wMin - have;
+        const extraScenes = Math.max(3, Math.ceil(missingWords / Math.max(1, wpsTarget)));
+        const filler = buildFallbackVideoScript(data.topic, extraScenes, Math.ceil(missingWords / 2.5), ratio, data.styleLabel);
+        finalOut.scenes = [...finalOut.scenes, ...filler.scenes].map((s, i) => ({ ...s, n: i + 1 }));
+        parseErrors.push(`Top-up: appended ${extraScenes} filler scenes to reach word budget`);
+      }
+    }
+
+    // Scale per-scene base durations so the timeline sum matches the request.
+    // Voice duration still wins in the renderer, but this keeps
+    // scene.duration consistent with reality.
+    if (finalOut.scenes.length > 0) {
       const parseSec = (d: string) => {
         const m = /([\d.]+)/.exec(d);
         const n = m ? parseFloat(m[1]) : 3;
@@ -233,7 +307,7 @@ Return ONLY this JSON object shape with no prose:
       if (current > 0) {
         const factor = lenSec / current;
         finalOut.scenes = finalOut.scenes.map((s) => {
-          const scaled = Math.max(2, Math.round(parseSec(s.duration) * factor));
+          const scaled = Math.max(2, Math.min(8, Math.round(parseSec(s.duration) * factor)));
           return { ...s, duration: `${scaled}s` };
         });
       }
@@ -246,9 +320,13 @@ Return ONLY this JSON object shape with no prose:
         parse_errors: parseErrors,
         attempts: Math.min(3, Math.max(1, parseErrors.length)),
         used_repair: usedRepair,
-        used_fallback: parseErrors.some((e) => e.includes("Used fallback")),
+        used_fallback: usedFallback || parseErrors.some((e) => e.includes("Used fallback")),
       };
     }
+
+    console.info(
+      `[ScriptAgent] requested=${lenSec}s words=${totalVoiceoverWords(finalOut.scenes)}/${wMin}-${wMax} scenes=${finalOut.scenes.length}/${sMin}-${sMax}`
+    );
 
     return finalOut;
   });
