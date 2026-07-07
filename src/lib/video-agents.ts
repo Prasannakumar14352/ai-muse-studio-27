@@ -584,43 +584,7 @@ export const VideoEditingAgent = {
   },
 };
 
-// ---------- Render (real canvas + real audio) ----------
-
-export const RenderAgent = {
-  async run(
-    brief: VideoBrief,
-    script: AiVideoScript,
-    visuals: VisualAsset[],
-    voice: VoiceoverClip[],
-    onProgress?: (p: number) => void,
-  ): Promise<RenderResult> {
-    const scenes: RenderScene[] = script.scenes.map((s, i) => ({
-      n: s.n,
-      visual: s.visual,
-      voiceover: s.voiceover,
-      duration: `${Math.max(2, Math.round(parseSec(s.duration)))}s`,
-      on_screen_text: s.on_screen_text ?? "",
-    }));
-    const result = await renderVideo({
-      title: brief.title,
-      platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType],
-      contentType: contentTypeFor(brief),
-      styleId: mapStyleForRenderer(brief.style),
-      scenes,
-      sceneImages: visuals.map((v) => v.url),
-      sceneAudio: voice.map((v) => v.buffer),
-      fitToAudio: true,
-      onProgress,
-    });
-    return {
-      video_url: URL.createObjectURL(result.blob),
-      mime: result.mimeType,
-      extension: result.extension,
-      duration_sec: result.durationSec,
-      aspect_ratio: brief.aspectRatio,
-    };
-  },
-};
+// (RenderAgent defined earlier — beat-driven.)
 
 // The renderer's constants use slightly different style ids; keep the accent
 // color consistent by mapping our extended set back to the base palette.
