@@ -632,8 +632,13 @@ function ProcessingScreen({
 // ---------------- Result ----------------
 
 function ResultScreen({
-  result, onAnother, onNew,
-}: { result: PipelineResult; onAnother: () => void; onNew: () => void }) {
+  result, onAnother, onNew, onSaveThumbnail,
+}: {
+  result: PipelineResult;
+  onAnother: () => void;
+  onNew: () => void;
+  onSaveThumbnail: (v: { url: string; concept: string; headline: string; alt: string }) => void;
+}) {
   const { render, thumbnail, subtitles, seo, brief } = result;
 
   function download(url: string, filename: string) {
