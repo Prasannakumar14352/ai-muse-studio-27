@@ -54,7 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             aria-label="CreatorVault AI home"
             className="flex items-center justify-center rounded-lg p-1 transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <img src={brandLogo.url} alt="" className="h-10 w-auto object-contain" />
+            <BrandLogo alt="" className="h-10 w-auto object-contain" />
           </Link>
           <Link
             to="/dashboard"
@@ -92,7 +92,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           aria-label="CreatorVault AI home"
           className="flex items-center justify-center rounded-lg p-1 transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          <img src={brandLogo.url} alt="" className="h-7 w-auto object-contain" />
+          <BrandLogo alt="" className="h-7 w-auto object-contain" />
         </Link>
         <Link
           to="/dashboard"
