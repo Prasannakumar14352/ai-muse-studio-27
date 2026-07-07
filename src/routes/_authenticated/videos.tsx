@@ -532,16 +532,17 @@ function ResultScreen({
             <video src={render.video_url} controls autoPlay playsInline className="w-full h-full object-contain" />
           </div>
           <div className="p-4 flex flex-wrap items-center gap-2">
-            <button onClick={() => download(render.video_url, `${slug(seo.youtube_title)}.webm`)} className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2">
-              <Download className="w-4 h-4" /> Download MP4
+            <button onClick={() => download(render.video_url, `${slug(seo.youtube_title)}.${render.extension}`)} className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2">
+              <Download className="w-4 h-4" /> Download video
             </button>
-            <button onClick={() => download(thumbnail.url, `${slug(seo.youtube_title)}-thumbnail.svg`)} className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2">
+            <button onClick={() => download(thumbnail.url, `${slug(seo.youtube_title)}-thumbnail.png`)} className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2">
               <Download className="w-4 h-4" /> Thumbnail
             </button>
             <button onClick={() => downloadText(subtitles.content, `${slug(seo.youtube_title)}.vtt`, "text/vtt")} className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2">
               <Download className="w-4 h-4" /> Subtitles
             </button>
             <div className="flex-1" />
+
             <button onClick={onAnother} className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2">
               <RefreshCw className="w-4 h-4" /> Another version
             </button>
