@@ -99,6 +99,22 @@ DURATION IS A HARD REQUIREMENT.
 Scene 1 is a hard hook (0-3 sec). Last scene is a CTA. In between, deliver
 a full documentary arc that pays off the hook.
 
+STRUCTURE (bake these into the scene sequence — they are NOT extra output):
+- INTRO (scenes 2-4, roughly 5-15% of total duration): set up the stakes
+  and PROMISE the payoff without giving it away. Tell the viewer exactly
+  what they will get if they stay.
+- CURIOSITY LOOPS: every 20-30 seconds, open a NEW loop with a phrase
+  like "but first…", "we'll get to that in a second", "here's the twist
+  most people miss…", "and the reason is not what you think". Close each
+  loop before the CTA — never leave one dangling.
+- RETENTION / PATTERN INTERRUPTS: roughly every 30-45 seconds, place a
+  pattern-interrupt scene — a surprising statistic, a contrarian claim,
+  a sudden mini-story, a visual metaphor pivot. NEVER let two consecutive
+  scenes hit the same emotional beat or use the same sentence structure.
+- PAYOFFS: every promise the intro or a loop makes MUST be explicitly
+  paid off in a later scene. Reward the viewer.
+
+
 For EACH scene, produce:
 - n: scene number (1..${sceneCount})
 - time_range: e.g. "0-3 sec"
