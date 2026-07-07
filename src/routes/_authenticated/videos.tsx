@@ -1029,3 +1029,79 @@ function MetaChips({ label, items, onCopy }: { label: string; items: string[]; o
     </div>
   );
 }
+
+// ---------------- Saved thumbnails library ----------------
+
+function ThumbnailLibrarySection({
+  items, onDelete,
+}: { items: LocalThumbnail[]; onDelete: (id: string) => void }) {
+  return (
+    <div className="glass rounded-2xl p-6 space-y-4">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-xl font-semibold">Saved thumbnails</h2>
+        <span className="text-xs text-muted-foreground">
+          Stored locally in your browser · {items.length} saved
+        </span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {items.map((rec) => (
+          <ThumbnailCard key={rec.id} rec={rec} onDelete={() => onDelete(rec.id)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ThumbnailCard({ rec, onDelete }: { rec: LocalThumbnail; onDelete: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    let obj: string | null = null;
+    void loadThumbnailImageURL(rec).then((u) => {
+      if (!live) { if (u) URL.revokeObjectURL(u); return; }
+      obj = u; setUrl(u);
+    });
+    return () => { live = false; if (obj) URL.revokeObjectURL(obj); };
+  }, [rec]);
+  async function doDownload() {
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug(rec.headline || rec.title)}-thumbnail.${rec.extension}`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+  return (
+    <div className="glass rounded-xl overflow-hidden border border-border flex flex-col">
+      <div className="aspect-video bg-black">
+        {url ? (
+          <img src={url} alt={rec.title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">Loading…</div>
+        )}
+      </div>
+      <div className="p-3 space-y-2 flex-1 flex flex-col">
+        <div className="text-sm font-medium line-clamp-2 leading-snug">{rec.title}</div>
+        <div className="flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
+          <span className="glass px-2 py-0.5 rounded">{rec.concept}</span>
+          <span className="glass px-2 py-0.5 rounded">{rec.styleLabel}</span>
+        </div>
+        <div className="text-[11px] text-muted-foreground">{fmtDate(rec.created_at)} · {rec.niche ?? ""}</div>
+        <div className="flex gap-2 pt-1 mt-auto">
+          <button
+            onClick={doDownload}
+            className="flex-1 rounded-lg gradient-primary text-white text-xs py-1.5 flex items-center justify-center gap-1"
+          >
+            <Download className="w-3 h-3" /> Download
+          </button>
+          <button
+            onClick={onDelete}
+            className="rounded-lg glass border border-border px-2 py-1.5 text-xs text-red-400 flex items-center gap-1"
+            title="Delete"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
