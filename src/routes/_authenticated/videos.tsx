@@ -356,7 +356,7 @@ function VideosPage() {
 
 // ---------------- Input ----------------
 
-function InputScreen({ onGenerate }: { onGenerate: (b: VideoBrief) => void }) {
+function InputScreen({ onGenerate }: { onGenerate: (args: GenerateArgs) => void }) {
   const [niche, setNiche] = useState<string>(NICHES[0].id);
   const [title, setTitle] = useState("");
   const [videoType, setVideoType] = useState<VideoType>("shorts");
@@ -373,7 +373,11 @@ function InputScreen({ onGenerate }: { onGenerate: (b: VideoBrief) => void }) {
 
   function submit() {
     if (!title.trim()) return toast.error("Enter a video title or idea");
-    onGenerate({ title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio });
+    onGenerate({
+      brief: { title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio },
+      niche,
+      topic: title.trim(),
+    });
   }
 
   return (
