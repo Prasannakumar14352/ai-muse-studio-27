@@ -264,12 +264,21 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   if (!rawCtx) throw new Error("Canvas 2D not supported");
   const ctx: CanvasRenderingContext2D = rawCtx;
 
-  // Load style fallback + per-scene AI images in parallel.
-  const [fallbackImg, ...sceneImgs] = await Promise.all([
+  // Load style fallback + per-beat media in parallel. Clips are preloaded as
+  // muted <video> elements; images stay as <img>. Falls back to sceneImages
+  // when no clip is provided, then to the style still.
+  const beatCount = opts.scenes.length;
+  const [fallbackImg, ...sceneMedia] = await Promise.all([
     loadImage(style.image),
-    ...opts.scenes.map((_, i) => {
-      const src = opts.sceneImages?.[i];
-      return src ? loadImage(src) : Promise.resolve<HTMLImageElement | null>(null);
+    ...Array.from({ length: beatCount }, async (_, i): Promise<Drawable> => {
+      const m = opts.sceneMedia?.[i];
+      if (m?.kind === "clip") {
+        const v = await loadClip(m.url);
+        if (v) return v;
+        // clip failed to load — fall through to still image
+      }
+      const stillSrc = m?.kind === "image" ? m.url : opts.sceneImages?.[i];
+      return stillSrc ? await loadImage(stillSrc) : null;
     }),
   ]);
 
