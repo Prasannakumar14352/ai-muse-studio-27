@@ -86,7 +86,7 @@ function AuthPage() {
         // Configure them in Lovable Cloud → Users → Auth Settings → Google.
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: "google",
-          options: { redirectTo, queryParams: { prompt: "select_account" } },
+          options: { redirectTo, skipBrowserRedirect: true, queryParams: { prompt: "select_account" } },
         });
         console.info("[auth] supabase oauth response", {
           providerUrl: data?.url ?? null,
