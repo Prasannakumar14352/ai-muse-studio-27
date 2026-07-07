@@ -6,7 +6,124 @@
 
 import { generateAiVideoScript, generateAiVideoSeo, type AiVideoScript, type AiVideoScene, type AiVideoSeo } from "@/lib/video-ai.functions";
 import { buildFallbackVideoScript } from "@/lib/video-fallback";
-import { renderVideo, type RenderScene } from "@/lib/video-renderer";
+import { renderVideo, type RenderScene, type CameraMotion } from "@/lib/video-renderer";
+
+// ---------- Beat expansion (documentary-style visual density) ----------
+//
+// A "beat" is a 2-5 second visual shot. Every script scene is broken into
+// multiple beats, each with its own AI image and camera motion, while the
+// scene's narration plays continuously across all its beats. This is what
+// makes the result feel like a professionally edited documentary instead of
+// a slideshow of one image per paragraph.
+
+const TARGET_BEAT_SEC = 3.5;
+const MIN_BEAT_SEC = 2.2;
+const MAX_BEAT_SEC = 5.0;
+const MOTION_CYCLE: CameraMotion[] = ["zoomIn", "panRight", "pushIn", "zoomOut", "panLeft", "tiltDown", "tiltUp"];
+
+type Beat = {
+  sceneIndex: number;   // index into script.scenes
+  beatIndex: number;    // beat position within the scene (0-based)
+  isFirstOfScene: boolean;
+  text: string;         // narration chunk this beat visually represents
+  words: number;
+  imagePrompt: string;  // per-beat image prompt
+  motion: CameraMotion;
+};
+
+/** Split a voiceover string into ~10-14-word visual chunks (sentence-aware). */
+function splitVoiceoverIntoBeatTexts(vo: string, targetBeats: number): string[] {
+  const clean = (vo ?? "").trim();
+  if (!clean) return [""];
+  // Sentence-aware split first.
+  const sentences = clean.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+  if (sentences.length === 0) return [clean];
+
+  // If we already have close to the right number of sentences, use them as-is.
+  if (sentences.length >= targetBeats) {
+    // Merge short adjacent sentences until we're at targetBeats.
+    const merged = [...sentences];
+    while (merged.length > targetBeats) {
+      // Find the shortest adjacent pair and merge.
+      let bestI = 0;
+      let bestLen = Infinity;
+      for (let i = 0; i < merged.length - 1; i++) {
+        const len = merged[i].split(/\s+/).length + merged[i + 1].split(/\s+/).length;
+        if (len < bestLen) { bestLen = len; bestI = i; }
+      }
+      merged.splice(bestI, 2, `${merged[bestI]} ${merged[bestI + 1]}`);
+    }
+    return merged;
+  }
+
+  // Fewer sentences than targetBeats: split long sentences on commas / word count.
+  const chunks: string[] = [];
+  for (const s of sentences) {
+    const words = s.split(/\s+/);
+    const need = Math.max(1, Math.round(words.length / 12));
+    if (need <= 1) { chunks.push(s); continue; }
+    // Prefer comma splits when reasonable.
+    const commaParts = s.split(/,\s+/).map((x) => x.trim()).filter(Boolean);
+    if (commaParts.length >= need) {
+      // Group commaParts into `need` chunks.
+      const per = Math.ceil(commaParts.length / need);
+      for (let i = 0; i < commaParts.length; i += per) {
+        chunks.push(commaParts.slice(i, i + per).join(", "));
+      }
+    } else {
+      const per = Math.ceil(words.length / need);
+      for (let i = 0; i < words.length; i += per) {
+        chunks.push(words.slice(i, i + per).join(" "));
+      }
+    }
+  }
+  return chunks.length ? chunks : [clean];
+}
+
+function expandScriptToBeats(script: AiVideoScript, style: StyleId): Beat[] {
+  const beats: Beat[] = [];
+  let globalIdx = 0;
+  script.scenes.forEach((scene, sceneIndex) => {
+    const sceneDur = parseSec(scene.duration);
+    const targetBeats = Math.max(1, Math.round(sceneDur / TARGET_BEAT_SEC));
+    const chunks = splitVoiceoverIntoBeatTexts(scene.voiceover ?? "", targetBeats);
+    const baseVisual = scene.visual || scene.image_prompt || `${scene.voiceover?.slice(0, 80)}`;
+    chunks.forEach((chunk, beatIndex) => {
+      const words = chunk.split(/\s+/).filter(Boolean).length || 1;
+      beats.push({
+        sceneIndex,
+        beatIndex,
+        isFirstOfScene: beatIndex === 0,
+        text: chunk,
+        words,
+        imagePrompt: buildBeatImagePrompt(chunk, baseVisual, style),
+        motion: MOTION_CYCLE[globalIdx % MOTION_CYCLE.length],
+      });
+      globalIdx += 1;
+    });
+  });
+  return beats;
+}
+
+function buildBeatImagePrompt(beatText: string, sceneVisual: string, style: StyleId): string {
+  const descriptor = STYLE_DESCRIPTOR[style];
+  // Beat-specific visual grounded in the narration chunk, styled consistently.
+  return `${descriptor}. Cinematic documentary shot visualizing: "${beatText.trim()}". Context: ${sceneVisual}. Dynamic composition, dramatic lighting, cinematic depth of field, no text, no watermarks, no captions.`;
+}
+
+/**
+ * Given a scene's audio duration and its beats, return the seconds each beat
+ * should occupy. Distributed proportionally to word count, clamped to
+ * [MIN_BEAT_SEC, MAX_BEAT_SEC], then rescaled to sum exactly to audioSec.
+ */
+function distributeAudioAcrossBeats(sceneBeats: Beat[], audioSec: number): number[] {
+  const totalWords = sceneBeats.reduce((a, b) => a + b.words, 0) || 1;
+  const raw = sceneBeats.map((b) => (b.words / totalWords) * audioSec);
+  const clamped = raw.map((d) => Math.max(MIN_BEAT_SEC, Math.min(MAX_BEAT_SEC, d)));
+  const sum = clamped.reduce((a, b) => a + b, 0) || 1;
+  const scale = audioSec / sum;
+  return clamped.map((d) => d * scale);
+}
 
 // ---------- Shared types ----------
 
@@ -277,23 +394,22 @@ async function fetchSceneImage(prompt: string, style: StyleId, ratio: AspectRati
 export const VisualGenerationAgent = {
   async run(
     brief: VideoBrief,
-    script: AiVideoScript,
+    beats: Beat[],
     onProgress?: (done: number, total: number) => void,
   ): Promise<VisualAsset[]> {
-    const total = script.scenes.length;
+    const total = beats.length;
     let done = 0;
     onProgress?.(0, total);
     const results = await Promise.all(
-      script.scenes.map(async (s) => {
-        const prompt = s.image_prompt || s.visual || `${brief.title} — scene ${s.n}`;
-        const url = await fetchSceneImage(prompt, brief.style, brief.aspectRatio);
+      beats.map(async (b, i) => {
+        const url = await fetchSceneImage(b.imagePrompt, brief.style, brief.aspectRatio);
         done += 1;
         onProgress?.(done, total);
         return {
-          n: s.n,
+          n: i + 1,
           kind: "image" as const,
-          url: url ?? placeholderImage(brief.aspectRatio, `Scene ${s.n}`),
-          duration_sec: parseSec(s.duration),
+          url: url ?? placeholderImage(brief.aspectRatio, `Beat ${i + 1}`),
+          duration_sec: TARGET_BEAT_SEC,
           generated: !!url,
         };
       }),
@@ -302,7 +418,75 @@ export const VisualGenerationAgent = {
   },
 };
 
-// ---------- Voiceover (real TTS per scene) ----------
+// ---------- Render (real canvas + real audio, beat-driven) ----------
+
+export const RenderAgent = {
+  async run(
+    brief: VideoBrief,
+    script: AiVideoScript,
+    beats: Beat[],
+    beatVisuals: VisualAsset[],
+    voice: VoiceoverClip[],
+    onProgress?: (p: number) => void,
+  ): Promise<RenderResult> {
+    // Distribute each scene's audio duration across its beats.
+    const beatDurations: number[] = new Array(beats.length).fill(TARGET_BEAT_SEC);
+    const beatAudio: Array<AudioBuffer | null> = new Array(beats.length).fill(null);
+
+    // Group beats by scene index.
+    const bySceneIdx = new Map<number, number[]>();
+    beats.forEach((b, i) => {
+      const arr = bySceneIdx.get(b.sceneIndex) ?? [];
+      arr.push(i);
+      bySceneIdx.set(b.sceneIndex, arr);
+    });
+
+    bySceneIdx.forEach((globalBeatIndices, sceneIdx) => {
+      const sceneBeats = globalBeatIndices.map((i) => beats[i]);
+      const vo = voice[sceneIdx];
+      const audioSec = vo?.buffer?.duration ?? vo?.duration_sec ?? sceneBeats.length * TARGET_BEAT_SEC;
+      const durations = distributeAudioAcrossBeats(sceneBeats, audioSec);
+      globalBeatIndices.forEach((gi, k) => {
+        beatDurations[gi] = durations[k];
+      });
+      // Attach the scene's continuous audio buffer to the FIRST beat only —
+      // it plays through the subsequent beats' visuals uninterrupted.
+      const firstGi = globalBeatIndices[0];
+      beatAudio[firstGi] = vo?.buffer ?? null;
+    });
+
+    const scenes: RenderScene[] = beats.map((b, i) => ({
+      n: i + 1,
+      visual: b.imagePrompt,
+      voiceover: b.text,
+      duration: `${beatDurations[i].toFixed(2)}s`,
+      // On-screen text only on the first beat of a scene, using the script's overlay when present.
+      on_screen_text: b.isFirstOfScene ? (script.scenes[b.sceneIndex]?.on_screen_text ?? "") : "",
+      motion: b.motion,
+    }));
+
+    const result = await renderVideo({
+      title: brief.title,
+      platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType],
+      contentType: contentTypeFor(brief),
+      styleId: mapStyleForRenderer(brief.style),
+      scenes,
+      sceneImages: beatVisuals.map((v) => v.url),
+      sceneAudio: beatAudio,
+      fitToAudio: false, // durations already sized to the audio timeline
+      onProgress,
+    });
+    return {
+      video_url: URL.createObjectURL(result.blob),
+      mime: result.mimeType,
+      extension: result.extension,
+      duration_sec: result.durationSec,
+      aspect_ratio: brief.aspectRatio,
+    };
+  },
+};
+
+// ---------- Voiceover (real TTS per scene, continuous narration) ----------
 
 async function fetchSceneAudio(text: string, voice: VoiceId, ctx: AudioContext): Promise<{ blobUrl: string; buffer: AudioBuffer } | null> {
   try {
@@ -383,15 +567,15 @@ export const SoundEffectsAgent = {
 };
 
 export const VideoEditingAgent = {
-  async run(script: AiVideoScript, visuals: VisualAsset[], voice: VoiceoverClip[]): Promise<Timeline> {
+  async run(script: AiVideoScript, voice: VoiceoverClip[]): Promise<Timeline> {
     let t = 0;
     const scenes = script.scenes.map((s, i) => {
-      const v = visuals[i];
       const vo = voice[i];
-      const dur = Math.max(v?.duration_sec ?? 3, (vo?.duration_sec ?? 0) + 0.25);
+      const dur = Math.max(2, (vo?.duration_sec ?? parseSec(s.duration)) + 0.25);
       const item = {
         n: s.n, start_sec: t, end_sec: t + dur,
-        voiceover: s.voiceover, on_screen_text: s.on_screen_text ?? "", visual: v!,
+        voiceover: s.voiceover, on_screen_text: s.on_screen_text ?? "",
+        visual: { n: s.n, kind: "image" as const, url: "", duration_sec: dur, generated: false },
       };
       t += dur;
       return item;
@@ -400,43 +584,7 @@ export const VideoEditingAgent = {
   },
 };
 
-// ---------- Render (real canvas + real audio) ----------
-
-export const RenderAgent = {
-  async run(
-    brief: VideoBrief,
-    script: AiVideoScript,
-    visuals: VisualAsset[],
-    voice: VoiceoverClip[],
-    onProgress?: (p: number) => void,
-  ): Promise<RenderResult> {
-    const scenes: RenderScene[] = script.scenes.map((s, i) => ({
-      n: s.n,
-      visual: s.visual,
-      voiceover: s.voiceover,
-      duration: `${Math.max(2, Math.round(parseSec(s.duration)))}s`,
-      on_screen_text: s.on_screen_text ?? "",
-    }));
-    const result = await renderVideo({
-      title: brief.title,
-      platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType],
-      contentType: contentTypeFor(brief),
-      styleId: mapStyleForRenderer(brief.style),
-      scenes,
-      sceneImages: visuals.map((v) => v.url),
-      sceneAudio: voice.map((v) => v.buffer),
-      fitToAudio: true,
-      onProgress,
-    });
-    return {
-      video_url: URL.createObjectURL(result.blob),
-      mime: result.mimeType,
-      extension: result.extension,
-      duration_sec: result.durationSec,
-      aspect_ratio: brief.aspectRatio,
-    };
-  },
-};
+// (RenderAgent defined earlier — beat-driven.)
 
 // The renderer's constants use slightly different style ids; keep the accent
 // color consistent by mapping our extended set back to the base palette.
@@ -528,9 +676,15 @@ export async function runVideoPipeline(
   }));
   const storyboard = await mark("storyboard", () => StoryboardAgent.run(script));
   const direction = await mark("direction", () => DirectorAgent.run(brief, storyboard));
+
+  // Expand every script scene into short (2-5s) visual beats. Each beat gets
+  // its own AI image + camera motion so the final video cycles visuals every
+  // few seconds instead of holding one image for a whole paragraph.
+  const beats = expandScriptToBeats(script, brief.style);
+
   const visuals = await mark("visuals", () =>
-    VisualGenerationAgent.run(brief, script, (done, total) =>
-      onStep("visuals", "running", `${done}/${total} scenes`)
+    VisualGenerationAgent.run(brief, beats, (done, total) =>
+      onStep("visuals", "running", `${done}/${total} shots`)
     ),
   );
   const voiceover = await mark("voiceover", () =>
@@ -539,11 +693,11 @@ export async function runVideoPipeline(
     ),
   );
   const subtitles = await mark("subtitles", () => SubtitleAgent.run(script, voiceover));
-  const timeline = await mark("edit", () => VideoEditingAgent.run(script, visuals, voiceover));
+  const timeline = await mark("edit", () => VideoEditingAgent.run(script, voiceover));
   const music = await mark("music", () => MusicAgent.run(brief, timeline.total_sec));
   const sfx = await mark("sfx", () => SoundEffectsAgent.run(direction));
   const render = await mark("render", () =>
-    RenderAgent.run(brief, script, visuals, voiceover, (p) =>
+    RenderAgent.run(brief, script, beats, visuals, voiceover, (p: number) =>
       onStep("render", "running", `${Math.round(p * 100)}%`)
     ),
   );
