@@ -339,8 +339,12 @@ function VideosPage() {
       await refreshInProgress();
 
       // Persist to browser-local library — no backend, no upload.
+      // We store the raw Blob (never the blob: URL) so it survives reloads.
       try {
-        const videoBlob = await (await fetch(r.render.video_url)).blob();
+        const videoBlob = r.render.blob;
+        if (!videoBlob || videoBlob.size === 0) {
+          throw new Error("Rendered video blob is empty");
+        }
         const niche = args.niche;
         const nicheLabel = NICHES.find((n) => n.id === niche)?.label ?? niche;
         const styleLabel = STYLE_CARDS.find((s) => s.id === args.brief.style)?.label ?? args.brief.style;
