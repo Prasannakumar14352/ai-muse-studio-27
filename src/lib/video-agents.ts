@@ -297,6 +297,7 @@ export type PipelineResult = {
 
 export const PIPELINE_STEPS = [
   { id: "research", label: "Researching topic" },
+  { id: "retention_engine", label: "Building YouTube retention blueprint" },
   { id: "title", label: "Optimizing title" },
   { id: "hook", label: "Writing hook" },
   { id: "intro", label: "Shaping intro" },
