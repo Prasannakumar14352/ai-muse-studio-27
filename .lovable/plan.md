@@ -1,56 +1,99 @@
-# Plan
+# Async Parallel Video Pipeline
 
-Two features. Both scoped to the Videos module. No database, no Supabase storage, no cloud upload.
+Rewrite the Videos generation pipeline to feel like a modern batch renderer: fast planning phase, hundreds of short shots generated in parallel with per-shot retry, live progress, resumable state in IndexedDB, and a Scene Viewer the user can browse while rendering continues.
 
-## Part A — Local video library (IndexedDB + localStorage)
+## Goals
 
-New file `src/lib/videoLocalStore.ts` following the carousel local-store pattern (`src/lib/local-store.ts` + `src/lib/blob-store.ts`):
+- 9-minute doc: planning done in seconds, shots stream in parallel, final render kicks off only when all shots are ready.
+- Never block the UI. Refresh-safe. Per-shot retry, not per-project retry.
+- Real counters ("47 / 132 shots"), not a fake progress bar.
 
-- **IndexedDB** (via existing `blob-store.ts` — already opens `cv-blobs` DB) holds the MP4/WebM blob and the thumbnail blob per video, keyed as `video:<id>` and `video-thumb:<id>`.
-- **localStorage** holds the small metadata index (`cv:<uid>:videos-index` → id[], and `cv:<uid>:video:<id>` → metadata JSON).
+## Phase 1 — Planning (seconds, sequential, cheap)
 
-Metadata stored per video:
-`id, title, niche, topic, styleId, styleLabel, videoType, aspectRatio, duration_sec, extension, mime, youtube_title, youtube_description, hashtags, tags, chapters, pinned_comment, subtitles_vtt, created_at, video_blob_key, thumbnail_blob_key`.
+Runs the existing agents in this order and persists each output to the job record in IndexedDB:
 
-Exports:
-`saveGeneratedVideo(input) → LocalVideo`, `getGeneratedVideos()`, `getGeneratedVideoById(id)`, `deleteGeneratedVideo(id)`, `clearGeneratedVideos()`.
+1. Research
+2. Script
+3. Storyboard (existing beat structure)
+4. Narration (TTS per section, streamed)
+5. Timeline: split storyboard into **3–5 s shots**. For a 9-min video that's ~120–180 shots. Each shot: `{ id, index, start, end, duration, prompt, style, ratio, narrationSliceRef, status: "pending" }`.
 
-Videos page changes (`src/routes/_authenticated/videos.tsx`):
+Output: a `VideoJob` object with `shots: Shot[]`. Saved to IDB immediately — this is the resume anchor.
 
-- After pipeline completes, call `saveGeneratedVideo(...)` with the render blob, thumbnail data URL, subtitles VTT, SEO fields, and the brief/niche/topic/style.
-- New "Your videos" library section rendered on the page (visible in the idle/form state, not during processing). Each card shows thumbnail, title, duration/aspect chip, created date, and Download / Delete buttons. Clicking a card re-opens the result view for that saved video (hydrated from IDB via object URL).
-- Refresh restores the library from IDB/localStorage on mount.
-- No auto-upload anywhere.
+## Phase 2 — Parallel shot generation (the bulk of the work)
 
-## Part B — AI video clip generation per beat (with image fallback)
+New module `src/lib/video-shot-runner.ts`:
 
-New server route `src/routes/api/generate-video-clip.ts`:
+- Concurrency-limited worker pool (default 6, configurable). Uses `Promise` scheduling, not sequential `await`s.
+- Each worker pulls the next `pending` shot, calls `/api/generate-video-clip` (falls back to `/api/generate-image` on non-ok), writes the resulting blob to IDB under `shot:<jobId>:<shotId>`, updates shot status to `done | failed`, persists the job.
+- Retry: exponential backoff up to N per shot. On final failure the shot stays `failed` but the pool continues. UI exposes a "Retry failed shots" action that requeues only failed shots.
+- Emits events via an `EventTarget` on the job: `shot:done`, `shot:failed`, `progress`. UI subscribes for live counters and Scene Viewer updates.
+- Cancellable via `AbortController` stored on the job runtime (not persisted).
 
-- POST `{ prompt, style, ratio, duration }` → `{ clip?: string /* data URL of mp4 */ }` or `{ ok: false, reason }`.
-- Calls Lovable AI Gateway video endpoint if the gateway exposes one. If the model returns a non-2xx or the response isn't an mp4, respond with `{ ok: false }` so the client falls back to an image.
-- Cap at ~5s per clip, low resolution (480p) to keep latency and cost reasonable.
+Shot blob storage reuses `blob-store.ts` (already IDB-backed). Metadata (status, attempts, blob key, error) lives in the job record in localStorage under `cv:<uid>:videojob:<id>` plus an index key.
 
-Pipeline change in `src/lib/video-agents.ts`:
+## Phase 3 — Assembly & render (only after Phase 2 completes, or user hits "Render now")
 
-- New `VisualBeatAsset = { kind: "image" | "clip"; url: string; ... }`.
-- `VisualGenerationAgent` for each beat first tries `fetchBeatClip(prompt, style, ratio, duration)`; on failure/null falls back to `fetchSceneImage(...)`. Progress reports both attempts as one "shot".
-- Passes `kind` through so the renderer knows what to draw.
+Runs the existing `RenderAgent`, but fed by the IDB shot blobs instead of in-memory arrays. Steps run sequentially inside the render agent and report progress on a separate channel (`render:progress`):
 
-Renderer change in `src/lib/video-renderer.ts`:
+1. Sync narration to timeline (already computed)
+2. Sync subtitles VTT
+3. Mix music bed + SFX
+4. Encode final MP4/WebM
+5. Save via `saveGeneratedVideo` (existing), mark job `complete`
 
-- `RenderOptions.sceneMedia?: Array<{ kind: "image" | "clip"; url: string } | null>` (backwards-compatible with existing `sceneImages`).
-- On load, images become `HTMLImageElement`; clips become muted, preloaded `HTMLVideoElement` (play/pause driven by the frame loop, `currentTime` synced to beat progress × clip.duration).
-- `drawScene` accepts either and draws to canvas the same way, applying the existing camera motion (Ken Burns / pan / tilt) on top.
-- Fallback path unchanged when a beat has no clip.
+Render progress bar shows encoder frame progress and is visually separate from the shots counter.
 
-Cost note: clip generation is much more expensive than image generation. If the gateway doesn't expose a video model, every beat falls back to image and there is no cost impact vs today. If it does, expect a large jump — worth flagging in the UI so the user knows what's running.
+## Phase 4 — Resume
 
-## Files touched
+On app mount, the Videos page:
 
-- **New**: `src/lib/videoLocalStore.ts`, `src/routes/api/generate-video-clip.ts`
-- **Edited**: `src/lib/video-agents.ts` (beat fetch + progress), `src/lib/video-renderer.ts` (clip playback), `src/routes/_authenticated/videos.tsx` (library UI + save-on-complete + rehydrate on click)
+1. Loads all jobs from IDB.
+2. For jobs in `planning | generating | rendering` states, offers "Resume".
+3. Resuming re-hydrates the job, spins the worker pool back up, and skips any shot already `done` in IDB.
 
-## Confirmation needed
+## UI changes (`src/routes/_authenticated/videos.tsx`)
 
-1. OK to add the `/api/generate-video-clip` route even though we don't yet know a working Lovable video model id? It will safely fall back to images until a real provider is wired (i.e. today it behaves like current behavior, but the plumbing is ready).
-2. OK for the library section to live directly on `/videos` (not a separate route), matching the carousels page pattern?
+- Landing view keeps the library. New card in the library: **in-progress jobs** with shot counter and a Resume/Cancel button.
+- When a job is active, replace the current single-progress screen with a dashboard:
+  - Phase indicator (Planning → Generating shots → Rendering).
+  - "Generated 47 / 132 shots" counter + small sparkline of completion rate.
+  - Failed-shot count with "Retry failed" button.
+  - **Scene Viewer**: grid of shot thumbnails, each clickable to preview the clip/image. Grid updates live as shots complete. Shots still pending show a placeholder tile; failed shots show a retry tile.
+  - Cancel button that aborts the pool without deleting completed shots (so resume still works).
+- Render phase adds a second progress bar labelled "Encoding final video".
+- All of this is non-blocking; the user can navigate away and come back.
+
+## Files
+
+- **New**
+  - `src/lib/video-job-store.ts` — IDB+localStorage job persistence (jobs, shots metadata, shot blobs). Modeled on `videoLocalStore.ts`.
+  - `src/lib/video-shot-runner.ts` — worker pool, retry, event emitter, cancel.
+  - `src/lib/video-timeline.ts` — split storyboard into 3–5s shots with narration slices.
+  - `src/components/video/SceneViewer.tsx` — thumbnail grid + preview modal.
+  - `src/components/video/JobDashboard.tsx` — phase indicator, counters, retry, cancel.
+- **Edited**
+  - `src/lib/video-agents.ts` — refactor pipeline into `runPlanning(job)` + delegate shot generation to `video-shot-runner`. Remove the current per-beat serial loop.
+  - `src/lib/video-renderer.ts` — accept shots from IDB blob keys; emit render progress on its own channel.
+  - `src/routes/_authenticated/videos.tsx` — three views: landing (with in-progress jobs), job dashboard, result. Resume-on-mount logic.
+  - `src/routes/api/generate-video-clip.ts` — unchanged contract; still falls back to image when the video model isn't wired.
+
+## Technical notes
+
+- Concurrency default 6 is a starting point. `/api/generate-video-clip` today returns `ok:false` and the runner falls back to `/api/generate-image`, which is safe to fan out. If a real video model gets wired later, drop concurrency to 2–3 to respect provider limits — a single constant in `video-shot-runner.ts`.
+- No database, no Supabase storage. Everything stays in IDB/localStorage, per the earlier local-first constraint.
+- Job state machine: `planning → generating → (paused | rendering) → complete | failed`. `paused` is what a cancelled or interrupted job becomes; resume flips it back to `generating`.
+- Shot state machine: `pending → running → done | failed`. `failed` is retryable; `done` is skipped on resume.
+- Existing `saveGeneratedVideo` / `thumbnailLocalStore` remain the final delivery surface — this plan only changes how we get there.
+
+## Out of scope
+
+- Actual text-to-video model wiring (still gated on a working provider).
+- Server-side rendering / offloading encode off the browser.
+- Multi-tab coordination (a second tab resuming the same job). First tab wins; second tab shows read-only view.
+
+## Confirmation
+
+1. OK with default worker-pool concurrency of 6 for image fallback? I'll expose a constant so we can tune later.
+2. Scene Viewer as a grid inside the job dashboard (not a separate route)?
+3. On resume after refresh: auto-resume in the background, or require the user to click "Resume"? I'm defaulting to explicit Resume so we never burn credits without consent.
