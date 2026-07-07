@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { Loader2, Sparkles } from "lucide-react";
@@ -65,9 +65,9 @@ function AuthCallbackPage() {
           <>
             <h1 className="text-2xl font-bold">Sign-in failed</h1>
             <p className="mt-2 text-sm text-muted-foreground">{error}</p>
-            <Link to={retryHref} className="mt-6 inline-flex rounded-lg gradient-primary px-5 py-2.5 text-sm font-medium text-white">
+            <a href={retryHref} className="mt-6 inline-flex rounded-lg gradient-primary px-5 py-2.5 text-sm font-medium text-white">
               Try again
-            </Link>
+            </a>
           </>
         ) : (
           <>
