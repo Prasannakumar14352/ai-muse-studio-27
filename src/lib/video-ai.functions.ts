@@ -169,5 +169,28 @@ Return JSON EXACTLY:
     });
     const out = Schema.parse(parsed);
     out.scenes = out.scenes.map((s, i) => ({ ...s, n: i + 1 }));
+
+    // Enforce the requested target length. AI models frequently return fewer
+    // or shorter scenes than asked; scale each scene's base duration so the
+    // total sum matches the user-selected length. The renderer uses
+    // max(base, voiceover+0.25s) per scene, so stretching base durations
+    // reliably extends the final video.
+    if (data.targetLengthSec && out.scenes.length > 0) {
+      const parseSec = (d: string) => {
+        const m = /([\d.]+)/.exec(d);
+        const n = m ? parseFloat(m[1]) : 3;
+        return Number.isFinite(n) && n > 0 ? n : 3;
+      };
+      const current = out.scenes.reduce((a, s) => a + parseSec(s.duration), 0);
+      if (current > 0) {
+        const factor = lenSec / current;
+        out.scenes = out.scenes.map((s) => {
+          const scaled = Math.max(2, Math.round(parseSec(s.duration) * factor));
+          return { ...s, duration: `${scaled}s` };
+        });
+      }
+      out.length_sec = out.scenes.reduce((a, s) => a + parseSec(s.duration), 0);
+    }
+
     return out;
   });
