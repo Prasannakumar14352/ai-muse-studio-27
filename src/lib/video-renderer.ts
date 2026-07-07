@@ -318,9 +318,25 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
 
   const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
 
-  drawScene(ctx, sceneImgs[0] ?? fallbackImg, opts.scenes[0], {
+  drawScene(ctx, sceneMedia[0] ?? fallbackImg, opts.scenes[0], {
     progress: 0, accent: style.accent, showOnScreenText: opts.showOnScreenText,
   });
+
+  // Kick off the first beat's clip playback if it's a video.
+  const currentPlaying = { idx: -1 };
+  const playIfClip = (i: number) => {
+    if (i === currentPlaying.idx) return;
+    // Pause previous
+    const prev = sceneMedia[currentPlaying.idx];
+    if (prev instanceof HTMLVideoElement) { try { prev.pause(); } catch { /* noop */ } }
+    currentPlaying.idx = i;
+    const next = sceneMedia[i];
+    if (next instanceof HTMLVideoElement) {
+      try { next.currentTime = 0; void next.play().catch(() => {}); } catch { /* noop */ }
+    }
+  };
+  playIfClip(0);
+
 
   recorder.start(250);
 
