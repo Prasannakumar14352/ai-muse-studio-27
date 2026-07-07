@@ -106,9 +106,16 @@ function pickRecorderMime(preferred?: "webm" | "mp4"): { mime: string; ext: "mp4
   return { mime: "video/webm", ext: "webm" };
 }
 
+type Drawable = HTMLImageElement | HTMLVideoElement | null;
+function drawableSize(d: Drawable): { w: number; h: number } {
+  if (!d) return { w: 0, h: 0 };
+  if (d instanceof HTMLVideoElement) return { w: d.videoWidth || 1280, h: d.videoHeight || 720 };
+  return { w: d.width, h: d.height };
+}
+
 function drawScene(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement | null,
+  media: Drawable,
   scene: RenderScene,
   opts: {
     progress: number; accent: string; showOnScreenText?: boolean;
@@ -135,13 +142,12 @@ function drawScene(
 
   ctx.fillStyle = "#0b0b16";
   ctx.fillRect(0, 0, W, H);
-  if (img) {
-    const iw = img.width;
-    const ih = img.height;
-    const ratio = Math.max(W / iw, H / ih) * scale;
-    const dw = iw * ratio;
-    const dh = ih * ratio;
-    ctx.drawImage(img, (W - dw) / 2 + panX * W, (H - dh) / 2 + panY * H, dw, dh);
+  const size = drawableSize(media);
+  if (media && size.w > 0 && size.h > 0) {
+    const ratio = Math.max(W / size.w, H / size.h) * scale;
+    const dw = size.w * ratio;
+    const dh = size.h * ratio;
+    ctx.drawImage(media, (W - dw) / 2 + panX * W, (H - dh) / 2 + panY * H, dw, dh);
   } else {
     const g = ctx.createLinearGradient(0, 0, W, H);
     g.addColorStop(0, opts.accent);
