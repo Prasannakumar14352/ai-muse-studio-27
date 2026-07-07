@@ -664,8 +664,8 @@ async function fetchBeatClip(prompt: string, style: StyleId, ratio: AspectRatio,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        prompt: `${STYLE_DESCRIPTOR[style]}. ${prompt}`,
-        style: STYLE_LABEL[style],
+        // Visual Director already fully composed the prompt.
+        prompt,
         ratio,
         duration,
       }),
