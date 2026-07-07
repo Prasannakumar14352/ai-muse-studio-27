@@ -500,7 +500,8 @@ export const RenderAgent = {
       contentType: contentTypeFor(brief),
       styleId: mapStyleForRenderer(brief.style),
       scenes,
-      sceneImages: beatVisuals.map((v) => v.url),
+      sceneImages: beatVisuals.map((v) => (v.kind === "image" ? v.url : null)),
+      sceneMedia: beatVisuals.map((v) => ({ kind: v.kind, url: v.url })),
       sceneAudio: beatAudio,
       fitToAudio: false, // durations already sized to the audio timeline
       onProgress,
