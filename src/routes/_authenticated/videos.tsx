@@ -332,6 +332,35 @@ function VideosPage() {
     toast.success("Deleted");
   }
 
+  async function saveThumb(v: { url: string; concept: string; headline: string; alt: string }) {
+    if (!gen) return;
+    try {
+      const nicheLabel = NICHES.find((n) => n.id === gen.niche)?.label ?? gen.niche;
+      const styleLabel = STYLE_CARDS.find((s) => s.id === gen.brief.style)?.label ?? gen.brief.style;
+      await saveGeneratedThumbnail({
+        title: gen.brief.title,
+        concept: v.concept,
+        headline: v.headline,
+        niche: nicheLabel,
+        topic: gen.topic || gen.brief.title,
+        styleId: gen.brief.style,
+        styleLabel,
+        image: v.url,
+      });
+      await refreshThumbLibrary();
+      toast.success("Thumbnail saved to your library");
+    } catch (e) {
+      console.warn(e);
+      toast.error("Couldn't save thumbnail (storage full?)");
+    }
+  }
+
+  async function removeThumb(id: string) {
+    await deleteGeneratedThumbnail(id);
+    await refreshThumbLibrary();
+    toast.success("Thumbnail deleted");
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -346,6 +375,9 @@ function VideosPage() {
           <InputScreen onGenerate={start} />
           {library.length > 0 && (
             <LibrarySection items={library} onOpen={openFromLibrary} onDelete={removeFromLibrary} />
+          )}
+          {thumbLibrary.length > 0 && (
+            <ThumbnailLibrarySection items={thumbLibrary} onDelete={removeThumb} />
           )}
         </>
       )}
