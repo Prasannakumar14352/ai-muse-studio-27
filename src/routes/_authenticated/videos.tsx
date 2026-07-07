@@ -695,9 +695,42 @@ function ResultScreen({
         </div>
 
         <div className="space-y-4">
-          <div className="glass rounded-2xl p-4">
-            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Thumbnail</div>
-            <img src={thumbnail.url} alt={thumbnail.alt} className="w-full rounded-lg bg-black" />
+          <div className="glass rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                Thumbnails · pick your winner
+              </div>
+              <span className="text-[10px] text-muted-foreground">MrBeast-style · high CTR</span>
+            </div>
+            <div className="space-y-3">
+              {(thumbnail.variants && thumbnail.variants.length > 0
+                ? thumbnail.variants
+                : [{ url: thumbnail.url, alt: thumbnail.alt, concept: "Hero", headline: seo.youtube_title, generated: thumbnail.generated }]
+              ).map((v, i) => (
+                <div key={i} className="space-y-2">
+                  <img src={v.url} alt={v.alt} className="w-full rounded-lg bg-black" />
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[11px] text-muted-foreground truncate">{v.concept}</div>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => download(v.url, `${slug(seo.youtube_title)}-thumb-${i + 1}.png`)}
+                        className="rounded-md glass border border-border px-2 py-1 text-[11px] flex items-center gap-1"
+                        title="Download"
+                      >
+                        <Download className="w-3 h-3" /> Save file
+                      </button>
+                      <button
+                        onClick={() => onSaveThumbnail({ url: v.url, concept: v.concept, headline: v.headline, alt: v.alt })}
+                        className="rounded-md gradient-primary text-white px-2 py-1 text-[11px] flex items-center gap-1"
+                        title="Save to your library"
+                      >
+                        <Check className="w-3 h-3" /> Save
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
           <button onClick={() => toast.info("YouTube publishing will connect soon")} className="w-full rounded-2xl glass border border-border p-4 text-sm flex items-center justify-center gap-2 hover:border-white/20 transition">
             <Youtube className="w-5 h-5 text-rose-500" />
