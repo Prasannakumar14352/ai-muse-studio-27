@@ -90,24 +90,47 @@ function drawScene(
   },
 ) {
   const { width: W, height: H } = ctx.canvas;
+  const p = Math.max(0, Math.min(1, opts.progress));
 
-  // Ken Burns zoom on the underlying image.
-  const zoom = 1.05 + opts.progress * 0.1;
+  // Cinematic camera motion per beat — cycled by the pipeline so consecutive
+  // beats never move the same way (kills the slideshow feel).
+  const motion: CameraMotion = scene.motion ?? "zoomIn";
+  let scale = 1.08;
+  let panX = 0; // fraction of W
+  let panY = 0; // fraction of H
+  switch (motion) {
+    case "zoomIn":    scale = 1.05 + p * 0.12; break;
+    case "zoomOut":   scale = 1.18 - p * 0.12; break;
+    case "pushIn":    scale = 1.02 + p * 0.20; break;
+    case "panLeft":   scale = 1.15; panX = (0.05 - p * 0.10); break;
+    case "panRight":  scale = 1.15; panX = (-0.05 + p * 0.10); break;
+    case "tiltDown":  scale = 1.15; panY = (-0.05 + p * 0.10); break;
+    case "tiltUp":    scale = 1.15; panY = (0.05 - p * 0.10); break;
+  }
+
   ctx.fillStyle = "#0b0b16";
   ctx.fillRect(0, 0, W, H);
   if (img) {
     const iw = img.width;
     const ih = img.height;
-    const ratio = Math.max(W / iw, H / ih) * zoom;
+    const ratio = Math.max(W / iw, H / ih) * scale;
     const dw = iw * ratio;
     const dh = ih * ratio;
-    ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    ctx.drawImage(img, (W - dw) / 2 + panX * W, (H - dh) / 2 + panY * H, dw, dh);
   } else {
-    // Fallback: gradient backdrop tinted with the style accent.
     const g = ctx.createLinearGradient(0, 0, W, H);
     g.addColorStop(0, opts.accent);
     g.addColorStop(1, "#0b0b16");
     ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Quick fade-in at the start of every beat so cuts feel filmic, not abrupt.
+  const fadeIn = p < 0.12 ? (1 - p / 0.12) * 0.85 : 0;
+  const fadeOut = p > 0.92 ? ((p - 0.92) / 0.08) * 0.5 : 0;
+  const veil = Math.max(fadeIn, fadeOut);
+  if (veil > 0) {
+    ctx.fillStyle = `rgba(0,0,0,${veil.toFixed(3)})`;
     ctx.fillRect(0, 0, W, H);
   }
 
