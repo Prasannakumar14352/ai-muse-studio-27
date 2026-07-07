@@ -754,10 +754,12 @@ export const RenderAgent = {
       onProgress,
     });
     return {
+      blob: result.blob,
       video_url: URL.createObjectURL(result.blob),
       mime: result.mimeType,
       extension: result.extension,
       duration_sec: result.durationSec,
+      size_bytes: result.blob.size,
       aspect_ratio: brief.aspectRatio,
     };
   },
