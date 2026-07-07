@@ -574,6 +574,7 @@ function EmptyLibrary({ onNew }: { onNew: () => void }) {
 
 function InputScreen({ onGenerate }: { onGenerate: (args: GenerateArgs) => void }) {
   const [niche, setNiche] = useState<string>(NICHES[0].id);
+  const [customNiche, setCustomNiche] = useState("");
   const [title, setTitle] = useState("");
   const [videoType, setVideoType] = useState<VideoType>("shorts");
   const [duration, setDuration] = useState<DurationSec>(60);
@@ -581,6 +582,7 @@ function InputScreen({ onGenerate }: { onGenerate: (args: GenerateArgs) => void 
   const [voice, setVoice] = useState<VoiceId>("documentary_narrator");
   const [ratio, setRatio] = useState<AspectRatio>("9:16");
 
+  const isCustom = niche === "custom";
   const currentNiche = useMemo(() => NICHES.find((n) => n.id === niche) ?? NICHES[0], [niche]);
   const suggestedRatio = useMemo<AspectRatio>(
     () => (videoType === "youtube_long" ? "16:9" : "9:16"),
@@ -589,9 +591,10 @@ function InputScreen({ onGenerate }: { onGenerate: (args: GenerateArgs) => void 
 
   function submit() {
     if (!title.trim()) return toast.error("Enter a video title or idea");
+    if (isCustom && !customNiche.trim()) return toast.error("Describe your custom niche or topic area");
     onGenerate({
       brief: { title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio },
-      niche,
+      niche: isCustom ? customNiche.trim() : niche,
       topic: title.trim(),
     });
   }
