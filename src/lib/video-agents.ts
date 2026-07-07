@@ -12,12 +12,18 @@ import { generateAiVideoScript, type AiVideoScript, type AiVideoScene } from "@/
 export type VideoType = "youtube_long" | "shorts" | "reels" | "tiktok";
 export type DurationSec = 30 | 60 | 180 | 300 | 540 | 720;
 export type StyleId =
-  | "cinematic_documentary"
+  | "3d"
+  | "ghibli"
+  | "anime"
   | "realistic"
-  | "futuristic"
-  | "business"
-  | "educational"
-  | "dark_mystery";
+  | "pixar"
+  | "cinematic"
+  | "documentary"
+  | "dark_mystery"
+  | "luxury"
+  | "cyberpunk"
+  | "minimal_product"
+  | "futuristic";
 export type VoiceId = "male" | "female" | "documentary_narrator";
 export type AspectRatio = "16:9" | "9:16" | "1:1";
 
