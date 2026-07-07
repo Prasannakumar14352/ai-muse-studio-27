@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
-  Wand2, Youtube, Play, RefreshCw, Send, Check, Trash2, Clock,
+  Wand2, Youtube, Play, RefreshCw, Send, Check, Trash2, Clock, Plus, Video,
 } from "lucide-react";
 import {
   runVideoPipeline,
