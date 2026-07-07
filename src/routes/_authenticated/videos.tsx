@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
-  Wand2, Youtube, Play, RefreshCw, Send, Check,
+  Wand2, Youtube, Play, RefreshCw, Send, Check, Trash2, Clock,
 } from "lucide-react";
 import {
   runVideoPipeline,
@@ -12,6 +12,11 @@ import {
   type VideoBrief, type VideoType, type DurationSec, type StyleId, type VoiceId, type AspectRatio,
   type StepStatus, type PipelineResult,
 } from "@/lib/video-agents";
+import {
+  saveGeneratedVideo, getGeneratedVideos, deleteGeneratedVideo,
+  loadVideoObjectURL, loadThumbnailObjectURL,
+  type LocalVideo,
+} from "@/lib/videoLocalStore";
 import style3d from "@/assets/style-3d.jpg";
 import styleGhibli from "@/assets/style-ghibli.jpg";
 import styleAnime from "@/assets/style-anime.jpg";
