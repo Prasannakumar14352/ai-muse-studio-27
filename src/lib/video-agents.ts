@@ -1459,6 +1459,19 @@ export async function runVideoJobPipeline(
   const thumbnail = await ThumbnailAgent.run(brief);
   const seo = await SeoAgent.run(brief, script, timeline);
 
+  // New pipeline agents — run after script so they can annotate it.
+  // Title / Hook are also computed here so the result carries them; the
+  // hook is not re-applied to the script in the async pipeline because the
+  // script has already been rendered.
+  const [titles, hook] = await Promise.all([
+    TitleOptimizerAgent.run(brief, research),
+    HookAgent.run(brief, research),
+  ]);
+  const intro = await IntroAgent.run(brief, script);
+  const curiosity = await CuriosityLoopAgent.run(script);
+  const retention = await RetentionAgent.run(brief, script, curiosity);
+  const chapters = await ChapterAgent.run(script);
+
   validatePipelineDuration({
     requestedSec: brief.duration,
     voiceoverSec: voiceover.reduce((a, v) => a + (v.buffer?.duration ?? v.duration_sec ?? 0), 0),
@@ -1471,8 +1484,8 @@ export async function runVideoJobPipeline(
   onEvent({ type: "phase", phase: "complete" });
 
   const result: PipelineResult = {
-    brief, research, script, storyboard, direction,
-    visuals, voiceover, subtitles, music, sfx, timeline,
+    brief, research, titles, hook, intro, curiosity, script, retention, chapters,
+    storyboard, direction, visuals, voiceover, subtitles, music, sfx, timeline,
     render, thumbnail, seo,
   };
   return { job, result };
