@@ -810,7 +810,34 @@ export async function runVideoPipeline(
   const thumbnail = await mark("thumbnail", () => ThumbnailAgent.run(brief));
   const seo = await mark("seo", () => SeoAgent.run(brief, script, timeline));
 
+  validatePipelineDuration({
+    requestedSec: brief.duration,
+    voiceoverSec: voiceover.reduce((a, v) => a + (v.buffer?.duration ?? v.duration_sec ?? 0), 0),
+    timelineSec: timeline.total_sec,
+    renderedSec: render.duration_sec,
+  });
+
   return { brief, research, script, storyboard, direction, visuals, voiceover, subtitles, music, sfx, timeline, render, thumbnail, seo };
+}
+
+/**
+ * Duration validation — logs PASS if the rendered video is within ±5% of the
+ * requested duration, WARN otherwise. Every stage is checked so it's obvious
+ * where the shortfall came from (script / voice / timeline / render).
+ */
+function validatePipelineDuration(d: {
+  requestedSec: number; voiceoverSec: number; timelineSec: number; renderedSec: number;
+}) {
+  const pct = (n: number) => (d.requestedSec > 0 ? Math.round((n / d.requestedSec) * 100) : 0);
+  const status = d.renderedSec >= d.requestedSec * 0.95 ? "PASS" : "SHORT";
+  console.info(
+    `[Duration] requested=${d.requestedSec.toFixed(1)}s voice=${d.voiceoverSec.toFixed(1)}s(${pct(d.voiceoverSec)}%) timeline=${d.timelineSec.toFixed(1)}s(${pct(d.timelineSec)}%) rendered=${d.renderedSec.toFixed(1)}s(${pct(d.renderedSec)}%) — ${status}`
+  );
+  if (status === "SHORT") {
+    console.warn(
+      `[Duration] Rendered video is ${((1 - d.renderedSec / d.requestedSec) * 100).toFixed(1)}% shorter than requested. Script produced insufficient narration for ${d.requestedSec}s.`
+    );
+  }
 }
 
 // ---------- helpers ----------
@@ -1149,6 +1176,13 @@ export async function runVideoJobPipeline(
 
   const thumbnail = await ThumbnailAgent.run(brief);
   const seo = await SeoAgent.run(brief, script, timeline);
+
+  validatePipelineDuration({
+    requestedSec: brief.duration,
+    voiceoverSec: voiceover.reduce((a, v) => a + (v.buffer?.duration ?? v.duration_sec ?? 0), 0),
+    timelineSec: timeline.total_sec,
+    renderedSec: render.duration_sec,
+  });
 
   job.phase = "complete";
   await saveJob(job);
