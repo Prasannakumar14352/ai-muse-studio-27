@@ -1,16 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client";
-import { getStyleImage } from "@/lib/constants";
+import { getStyle, getStyleImage } from "@/lib/constants";
 import { generateProject } from "@/lib/generators";
+import { generateScenesFromScript } from "@/lib/video-ai.functions";
 import { renderVideo, renderUgcVideo, generateSceneImage, type UgcStage } from "@/lib/video-renderer";
-import { getOutput, saveOutput, type LocalOutput } from "@/lib/local-store";
+import { getOutput, saveOutput, type LocalOutput, type Scene as LocalScene, type Prompt as LocalPrompt } from "@/lib/local-store";
 import { isBlobKey, getDataURL } from "@/lib/blob-store";
 import { deductUsage } from "@/lib/access";
 import { toast } from "sonner";
 import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles, AlertTriangle, Bug, CheckCircle2, X, Package, Edit3, Save, Eye, EyeOff, ImageOff, Volume2, ChevronDown, ChevronRight, History, FileText, Wand2 } from "lucide-react";
+
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
 
