@@ -221,10 +221,43 @@ export type ThumbnailResult = {
 
 export type SeoResult = AiVideoSeo;
 
+export type IntroPlan = {
+  scenes_covered: number[];      // 1-based scene indices that form the intro
+  duration_sec: number;
+  promise: string;               // what the intro promises the viewer
+  first_line: string;
+};
+
+export type CuriosityLoop = {
+  scene_index: number;           // 1-based
+  loop_text: string;             // the actual open-loop phrase found in the voiceover
+  kind: "open" | "payoff";
+  paired_scene?: number;         // for "open" loops: the scene that pays it off, if we can find one
+};
+export type CuriosityLoopPlan = { loops: CuriosityLoop[] };
+
+export type RetentionMarker = {
+  scene_index: number;           // 1-based
+  time_sec: number;
+  kind: "hook" | "open_loop" | "payoff" | "pattern_interrupt" | "cta";
+  note: string;                  // 1-line rationale
+};
+export type RetentionPlan = {
+  markers: RetentionMarker[];
+  weakest_scene: number | null;  // scene index most likely to lose viewers
+  average_gap_sec: number;       // avg seconds between retention beats
+};
+
 export type PipelineResult = {
   brief: VideoBrief;
   research: ResearchBrief;
+  titles: VideoTitleVariants;
+  hook: VideoHook;
+  intro: IntroPlan;
+  curiosity: CuriosityLoopPlan;
   script: AiVideoScript;
+  retention: RetentionPlan;
+  chapters: VideoChapters;
   storyboard: Storyboard;
   direction: DirectorPlan;
   visuals: VisualAsset[];
@@ -242,7 +275,13 @@ export type PipelineResult = {
 
 export const PIPELINE_STEPS = [
   { id: "research", label: "Researching topic" },
+  { id: "title", label: "Optimizing title" },
+  { id: "hook", label: "Writing hook" },
+  { id: "intro", label: "Shaping intro" },
+  { id: "curiosity", label: "Planting curiosity loops" },
   { id: "script", label: "Writing script" },
+  { id: "retention", label: "Mapping retention beats" },
+  { id: "chapters", label: "Generating chapters" },
   { id: "storyboard", label: "Creating storyboard" },
   { id: "direction", label: "Directing pacing & style" },
   { id: "visuals", label: "Generating visuals" },
