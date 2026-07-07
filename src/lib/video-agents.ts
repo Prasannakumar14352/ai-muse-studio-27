@@ -1033,15 +1033,37 @@ export async function runVideoPipeline(
   };
 
   const research = await mark("research", () => ResearchAgent.run(brief));
+
+  // New pre-script agents (Title / Hook run in parallel — independent).
+  const [titles, hook] = await Promise.all([
+    mark("title", () => TitleOptimizerAgent.run(brief, research)),
+    mark("hook", () => HookAgent.run(brief, research)),
+  ]);
+
   const script = await mark("script", () => ScriptAgent.run(brief, research, () => {
     onStep("script", "running", "Script generation failed. Retrying...");
   }));
+
+  // Apply the Hook Agent's opening line to scene 1 so the video starts with
+  // the CTR-optimized hook rather than whatever the Script Agent wrote there.
+  if (script.scenes[0] && hook.voiceover.trim().length > 0) {
+    script.scenes[0] = {
+      ...script.scenes[0],
+      voiceover: hook.voiceover,
+      on_screen_text: hook.on_screen_text || script.scenes[0].on_screen_text,
+      visual: hook.visual || script.scenes[0].visual,
+    };
+  }
+
+  // Intro / Curiosity are derived from the finished script (deterministic).
+  const intro = await mark("intro", () => IntroAgent.run(brief, script));
+  const curiosity = await mark("curiosity", () => CuriosityLoopAgent.run(script));
+  const retention = await mark("retention", () => RetentionAgent.run(brief, script, curiosity));
+  const chapters = await mark("chapters", () => ChapterAgent.run(script));
+
   const storyboard = await mark("storyboard", () => StoryboardAgent.run(script));
   const direction = await mark("direction", () => DirectorAgent.run(brief, storyboard));
 
-  // Expand every script scene into short (2-5s) visual beats. Each beat gets
-  // its own AI image + camera motion so the final video cycles visuals every
-  // few seconds instead of holding one image for a whole paragraph.
   const beats = expandScriptToBeats(script, brief.style);
 
   const visuals = await mark("visuals", () =>
@@ -1073,7 +1095,11 @@ export async function runVideoPipeline(
     renderedSec: render.duration_sec,
   });
 
-  return { brief, research, script, storyboard, direction, visuals, voiceover, subtitles, music, sfx, timeline, render, thumbnail, seo };
+  return {
+    brief, research, titles, hook, intro, curiosity, script, retention, chapters,
+    storyboard, direction, visuals, voiceover, subtitles, music, sfx, timeline,
+    render, thumbnail, seo,
+  };
 }
 
 /**
