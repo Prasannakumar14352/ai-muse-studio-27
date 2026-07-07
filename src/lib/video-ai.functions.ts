@@ -149,7 +149,7 @@ Return ONLY this JSON object shape with no prose:
     const rawResponses: string[] = [];
     const parseErrors: string[] = [];
     let usedRepair = false;
-    let out: z.infer<typeof Schema> | null = null;
+    let out: (z.infer<typeof Schema> & { debug_json?: AiJsonDebug }) | null = null;
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       let raw = "";
@@ -202,37 +202,40 @@ Return ONLY this JSON object shape with no prose:
       }
     }
 
-    if (!out) {
-      out = buildFallbackVideoScript(data.topic, sceneCount, lenSec, ratio, data.styleLabel);
+    let finalOut: z.infer<typeof Schema> & { debug_json?: AiJsonDebug };
+    if (out) {
+      finalOut = out;
+    } else {
+      finalOut = buildFallbackVideoScript(data.topic, sceneCount, lenSec, ratio, data.styleLabel);
       parseErrors.push("Used fallback script after 3 invalid JSON attempts");
     }
 
-    out.scenes = out.scenes.map((s, i) => ({ ...s, n: i + 1 }));
+    finalOut.scenes = finalOut.scenes.map((s, i) => ({ ...s, n: i + 1 }));
 
     // Enforce the requested target length. AI models frequently return fewer
     // or shorter scenes than asked; scale each scene's base duration so the
     // total sum matches the user-selected length. The renderer uses
     // max(base, voiceover+0.25s) per scene, so stretching base durations
     // reliably extends the final video.
-    if (data.targetLengthSec && out.scenes.length > 0) {
+    if (data.targetLengthSec && finalOut.scenes.length > 0) {
       const parseSec = (d: string) => {
         const m = /([\d.]+)/.exec(d);
         const n = m ? parseFloat(m[1]) : 3;
         return Number.isFinite(n) && n > 0 ? n : 3;
       };
-      const current = out.scenes.reduce((a, s) => a + parseSec(s.duration), 0);
+      const current = finalOut.scenes.reduce((a, s) => a + parseSec(s.duration), 0);
       if (current > 0) {
         const factor = lenSec / current;
-        out.scenes = out.scenes.map((s) => {
+        finalOut.scenes = finalOut.scenes.map((s) => {
           const scaled = Math.max(2, Math.round(parseSec(s.duration) * factor));
           return { ...s, duration: `${scaled}s` };
         });
       }
-      out.length_sec = out.scenes.reduce((a, s) => a + parseSec(s.duration), 0);
+      finalOut.length_sec = finalOut.scenes.reduce((a, s) => a + parseSec(s.duration), 0);
     }
 
     if (rawResponses.length > 0 || parseErrors.length > 0) {
-      out.debug_json = {
+      finalOut.debug_json = {
         raw_responses: rawResponses.filter(Boolean),
         parse_errors: parseErrors,
         attempts: Math.min(3, Math.max(1, parseErrors.length)),
@@ -241,7 +244,7 @@ Return ONLY this JSON object shape with no prose:
       };
     }
 
-    return out;
+    return finalOut;
   });
 
 // ---------------------------------------------------------------------------
@@ -373,12 +376,12 @@ Return ONLY this JSON object shape with no prose:
       }
     }
 
+    const finalOut = out ?? { scenes: buildFallbackScenesFromScript(data.script, sceneCount, lenSec, ratio, data.styleLabel) };
     if (!out) {
-      out = { scenes: buildFallbackScenesFromScript(data.script, sceneCount, lenSec, ratio, data.styleLabel) };
       parseErrors.push("Used fallback scenes after 3 invalid JSON attempts");
     }
 
-    const scenes = out.scenes.map((s, i) => ({ ...s, n: i + 1 }));
+    const scenes = finalOut.scenes.map((s, i) => ({ ...s, n: i + 1 }));
 
     const image_prompts = scenes.map((s) => ({
       n: s.n,
@@ -399,64 +402,65 @@ Return ONLY this JSON object shape with no prose:
     };
   });
 
-// ---------------------------------------------------------------------------
-// Tolerant JSON repair for truncated model output.
-// Gemini/Flash sometimes hits its output token cap mid-scene, leaving JSON
-// like `{"scenes":[{...},{...},{"n":42,"voice`. We salvage as much of the
-// scenes array as we can by trimming back to the last complete object and
-// closing any open brackets, so the pipeline can proceed.
-// ---------------------------------------------------------------------------
-function repairTruncatedJson(raw: string): unknown | null {
-  const start = raw.indexOf("{");
-  if (start < 0) return null;
-  const s = raw.slice(start);
+function buildFallbackVideoScript(topic: string, sceneCount: number, lenSec: number, ratio: string, styleLabel: string): AiVideoScript {
+  const duration = Math.max(2, Math.round(lenSec / Math.max(1, sceneCount)));
+  const beats = [
+    `What if ${topic} changed everything?`,
+    `The first shift is already happening quietly.`,
+    `Most people will miss the pattern until it is obvious.`,
+    `The winners will adapt before the old rules disappear.`,
+    `Follow the signal, not the noise.`,
+  ];
 
-  // Fast path: matched braces already.
-  try { return JSON.parse(s); } catch { /* fall through */ }
+  const scenes = Array.from({ length: sceneCount }, (_, i): AiVideoScene => {
+    const voiceover = beats[i % beats.length];
+    return {
+      n: i + 1,
+      time_range: `${i * duration}-${(i + 1) * duration} sec`,
+      role: i === 0 ? "Hook" : i === sceneCount - 1 ? "CTA" : `Beat ${i}`,
+      voiceover,
+      on_screen_text: i === 0 ? "Imagine this" : "",
+      visual: `${styleLabel} cinematic scene about ${topic}`,
+      image_prompt: `${styleLabel} style, ${ratio}, photorealistic, cinematic, premium commercial look, 8k, shallow depth of field. Visualize: ${voiceover}`,
+      duration: `${duration}s`,
+    };
+  });
 
-  // Walk through the string tracking string state and bracket depth. Remember
-  // the last position where we could cleanly close everything.
-  let inStr = false;
-  let esc = false;
-  const stack: string[] = [];
-  let lastGoodCut = -1;
-  let lastGoodClose = "";
-
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (esc) { esc = false; continue; }
-    if (c === "\\") { esc = true; continue; }
-    if (c === '"') { inStr = !inStr; continue; }
-    if (inStr) continue;
-
-    if (c === "{" || c === "[") stack.push(c === "{" ? "}" : "]");
-    else if (c === "}" || c === "]") stack.pop();
-
-    // After a value-ending character at the top of the scenes array, remember
-    // this as a safe truncation point.
-    if ((c === "}" || c === "]") && stack.length > 0) {
-      lastGoodCut = i;
-      lastGoodClose = stack.slice().reverse().join("");
-    }
-  }
-
-  const tryParse = (candidate: string): unknown | null => {
-    try { return JSON.parse(candidate); } catch { return null; }
+  return {
+    title: topic,
+    reel_title: topic,
+    length_sec: scenes.reduce((total, scene) => total + parseSecValue(scene.duration), 0),
+    style_note: `${styleLabel} structured fallback script`,
+    scenes,
+    caption: `${topic}. A fast cinematic breakdown of the key shift, why it matters, and what comes next.`,
+    hashtags: ["#AI", "#Video", "#Future", "#Creator", "#Storytelling", "#Innovation", "#Trends", "#Shorts"],
   };
+}
 
-  if (lastGoodCut > 0) {
-    // Trim trailing whitespace/comma after the last complete value, then close.
-    let end = lastGoodCut + 1;
-    while (end < s.length && /\s/.test(s[end])) end++;
-    // Drop a trailing comma if any got included.
-    let candidate = s.slice(0, end).replace(/,\s*$/, "") + lastGoodClose;
-    const parsed = tryParse(candidate);
-    if (parsed) return parsed;
-    // Fallback: close whatever stack is open right now.
-    candidate = s.slice(0, end).replace(/,\s*$/, "") + stack.slice().reverse().join("");
-    const parsed2 = tryParse(candidate);
-    if (parsed2) return parsed2;
-  }
+function buildFallbackScenesFromScript(script: string, sceneCount: number, lenSec: number, ratio: string, styleLabel: string): AiVideoScene[] {
+  const sentences = script
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const duration = Math.max(2, Math.round(lenSec / Math.max(1, sceneCount)));
 
-  return null;
+  return Array.from({ length: sceneCount }, (_, i): AiVideoScene => {
+    const voiceover = sentences[i % Math.max(1, sentences.length)] || script.trim().slice(0, 160) || "Continue the story with a clear, cinematic beat.";
+    return {
+      n: i + 1,
+      time_range: `${i * duration}-${(i + 1) * duration} sec`,
+      role: i === 0 ? "Hook" : i === sceneCount - 1 ? "CTA" : `Beat ${i}`,
+      voiceover,
+      on_screen_text: i === 0 ? "Watch this" : "",
+      visual: `${styleLabel} cinematic scene matching the narration beat.`,
+      image_prompt: `${styleLabel} style, ${ratio}, photorealistic, cinematic, premium commercial look, 8k, shallow depth of field. Visualize: ${voiceover}`,
+      duration: `${duration}s`,
+    };
+  });
+}
+
+function parseSecValue(duration: string): number {
+  const m = /([\d.]+)/.exec(duration);
+  const n = m ? parseFloat(m[1]) : 3;
+  return Number.isFinite(n) && n > 0 ? n : 3;
 }
