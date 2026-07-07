@@ -408,3 +408,202 @@ Return ONLY this JSON object shape with no prose:
       } : undefined,
     };
   });
+
+// ---------------------------------------------------------------------------
+// SEO Agent — YouTube title / long description / hashtags / tags / pinned
+// comment / chapters. Always returns populated fields (uses a fallback so
+// nothing in the UI is ever blank).
+// ---------------------------------------------------------------------------
+
+const SeoInput = z.object({
+  topic: z.string().min(1),
+  styleLabel: z.string().optional().default("Cinematic"),
+  platform: z.string().optional().default("youtube"),
+  contentType: z.string().optional().default("short_reel"),
+  scenes: z.array(z.object({
+    n: z.number(),
+    voiceover: z.string().optional().default(""),
+    duration_sec: z.number().optional().default(3),
+  })).optional().default([]),
+  script_caption: z.string().optional().default(""),
+});
+
+export type AiVideoSeo = {
+  youtube_title: string;
+  youtube_description: string;
+  hashtags: string[];
+  tags: string[];
+  pinned_comment: string;
+  chapters: Array<{ time: string; label: string }>;
+};
+
+export const generateAiVideoSeo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => SeoInput.parse(v))
+  .handler(async ({ data }): Promise<AiVideoSeo> => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+
+    const sys = `You are a YouTube SEO strategist. Return ONLY valid JSON. No
+markdown. No code fences. No prose outside the JSON.`;
+
+    const chapterHint = data.scenes.length >= 3
+      ? `Use the ${data.scenes.length} scenes below to derive chapter timestamps in mm:ss starting at 00:00.`
+      : "Include 3-6 chapters spanning the video.";
+
+    const cumulative: Array<{ time: string; hint: string }> = [];
+    let t = 0;
+    for (const s of data.scenes) {
+      const mm = Math.floor(t / 60).toString().padStart(2, "0");
+      const ss = Math.floor(t % 60).toString().padStart(2, "0");
+      cumulative.push({ time: `${mm}:${ss}`, hint: s.voiceover.slice(0, 80) });
+      t += Math.max(1, s.duration_sec || 3);
+    }
+
+    const user = `Generate YouTube SEO for the video below.
+
+TOPIC: ${data.topic}
+STYLE: ${data.styleLabel}
+PLATFORM: ${data.platform}
+FORMAT: ${data.contentType}
+${data.script_caption ? `EXISTING CAPTION: ${data.script_caption}` : ""}
+
+${chapterHint}
+Scene timing hints (mm:ss — voiceover snippet):
+${cumulative.map((c) => `- ${c.time} — ${c.hint}`).join("\n")}
+
+Requirements:
+- youtube_title: <= 70 characters, keyword-rich, high CTR, no clickbait lies.
+- youtube_description: 300-600 words. Open with a strong hook line. Include
+  the topic keyword naturally 2-4 times. Include a clear CTA to subscribe /
+  comment. Include a short "In this video" bullet list. End with a
+  hashtag line.
+- hashtags: 15-20 relevant hashtags, each starting with #, no spaces.
+- tags: 15-25 YouTube search tags (plain phrases, no #).
+- pinned_comment: a friendly 1-3 sentence pinned comment that asks a
+  question to drive replies.
+- chapters: array of { time: "mm:ss", label: "Short title" }. First MUST be
+  00:00. 3-8 chapters total.
+
+Return ONLY this JSON shape:
+{
+  "youtube_title": "string",
+  "youtube_description": "string",
+  "hashtags": ["#example"],
+  "tags": ["example"],
+  "pinned_comment": "string",
+  "chapters": [{ "time": "00:00", "label": "Intro" }]
+}`;
+
+    const Schema = z.object({
+      youtube_title: z.string(),
+      youtube_description: z.string(),
+      hashtags: z.array(z.string()).optional().default([]),
+      tags: z.array(z.string()).optional().default([]),
+      pinned_comment: z.string().optional().default(""),
+      chapters: z.array(z.object({ time: z.string(), label: z.string() })).optional().default([]),
+    });
+
+    const fallback = (): AiVideoSeo => ({
+      youtube_title: data.topic.slice(0, 70),
+      youtube_description:
+        `${data.topic}. In this video we break down what it means, why it matters, and where it leads next.\n\n` +
+        `We look at ${data.topic.toLowerCase()} through a ${data.styleLabel.toLowerCase()} lens — the signals, the shifts, and the story most people are missing.\n\n` +
+        `In this video:\n- The hook: why ${data.topic.toLowerCase()} is happening now\n- The core shift\n- What it means for you\n- Where it goes next\n\n` +
+        `👉 Subscribe for more deep dives on the future.\n💬 Drop your thoughts in the comments — we read every one.\n\n` +
+        `#${slugTag(data.topic)} #future #ai #technology #shorts`,
+      hashtags: buildFallbackHashtags(data.topic),
+      tags: buildFallbackTags(data.topic),
+      pinned_comment: `What surprised you most about ${data.topic}? Drop your take below — we reply to every comment.`,
+      chapters: buildFallbackChapters(cumulative),
+    });
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              { role: "system", content: sys },
+              { role: "user", content: user },
+            ],
+            response_format: { type: "json_object" },
+            max_tokens: 4000,
+          }),
+        });
+        if (!upstream.ok) {
+          const t2 = await upstream.text().catch(() => "");
+          throw new Error(`AI gateway ${upstream.status}: ${t2 || upstream.statusText}`);
+        }
+        const j = (await upstream.json()) as { choices?: Array<{ message?: { content?: string } }> };
+        const raw = j.choices?.[0]?.message?.content ?? "";
+        const parsed = parseStructuredJsonResponse(raw);
+        const checked = Schema.safeParse(parsed.value);
+        if (!checked.success) {
+          console.error("[SEO Agent] Invalid JSON", checked.error.message, raw);
+          continue;
+        }
+        const seo = checked.data;
+        // Guarantee non-empty fields.
+        if (!seo.hashtags.length) seo.hashtags = buildFallbackHashtags(data.topic);
+        if (!seo.tags.length) seo.tags = buildFallbackTags(data.topic);
+        if (!seo.chapters.length) seo.chapters = buildFallbackChapters(cumulative);
+        if (!seo.pinned_comment) seo.pinned_comment = `What surprised you most about ${data.topic}?`;
+        return seo as AiVideoSeo;
+      } catch (e) {
+        console.error("[SEO Agent] attempt failed", e);
+      }
+    }
+
+    return fallback();
+  });
+
+function slugTag(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || "video";
+}
+
+function buildFallbackHashtags(topic: string): string[] {
+  const base = [
+    `#${slugTag(topic)}`, "#future", "#ai", "#technology", "#innovation",
+    "#trends", "#viral", "#shorts", "#reels", "#creator",
+    "#storytelling", "#documentary", "#science", "#mindset", "#business",
+    "#youtube", "#learn", "#insight", "#deepdive", "#next",
+  ];
+  return Array.from(new Set(base)).slice(0, 18);
+}
+
+function buildFallbackTags(topic: string): string[] {
+  const base = [
+    topic, `${topic} explained`, `${topic} documentary`, `${topic} future`,
+    "future technology", "ai", "artificial intelligence", "future world",
+    "future predictions", "science", "innovation", "trends", "next big thing",
+    "documentary", "cinematic", "storytelling", "viral video", "shorts",
+    "future of humanity", "big ideas",
+  ];
+  return Array.from(new Set(base)).slice(0, 20);
+}
+
+function buildFallbackChapters(cumulative: Array<{ time: string; hint: string }>): Array<{ time: string; label: string }> {
+  if (cumulative.length === 0) {
+    return [
+      { time: "00:00", label: "Intro" },
+      { time: "00:15", label: "The setup" },
+      { time: "00:45", label: "The shift" },
+      { time: "01:30", label: "What it means" },
+      { time: "02:15", label: "Wrap-up" },
+    ];
+  }
+  const chapters: Array<{ time: string; label: string }> = [];
+  const step = Math.max(1, Math.floor(cumulative.length / 5));
+  const labels = ["Intro", "The setup", "The shift", "What it means", "The payoff", "Wrap-up"];
+  for (let i = 0; i < cumulative.length; i += step) {
+    const idx = Math.min(chapters.length, labels.length - 1);
+    chapters.push({ time: cumulative[i].time, label: labels[idx] });
+    if (chapters.length >= labels.length) break;
+  }
+  if (chapters[0]) chapters[0].time = "00:00";
+  return chapters;
+}
+
