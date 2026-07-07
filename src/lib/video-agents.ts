@@ -1546,7 +1546,7 @@ export async function runVideoJobPipeline(
     script = await ScriptAgent.run(brief, research, undefined, retentionEngine);
     storyboard = await StoryboardAgent.run(script);
     direction = await DirectorAgent.run(brief, storyboard);
-    const shots = planShots(script, brief.style);
+    const shots = planShots(script, brief.style, brief.title);
     job = await createJob({
       title: brief.title,
       niche: opts.niche,
