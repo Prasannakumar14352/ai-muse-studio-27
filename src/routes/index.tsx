@@ -88,6 +88,7 @@ function Landing() {
               <div className="rounded-xl overflow-hidden bg-black aspect-video relative group">
                 <video
                   src={demoVideo.url}
+                  poster={demoVideo.poster}
                   controls
                   autoPlay
                   muted
