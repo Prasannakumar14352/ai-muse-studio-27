@@ -1216,24 +1216,35 @@ export async function runVideoPipeline(
 
   const research = await mark("research", () => ResearchAgent.run(brief));
 
-  // New pre-script agents (Title / Hook run in parallel — independent).
+  // YouTube Retention Engine — builds the professional documentary blueprint
+  // FIRST so every downstream agent (script, storyboard, voice, editing)
+  // renders against the same structural plan.
+  const retentionEngine = await mark("retention_engine", () => RetentionEngineAgent.run(brief, research));
+
+  // Pre-script agents (Title / Hook run in parallel — independent).
   const [titles, hook] = await Promise.all([
     mark("title", () => TitleOptimizerAgent.run(brief, research)),
     mark("hook", () => HookAgent.run(brief, research)),
   ]);
 
+  // Prefer the retention engine's hook line — that's the source of truth.
+  const effectiveHook: VideoHook = {
+    ...hook,
+    voiceover: retentionEngine.hook.line || hook.voiceover,
+  };
+
   const script = await mark("script", () => ScriptAgent.run(brief, research, () => {
     onStep("script", "running", "Script generation failed. Retrying...");
-  }));
+  }, retentionEngine));
 
-  // Apply the Hook Agent's opening line to scene 1 so the video starts with
-  // the CTR-optimized hook rather than whatever the Script Agent wrote there.
-  if (script.scenes[0] && hook.voiceover.trim().length > 0) {
+  // Apply the retention engine's hook line to scene 1 so the video opens
+  // with the blueprint's hook verbatim.
+  if (script.scenes[0] && effectiveHook.voiceover.trim().length > 0) {
     script.scenes[0] = {
       ...script.scenes[0],
-      voiceover: hook.voiceover,
-      on_screen_text: hook.on_screen_text || script.scenes[0].on_screen_text,
-      visual: hook.visual || script.scenes[0].visual,
+      voiceover: effectiveHook.voiceover,
+      on_screen_text: effectiveHook.on_screen_text || script.scenes[0].on_screen_text,
+      visual: effectiveHook.visual || script.scenes[0].visual,
     };
   }
 
@@ -1278,7 +1289,7 @@ export async function runVideoPipeline(
   });
 
   return {
-    brief, research, titles, hook, intro, curiosity, script, retention, chapters,
+    brief, research, retentionEngine, titles, hook: effectiveHook, intro, curiosity, script, retention, chapters,
     storyboard, direction, visuals, voiceover, subtitles, music, sfx, timeline,
     render, thumbnail, seo,
   };
