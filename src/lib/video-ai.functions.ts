@@ -99,6 +99,22 @@ DURATION IS A HARD REQUIREMENT.
 Scene 1 is a hard hook (0-3 sec). Last scene is a CTA. In between, deliver
 a full documentary arc that pays off the hook.
 
+STRUCTURE (bake these into the scene sequence — they are NOT extra output):
+- INTRO (scenes 2-4, roughly 5-15% of total duration): set up the stakes
+  and PROMISE the payoff without giving it away. Tell the viewer exactly
+  what they will get if they stay.
+- CURIOSITY LOOPS: every 20-30 seconds, open a NEW loop with a phrase
+  like "but first…", "we'll get to that in a second", "here's the twist
+  most people miss…", "and the reason is not what you think". Close each
+  loop before the CTA — never leave one dangling.
+- RETENTION / PATTERN INTERRUPTS: roughly every 30-45 seconds, place a
+  pattern-interrupt scene — a surprising statistic, a contrarian claim,
+  a sudden mini-story, a visual metaphor pivot. NEVER let two consecutive
+  scenes hit the same emotional beat or use the same sentence structure.
+- PAYOFFS: every promise the intro or a loop makes MUST be explicitly
+  paid off in a later scene. Reward the viewer.
+
+
 For EACH scene, produce:
 - n: scene number (1..${sceneCount})
 - time_range: e.g. "0-3 sec"
@@ -687,3 +703,259 @@ function buildFallbackChapters(cumulative: Array<{ time: string; hint: string }>
   return chapters;
 }
 
+
+// ============================================================================
+// Title Optimizer / Hook / Chapter agents — added per pipeline expansion.
+// Each is a small, focused AI call that runs BEFORE (title/hook) or AFTER
+// (chapter) the main Script Agent so the pipeline reads:
+//   Research → Title → Hook → Intro → Curiosity → Script → Retention → Chapter → Storyboard
+// Intro / Curiosity / Retention rewriting is baked into the Script Agent
+// prompt (Hybrid mode) instead of separate calls; only the annotation part
+// of Retention runs as its own step (see RetentionAgent in video-agents.ts).
+// ============================================================================
+
+async function callGateway(key: string, sys: string, user: string, maxTokens = 2000): Promise<unknown | null> {
+  try {
+    const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "system", content: sys }, { role: "user", content: user }],
+        response_format: { type: "json_object" },
+        max_tokens: maxTokens,
+      }),
+    });
+    if (!upstream.ok) return null;
+    const j = (await upstream.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const raw = j.choices?.[0]?.message?.content ?? "";
+    return parseStructuredJsonResponse(raw).value;
+  } catch (e) {
+    console.error("[Gateway call]", e);
+    return null;
+  }
+}
+
+// ---------------- Title Optimizer ----------------
+
+const TitleInput = z.object({
+  topic: z.string().min(1),
+  styleLabel: z.string().optional().default("Cinematic"),
+  platform: z.string().optional().default("youtube"),
+});
+
+export type VideoTitleVariants = {
+  recommended: string;
+  variants: Array<{ title: string; angle: string; ctr_score: number }>;
+};
+
+export const generateVideoTitleVariants = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => TitleInput.parse(v))
+  .handler(async ({ data }): Promise<VideoTitleVariants> => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+
+    const sys = `You are a YouTube CTR strategist. You write video titles that
+maximize click-through without lying. Return ONLY valid JSON — no prose, no code fences.`;
+    const user = `TOPIC: ${data.topic}
+PLATFORM: ${data.platform}
+STYLE: ${data.styleLabel}
+
+Generate 5 title variants using different proven angles:
+1. Curiosity gap ("The thing nobody tells you about X")
+2. Contrarian / pattern interrupt ("Why X is wrong")
+3. Numbered specificity ("7 signs of X")
+4. Stakes / consequence ("What happens when X breaks")
+5. Bold declarative statement
+
+Each title MUST:
+- Be <= 65 characters (YouTube truncation limit).
+- Include the topic keyword.
+- Have NO clickbait lies, NO ALL CAPS, NO emoji.
+- Score 1-10 on likely CTR (10 = strongest hook).
+
+Pick the single strongest as "recommended".
+
+Return ONLY:
+{ "recommended": "string", "variants": [{ "title": "string", "angle": "string", "ctr_score": 8 }] }`;
+
+    const Schema = z.object({
+      recommended: z.string(),
+      variants: z.array(z.object({ title: z.string(), angle: z.string(), ctr_score: z.number() })),
+    });
+
+    const parsed = await callGateway(key, sys, user, 1500);
+    const checked = parsed ? Schema.safeParse(parsed) : null;
+    if (checked && checked.success && checked.data.variants.length > 0) {
+      return checked.data;
+    }
+
+    // Fallback — deterministic variants so pipeline never blocks.
+    const t = data.topic;
+    const variants = [
+      { title: `The Truth About ${t}`.slice(0, 65), angle: "Curiosity gap", ctr_score: 7 },
+      { title: `Why ${t} Is Not What You Think`.slice(0, 65), angle: "Contrarian", ctr_score: 7 },
+      { title: `5 Things Nobody Tells You About ${t}`.slice(0, 65), angle: "Numbered", ctr_score: 8 },
+      { title: `What Happens When ${t} Breaks`.slice(0, 65), angle: "Stakes", ctr_score: 6 },
+      { title: `${t}: The Story Behind It`.slice(0, 65), angle: "Declarative", ctr_score: 6 },
+    ];
+    return { recommended: variants[2].title, variants };
+  });
+
+// ---------------- Hook Agent ----------------
+
+const HookInput = z.object({
+  topic: z.string().min(1),
+  styleLabel: z.string().optional().default("Cinematic"),
+  platform: z.string().optional().default("youtube"),
+  currentHook: z.string().optional().default(""),
+});
+
+export type VideoHook = {
+  voiceover: string;
+  on_screen_text: string;
+  visual: string;
+  rationale: string;
+};
+
+export const generateVideoHook = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => HookInput.parse(v))
+  .handler(async ({ data }): Promise<VideoHook> => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+
+    const sys = `You are a YouTube retention expert. You write 3-second video
+hooks (opening lines) that stop the scroll. Return ONLY valid JSON.`;
+    const user = `TOPIC: ${data.topic}
+STYLE: ${data.styleLabel}
+PLATFORM: ${data.platform}
+${data.currentHook ? `CURRENT HOOK: ${data.currentHook}` : ""}
+
+Write ONE opening hook (the first 3 seconds of the video) that:
+- Uses ONE of: shocking statement, unexpected question, bold contrarian claim, or vivid mini-story.
+- Is 8-14 spoken words (must fit in ~3 seconds at ~2.5 words/second).
+- Does NOT include the word "welcome", "hey guys", "in this video", "today we".
+- Immediately promises a payoff without giving it away.
+
+Also provide:
+- on_screen_text: 0-4 words burned onto the frame (bold reveal, big number, punch line, or "").
+- visual: 1-line description of the opening shot.
+- rationale: 1 sentence explaining why this hook works.
+
+Return ONLY:
+{ "voiceover": "string", "on_screen_text": "string", "visual": "string", "rationale": "string" }`;
+
+    const Schema = z.object({
+      voiceover: z.string(),
+      on_screen_text: z.string().optional().default(""),
+      visual: z.string().optional().default(""),
+      rationale: z.string().optional().default(""),
+    });
+
+    const parsed = await callGateway(key, sys, user, 800);
+    const checked = parsed ? Schema.safeParse(parsed) : null;
+    if (checked && checked.success && checked.data.voiceover.trim().length > 0) {
+      return checked.data as VideoHook;
+    }
+
+    return {
+      voiceover: `What if everything you knew about ${data.topic} was wrong?`,
+      on_screen_text: "",
+      visual: `${data.styleLabel} cinematic opening shot on ${data.topic}, dramatic lighting.`,
+      rationale: "Contrarian curiosity gap that promises a payoff.",
+    };
+  });
+
+// ---------------- Chapter Agent ----------------
+
+const ChapterInput = z.object({
+  topic: z.string().min(1),
+  scenes: z.array(z.object({
+    voiceover: z.string().optional().default(""),
+    duration_sec: z.number().optional().default(3),
+  })),
+});
+
+export type VideoChapters = {
+  chapters: Array<{ time: string; label: string; description: string }>;
+};
+
+export const generateVideoChapters = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => ChapterInput.parse(v))
+  .handler(async ({ data }): Promise<VideoChapters> => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+
+    // Build cumulative timing hints so the model can align chapters to real scene starts.
+    const cumulative: Array<{ time: string; hint: string; sec: number }> = [];
+    let t = 0;
+    for (const s of data.scenes) {
+      const mm = Math.floor(t / 60).toString().padStart(2, "0");
+      const ss = Math.floor(t % 60).toString().padStart(2, "0");
+      cumulative.push({ time: `${mm}:${ss}`, hint: (s.voiceover || "").slice(0, 100), sec: t });
+      t += Math.max(1, s.duration_sec || 3);
+    }
+    const totalSec = t;
+
+    const totalMin = Math.max(1, Math.round(totalSec / 60));
+    const targetChapters = Math.max(3, Math.min(10, totalMin + 1));
+
+    const sys = `You are a YouTube chapter strategist. You group scenes into
+watchable chapters that describe the video's arc. Return ONLY valid JSON.`;
+    const user = `TOPIC: ${data.topic}
+Total duration: ${totalSec}s (~${totalMin} min).
+Scene timing hints (mm:ss — voiceover snippet):
+${cumulative.map((c) => `- ${c.time} — ${c.hint}`).join("\n")}
+
+Group these scenes into ${targetChapters} chapters that cover the whole video.
+Each chapter starts at the mm:ss of the scene that opens it (the FIRST chapter MUST be 00:00).
+Chapters must be strictly increasing in time. No two chapters share the same start time.
+
+Each chapter needs:
+- time: "mm:ss"
+- label: 2-5 word chapter title, no punctuation, title case
+- description: 1 short sentence describing what the viewer sees in this chapter
+
+Return ONLY:
+{ "chapters": [{ "time": "00:00", "label": "The Hook", "description": "..." }] }`;
+
+    const Schema = z.object({
+      chapters: z.array(z.object({
+        time: z.string(),
+        label: z.string(),
+        description: z.string().optional().default(""),
+      })),
+    });
+
+    const parsed = await callGateway(key, sys, user, 2000);
+    const checked = parsed ? Schema.safeParse(parsed) : null;
+    if (checked && checked.success && checked.data.chapters.length > 0) {
+      const chapters = checked.data.chapters
+        .map((c) => ({ time: c.time, label: c.label, description: c.description }))
+        .sort((a, b) => timeToSec(a.time) - timeToSec(b.time));
+      if (chapters[0]) chapters[0].time = "00:00";
+      return { chapters };
+    }
+
+    // Fallback — evenly space chapters.
+    const step = Math.max(1, Math.floor(cumulative.length / targetChapters));
+    const labels = ["Intro", "The Setup", "The Shift", "The Evidence", "The Twist", "What It Means", "The Payoff", "Wrap-Up"];
+    const chapters: Array<{ time: string; label: string; description: string }> = [];
+    for (let i = 0; i < cumulative.length && chapters.length < targetChapters; i += step) {
+      chapters.push({
+        time: cumulative[i].time,
+        label: labels[Math.min(chapters.length, labels.length - 1)],
+        description: cumulative[i].hint.slice(0, 100),
+      });
+    }
+    if (chapters[0]) chapters[0].time = "00:00";
+    return { chapters };
+  });
+
+function timeToSec(t: string): number {
+  const parts = t.split(":").map((n) => parseInt(n, 10) || 0);
+  return parts.length === 2 ? parts[0] * 60 + parts[1] : parts[0];
+}
