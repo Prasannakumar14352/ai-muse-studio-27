@@ -27,6 +27,8 @@ import {
   loadThumbnailImageURL,
   type LocalThumbnail,
 } from "@/lib/thumbnailLocalStore";
+import { validateRenderedVideo, type VideoValidation } from "@/lib/video-validate";
+import { AlertTriangle } from "lucide-react";
 import style3d from "@/assets/style-3d.jpg";
 import styleGhibli from "@/assets/style-ghibli.jpg";
 import styleAnime from "@/assets/style-anime.jpg";
