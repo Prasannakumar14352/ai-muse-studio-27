@@ -27,6 +27,8 @@ import {
   loadThumbnailImageURL,
   type LocalThumbnail,
 } from "@/lib/thumbnailLocalStore";
+import { validateRenderedVideo, type VideoValidation } from "@/lib/video-validate";
+import { AlertTriangle } from "lucide-react";
 import style3d from "@/assets/style-3d.jpg";
 import styleGhibli from "@/assets/style-ghibli.jpg";
 import styleAnime from "@/assets/style-anime.jpg";
@@ -339,8 +341,12 @@ function VideosPage() {
       await refreshInProgress();
 
       // Persist to browser-local library — no backend, no upload.
+      // We store the raw Blob (never the blob: URL) so it survives reloads.
       try {
-        const videoBlob = await (await fetch(r.render.video_url)).blob();
+        const videoBlob = r.render.blob;
+        if (!videoBlob || videoBlob.size === 0) {
+          throw new Error("Rendered video blob is empty");
+        }
         const niche = args.niche;
         const nicheLabel = NICHES.find((n) => n.id === niche)?.label ?? niche;
         const styleLabel = STYLE_CARDS.find((s) => s.id === args.brief.style)?.label ?? args.brief.style;
@@ -1027,6 +1033,126 @@ function InProgressJobs({
 
 // ---------------- Result ----------------
 
+/**
+ * Safe MP4/WebM preview player.
+ * - Owns a single object URL derived from the incoming Blob.
+ * - Revokes the URL only on unmount / blob change (never while mounted).
+ * - Runs metadata validation before allowing playback and surfaces errors
+ *   instead of silently showing an empty player.
+ * - Renders a dev-mode diagnostics panel with blob size, MIME, duration, etc.
+ */
+function SafeVideoPreview({
+  blob, requestedDurationSec, aspectClass, filename, onRegenerate,
+}: {
+  blob: Blob | null | undefined;
+  requestedDurationSec: number;
+  aspectClass: string;
+  filename: string;
+  onRegenerate: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [validation, setValidation] = useState<VideoValidation | null>(null);
+  const [validating, setValidating] = useState<boolean>(true);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+
+  // Create the object URL once per blob and revoke on unmount / blob swap.
+  useEffect(() => {
+    if (!blob) { setObjectUrl(null); return; }
+    const url = URL.createObjectURL(blob);
+    setObjectUrl(url);
+    return () => { URL.revokeObjectURL(url); };
+  }, [blob]);
+
+  // Validate the blob (size, MIME, metadata) before we trust the player.
+  useEffect(() => {
+    let cancelled = false;
+    setValidating(true);
+    setValidation(null);
+    setPlaybackError(null);
+    if (!blob) { setValidating(false); return; }
+    void validateRenderedVideo(blob, requestedDurationSec).then((v) => {
+      if (cancelled) return;
+      setValidation(v);
+      setValidating(false);
+    });
+    return () => { cancelled = true; };
+  }, [blob, requestedDurationSec]);
+
+  function handleDownload() {
+    if (!blob || blob.size === 0) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  const showPlayer = !!objectUrl && !!validation?.ok;
+  const showError = !validating && (!validation?.ok || !!playbackError);
+  const errorMsg = playbackError
+    ?? validation?.reason
+    ?? (validating ? null : "Video unavailable");
+
+  return (
+    <div>
+      <div className={`bg-black ${aspectClass} max-h-[70vh] mx-auto relative`}>
+        {showPlayer && objectUrl && (
+          <video
+            ref={videoRef}
+            src={objectUrl}
+            controls
+            autoPlay
+            playsInline
+            preload="metadata"
+            className="w-full h-full object-contain"
+            onLoadedMetadata={(e) => {
+              // Explicit load() after metadata is a workaround for Chromium
+              // Range-request quirks on MediaRecorder blobs.
+              try { (e.currentTarget as HTMLVideoElement).load(); } catch { /* noop */ }
+            }}
+            onError={() => {
+              setPlaybackError("Rendered video exists but the browser could not play it. Please download the MP4 or regenerate render.");
+            }}
+          />
+        )}
+        {validating && (
+          <div className="absolute inset-0 flex items-center justify-center text-white/80 text-sm">
+            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Validating rendered video…
+          </div>
+        )}
+        {showError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+            <AlertTriangle className="w-8 h-8 text-amber-400" />
+            <div className="text-white text-sm max-w-md">{errorMsg}</div>
+            <div className="flex gap-2">
+              {blob && blob.size > 0 && (
+                <button onClick={handleDownload} className="rounded-lg gradient-primary text-white px-3 py-1.5 text-xs flex items-center gap-1.5">
+                  <Download className="w-3.5 h-3.5" /> Download MP4
+                </button>
+              )}
+              <button onClick={onRegenerate} className="rounded-lg glass border border-border px-3 py-1.5 text-xs flex items-center gap-1.5">
+                <RefreshCw className="w-3.5 h-3.5" /> Regenerate render
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      {import.meta.env.DEV && (
+        <div className="px-4 py-2 text-[11px] text-muted-foreground border-t border-border/50 font-mono space-y-0.5">
+          <div>Blob size: {blob ? `${(blob.size / 1024 / 1024).toFixed(2)} MB (${blob.size} bytes)` : "—"}</div>
+          <div>MIME type: {blob?.type || "—"}</div>
+          <div>Requested duration: {Math.round(requestedDurationSec)}s</div>
+          <div>Detected duration: {validation?.detectedDuration != null ? `${validation.detectedDuration.toFixed(2)}s` : "—"}</div>
+          <div>Object URL created: {objectUrl ? "yes" : "no"}</div>
+          <div>Playback error: {playbackError ?? (validation?.ok ? "none" : validation?.reason ?? "—")}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function ResultScreen({
   result, onAnother, onNew, onSaveThumbnail,
 }: {
@@ -1061,16 +1187,25 @@ function ResultScreen({
   }
 
   const isVertical = brief.aspectRatio === "9:16";
+  const aspectClass = isVertical ? "aspect-[9/16]" : brief.aspectRatio === "1:1" ? "aspect-square" : "aspect-video";
 
   return (
     <div className="space-y-6">
       <div className="grid lg:grid-cols-[1fr_360px] gap-6">
         <div className="glass rounded-2xl overflow-hidden">
-          <div className={`bg-black ${isVertical ? "aspect-[9/16]" : brief.aspectRatio === "1:1" ? "aspect-square" : "aspect-video"} max-h-[70vh] mx-auto`}>
-            <video src={render.video_url} controls autoPlay playsInline className="w-full h-full object-contain" />
-          </div>
+          <SafeVideoPreview
+            blob={render.blob}
+            requestedDurationSec={brief.duration}
+            aspectClass={aspectClass}
+            filename={`${slug(seo.youtube_title)}.${render.extension}`}
+            onRegenerate={onAnother}
+          />
           <div className="p-4 flex flex-wrap items-center gap-2">
-            <button onClick={() => download(render.video_url, `${slug(seo.youtube_title)}.${render.extension}`)} className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2">
+            <button
+              onClick={() => download(URL.createObjectURL(render.blob), `${slug(seo.youtube_title)}.${render.extension}`)}
+              disabled={!render.blob || render.blob.size === 0}
+              className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+            >
               <Download className="w-4 h-4" /> Download video
             </button>
             <button onClick={() => download(thumbnail.url, `${slug(seo.youtube_title)}-thumbnail.png`)} className="rounded-lg glass border border-border px-4 py-2 text-sm flex items-center gap-2">

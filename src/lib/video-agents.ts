@@ -198,10 +198,14 @@ export type Timeline = {
 };
 
 export type RenderResult = {
+  /** Real MP4/WebM blob returned by the renderer. Preserve this — never persist a blob URL. */
+  blob: Blob;
+  /** Convenience object URL created once for the initial preview. Caller owns lifecycle. */
   video_url: string;
   mime: string;
   extension: "mp4" | "webm";
   duration_sec: number;
+  size_bytes: number;
   aspect_ratio: AspectRatio;
 };
 
@@ -750,10 +754,12 @@ export const RenderAgent = {
       onProgress,
     });
     return {
+      blob: result.blob,
       video_url: URL.createObjectURL(result.blob),
       mime: result.mimeType,
       extension: result.extension,
       duration_sec: result.durationSec,
+      size_bytes: result.blob.size,
       aspect_ratio: brief.aspectRatio,
     };
   },
