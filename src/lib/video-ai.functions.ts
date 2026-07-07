@@ -45,6 +45,15 @@ const Input = z.object({
   audience: z.string().optional().default(""),
   /** Target length in seconds — used to size long_video output (30-600). */
   targetLengthSec: z.number().int().min(15).max(1800).optional(),
+  /**
+   * Structural blueprint produced by the YouTube Retention Engine that runs
+   * BEFORE this agent. When present, the Script Agent MUST follow it exactly:
+   * hook line, intro promise, curiosity loops, chapter beats, retention-hook
+   * cadence, pattern-interrupt schedule, emotional-climax placement, ending,
+   * and CTA. This is what turns a narrated article into a professionally
+   * structured YouTube documentary.
+   */
+  retentionBrief: z.string().optional().default(""),
 });
 
 export const generateAiVideoScript = createServerFn({ method: "POST" })
