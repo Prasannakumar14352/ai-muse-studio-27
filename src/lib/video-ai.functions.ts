@@ -283,9 +283,9 @@ Return JSON EXACTLY:
     let parsed: unknown;
     try { parsed = JSON.parse(raw); }
     catch {
-      const m = raw.match(/\{[\s\S]*\}/);
-      if (!m) throw new Error("AI response was not valid JSON");
-      parsed = JSON.parse(m[0]);
+      const repaired = repairTruncatedJson(raw);
+      if (!repaired) throw new Error("AI response was not valid JSON");
+      parsed = repaired;
     }
 
     const Schema = z.object({
