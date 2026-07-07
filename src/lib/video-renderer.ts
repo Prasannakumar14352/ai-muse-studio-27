@@ -82,10 +82,6 @@ async function loadClip(src: string): Promise<HTMLVideoElement | null> {
     } catch { resolve(null); }
   });
 }
-    img.onerror = () => resolve(null);
-    img.src = src;
-  });
-}
 
 function pickRecorderMime(preferred?: "webm" | "mp4"): { mime: string; ext: "mp4" | "webm" } {
   const webmCandidates: Array<{ mime: string; ext: "mp4" | "webm" }> = [
