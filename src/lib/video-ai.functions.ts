@@ -194,3 +194,120 @@ Return JSON EXACTLY:
 
     return out;
   });
+
+// ---------------------------------------------------------------------------
+// Regenerate scenes + image prompts from a user-edited script.
+// ---------------------------------------------------------------------------
+
+const FromScriptInput = z.object({
+  script: z.string().min(1),
+  topic: z.string().optional().default(""),
+  tone: z.string().optional().default("Viral"),
+  platform: z.string().optional().default("instagram"),
+  styleLabel: z.string().optional().default("Cinematic"),
+  contentType: z.string().optional().default("short_reel"),
+  targetLengthSec: z.number().int().min(15).max(1800).optional(),
+});
+
+export type ScenesFromScript = {
+  scenes: AiVideoScene[];
+  image_prompts: Array<{ n: number; prompt: string; style: string }>;
+};
+
+export const generateScenesFromScript = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => FromScriptInput.parse(v))
+  .handler(async ({ data }): Promise<ScenesFromScript> => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+
+    const isLong = data.contentType === "long_video";
+    const defaultLen = isLong ? 75 : 35;
+    const lenSec = Math.max(15, Math.min(1800, data.targetLengthSec ?? defaultLen));
+    const sceneCount = Math.max(3, Math.min(120, Math.round(lenSec / (isLong ? 8 : 5))));
+    const ratio = isLong ? "16:9" : "9:16";
+
+    const sys = `You are a senior short-form video creative director. Given a
+finished script, break it into a scene-by-scene shot list with rich AI image
+prompts. Return STRICT JSON — no prose, no markdown fences.`;
+
+    const user = `Break the following ${data.platform} script into ${sceneCount} scenes.
+The scenes MUST cover the entire script in order — do not drop or invent content.
+
+TOPIC: ${data.topic}
+TONE: ${data.tone}
+VISUAL STYLE: ${data.styleLabel}
+FORMAT: ${data.contentType} (${ratio})
+
+SCRIPT:
+"""
+${data.script}
+"""
+
+For EACH scene produce:
+- n: 1..${sceneCount}
+- time_range: e.g. "0-3 sec"
+- role: "Hook" | "Beat 1"..."Beat N" | "CTA"
+- voiceover: exact spoken line pulled/paraphrased from the script (1 sentence, max 20 words, no stage directions)
+- on_screen_text: 0-6 word caption or "" (no hashtags, no emojis)
+- visual: 1-line description of what's on screen
+- image_prompt: rich prompt for an AI image model. MUST include:
+  "${data.styleLabel} style, ${ratio}, photorealistic, cinematic, premium commercial look, 8k, shallow depth of field".
+  Describe subject, setting, lighting, framing. NO text overlays in the image.
+- duration: "Ns" integer seconds 2-8
+
+Return JSON EXACTLY:
+{ "scenes": [ { ...fields above... } ] }`;
+
+    const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: sys },
+          { role: "user", content: user },
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: Math.min(32000, 2000 + sceneCount * 400),
+      }),
+    });
+    if (!upstream.ok) {
+      const t = await upstream.text().catch(() => "");
+      throw new Error(`AI gateway ${upstream.status}: ${t || upstream.statusText}`);
+    }
+    const j = (await upstream.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const raw = j.choices?.[0]?.message?.content ?? "";
+    if (!raw) throw new Error("AI returned empty content");
+
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw); }
+    catch {
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error("AI response was not valid JSON");
+      parsed = JSON.parse(m[0]);
+    }
+
+    const Schema = z.object({
+      scenes: z.array(z.object({
+        n: z.number().optional().default(0),
+        time_range: z.string().optional().default(""),
+        role: z.string().optional().default("Beat"),
+        voiceover: z.string(),
+        on_screen_text: z.string().optional().default(""),
+        visual: z.string(),
+        image_prompt: z.string(),
+        duration: z.string().optional().default("3s"),
+      })),
+    });
+    const out = Schema.parse(parsed);
+    const scenes = out.scenes.map((s, i) => ({ ...s, n: i + 1 }));
+
+    const image_prompts = scenes.map((s) => ({
+      n: s.n,
+      prompt: s.image_prompt,
+      style: data.styleLabel,
+    }));
+
+    return { scenes, image_prompts };
+  });
