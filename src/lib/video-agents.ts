@@ -6,7 +6,124 @@
 
 import { generateAiVideoScript, generateAiVideoSeo, type AiVideoScript, type AiVideoScene, type AiVideoSeo } from "@/lib/video-ai.functions";
 import { buildFallbackVideoScript } from "@/lib/video-fallback";
-import { renderVideo, type RenderScene } from "@/lib/video-renderer";
+import { renderVideo, type RenderScene, type CameraMotion } from "@/lib/video-renderer";
+
+// ---------- Beat expansion (documentary-style visual density) ----------
+//
+// A "beat" is a 2-5 second visual shot. Every script scene is broken into
+// multiple beats, each with its own AI image and camera motion, while the
+// scene's narration plays continuously across all its beats. This is what
+// makes the result feel like a professionally edited documentary instead of
+// a slideshow of one image per paragraph.
+
+const TARGET_BEAT_SEC = 3.5;
+const MIN_BEAT_SEC = 2.2;
+const MAX_BEAT_SEC = 5.0;
+const MOTION_CYCLE: CameraMotion[] = ["zoomIn", "panRight", "pushIn", "zoomOut", "panLeft", "tiltDown", "tiltUp"];
+
+type Beat = {
+  sceneIndex: number;   // index into script.scenes
+  beatIndex: number;    // beat position within the scene (0-based)
+  isFirstOfScene: boolean;
+  text: string;         // narration chunk this beat visually represents
+  words: number;
+  imagePrompt: string;  // per-beat image prompt
+  motion: CameraMotion;
+};
+
+/** Split a voiceover string into ~10-14-word visual chunks (sentence-aware). */
+function splitVoiceoverIntoBeatTexts(vo: string, targetBeats: number): string[] {
+  const clean = (vo ?? "").trim();
+  if (!clean) return [""];
+  // Sentence-aware split first.
+  const sentences = clean.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+  if (sentences.length === 0) return [clean];
+
+  // If we already have close to the right number of sentences, use them as-is.
+  if (sentences.length >= targetBeats) {
+    // Merge short adjacent sentences until we're at targetBeats.
+    const merged = [...sentences];
+    while (merged.length > targetBeats) {
+      // Find the shortest adjacent pair and merge.
+      let bestI = 0;
+      let bestLen = Infinity;
+      for (let i = 0; i < merged.length - 1; i++) {
+        const len = merged[i].split(/\s+/).length + merged[i + 1].split(/\s+/).length;
+        if (len < bestLen) { bestLen = len; bestI = i; }
+      }
+      merged.splice(bestI, 2, `${merged[bestI]} ${merged[bestI + 1]}`);
+    }
+    return merged;
+  }
+
+  // Fewer sentences than targetBeats: split long sentences on commas / word count.
+  const chunks: string[] = [];
+  for (const s of sentences) {
+    const words = s.split(/\s+/);
+    const need = Math.max(1, Math.round(words.length / 12));
+    if (need <= 1) { chunks.push(s); continue; }
+    // Prefer comma splits when reasonable.
+    const commaParts = s.split(/,\s+/).map((x) => x.trim()).filter(Boolean);
+    if (commaParts.length >= need) {
+      // Group commaParts into `need` chunks.
+      const per = Math.ceil(commaParts.length / need);
+      for (let i = 0; i < commaParts.length; i += per) {
+        chunks.push(commaParts.slice(i, i + per).join(", "));
+      }
+    } else {
+      const per = Math.ceil(words.length / need);
+      for (let i = 0; i < words.length; i += per) {
+        chunks.push(words.slice(i, i + per).join(" "));
+      }
+    }
+  }
+  return chunks.length ? chunks : [clean];
+}
+
+function expandScriptToBeats(script: AiVideoScript, style: StyleId): Beat[] {
+  const beats: Beat[] = [];
+  let globalIdx = 0;
+  script.scenes.forEach((scene, sceneIndex) => {
+    const sceneDur = parseSec(scene.duration);
+    const targetBeats = Math.max(1, Math.round(sceneDur / TARGET_BEAT_SEC));
+    const chunks = splitVoiceoverIntoBeatTexts(scene.voiceover ?? "", targetBeats);
+    const baseVisual = scene.visual || scene.image_prompt || `${scene.voiceover?.slice(0, 80)}`;
+    chunks.forEach((chunk, beatIndex) => {
+      const words = chunk.split(/\s+/).filter(Boolean).length || 1;
+      beats.push({
+        sceneIndex,
+        beatIndex,
+        isFirstOfScene: beatIndex === 0,
+        text: chunk,
+        words,
+        imagePrompt: buildBeatImagePrompt(chunk, baseVisual, style),
+        motion: MOTION_CYCLE[globalIdx % MOTION_CYCLE.length],
+      });
+      globalIdx += 1;
+    });
+  });
+  return beats;
+}
+
+function buildBeatImagePrompt(beatText: string, sceneVisual: string, style: StyleId): string {
+  const descriptor = STYLE_DESCRIPTOR[style];
+  // Beat-specific visual grounded in the narration chunk, styled consistently.
+  return `${descriptor}. Cinematic documentary shot visualizing: "${beatText.trim()}". Context: ${sceneVisual}. Dynamic composition, dramatic lighting, cinematic depth of field, no text, no watermarks, no captions.`;
+}
+
+/**
+ * Given a scene's audio duration and its beats, return the seconds each beat
+ * should occupy. Distributed proportionally to word count, clamped to
+ * [MIN_BEAT_SEC, MAX_BEAT_SEC], then rescaled to sum exactly to audioSec.
+ */
+function distributeAudioAcrossBeats(sceneBeats: Beat[], audioSec: number): number[] {
+  const totalWords = sceneBeats.reduce((a, b) => a + b.words, 0) || 1;
+  const raw = sceneBeats.map((b) => (b.words / totalWords) * audioSec);
+  const clamped = raw.map((d) => Math.max(MIN_BEAT_SEC, Math.min(MAX_BEAT_SEC, d)));
+  const sum = clamped.reduce((a, b) => a + b, 0) || 1;
+  const scale = audioSec / sum;
+  return clamped.map((d) => d * scale);
+}
 
 // ---------- Shared types ----------
 
