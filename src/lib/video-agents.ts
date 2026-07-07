@@ -272,6 +272,7 @@ export type RetentionBlueprint = {
 export type PipelineResult = {
   brief: VideoBrief;
   research: ResearchBrief;
+  retentionEngine: RetentionBlueprint;
   titles: VideoTitleVariants;
   hook: VideoHook;
   intro: IntroPlan;
