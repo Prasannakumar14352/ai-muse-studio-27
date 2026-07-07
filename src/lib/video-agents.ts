@@ -195,7 +195,19 @@ export type RenderResult = {
   aspect_ratio: AspectRatio;
 };
 
-export type ThumbnailResult = { url: string; alt: string; generated: boolean };
+export type ThumbnailVariant = {
+  url: string;
+  alt: string;
+  headline: string;
+  concept: string;
+  generated: boolean;
+};
+export type ThumbnailResult = {
+  url: string;
+  alt: string;
+  generated: boolean;
+  variants: ThumbnailVariant[];
+};
 
 export type SeoResult = AiVideoSeo;
 
