@@ -1,11 +1,15 @@
-import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Sparkles, Mail, Lock, User, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { getAuthCallbackUrl, redirectToSafePath } from "@/lib/auth-redirect";
 
-const searchSchema = z.object({ mode: z.enum(["signin", "signup"]).optional() });
+const searchSchema = z.object({
+  mode: z.enum(["signin", "signup"]).optional(),
+  next: z.string().optional(),
+});
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -14,19 +18,18 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const { mode: initialMode } = useSearch({ from: "/auth" });
+  const { mode: initialMode, next } = useSearch({ from: "/auth" });
   const [mode, setMode] = useState<"signin" | "signup">(initialMode ?? "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/dashboard" });
+      if (data.session) redirectToSafePath(next);
     });
-  }, [navigate]);
+  }, [next]);
 
   async function handleEmail(e: React.FormEvent) {
     e.preventDefault();
@@ -36,7 +39,7 @@ function AuthPage() {
         const { error } = await supabase.auth.signUp({
           email, password,
           options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
+            emailRedirectTo: getAuthCallbackUrl(next),
             data: { full_name: fullName },
           },
         });
@@ -46,7 +49,7 @@ function AuthPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success("Welcome back!");
-        navigate({ to: "/dashboard" });
+        redirectToSafePath(next);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
@@ -57,7 +60,7 @@ function AuthPage() {
 
   async function handleGoogle() {
     setLoading(true);
-    const redirectTo = `${window.location.origin}/dashboard`;
+    const redirectTo = getAuthCallbackUrl(next);
     console.info("[auth] google oauth start", { origin: window.location.origin, redirectTo });
 
     try {
