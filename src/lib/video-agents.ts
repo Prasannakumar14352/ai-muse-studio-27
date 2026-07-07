@@ -1177,6 +1177,13 @@ export async function runVideoJobPipeline(
   const thumbnail = await ThumbnailAgent.run(brief);
   const seo = await SeoAgent.run(brief, script, timeline);
 
+  validatePipelineDuration({
+    requestedSec: brief.duration,
+    voiceoverSec: voiceover.reduce((a, v) => a + (v.buffer?.duration ?? v.duration_sec ?? 0), 0),
+    timelineSec: timeline.total_sec,
+    renderedSec: render.duration_sec,
+  });
+
   job.phase = "complete";
   await saveJob(job);
   onEvent({ type: "phase", phase: "complete" });
