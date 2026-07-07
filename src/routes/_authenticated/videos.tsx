@@ -595,6 +595,42 @@ function ResultScreen({
             ))}
           </div>
         </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">Tags</div>
+            <CopyBtn onClick={() => copy(seo.tags.join(", "), "Tags")} />
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {seo.tags.map((t) => (
+              <span key={t} className="glass px-2 py-1 rounded text-xs">{t}</span>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">Pinned comment</div>
+            <CopyBtn onClick={() => copy(seo.pinned_comment, "Pinned comment")} />
+          </div>
+          <div className="glass rounded-lg p-3 text-sm whitespace-pre-wrap">{seo.pinned_comment}</div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">Chapters</div>
+            <CopyBtn onClick={() => copy(seo.chapters.map((c) => `${c.time} ${c.label}`).join("\n"), "Chapters")} />
+          </div>
+          <div className="glass rounded-lg p-3 text-sm space-y-1 font-mono">
+            {seo.chapters.map((c) => (
+              <div key={`${c.time}-${c.label}`} className="flex gap-3">
+                <span className="text-muted-foreground w-14 shrink-0">{c.time}</span>
+                <span>{c.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
     </div>
   );
