@@ -383,7 +383,7 @@ function VideosPage() {
       )}
       {view === "processing" && <ProcessingScreen steps={steps} error={error} onCancel={reset} />}
       {view === "result" && result && (
-        <ResultScreen result={result} onAnother={() => gen && start(gen)} onNew={reset} />
+        <ResultScreen result={result} onAnother={() => gen && start(gen)} onNew={reset} onSaveThumbnail={saveThumb} />
       )}
       {view === "library" && libraryOpen && (
         <LibraryViewer
