@@ -751,50 +751,160 @@ function ChipRow<T extends string | number>({
   );
 }
 
-// ---------------- Processing ----------------
+// ---------------- Job Dashboard (async parallel pipeline) ----------------
 
-function ProcessingScreen({
-  steps, error, onCancel,
-}: { steps: StepStatus[]; error: string | null; onCancel: () => void }) {
-  const doneCount = steps.filter((s) => s.state === "done").length;
-  const pct = Math.round((doneCount / steps.length) * 100);
+const PHASE_LABELS: Record<JobPhaseId, string> = {
+  planning: "Planning",
+  generating_shots: "Generating shots",
+  voiceover: "Narrating & subtitling",
+  rendering: "Rendering final video",
+  complete: "Complete",
+  failed: "Failed",
+};
+
+const PHASE_ORDER: JobPhaseId[] = ["planning", "generating_shots", "voiceover", "rendering", "complete"];
+
+function JobDashboard({
+  dash, error, onCancel, onRetryFailed, onBack,
+}: {
+  dash: DashState;
+  error: string | null;
+  onCancel: () => void;
+  onRetryFailed: () => void;
+  onBack: () => void;
+}) {
+  const shotPct = dash.shotsTotal > 0 ? Math.round((dash.shotsDone / dash.shotsTotal) * 100) : 0;
+  const renderPct = Math.round(dash.renderProgress * 100);
+  const currentPhaseIdx = PHASE_ORDER.indexOf(dash.phase);
 
   return (
-    <div className="glass rounded-2xl p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="font-semibold text-lg">Building your video</h2>
-          <p className="text-sm text-muted-foreground">Each agent hands structured JSON to the next step.</p>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold">{pct}%</div>
-          <div className="text-xs text-muted-foreground">{doneCount} / {steps.length} steps</div>
-        </div>
-      </div>
-
-      <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden mb-6">
-        <div className="h-full gradient-primary transition-all" style={{ width: `${pct}%` }} />
-      </div>
-
-      <ol className="space-y-2">
-        {steps.map((s) => (
-          <li key={s.id} className="flex items-center gap-3 text-sm">
-            {s.state === "done" && <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />}
-            {s.state === "running" && <Loader2 className="w-5 h-5 animate-spin text-[color:var(--neon-purple)] shrink-0" />}
-            {s.state === "pending" && <Circle className="w-5 h-5 text-muted-foreground/50 shrink-0" />}
-            {s.state === "error" && <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />}
-            <span className={s.state === "pending" ? "text-muted-foreground" : ""}>{s.label}</span>
-            {s.note && (
-              <span className={`text-xs ${s.state === "error" ? "text-rose-400" : "text-muted-foreground"}`}>— {s.note}</span>
+    <div className="space-y-4">
+      {/* Phase indicator */}
+      <div className="glass rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="font-semibold text-lg">Building your video</h2>
+            <p className="text-sm text-muted-foreground">
+              Runs in the background — you can leave this page and come back.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {dash.phase !== "complete" && dash.phase !== "failed" && (
+              <button
+                onClick={onCancel}
+                className="rounded-lg glass border border-border px-3 py-1.5 text-xs flex items-center gap-1.5"
+                title="Pause — you can resume later from your videos list"
+              >
+                <X className="w-3.5 h-3.5" /> Cancel
+              </button>
             )}
-          </li>
-        ))}
-      </ol>
+            <button
+              onClick={onBack}
+              className="rounded-lg glass border border-border px-3 py-1.5 text-xs"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {PHASE_ORDER.slice(0, -1).map((p, i) => {
+            const state: "done" | "active" | "pending" =
+              i < currentPhaseIdx ? "done" : i === currentPhaseIdx ? "active" : "pending";
+            return (
+              <div
+                key={p}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 border ${
+                  state === "done" ? "border-emerald-500/40 text-emerald-300 bg-emerald-500/10" :
+                  state === "active" ? "gradient-primary text-white border-transparent" :
+                  "border-border text-muted-foreground"
+                }`}
+              >
+                {state === "done" && <CheckCircle2 className="w-3.5 h-3.5" />}
+                {state === "active" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {state === "pending" && <Circle className="w-3.5 h-3.5" />}
+                {PHASE_LABELS[p]}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Shots counter + retry */}
+      {dash.shotsTotal > 0 && (
+        <div className="glass rounded-2xl p-5">
+          <div className="flex items-end justify-between mb-3">
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Scenes generated</div>
+              <div className="text-3xl font-bold mt-1">
+                {dash.shotsDone} <span className="text-muted-foreground text-xl">/ {dash.shotsTotal}</span>
+              </div>
+              {dash.shotsFailed > 0 && (
+                <div className="text-xs text-rose-400 mt-1">
+                  {dash.shotsFailed} failed
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {dash.shotsFailed > 0 && (
+                <button
+                  onClick={onRetryFailed}
+                  className="rounded-lg glass border border-rose-500/40 text-rose-200 px-3 py-1.5 text-xs flex items-center gap-1.5"
+                >
+                  <RotateCw className="w-3.5 h-3.5" /> Retry failed
+                </button>
+              )}
+              <div className="text-right">
+                <div className="text-2xl font-bold">{shotPct}%</div>
+              </div>
+            </div>
+          </div>
+          <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-full gradient-primary transition-all" style={{ width: `${shotPct}%` }} />
+          </div>
+
+          {/* Scene Viewer grid */}
+          <div className="mt-5">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
+              Scene viewer
+            </div>
+            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1.5 max-h-[420px] overflow-y-auto pr-1">
+              {dash.shots.map((s) => (
+                <SceneTile key={s.id} shot={s} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Voiceover progress */}
+      {dash.voiceoverTotal > 0 && dash.phase !== "rendering" && dash.phase !== "complete" && (
+        <div className="glass rounded-2xl p-4 text-sm flex items-center gap-3">
+          <Loader2 className="w-4 h-4 animate-spin text-[color:var(--neon-purple)]" />
+          <span>Narration {dash.voiceoverDone} / {dash.voiceoverTotal} scenes</span>
+        </div>
+      )}
+
+      {/* Render progress — separate */}
+      {(dash.phase === "rendering" || dash.renderProgress > 0) && (
+        <div className="glass rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Encoding final MP4</div>
+              <div className="text-lg font-semibold mt-1">Rendering video</div>
+            </div>
+            <div className="text-2xl font-bold">{renderPct}%</div>
+          </div>
+          <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-full transition-all" style={{ width: `${renderPct}%`, background: "linear-gradient(135deg,#22d3ee,#a855f7)" }} />
+          </div>
+        </div>
+      )}
 
       {error && (
-        <div className="mt-6 flex items-center justify-between glass border border-rose-500/30 rounded-lg p-3">
+        <div className="glass border border-rose-500/30 rounded-lg p-3 flex items-center justify-between">
           <div className="text-sm text-rose-300">{error}</div>
-          <button onClick={onCancel} className="rounded-lg glass border border-border px-3 py-1.5 text-xs">
+          <button onClick={onBack} className="rounded-lg glass border border-border px-3 py-1.5 text-xs">
             Start over
           </button>
         </div>
@@ -802,6 +912,90 @@ function ProcessingScreen({
     </div>
   );
 }
+
+function SceneTile({ shot }: { shot: ShotProgress }) {
+  const status = shot.status;
+  const bg = status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
+             status === "failed" ? "bg-rose-500/10 border-rose-500/40" :
+             status === "running" ? "bg-white/5 border-white/20" :
+             "bg-white/5 border-border";
+  return (
+    <div
+      className={`relative aspect-square rounded border overflow-hidden ${bg}`}
+      title={shot.error ? `Shot ${shot.index + 1}: ${shot.error}` : `Shot ${shot.index + 1}`}
+    >
+      {shot.previewUrl && shot.kind === "image" && (
+        <img src={shot.previewUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      )}
+      {shot.previewUrl && shot.kind === "clip" && (
+        <video src={shot.previewUrl} muted playsInline className="absolute inset-0 w-full h-full object-cover" />
+      )}
+      {!shot.previewUrl && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          {status === "running" && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+          {status === "pending" && <Circle className="w-3 h-3 text-muted-foreground/50" />}
+          {status === "failed" && <AlertCircle className="w-3.5 h-3.5 text-rose-400" />}
+        </div>
+      )}
+      <div className="absolute bottom-0 right-0 text-[9px] font-mono text-white/70 bg-black/40 px-1 rounded-tl">
+        {shot.index + 1}
+      </div>
+    </div>
+  );
+}
+
+// ---------------- In-progress jobs (resume) ----------------
+
+function InProgressJobs({
+  jobs, onResume, onDiscard,
+}: {
+  jobs: JobRecord[];
+  onResume: (job: JobRecord) => void;
+  onDiscard: (id: string) => void;
+}) {
+  return (
+    <div className="glass rounded-2xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Clock className="w-4 h-4 text-[color:var(--neon-purple)]" />
+        <h2 className="font-semibold text-sm">In progress · resume where you left off</h2>
+      </div>
+      <div className="space-y-2">
+        {jobs.map((j) => {
+          const pct = j.shotsTotal > 0 ? Math.round((j.shotsDone / j.shotsTotal) * 100) : 0;
+          return (
+            <div key={j.id} className="glass rounded-lg p-3 border border-border flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">{j.title}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {PHASE_LABELS[j.phase as JobPhaseId] ?? j.phase} · {j.shotsDone} / {j.shotsTotal} shots
+                  {j.shotsFailed > 0 && <span className="text-rose-400"> · {j.shotsFailed} failed</span>}
+                </div>
+                <div className="w-full h-1 rounded-full bg-white/5 overflow-hidden mt-2">
+                  <div className="h-full gradient-primary" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+              <button
+                onClick={() => onResume(j)}
+                className="rounded-lg gradient-primary text-white px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5"
+              >
+                <Play className="w-3.5 h-3.5" /> Resume
+              </button>
+              <button
+                onClick={() => onDiscard(j.id)}
+                className="rounded-lg glass border border-border px-2 py-1.5 text-xs"
+                title="Discard job"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
 
 // ---------------- Result ----------------
 
