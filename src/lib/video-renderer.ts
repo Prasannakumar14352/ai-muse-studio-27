@@ -25,6 +25,12 @@ export type RenderOptions = {
   fps?: number;
   onProgress?: (p: number) => void; // 0..1
   sceneImages?: Array<string | null>;
+  /**
+   * Per-beat media. If `kind === "clip"`, the URL points to an mp4/webm that
+   * plays muted underneath the camera motion overlay; on load failure or when
+   * the entry is null, falls back to `sceneImages[i]` and then the style still.
+   */
+  sceneMedia?: Array<{ kind: "image" | "clip"; url: string } | null>;
   sceneAudio?: Array<AudioBuffer | null>;
   fitToAudio?: boolean;
   /** Cancel the render mid-flight — recorder stops and result rejects with AbortError. */
