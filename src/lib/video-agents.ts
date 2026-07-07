@@ -4,7 +4,12 @@
 // clean input/output contract (structured JSON) so real providers can be
 // swapped in without touching the UI.
 
-import { generateAiVideoScript, generateAiVideoSeo, type AiVideoScript, type AiVideoScene, type AiVideoSeo } from "@/lib/video-ai.functions";
+import {
+  generateAiVideoScript, generateAiVideoSeo,
+  generateVideoTitleVariants, generateVideoHook, generateVideoChapters,
+  type AiVideoScript, type AiVideoScene, type AiVideoSeo,
+  type VideoTitleVariants, type VideoHook, type VideoChapters,
+} from "@/lib/video-ai.functions";
 import { buildFallbackVideoScript } from "@/lib/video-fallback";
 import { renderVideo, type RenderScene, type CameraMotion } from "@/lib/video-renderer";
 import { runShotPool } from "@/lib/video-shot-runner";
