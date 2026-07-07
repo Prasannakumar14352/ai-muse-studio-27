@@ -3,7 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { parseStructuredJsonResponse } from "@/lib/video-json";
 import { buildFallbackScenesFromScript, buildFallbackVideoScript } from "@/lib/video-fallback";
-import { getDurationTargets, countWords, totalVoiceoverWords } from "@/lib/video-duration";
+import { getDurationTargets, totalVoiceoverWords } from "@/lib/video-duration";
 
 
 export type AiVideoScene = {
