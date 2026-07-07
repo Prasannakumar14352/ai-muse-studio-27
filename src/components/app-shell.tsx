@@ -9,7 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAccess, getAvailableCredits } from "@/lib/access";
 
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
-import brandLogo from "@/assets/prodxstore-logo.png.asset.json";
+import { BrandLogo } from "@/components/brand-logo";
 
 const BASE_NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },

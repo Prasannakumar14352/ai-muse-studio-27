@@ -7,8 +7,8 @@ import { PLANS } from "@/lib/constants";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
-import brandLogo from "@/assets/prodxstore-logo.png.asset.json";
-const demoVideo = { url: "/creatorvault-demo.mp4" };
+import { BrandLogo } from "@/components/brand-logo";
+const demoVideo = { url: "/creatorvault-demo.mp4", poster: "/brand/hero-poster.jpg" };
 
 
 export const Route = createFileRoute("/")({ component: Landing });
@@ -36,8 +36,8 @@ function Landing() {
       {/* Nav */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/60 border-b border-border/40">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={brandLogo.url} alt="CreatorVault AI" className="h-9 md:h-10 w-auto object-contain" />
+          <Link to="/" className="flex items-center gap-2" aria-label="CreatorVault AI home">
+            <BrandLogo alt="CreatorVault AI" className="h-9 md:h-10 w-auto object-contain" />
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground">Features</a>
