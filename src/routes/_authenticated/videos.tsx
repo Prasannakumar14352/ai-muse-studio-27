@@ -239,13 +239,18 @@ function VideosPage() {
   const [error, setError] = useState<string | null>(null);
   const [library, setLibrary] = useState<LocalVideo[]>([]);
   const [libraryOpen, setLibraryOpen] = useState<LibraryOpen | null>(null);
+  const [thumbLibrary, setThumbLibrary] = useState<LocalThumbnail[]>([]);
 
   const refreshLibrary = useCallback(async () => {
     const items = await getGeneratedVideos();
     setLibrary(items);
   }, []);
+  const refreshThumbLibrary = useCallback(async () => {
+    const items = await getGeneratedThumbnails();
+    setThumbLibrary(items);
+  }, []);
 
-  useEffect(() => { void refreshLibrary(); }, [refreshLibrary]);
+  useEffect(() => { void refreshLibrary(); void refreshThumbLibrary(); }, [refreshLibrary, refreshThumbLibrary]);
 
   async function start(args: GenerateArgs) {
     setGen(args);
