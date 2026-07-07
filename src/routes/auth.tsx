@@ -57,51 +57,16 @@ function AuthPage() {
 
   async function handleGoogle() {
     setLoading(true);
-    const host = window.location.hostname;
-    const isLocalHost = host === "localhost" || host === "127.0.0.1";
-    const isLovableHost = host.endsWith(".lovable.app") && !isLocalHost;
-    const redirectTo = `${window.location.origin}/auth`;
-
-    // Diagnostic: prints where the OAuth flow is starting and which path we take.
-    // Look for [auth] entries in DevTools → Console to debug Google sign-in.
-    console.info("[auth] google oauth start", {
-      host,
-      origin: window.location.origin,
-      path: isLovableHost ? "lovable-broker (/~oauth/initiate)" : "supabase direct oauth",
-      redirectTo,
-    });
+    const redirectTo = `${window.location.origin}/dashboard`;
+    console.info("[auth] google oauth start", { origin: window.location.origin, redirectTo });
 
     try {
-      if (isLovableHost) {
-        const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-        console.info("[auth] lovable oauth result", {
-          redirected: result.redirected,
-          error: result.error?.message ?? null,
-        });
-        if (result.error) throw new Error(result.error.message ?? "Google sign-in failed");
-        if (result.redirected) return;
-        navigate({ to: "/dashboard" });
-      } else {
-        // Vercel / custom host: use Supabase directly with the project's own Google credentials.
-        // Configure them in Lovable Cloud → Users → Auth Settings → Google.
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: { redirectTo, skipBrowserRedirect: true, queryParams: { prompt: "select_account" } },
-        });
-        console.info("[auth] supabase oauth response", {
-          providerUrl: data?.url ?? null,
-          error: error?.message ?? null,
-        });
-        if (error) throw error;
-        if (isLocalHost) {
-          console.info("[auth] localhost redirect allow-list required if the provider returns 400", {
-            addRedirectUrl: `${window.location.origin}/auth`,
-            providerUrl: data?.url ?? null,
-          });
-        }
-        // Supabase returns a URL to redirect to.
-        if (data?.url) window.location.href = data.url;
-      }
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo },
+      });
+      if (error) throw error;
+      if (data?.url) window.location.href = data.url;
     } catch (err) {
       console.error("[auth] google oauth failed", err);
       toast.error(err instanceof Error ? err.message : "Google sign-in failed");
