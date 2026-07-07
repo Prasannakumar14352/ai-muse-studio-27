@@ -138,12 +138,18 @@ export type StepStatus = { id: StepId; label: string; state: StepState; note?: s
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const STYLE_LABEL: Record<StyleId, string> = {
-  cinematic_documentary: "Cinematic Documentary",
+  "3d": "3D",
+  ghibli: "Ghibli-inspired",
+  anime: "Anime",
   realistic: "Realistic",
-  futuristic: "Futuristic",
-  business: "Business",
-  educational: "Educational",
+  pixar: "Pixar-like",
+  cinematic: "Cinematic",
+  documentary: "Documentary",
   dark_mystery: "Dark Mystery",
+  luxury: "Luxury",
+  cyberpunk: "Cyberpunk",
+  minimal_product: "Minimal Product",
+  futuristic: "Futuristic",
 };
 
 const VOICE_LABEL: Record<VoiceId, string> = {
