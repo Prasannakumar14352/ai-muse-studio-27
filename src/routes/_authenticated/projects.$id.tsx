@@ -1,16 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client";
-import { getStyleImage } from "@/lib/constants";
+import { getStyle, getStyleImage } from "@/lib/constants";
 import { generateProject } from "@/lib/generators";
+import { generateScenesFromScript } from "@/lib/video-ai.functions";
 import { renderVideo, renderUgcVideo, generateSceneImage, type UgcStage } from "@/lib/video-renderer";
-import { getOutput, saveOutput, type LocalOutput } from "@/lib/local-store";
+import { getOutput, saveOutput, type LocalOutput, type Scene as LocalScene, type Prompt as LocalPrompt } from "@/lib/local-store";
 import { isBlobKey, getDataURL } from "@/lib/blob-store";
 import { deductUsage } from "@/lib/access";
 import { toast } from "sonner";
 import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles, AlertTriangle, Bug, CheckCircle2, X, Package, Edit3, Save, Eye, EyeOff, ImageOff, Volume2, ChevronDown, ChevronRight, History, FileText, Wand2 } from "lucide-react";
+
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
 
@@ -363,63 +366,17 @@ function ProjectView() {
         <BrandPrompt projectId={project.id} platform={project.platform ?? "instagram"} />
       )}
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Script */}
-        <CollapsibleCard id={`sec:script:${project.id}`} title="Full Script" icon={<FileText className="w-4 h-4 text-[color:var(--neon-purple)]" />} className="lg:col-span-2">
-          <pre className="text-sm whitespace-pre-wrap text-muted-foreground font-mono leading-relaxed">{output?.script}</pre>
-        </CollapsibleCard>
+      <EditableSections
+        projectId={project.id}
+        project={project}
+        output={output}
+        scenes={scenes}
+        prompts={prompts}
+        thumbs={thumbs}
+      />
 
-        {/* Scenes */}
-        <CollapsibleCard id={`sec:scenes:${project.id}`} title="Scene Breakdown" icon={<Film className="w-4 h-4 text-[color:var(--neon-purple)]" />}>
-          <div className="space-y-3 max-h-[500px] overflow-y-auto">
-            {scenes.map((s) => (
-              <div key={s.n} className="border border-border/50 rounded-lg p-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="gradient-primary text-white px-2 py-0.5 rounded">Scene {s.n}</span>
-                  <span className="text-muted-foreground">{s.duration}</span>
-                </div>
-                <div className="mt-2 text-sm">{s.visual}</div>
-                <div className="mt-1 text-xs text-muted-foreground">🎙 {s.voiceover}</div>
-              </div>
-            ))}
-          </div>
-        </CollapsibleCard>
 
-        {/* Image prompts */}
-        <CollapsibleCard id={`sec:prompts:${project.id}`} title="Image Prompts (B-roll)" icon={<Wand2 className="w-4 h-4 text-[color:var(--neon-purple)]" />}>
-          <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {prompts.map((p) => (
-              <div key={p.n} className="border border-border/50 rounded-lg p-3 text-sm">
-                <div className="text-xs text-muted-foreground mb-1">Shot #{p.n} · {p.style}</div>
-                {p.prompt}
-              </div>
-            ))}
-          </div>
-        </CollapsibleCard>
 
-        {/* Captions & hashtags */}
-        <CollapsibleCard id={`sec:captions:${project.id}`} title="Captions & Hashtags" icon={<Copy className="w-4 h-4 text-[color:var(--neon-purple)]" />}>
-          <div className="text-sm text-muted-foreground whitespace-pre-wrap max-h-64 overflow-y-auto">{output?.captions}</div>
-          <h3 className="mt-4 font-semibold text-sm">Hashtags</h3>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {(output?.hashtags ?? []).map((h) => (
-              <span key={h} className="text-xs glass px-2 py-1 rounded-full">{h}</span>
-            ))}
-          </div>
-        </CollapsibleCard>
-
-        {/* Thumbnails */}
-        <CollapsibleCard id={`sec:thumbs:${project.id}`} title="Thumbnail Ideas" icon={<Sparkles className="w-4 h-4 text-[color:var(--neon-pink)]" />} className="lg:col-span-2">
-          <div className="grid md:grid-cols-2 gap-3">
-            {thumbs.map((t, i) => (
-              <div key={i} className="border border-border/50 rounded-lg p-4 text-sm">
-                <div className="text-xs text-[color:var(--neon-pink)] mb-1">Concept {i + 1}</div>
-                {t}
-              </div>
-            ))}
-          </div>
-        </CollapsibleCard>
-      </div>
 
       {project.content_type !== "carousel" && (
         <VideoPreview
@@ -1748,3 +1705,400 @@ function BrandPrompt({ projectId, platform }: { projectId: string; platform: str
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// EditableSections — inline edit for Script / Scenes / Prompts / Captions /
+// Hashtags / Thumbnails. Saves to the local per-project output store. When
+// the Full Script is edited, offers a one-click regenerate of Scene Breakdown
+// + Image Prompts from the edited script via AI.
+// ---------------------------------------------------------------------------
+
+type ProjectRow = {
+  id: string;
+  title: string | null;
+  topic: string | null;
+  tone: string | null;
+  platform: string | null;
+  style: string | null;
+  content_type: string | null;
+};
+
+function EditableSections({
+  projectId, project, output, scenes, prompts, thumbs,
+}: {
+  projectId: string;
+  project: ProjectRow;
+  output: LocalOutput | null;
+  scenes: LocalScene[];
+  prompts: LocalPrompt[];
+  thumbs: string[];
+}) {
+  const qc = useQueryClient();
+  const regenScenesFn = useServerFn(generateScenesFromScript);
+
+  // ---- Script ----
+  const [editScript, setEditScript] = useState(false);
+  const [scriptDraft, setScriptDraft] = useState(output?.script ?? "");
+  const [scriptDirty, setScriptDirty] = useState(false);
+  const [regenBusy, setRegenBusy] = useState(false);
+  useEffect(() => { setScriptDraft(output?.script ?? ""); setScriptDirty(false); }, [output?.script]);
+
+  async function saveScript() {
+    await saveOutput(projectId, { script: scriptDraft });
+    qc.invalidateQueries({ queryKey: ["project", projectId] });
+    toast.success("Script saved");
+    setEditScript(false);
+    setScriptDirty(false);
+  }
+
+  async function regenFromScript() {
+    if (!scriptDraft.trim()) return toast.error("Script is empty");
+    setRegenBusy(true);
+    try {
+      const styleLabel = getStyle(project.style ?? "cinematic").label;
+      const res = await regenScenesFn({
+        data: {
+          script: scriptDraft,
+          topic: project.topic ?? project.title ?? "",
+          tone: project.tone ?? "Viral",
+          platform: project.platform ?? "instagram",
+          styleLabel,
+          contentType: project.content_type ?? "short_reel",
+        },
+      });
+      const newScenes: LocalScene[] = res.scenes.map((s) => ({
+        n: s.n,
+        visual: s.visual,
+        voiceover: s.voiceover,
+        duration: s.duration,
+        on_screen_text: s.on_screen_text,
+      }));
+      await saveOutput(projectId, {
+        script: scriptDraft,
+        scenes: newScenes,
+        image_prompts: res.image_prompts,
+      });
+      qc.invalidateQueries({ queryKey: ["project", projectId] });
+      toast.success(`Regenerated ${newScenes.length} scenes + image prompts`);
+      setEditScript(false);
+      setScriptDirty(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Regenerate failed");
+    } finally {
+      setRegenBusy(false);
+    }
+  }
+
+  // ---- Scenes ----
+  const [editScenes, setEditScenes] = useState(false);
+  const [scenesDraft, setScenesDraft] = useState<LocalScene[]>(scenes);
+  useEffect(() => { setScenesDraft(scenes); }, [output?.updated_at]);
+
+  function updateScene(i: number, patch: Partial<LocalScene>) {
+    setScenesDraft((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  }
+  async function saveScenes() {
+    await saveOutput(projectId, { scenes: scenesDraft });
+    qc.invalidateQueries({ queryKey: ["project", projectId] });
+    toast.success("Scenes saved");
+    setEditScenes(false);
+  }
+
+  // ---- Prompts ----
+  const [editPrompts, setEditPrompts] = useState(false);
+  const [promptsDraft, setPromptsDraft] = useState<LocalPrompt[]>(prompts);
+  useEffect(() => { setPromptsDraft(prompts); }, [output?.updated_at]);
+  async function savePrompts() {
+    await saveOutput(projectId, { image_prompts: promptsDraft });
+    qc.invalidateQueries({ queryKey: ["project", projectId] });
+    toast.success("Image prompts saved");
+    setEditPrompts(false);
+  }
+
+  // ---- Captions & hashtags ----
+  const [editCaps, setEditCaps] = useState(false);
+  const [captionDraft, setCaptionDraft] = useState(output?.captions ?? "");
+  const [hashtagsDraft, setHashtagsDraft] = useState((output?.hashtags ?? []).join(" "));
+  useEffect(() => {
+    setCaptionDraft(output?.captions ?? "");
+    setHashtagsDraft((output?.hashtags ?? []).join(" "));
+  }, [output?.captions, output?.hashtags]);
+  async function saveCaps() {
+    const tags = hashtagsDraft.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean)
+      .map((t) => (t.startsWith("#") ? t : `#${t}`));
+    await saveOutput(projectId, { captions: captionDraft, hashtags: tags });
+    qc.invalidateQueries({ queryKey: ["project", projectId] });
+    toast.success("Captions & hashtags saved");
+    setEditCaps(false);
+  }
+
+  // ---- Thumbnails ----
+  const [editThumbs, setEditThumbs] = useState(false);
+  const [thumbsDraft, setThumbsDraft] = useState<string[]>(thumbs);
+  useEffect(() => { setThumbsDraft(thumbs); }, [output?.updated_at]);
+  async function saveThumbs() {
+    await saveOutput(projectId, { thumbnail_ideas: thumbsDraft.filter((t) => t.trim()) });
+    qc.invalidateQueries({ queryKey: ["project", projectId] });
+    toast.success("Thumbnail ideas saved");
+    setEditThumbs(false);
+  }
+
+  const EditToggle = ({ editing, onEdit, onCancel, onSave, saving }: {
+    editing: boolean; onEdit: () => void; onCancel: () => void; onSave: () => void; saving?: boolean;
+  }) => editing ? (
+    <div className="flex gap-2">
+      <button onClick={onCancel} className="text-xs rounded-lg glass px-3 py-1.5 hover:bg-white/5 flex items-center gap-1">
+        <X className="w-3 h-3" /> Cancel
+      </button>
+      <button onClick={onSave} disabled={saving} className="text-xs rounded-lg gradient-primary text-white px-3 py-1.5 flex items-center gap-1 disabled:opacity-60">
+        {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
+      </button>
+    </div>
+  ) : (
+    <button onClick={onEdit} className="text-xs rounded-lg glass px-3 py-1.5 hover:bg-white/5 flex items-center gap-1">
+      <Edit3 className="w-3 h-3" /> Edit
+    </button>
+  );
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-6">
+      {/* Script — full width */}
+      <div className="glass rounded-2xl p-6 lg:col-span-2">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-semibold flex items-center gap-2">
+            <FileText className="w-4 h-4 text-[color:var(--neon-purple)]" /> Full Script
+          </h2>
+          <EditToggle
+            editing={editScript}
+            onEdit={() => setEditScript(true)}
+            onCancel={() => { setScriptDraft(output?.script ?? ""); setEditScript(false); setScriptDirty(false); }}
+            onSave={saveScript}
+          />
+        </div>
+        {editScript ? (
+          <>
+            <textarea
+              value={scriptDraft}
+              onChange={(e) => { setScriptDraft(e.target.value); setScriptDirty(true); }}
+              rows={16}
+              className="mt-3 w-full rounded-lg bg-black/40 border border-border p-3 text-sm font-mono leading-relaxed focus:outline-none focus:border-[color:var(--neon-purple)]"
+              placeholder="Write or paste your full script here…"
+            />
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                onClick={regenFromScript}
+                disabled={regenBusy || !scriptDraft.trim()}
+                className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)] disabled:opacity-60"
+                title="Rebuild Scene Breakdown + Image Prompts from the edited script"
+              >
+                {regenBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                Regenerate scenes & image prompts from this script
+              </button>
+              {scriptDirty && <span className="text-xs text-muted-foreground">Unsaved changes</span>}
+            </div>
+          </>
+        ) : (
+          <pre className="mt-3 text-sm whitespace-pre-wrap text-muted-foreground font-mono leading-relaxed">
+            {output?.script || <span className="italic">No script yet.</span>}
+          </pre>
+        )}
+      </div>
+
+      {/* Scenes */}
+      <div className="glass rounded-2xl p-6">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-semibold flex items-center gap-2">
+            <Film className="w-4 h-4 text-[color:var(--neon-purple)]" /> Scene Breakdown
+          </h2>
+          <EditToggle
+            editing={editScenes}
+            onEdit={() => setEditScenes(true)}
+            onCancel={() => { setScenesDraft(scenes); setEditScenes(false); }}
+            onSave={saveScenes}
+          />
+        </div>
+        <div className="mt-3 space-y-3 max-h-[500px] overflow-y-auto">
+          {(editScenes ? scenesDraft : scenes).map((s, i) => (
+            <div key={s.n} className="border border-border/50 rounded-lg p-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="gradient-primary text-white px-2 py-0.5 rounded">Scene {s.n}</span>
+                {editScenes ? (
+                  <input
+                    value={s.duration}
+                    onChange={(e) => updateScene(i, { duration: e.target.value })}
+                    className="w-20 rounded bg-black/40 border border-border px-2 py-0.5 text-xs text-right"
+                  />
+                ) : (
+                  <span className="text-muted-foreground">{s.duration}</span>
+                )}
+              </div>
+              {editScenes ? (
+                <>
+                  <textarea
+                    value={s.visual}
+                    onChange={(e) => updateScene(i, { visual: e.target.value })}
+                    rows={2}
+                    className="mt-2 w-full rounded bg-black/40 border border-border p-2 text-sm"
+                    placeholder="Visual description"
+                  />
+                  <textarea
+                    value={s.voiceover}
+                    onChange={(e) => updateScene(i, { voiceover: e.target.value })}
+                    rows={2}
+                    className="mt-2 w-full rounded bg-black/40 border border-border p-2 text-xs"
+                    placeholder="🎙 Voiceover"
+                  />
+                  <input
+                    value={s.on_screen_text ?? ""}
+                    onChange={(e) => updateScene(i, { on_screen_text: e.target.value })}
+                    className="mt-2 w-full rounded bg-black/40 border border-border p-2 text-xs"
+                    placeholder="On-screen text (optional)"
+                  />
+                </>
+              ) : (
+                <>
+                  <div className="mt-2 text-sm">{s.visual}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">🎙 {s.voiceover}</div>
+                </>
+              )}
+            </div>
+          ))}
+          {!(editScenes ? scenesDraft : scenes).length && <div className="text-xs text-muted-foreground italic">No scenes yet.</div>}
+        </div>
+      </div>
+
+      {/* Image Prompts */}
+      <div className="glass rounded-2xl p-6">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-semibold flex items-center gap-2">
+            <Wand2 className="w-4 h-4 text-[color:var(--neon-purple)]" /> Image Prompts (B-roll)
+          </h2>
+          <EditToggle
+            editing={editPrompts}
+            onEdit={() => setEditPrompts(true)}
+            onCancel={() => { setPromptsDraft(prompts); setEditPrompts(false); }}
+            onSave={savePrompts}
+          />
+        </div>
+        <div className="mt-3 space-y-2 max-h-[500px] overflow-y-auto">
+          {(editPrompts ? promptsDraft : prompts).map((p, i) => (
+            <div key={p.n} className="border border-border/50 rounded-lg p-3 text-sm">
+              <div className="text-xs text-muted-foreground mb-1">Shot #{p.n} · {p.style}</div>
+              {editPrompts ? (
+                <textarea
+                  value={p.prompt}
+                  onChange={(e) => setPromptsDraft((prev) => prev.map((pp, idx) => idx === i ? { ...pp, prompt: e.target.value } : pp))}
+                  rows={3}
+                  className="w-full rounded bg-black/40 border border-border p-2 text-sm"
+                />
+              ) : (
+                p.prompt
+              )}
+            </div>
+          ))}
+          {!(editPrompts ? promptsDraft : prompts).length && <div className="text-xs text-muted-foreground italic">No image prompts yet.</div>}
+        </div>
+      </div>
+
+      {/* Captions & hashtags */}
+      <div className="glass rounded-2xl p-6">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-semibold flex items-center gap-2">
+            <Copy className="w-4 h-4 text-[color:var(--neon-purple)]" /> Captions & Hashtags
+          </h2>
+          <EditToggle
+            editing={editCaps}
+            onEdit={() => setEditCaps(true)}
+            onCancel={() => {
+              setCaptionDraft(output?.captions ?? "");
+              setHashtagsDraft((output?.hashtags ?? []).join(" "));
+              setEditCaps(false);
+            }}
+            onSave={saveCaps}
+          />
+        </div>
+        {editCaps ? (
+          <>
+            <textarea
+              value={captionDraft}
+              onChange={(e) => setCaptionDraft(e.target.value)}
+              rows={6}
+              className="mt-3 w-full rounded-lg bg-black/40 border border-border p-3 text-sm"
+              placeholder="Caption text"
+            />
+            <h3 className="mt-4 font-semibold text-sm">Hashtags</h3>
+            <textarea
+              value={hashtagsDraft}
+              onChange={(e) => setHashtagsDraft(e.target.value)}
+              rows={3}
+              className="mt-2 w-full rounded-lg bg-black/40 border border-border p-3 text-xs font-mono"
+              placeholder="#tag1 #tag2 #tag3 (space or comma separated)"
+            />
+          </>
+        ) : (
+          <>
+            <div className="mt-3 text-sm text-muted-foreground whitespace-pre-wrap max-h-64 overflow-y-auto">{output?.captions}</div>
+            <h3 className="mt-4 font-semibold text-sm">Hashtags</h3>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {(output?.hashtags ?? []).map((h) => (
+                <span key={h} className="text-xs glass px-2 py-1 rounded-full">{h}</span>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Thumbnails */}
+      <div className="glass rounded-2xl p-6 lg:col-span-2">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-semibold flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-[color:var(--neon-pink)]" /> Thumbnail Ideas
+          </h2>
+          <div className="flex items-center gap-2">
+            {editThumbs && (
+              <button
+                onClick={() => setThumbsDraft((t) => [...t, ""])}
+                className="text-xs rounded-lg glass px-3 py-1.5 hover:bg-white/5 flex items-center gap-1"
+              >
+                + Add
+              </button>
+            )}
+            <EditToggle
+              editing={editThumbs}
+              onEdit={() => setEditThumbs(true)}
+              onCancel={() => { setThumbsDraft(thumbs); setEditThumbs(false); }}
+              onSave={saveThumbs}
+            />
+          </div>
+        </div>
+        <div className="mt-3 grid md:grid-cols-2 gap-3">
+          {(editThumbs ? thumbsDraft : thumbs).map((t, i) => (
+            <div key={i} className="border border-border/50 rounded-lg p-4 text-sm">
+              <div className="text-xs text-[color:var(--neon-pink)] mb-1 flex items-center justify-between">
+                <span>Concept {i + 1}</span>
+                {editThumbs && (
+                  <button
+                    onClick={() => setThumbsDraft((arr) => arr.filter((_, idx) => idx !== i))}
+                    className="text-muted-foreground hover:text-white"
+                  ><X className="w-3 h-3" /></button>
+                )}
+              </div>
+              {editThumbs ? (
+                <textarea
+                  value={t}
+                  onChange={(e) => setThumbsDraft((arr) => arr.map((v, idx) => idx === i ? e.target.value : v))}
+                  rows={3}
+                  className="w-full rounded bg-black/40 border border-border p-2 text-sm"
+                />
+              ) : (
+                t
+              )}
+            </div>
+          ))}
+          {!(editThumbs ? thumbsDraft : thumbs).length && <div className="text-xs text-muted-foreground italic">No thumbnail ideas yet.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
