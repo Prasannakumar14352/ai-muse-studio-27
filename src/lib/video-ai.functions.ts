@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { parseStructuredJsonResponse } from "@/lib/video-json";
 
 export type AiVideoScene = {
   n: number;
@@ -21,6 +22,15 @@ export type AiVideoScript = {
   scenes: AiVideoScene[];
   caption: string;
   hashtags: string[];
+  debug_json?: AiJsonDebug;
+};
+
+export type AiJsonDebug = {
+  raw_responses: string[];
+  parse_errors: string[];
+  attempts: number;
+  used_repair: boolean;
+  used_fallback?: boolean;
 };
 
 const Input = z.object({
@@ -53,8 +63,9 @@ export const generateAiVideoScript = createServerFn({ method: "POST" })
 
     const sys = `You are a senior short-form video creative director. You write
 premium, high-retention social video scripts in the style of top viral creators
-(Apple-style commercials, cinematic, punchy). Return STRICT JSON — no prose,
-no markdown fences.`;
+(Apple-style commercials, cinematic, punchy). Return ONLY valid JSON. No
+markdown. No explanations. No code fences. Escape quotation marks inside all
+generated strings so the response parses with JSON.parse.`;
 
     const user = `Write a ${targetLen} ${data.platform} video for the topic below.
 
@@ -94,60 +105,27 @@ Also produce:
 - caption: platform caption with a hook line + payoff (2-4 sentences)
 - hashtags: 8-15 relevant hashtags, each starting with #
 
-Return JSON EXACTLY:
+Return ONLY this JSON object shape with no prose:
 {
-  "title": "...",
-  "reel_title": "...",
+  "title": "string",
+  "reel_title": "string",
   "length_sec": 34,
-  "style_note": "...",
-  "scenes": [ { ...fields above... } ],
-  "caption": "...",
-  "hashtags": ["#..."]
+  "style_note": "string",
+  "scenes": [
+    {
+      "n": 1,
+      "time_range": "0-3 sec",
+      "role": "Hook",
+      "voiceover": "string",
+      "on_screen_text": "string",
+      "visual": "string",
+      "image_prompt": "string",
+      "duration": "3s"
+    }
+  ],
+  "caption": "string",
+  "hashtags": ["#example"]
 }`;
-
-    let upstream: Response;
-    try {
-      upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: sys },
-            { role: "user", content: user },
-          ],
-          response_format: { type: "json_object" },
-          // Scale headroom with scene count so long videos aren't truncated
-          // (~350 tokens per scene + overhead).
-          max_tokens: Math.min(32000, 2000 + sceneCount * 400),
-        }),
-      });
-    } catch (e) {
-      throw new Error(`AI gateway unreachable: ${e instanceof Error ? e.message : String(e)}`);
-    }
-
-    if (!upstream.ok) {
-      const t = await upstream.text().catch(() => "");
-      throw new Error(`AI gateway ${upstream.status}: ${t || upstream.statusText}`);
-    }
-
-    const j = (await upstream.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const raw = j.choices?.[0]?.message?.content ?? "";
-    if (!raw) throw new Error("AI returned empty content");
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      const repaired = repairTruncatedJson(raw);
-      if (!repaired) throw new Error("AI response was not valid JSON");
-      parsed = repaired;
-    }
 
     const Schema = z.object({
       title: z.string(),
@@ -167,7 +145,68 @@ Return JSON EXACTLY:
       caption: z.string().optional().default(""),
       hashtags: z.array(z.string()).optional().default([]),
     });
-    const out = Schema.parse(parsed);
+
+    const rawResponses: string[] = [];
+    const parseErrors: string[] = [];
+    let usedRepair = false;
+    let out: z.infer<typeof Schema> | null = null;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      let raw = "";
+      try {
+        const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${key}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              { role: "system", content: sys },
+              { role: "user", content: user },
+            ],
+            response_format: { type: "json_object" },
+            max_tokens: Math.min(32000, 2000 + sceneCount * 400),
+          }),
+        });
+
+        if (!upstream.ok) {
+          const t = await upstream.text().catch(() => "");
+          throw new Error(`AI gateway ${upstream.status}: ${t || upstream.statusText}`);
+        }
+
+        const j = (await upstream.json()) as {
+          choices?: Array<{ message?: { content?: string } }>;
+        };
+        raw = j.choices?.[0]?.message?.content ?? "";
+        const parsed = parseStructuredJsonResponse(raw);
+        const checked = Schema.safeParse(parsed.value);
+        if (!checked.success) {
+          console.error(raw);
+          rawResponses.push(raw);
+          parseErrors.push(`Attempt ${attempt}: ${checked.error.message}`);
+          continue;
+        }
+        if (parsed.repaired) {
+          usedRepair = true;
+          rawResponses.push(raw);
+          parseErrors.push(`Attempt ${attempt}: ${parsed.note ?? "AI JSON response was repaired before parsing"}`);
+        }
+        out = checked.data;
+        break;
+      } catch (e) {
+        rawResponses.push(raw);
+        parseErrors.push(`Attempt ${attempt}: ${e instanceof Error ? e.message : String(e)}`);
+        if (attempt === 3 && raw) console.error(raw);
+      }
+    }
+
+    if (!out) {
+      out = buildFallbackVideoScript(data.topic, sceneCount, lenSec, ratio, data.styleLabel);
+      parseErrors.push("Used fallback script after 3 invalid JSON attempts");
+    }
+
     out.scenes = out.scenes.map((s, i) => ({ ...s, n: i + 1 }));
 
     // Enforce the requested target length. AI models frequently return fewer
@@ -192,6 +231,16 @@ Return JSON EXACTLY:
       out.length_sec = out.scenes.reduce((a, s) => a + parseSec(s.duration), 0);
     }
 
+    if (rawResponses.length > 0 || parseErrors.length > 0) {
+      out.debug_json = {
+        raw_responses: rawResponses.filter(Boolean),
+        parse_errors: parseErrors,
+        attempts: Math.min(3, Math.max(1, parseErrors.length)),
+        used_repair: usedRepair,
+        used_fallback: parseErrors.some((e) => e.includes("Used fallback")),
+      };
+    }
+
     return out;
   });
 
@@ -212,6 +261,7 @@ const FromScriptInput = z.object({
 export type ScenesFromScript = {
   scenes: AiVideoScene[];
   image_prompts: Array<{ n: number; prompt: string; style: string }>;
+  debug_json?: AiJsonDebug;
 };
 
 export const generateScenesFromScript = createServerFn({ method: "POST" })
@@ -229,7 +279,9 @@ export const generateScenesFromScript = createServerFn({ method: "POST" })
 
     const sys = `You are a senior short-form video creative director. Given a
 finished script, break it into a scene-by-scene shot list with rich AI image
-prompts. Return STRICT JSON — no prose, no markdown fences.`;
+prompts. Return ONLY valid JSON. No markdown. No explanations. No code fences.
+Escape quotation marks inside all generated strings so the response parses with
+JSON.parse.`;
 
     const user = `Break the following ${data.platform} script into ${sceneCount} scenes.
 The scenes MUST cover the entire script in order — do not drop or invent content.
@@ -256,37 +308,8 @@ For EACH scene produce:
   Describe subject, setting, lighting, framing. NO text overlays in the image.
 - duration: "Ns" integer seconds 2-8
 
-Return JSON EXACTLY:
-{ "scenes": [ { ...fields above... } ] }`;
-
-    const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: user },
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: Math.min(32000, 2000 + sceneCount * 400),
-      }),
-    });
-    if (!upstream.ok) {
-      const t = await upstream.text().catch(() => "");
-      throw new Error(`AI gateway ${upstream.status}: ${t || upstream.statusText}`);
-    }
-    const j = (await upstream.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = j.choices?.[0]?.message?.content ?? "";
-    if (!raw) throw new Error("AI returned empty content");
-
-    let parsed: unknown;
-    try { parsed = JSON.parse(raw); }
-    catch {
-      const repaired = repairTruncatedJson(raw);
-      if (!repaired) throw new Error("AI response was not valid JSON");
-      parsed = repaired;
-    }
+Return ONLY this JSON object shape with no prose:
+{ "scenes": [ { "n": 1, "time_range": "0-3 sec", "role": "Hook", "voiceover": "string", "on_screen_text": "string", "visual": "string", "image_prompt": "string", "duration": "3s" } ] }`;
 
     const Schema = z.object({
       scenes: z.array(z.object({
@@ -300,7 +323,61 @@ Return JSON EXACTLY:
         duration: z.string().optional().default("3s"),
       })),
     });
-    const out = Schema.parse(parsed);
+
+    const rawResponses: string[] = [];
+    const parseErrors: string[] = [];
+    let usedRepair = false;
+    let out: z.infer<typeof Schema> | null = null;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      let raw = "";
+      try {
+        const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              { role: "system", content: sys },
+              { role: "user", content: user },
+            ],
+            response_format: { type: "json_object" },
+            max_tokens: Math.min(32000, 2000 + sceneCount * 400),
+          }),
+        });
+        if (!upstream.ok) {
+          const t = await upstream.text().catch(() => "");
+          throw new Error(`AI gateway ${upstream.status}: ${t || upstream.statusText}`);
+        }
+        const j = (await upstream.json()) as { choices?: Array<{ message?: { content?: string } }> };
+        raw = j.choices?.[0]?.message?.content ?? "";
+        const parsed = parseStructuredJsonResponse(raw);
+        const checked = Schema.safeParse(parsed.value);
+        if (!checked.success) {
+          console.error(raw);
+          rawResponses.push(raw);
+          parseErrors.push(`Attempt ${attempt}: ${checked.error.message}`);
+          continue;
+        }
+        if (parsed.repaired) {
+          usedRepair = true;
+          rawResponses.push(raw);
+          parseErrors.push(`Attempt ${attempt}: ${parsed.note ?? "AI JSON response was repaired before parsing"}`);
+        }
+        out = checked.data;
+        break;
+      } catch (e) {
+        rawResponses.push(raw);
+        parseErrors.push(`Attempt ${attempt}: ${e instanceof Error ? e.message : String(e)}`);
+        if (attempt === 3 && raw) console.error(raw);
+      }
+    }
+
+    if (!out) {
+      out = { scenes: buildFallbackScenesFromScript(data.script, sceneCount, lenSec, ratio, data.styleLabel) };
+      parseErrors.push("Used fallback scenes after 3 invalid JSON attempts");
+    }
+
     const scenes = out.scenes.map((s, i) => ({ ...s, n: i + 1 }));
 
     const image_prompts = scenes.map((s) => ({
@@ -309,8 +386,17 @@ Return JSON EXACTLY:
       style: data.styleLabel,
     }));
 
-    return { scenes, image_prompts };
-    return { scenes, image_prompts };
+    return {
+      scenes,
+      image_prompts,
+      debug_json: rawResponses.length > 0 || parseErrors.length > 0 ? {
+        raw_responses: rawResponses.filter(Boolean),
+        parse_errors: parseErrors,
+        attempts: Math.min(3, Math.max(1, parseErrors.length)),
+        used_repair: usedRepair,
+        used_fallback: parseErrors.some((e) => e.includes("Used fallback")),
+      } : undefined,
+    };
   });
 
 // ---------------------------------------------------------------------------
