@@ -17,6 +17,10 @@ import {
   createJob, getJob, saveJob, saveShotBlob, loadShotObjectURL,
   type JobRecord, type ShotRecord,
 } from "@/lib/video-job-store";
+import {
+  directBeatPrompt, buildContinuityCard,
+  type ContinuityCard, type ShotType, type VDStyle,
+} from "@/lib/visual-director";
 
 // ---------- Beat expansion (documentary-style visual density) ----------
 //
