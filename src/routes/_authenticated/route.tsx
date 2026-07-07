@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_authenticated")({
       const done = (s: import("@supabase/supabase-js").Session | null) => {
         if (settled) return;
         settled = true;
-        sub.subscription.unsubscribe();
+        sub.data.subscription.unsubscribe();
         resolve(s);
       };
       const sub = supabase.auth.onAuthStateChange((event, s) => {
