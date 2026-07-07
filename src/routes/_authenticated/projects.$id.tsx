@@ -365,61 +365,15 @@ function ProjectView() {
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Script */}
-        <CollapsibleCard id={`sec:script:${project.id}`} title="Full Script" icon={<FileText className="w-4 h-4 text-[color:var(--neon-purple)]" />} className="lg:col-span-2">
-          <pre className="text-sm whitespace-pre-wrap text-muted-foreground font-mono leading-relaxed">{output?.script}</pre>
-        </CollapsibleCard>
+      <EditableSections
+        projectId={project.id}
+        project={project}
+        output={output}
+        scenes={scenes}
+        prompts={prompts}
+        thumbs={thumbs}
+      />
 
-        {/* Scenes */}
-        <CollapsibleCard id={`sec:scenes:${project.id}`} title="Scene Breakdown" icon={<Film className="w-4 h-4 text-[color:var(--neon-purple)]" />}>
-          <div className="space-y-3 max-h-[500px] overflow-y-auto">
-            {scenes.map((s) => (
-              <div key={s.n} className="border border-border/50 rounded-lg p-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="gradient-primary text-white px-2 py-0.5 rounded">Scene {s.n}</span>
-                  <span className="text-muted-foreground">{s.duration}</span>
-                </div>
-                <div className="mt-2 text-sm">{s.visual}</div>
-                <div className="mt-1 text-xs text-muted-foreground">🎙 {s.voiceover}</div>
-              </div>
-            ))}
-          </div>
-        </CollapsibleCard>
-
-        {/* Image prompts */}
-        <CollapsibleCard id={`sec:prompts:${project.id}`} title="Image Prompts (B-roll)" icon={<Wand2 className="w-4 h-4 text-[color:var(--neon-purple)]" />}>
-          <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {prompts.map((p) => (
-              <div key={p.n} className="border border-border/50 rounded-lg p-3 text-sm">
-                <div className="text-xs text-muted-foreground mb-1">Shot #{p.n} · {p.style}</div>
-                {p.prompt}
-              </div>
-            ))}
-          </div>
-        </CollapsibleCard>
-
-        {/* Captions & hashtags */}
-        <CollapsibleCard id={`sec:captions:${project.id}`} title="Captions & Hashtags" icon={<Copy className="w-4 h-4 text-[color:var(--neon-purple)]" />}>
-          <div className="text-sm text-muted-foreground whitespace-pre-wrap max-h-64 overflow-y-auto">{output?.captions}</div>
-          <h3 className="mt-4 font-semibold text-sm">Hashtags</h3>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {(output?.hashtags ?? []).map((h) => (
-              <span key={h} className="text-xs glass px-2 py-1 rounded-full">{h}</span>
-            ))}
-          </div>
-        </CollapsibleCard>
-
-        {/* Thumbnails */}
-        <CollapsibleCard id={`sec:thumbs:${project.id}`} title="Thumbnail Ideas" icon={<Sparkles className="w-4 h-4 text-[color:var(--neon-pink)]" />} className="lg:col-span-2">
-          <div className="grid md:grid-cols-2 gap-3">
-            {thumbs.map((t, i) => (
-              <div key={i} className="border border-border/50 rounded-lg p-4 text-sm">
-                <div className="text-xs text-[color:var(--neon-pink)] mb-1">Concept {i + 1}</div>
-                {t}
-              </div>
-            ))}
-          </div>
-        </CollapsibleCard>
-      </div>
 
       {project.content_type !== "carousel" && (
         <VideoPreview
