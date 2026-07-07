@@ -17,6 +17,11 @@ import {
   loadVideoObjectURL, loadThumbnailObjectURL,
   type LocalVideo,
 } from "@/lib/videoLocalStore";
+import {
+  saveGeneratedThumbnail, getGeneratedThumbnails, deleteGeneratedThumbnail,
+  loadThumbnailImageURL,
+  type LocalThumbnail,
+} from "@/lib/thumbnailLocalStore";
 import style3d from "@/assets/style-3d.jpg";
 import styleGhibli from "@/assets/style-ghibli.jpg";
 import styleAnime from "@/assets/style-anime.jpg";
