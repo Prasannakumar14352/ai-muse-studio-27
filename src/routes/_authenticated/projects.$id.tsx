@@ -363,8 +363,6 @@ function ProjectView() {
         <BrandPrompt projectId={project.id} platform={project.platform ?? "instagram"} />
       )}
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Script */}
       <EditableSections
         projectId={project.id}
         project={project}
@@ -373,6 +371,8 @@ function ProjectView() {
         prompts={prompts}
         thumbs={thumbs}
       />
+
+
 
 
       {project.content_type !== "carousel" && (
