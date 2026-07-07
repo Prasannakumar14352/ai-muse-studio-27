@@ -485,6 +485,10 @@ export const RenderAgent = {
     };
   },
 };
+
+// ---------- Voiceover (real TTS per scene, continuous narration) ----------
+
+async function fetchSceneAudio(text: string, voice: VoiceId, ctx: AudioContext): Promise<{ blobUrl: string; buffer: AudioBuffer } | null> {
   try {
     const res = await fetch("/api/tts", {
       method: "POST",
