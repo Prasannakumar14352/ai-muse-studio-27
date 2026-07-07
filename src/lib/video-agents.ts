@@ -209,6 +209,7 @@ export const ScriptAgent = {
         logScriptJsonDebug(script);
         return script;
       } catch (error) {
+        if (isHardAiFailure(error)) throw error;
         console.error("Script generation failed. Retrying...", error);
         onRetry?.(attempt, error);
         if (attempt < 3) await wait(700 * attempt);
@@ -477,6 +478,11 @@ function logScriptJsonDebug(script: AiVideoScript) {
     console.error(`[Script Agent raw AI response ${i + 1}]`, raw);
   });
   debug.parse_errors.forEach((error) => console.error("[Script Agent JSON validation]", error));
+}
+
+function isHardAiFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("AI gateway 402") || message.includes("AI gateway 429") || message.includes("Unauthorized") || message.includes("Missing LOVABLE_API_KEY");
 }
 
 function vtt(sec: number): string {

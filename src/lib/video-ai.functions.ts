@@ -154,6 +154,7 @@ Return ONLY this JSON object shape with no prose:
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       let raw = "";
+      let receivedAiResponse = false;
       try {
         const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
@@ -181,6 +182,7 @@ Return ONLY this JSON object shape with no prose:
           choices?: Array<{ message?: { content?: string } }>;
         };
         raw = j.choices?.[0]?.message?.content ?? "";
+        receivedAiResponse = true;
         const parsed = parseStructuredJsonResponse(raw);
         const checked = Schema.safeParse(parsed.value);
         if (!checked.success) {
@@ -197,6 +199,7 @@ Return ONLY this JSON object shape with no prose:
         out = checked.data;
         break;
       } catch (e) {
+        if (!receivedAiResponse) throw e;
         rawResponses.push(raw);
         parseErrors.push(`Attempt ${attempt}: ${e instanceof Error ? e.message : String(e)}`);
         if (attempt === 3 && raw) console.error(raw);
@@ -335,6 +338,7 @@ Return ONLY this JSON object shape with no prose:
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       let raw = "";
+      let receivedAiResponse = false;
       try {
         const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
@@ -355,6 +359,7 @@ Return ONLY this JSON object shape with no prose:
         }
         const j = (await upstream.json()) as { choices?: Array<{ message?: { content?: string } }> };
         raw = j.choices?.[0]?.message?.content ?? "";
+        receivedAiResponse = true;
         const parsed = parseStructuredJsonResponse(raw);
         const checked = Schema.safeParse(parsed.value);
         if (!checked.success) {
@@ -371,6 +376,7 @@ Return ONLY this JSON object shape with no prose:
         out = checked.data;
         break;
       } catch (e) {
+        if (!receivedAiResponse) throw e;
         rawResponses.push(raw);
         parseErrors.push(`Attempt ${attempt}: ${e instanceof Error ? e.message : String(e)}`);
         if (attempt === 3 && raw) console.error(raw);
