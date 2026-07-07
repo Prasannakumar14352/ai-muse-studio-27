@@ -1,17 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
   Wand2, Youtube, Play, RefreshCw, Send, Check, Trash2, Clock, Plus, Video,
+  X, RotateCw,
 } from "lucide-react";
 import {
-  runVideoPipeline,
+  runVideoJobPipeline, retryFailedShots,
   PIPELINE_STEPS,
   VIDEO_TYPES, DURATIONS, VOICES, ASPECT_RATIOS,
   type VideoBrief, type VideoType, type DurationSec, type StyleId, type VoiceId, type AspectRatio,
-  type StepStatus, type PipelineResult,
+  type StepStatus, type PipelineResult, type JobEvent, type JobPhaseId, type ShotProgress,
 } from "@/lib/video-agents";
+import {
+  listJobs, deleteJob as deleteJobRec, loadShotObjectURL,
+  type JobRecord,
+} from "@/lib/video-job-store";
 import {
   saveGeneratedVideo, getGeneratedVideos, deleteGeneratedVideo,
   loadVideoObjectURL, loadThumbnailObjectURL,
