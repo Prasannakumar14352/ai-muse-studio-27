@@ -391,6 +391,28 @@ async function fetchSceneImage(prompt: string, style: StyleId, ratio: AspectRati
   }
 }
 
+/** Try to generate a short AI video clip for a beat. Returns null on any failure. */
+async function fetchBeatClip(prompt: string, style: StyleId, ratio: AspectRatio, duration: number): Promise<string | null> {
+  try {
+    const res = await fetch("/api/generate-video-clip", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: `${STYLE_DESCRIPTOR[style]}. ${prompt}`,
+        style: STYLE_LABEL[style],
+        ratio,
+        duration,
+      }),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { ok?: boolean; clip?: string };
+    if (!json.ok || !json.clip) return null;
+    return json.clip;
+  } catch {
+    return null;
+  }
+}
+
 export const VisualGenerationAgent = {
   async run(
     brief: VideoBrief,
@@ -402,6 +424,13 @@ export const VisualGenerationAgent = {
     onProgress?.(0, total);
     const results = await Promise.all(
       beats.map(async (b, i) => {
+        // Try AI video clip first; fall back to still image on any failure.
+        const clip = await fetchBeatClip(b.imagePrompt, brief.style, brief.aspectRatio, TARGET_BEAT_SEC);
+        if (clip) {
+          done += 1;
+          onProgress?.(done, total);
+          return { n: i + 1, kind: "clip" as const, url: clip, duration_sec: TARGET_BEAT_SEC, generated: true };
+        }
         const url = await fetchSceneImage(b.imagePrompt, brief.style, brief.aspectRatio);
         done += 1;
         onProgress?.(done, total);
