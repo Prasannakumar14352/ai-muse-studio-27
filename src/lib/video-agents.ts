@@ -1468,8 +1468,8 @@ function beatsFromShots(job: JobRecord, style: StyleId): Beat[] {
   } as unknown as Beat));
 }
 
-function planShots(script: AiVideoScript, style: StyleId): ShotRecord[] {
-  const beats = expandScriptToBeats(script, style);
+function planShots(script: AiVideoScript, style: StyleId, title: string): ShotRecord[] {
+  const beats = expandScriptToBeats(script, style, title);
   return beats.map<ShotRecord>((b, i) => ({
     id: `s${i + 1}`,
     index: i,
