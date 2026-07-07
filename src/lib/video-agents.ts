@@ -1680,7 +1680,7 @@ export async function runVideoJobPipeline(
   onEvent({ type: "phase", phase: "complete" });
 
   const result: PipelineResult = {
-    brief, research, titles, hook, intro, curiosity, script, retention, chapters,
+    brief, research, retentionEngine, titles, hook, intro, curiosity, script, retention, chapters,
     storyboard, direction, visuals, voiceover, subtitles, music, sfx, timeline,
     render, thumbnail, seo,
   };
