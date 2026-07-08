@@ -896,70 +896,40 @@ function mapStyleForRenderer(id: StyleId): string {
   return map[id];
 }
 
-// ---------- Thumbnail (real AI-generated 16:9) ----------
+// ---------- Thumbnail (layered, high-CTR via Thumbnail Director) ----------
+//
+// Uses the Thumbnail Director's concept planner so the video pipeline emits the
+// same 4-concept high-CTR structure (Fear / Curiosity / Documentary / Minimal)
+// as the standalone Thumbnails page. Text is generated automatically but NOT
+// baked into the image — downstream UI overlays it via HTML/CSS so it stays
+// perfectly spelled and editable.
+
+import { planThumbnails } from "@/lib/thumbnail-director";
 
 export const ThumbnailAgent = {
   async run(brief: VideoBrief): Promise<ThumbnailResult> {
-    // MrBeast / Ryan Trahan / Ruddy Rose / Colin & Samir school of thumbnail design:
-    // maximum contrast, one clear emotional focal point, saturated colors, giant
-    // object or shocked expressive face, extreme rim lighting, cinematic depth,
-    // massive negative space on ONE side for the headline the user will slap on.
-    // We deliberately ask the model NOT to render text — it almost always butchers it.
-    const styleDesc = STYLE_DESCRIPTOR[brief.style];
     const topic = brief.title;
-
-    const concepts: Array<{ concept: string; headline: string; promptExtra: string }> = [
-      {
-        concept: "Shocked reaction hero",
-        headline: topic.toUpperCase().slice(0, 40),
-        promptExtra:
-          `Extreme close-up of a single expressive human face reacting in pure shock and awe — wide eyes, mouth slightly open, ` +
-          `dramatic key light from one side, colored rim light (neon pink or cyan) on the other. Face fills 40% of the frame on the LEFT third. ` +
-          `Right two thirds: bold, out-of-focus scene illustrating "${topic}" with heavy bokeh and saturated colors. ` +
-          `Extreme contrast, glossy magazine finish, MrBeast-tier CTR composition.`,
-      },
-      {
-        concept: "Giant object vs tiny human",
-        headline: topic.toUpperCase().slice(0, 40),
-        promptExtra:
-          `A giant hero object symbolizing "${topic}" dominating the center of the frame, dwarfing a small human silhouette in the foreground for scale. ` +
-          `Golden-hour cinematic lighting, volumetric god rays, saturated teal-and-orange color grade, ultra-detailed textures, ` +
-          `heavy atmospheric haze for depth. Wide 16:9 composition with a clean sky area on the top-left for a headline. ` +
-          `Ryan Trahan / Johnny Harris documentary poster energy.`,
-      },
-      {
-        concept: "High-contrast split scene",
-        headline: topic.toUpperCase().slice(0, 40),
-        promptExtra:
-          `A split-scene composition: left half depicts the "before" of "${topic}" in cold desaturated blue tones, ` +
-          `right half depicts the dramatic "after" in warm saturated red/orange tones. A single hero element bridges both halves in the center. ` +
-          `Insanely sharp, high dynamic range, cinematic, Vox / ColdFusion / MagnatesMedia thumbnail energy. ` +
-          `Vignette darkened corners so the eye locks on the center.`,
-      },
-    ];
+    const plan = planThumbnails(topic);
 
     const results = await Promise.all(
-      concepts.map(async (c) => {
-        const prompt =
-          `Ultra high-CTR YouTube thumbnail, 1280x720, ${styleDesc}. ` +
-          `${c.promptExtra} ` +
-          `Absolutely no text, no letters, no numbers, no watermarks, no logos in the image. ` +
-          `Photorealistic quality, poster-grade composition, maximum click-through appeal.`;
-        const url = await fetchSceneImage(prompt, brief.style, "16:9");
+      plan.concepts.map(async (c) => {
+        // Background-only image (opaque). Deliberately NO text and clear
+        // negative space so the client can composite the subject + HTML text.
+        const url = await fetchSceneImage(c.backgroundPrompt, brief.style, "16:9");
         if (url) {
           return {
             url,
-            alt: `${topic} — ${c.concept}`,
+            alt: `${topic} — ${c.label}`,
             headline: c.headline,
-            concept: c.concept,
+            concept: c.label,
             generated: true,
           };
         }
         return {
           url: placeholderImage("16:9", topic),
-          alt: `${topic} — ${c.concept}`,
+          alt: `${topic} — ${c.label}`,
           headline: c.headline,
-          concept: c.concept,
+          concept: c.label,
           generated: false,
         };
       }),
