@@ -121,8 +121,9 @@ export const Route = createFileRoute("/api/generate-image")({
             debug: {
               model: "openai/gpt-image-2",
               size,
-              quality: "low",
+              quality: chosenQuality,
               n: 1,
+              background: background === "transparent" ? "transparent" : "opaque",
               fullPrompt,
               originalPrompt: prompt,
               stylePrefix: stylePrefix || null,
