@@ -153,7 +153,7 @@ function CarouselsPage() {
         const res = await fetch("/api/generate-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: prompt.prompt, style: styleLabel, ratio }),
+          body: JSON.stringify({ prompt: prompt.prompt, style: styleLabel, ratio, quality: "high" }),
         });
         const j = (await res.json().catch(() => ({}))) as { image?: string; error?: string };
         if (!res.ok || !j.image) {
