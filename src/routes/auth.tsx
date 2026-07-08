@@ -2,7 +2,7 @@ import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Mail, Lock, User, Loader2 } from "lucide-react";
+import { Sparkles, Mail, Lock, User, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { getAuthCallbackUrl, redirectToSafePath } from "@/lib/auth-redirect";
 
@@ -24,16 +24,63 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
+  // Initial session check + handle OAuth redirects that land here directly
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) redirectToSafePath(next);
-    });
+    let cancelled = false;
+
+    async function init() {
+      try {
+        const href = window.location.href;
+        const url = new URL(href);
+        const hasCode = url.searchParams.has("code");
+        const hasHashToken = window.location.hash.includes("access_token");
+        const errParam = url.searchParams.get("error_description") || url.searchParams.get("error");
+
+        if (errParam) {
+          if (!cancelled) {
+            setAuthError(decodeURIComponent(errParam));
+            setInitializing(false);
+          }
+          return;
+        }
+
+        if (hasCode) {
+          const { error } = await supabase.auth.exchangeCodeForSession(href);
+          if (error) {
+            const { data } = await supabase.auth.getSession();
+            if (!data.session) throw error;
+          }
+        } else if (hasHashToken) {
+          // Let detectSessionInUrl parse the hash
+          await new Promise((r) => setTimeout(r, 150));
+        }
+
+        const { data } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (data.session) {
+          redirectToSafePath(next);
+          return;
+        }
+        setInitializing(false);
+      } catch (err) {
+        if (!cancelled) {
+          setAuthError(err instanceof Error ? err.message : "Sign-in failed");
+          setInitializing(false);
+        }
+      }
+    }
+
+    init();
+    return () => { cancelled = true; };
   }, [next]);
 
   async function handleEmail(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setAuthError(null);
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
@@ -52,7 +99,9 @@ function AuthPage() {
         redirectToSafePath(next);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setAuthError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -60,21 +109,36 @@ function AuthPage() {
 
   async function handleGoogle() {
     setLoading(true);
+    setAuthError(null);
     const redirectTo = getAuthCallbackUrl(next);
-    console.info("[auth] google oauth start", { origin: window.location.origin, redirectTo });
 
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo },
+        options: {
+          redirectTo,
+          queryParams: { prompt: "select_account", access_type: "offline" },
+        },
       });
       if (error) throw error;
       if (data?.url) window.location.href = data.url;
     } catch (err) {
-      console.error("[auth] google oauth failed", err);
-      toast.error(err instanceof Error ? err.message : "Google sign-in failed");
+      const msg = err instanceof Error ? err.message : "Google sign-in failed";
+      setAuthError(msg);
+      toast.error(msg);
       setLoading(false);
     }
+  }
+
+  if (initializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 py-12">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-6 w-6 animate-spin text-[color:var(--neon-purple)]" />
+          <p className="mt-3 text-sm text-muted-foreground">Loading…</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -94,6 +158,13 @@ function AuthPage() {
           <p className="text-center text-sm text-muted-foreground mt-1">
             {mode === "signin" ? "Sign in to keep creating" : "Free forever plan included"}
           </p>
+
+          {authError && (
+            <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{authError}</span>
+            </div>
+          )}
 
           <button onClick={handleGoogle} disabled={loading}
             className="mt-6 w-full flex items-center justify-center gap-3 rounded-lg bg-white text-slate-900 py-2.5 text-sm font-medium hover:bg-white/90 disabled:opacity-60">

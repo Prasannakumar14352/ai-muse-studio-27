@@ -31,12 +31,19 @@ function AuthCallbackPage() {
           throw new Error(search.error_description || search.error);
         }
 
-        if (search.code) {
-          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(search.code);
+        const href = window.location.href;
+        const hasCode = search.code || new URL(href).searchParams.get("code");
+        const hasHashToken = window.location.hash.includes("access_token");
+
+        if (hasCode) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(href);
           if (exchangeError) {
             const { data } = await supabase.auth.getSession();
             if (!data.session) throw exchangeError;
           }
+        } else if (!hasHashToken) {
+          // Wait briefly for detectSessionInUrl to finish
+          await new Promise((r) => setTimeout(r, 100));
         }
 
         const { data, error: sessionError } = await supabase.auth.getSession();
