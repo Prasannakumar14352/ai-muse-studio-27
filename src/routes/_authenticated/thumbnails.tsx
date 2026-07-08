@@ -313,7 +313,7 @@ function ThumbnailsPage() {
                       <span className={l.visible ? "text-white" : ""}>{l.label}</span>
                     </button>
                     {(l.key === "background" || l.key === "subject" || l.key === "secondary") && selectedRender && (
-                      <button onClick={() => regenerate(selectedConcept, l.key)} disabled={busyConcept !== null}
+                      <button onClick={() => regenerate(selectedConcept, l.key as "background" | "subject" | "secondary")} disabled={busyConcept !== null}
                         className="text-[10px] text-muted-foreground hover:text-white flex items-center gap-1 disabled:opacity-40">
                         <RefreshCw className="w-3 h-3" /> re-gen
                       </button>
