@@ -226,20 +226,36 @@ const CAMERA_MOVE_PHRASES: Record<CameraMove, string> = {
 };
 
 export type ContinuityCard = {
+  /** Short subject name, e.g. "the last human employee". */
   subjectAnchor: string;
+  /** Locked physical description (age, hair, build, distinguishing features). */
+  characterSheet: string;
   wardrobeAnchor: string;
   locationAnchor: string;
 };
 
-/** Extracts a lightweight continuity card from the video title so recurring
- * subjects (a character, product, or place) stay visually consistent. */
+/**
+ * Extracts a lightweight continuity card so a recurring subject (character,
+ * product, or place) stays visually consistent across every generated shot.
+ * The character sheet is deliberately specific so the image model locks onto
+ * the same face/wardrobe rather than reinventing the subject each beat.
+ */
 export function buildContinuityCard(title: string, hint?: string): ContinuityCard {
   const t = (title || "").trim();
   const subject = t.length > 0 ? t : (hint || "the central subject");
+  const characterSheet = hint && hint.length > 20
+    ? hint
+    : `one specific protagonist — early 30s, warm brown eyes, short dark hair, ` +
+      `neutral navy jacket over a plain grey tee, medium athletic build, ` +
+      `clean-shaven, small scar above right eyebrow. This exact same person ` +
+      `must appear in every shot with identical face, identical wardrobe, ` +
+      `identical hairstyle. Do not swap the character. Do not add extra people ` +
+      `unless the beat text explicitly requires them.`;
   return {
     subjectAnchor: subject,
-    wardrobeAnchor: "consistent wardrobe and hairstyle across every shot",
-    locationAnchor: "consistent architecture and set design across every shot",
+    characterSheet,
+    wardrobeAnchor: "identical wardrobe, identical hairstyle, identical face across every shot",
+    locationAnchor: "consistent architecture, props, and set design across every shot",
   };
 }
 
