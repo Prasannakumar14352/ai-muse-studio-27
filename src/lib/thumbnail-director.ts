@@ -175,7 +175,7 @@ export const THUMBNAIL_STYLE_PRESETS: ThumbnailStylePreset[] = [
     "Mystery, chiaroscuro, deep negative space, single red accent",
   ),
   stylePreset(
-    "netflix", "Netflix", "cinematic", "hero_face" as CompositionArchetype ?? "shocked_hero_face", "urgency",
+    "netflix", "Netflix", "cinematic", "shocked_hero_face", "urgency",
     { primary: "#E50914", accent: WHITE, vignette: 0.6, contrast: 0.9, saturation: 0.75,
       overlay: "linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.7) 100%)" },
     { color: WHITE, outline: "#E50914", glow: "rgba(229,9,20,0.55)", fontWeight: 900, italic: false, fontFamily: "Bebas", transform: "uppercase" },
