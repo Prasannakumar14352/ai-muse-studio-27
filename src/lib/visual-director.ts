@@ -226,20 +226,36 @@ const CAMERA_MOVE_PHRASES: Record<CameraMove, string> = {
 };
 
 export type ContinuityCard = {
+  /** Short subject name, e.g. "the last human employee". */
   subjectAnchor: string;
+  /** Locked physical description (age, hair, build, distinguishing features). */
+  characterSheet: string;
   wardrobeAnchor: string;
   locationAnchor: string;
 };
 
-/** Extracts a lightweight continuity card from the video title so recurring
- * subjects (a character, product, or place) stay visually consistent. */
+/**
+ * Extracts a lightweight continuity card so a recurring subject (character,
+ * product, or place) stays visually consistent across every generated shot.
+ * The character sheet is deliberately specific so the image model locks onto
+ * the same face/wardrobe rather than reinventing the subject each beat.
+ */
 export function buildContinuityCard(title: string, hint?: string): ContinuityCard {
   const t = (title || "").trim();
   const subject = t.length > 0 ? t : (hint || "the central subject");
+  const characterSheet = hint && hint.length > 20
+    ? hint
+    : `one specific protagonist — early 30s, warm brown eyes, short dark hair, ` +
+      `neutral navy jacket over a plain grey tee, medium athletic build, ` +
+      `clean-shaven, small scar above right eyebrow. This exact same person ` +
+      `must appear in every shot with identical face, identical wardrobe, ` +
+      `identical hairstyle. Do not swap the character. Do not add extra people ` +
+      `unless the beat text explicitly requires them.`;
   return {
     subjectAnchor: subject,
-    wardrobeAnchor: "consistent wardrobe and hairstyle across every shot",
-    locationAnchor: "consistent architecture and set design across every shot",
+    characterSheet,
+    wardrobeAnchor: "identical wardrobe, identical hairstyle, identical face across every shot",
+    locationAnchor: "consistent architecture, props, and set design across every shot",
   };
 }
 
@@ -324,11 +340,16 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
 
   const sceneCtx = (input.sceneContext ?? "").trim();
   const beat = input.beatText.trim().replace(/\s+/g, " ");
-  const subject = input.continuity.subjectAnchor;
+  void input.continuity.subjectAnchor;
 
   const parts: string[] = [];
+  // Character lock FIRST so the model reads it before anything else.
+  parts.push(
+    `LOCKED CHARACTER SHEET (must match exactly in every image): ` +
+    `${input.continuity.characterSheet}`,
+  );
   parts.push(`${SHOT_TYPE_PHRASES[shotType]} — ${CAMERA_MOVE_PHRASES[cameraMove]}`);
-  parts.push(`Subject: ${subject}, visualizing "${beat}"`);
+  parts.push(`Subject: the SAME locked character above, visualizing "${beat}"`);
   if (sceneCtx) parts.push(`Environment: ${sceneCtx}`);
   parts.push(`Time of day: ${mood.timeOfDay}. Atmosphere: ${mood.weather}`);
   parts.push(`Camera: ${preset.camera}, ${preset.lens} at ${preset.aperture}`);
@@ -336,13 +357,18 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
   parts.push(`Color grade: ${preset.colorGrade}`);
   parts.push(`Look: ${preset.look}`);
   if (preset.extras.length) parts.push(preset.extras.join(", "));
-  parts.push(`Continuity: ${input.continuity.wardrobeAnchor}; ${input.continuity.locationAnchor}`);
+  parts.push(
+    `Continuity RULES: ${input.continuity.wardrobeAnchor}; ` +
+    `${input.continuity.locationAnchor}. ` +
+    `The protagonist's face, hairstyle, and outfit MUST be identical to previous shots — ` +
+    `do not redesign the character.`,
+  );
   if (input.emotion) parts.push(`Emotion: ${input.emotion}`);
   if (input.scenePurpose) parts.push(`Scene purpose: ${input.scenePurpose}`);
   if (input.chapterLabel) parts.push(`Chapter: ${input.chapterLabel}`);
   if (input.sceneNumber != null) parts.push(`Scene ${input.sceneNumber}`);
   parts.push("ultra realistic, HDR, 8K, highly detailed, sharp focus, professional photography");
-  parts.push(`Avoid: ${negativePrompt}`);
+  parts.push(`Avoid: ${negativePrompt}, different person, changed face, new character, wardrobe change, hairstyle change`);
 
   const prompt = optimizePrompt(parts.join(". "), input.styleId);
 
