@@ -340,7 +340,7 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
 
   const sceneCtx = (input.sceneContext ?? "").trim();
   const beat = input.beatText.trim().replace(/\s+/g, " ");
-  const subject = input.continuity.subjectAnchor;
+  void input.continuity.subjectAnchor;
 
   const parts: string[] = [];
   // Character lock FIRST so the model reads it before anything else.
