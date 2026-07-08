@@ -6,10 +6,14 @@ export const Route = createFileRoute("/api/generate-image")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { prompt, style, ratio } = (await request.json()) as {
+        const { prompt, style, ratio, background, quality } = (await request.json()) as {
           prompt: string;
           style?: string;
           ratio?: string;
+          /** "transparent" produces a subject on a transparent PNG (great for thumbnail layer compositing). */
+          background?: "transparent" | "opaque";
+          /** "low" | "medium" | "high" — thumbnails default to "medium". */
+          quality?: "low" | "medium" | "high";
         };
 
         const key = process.env.LOVABLE_API_KEY;
@@ -36,6 +40,24 @@ export const Route = createFileRoute("/api/generate-image")({
 
         const stylePrefix = style ? `${style} style. ` : "";
         const fullPrompt = `${stylePrefix}${prompt}`;
+        const chosenQuality = quality ?? "low";
+
+        type ImageReqBody = {
+          model: string;
+          prompt: string;
+          size: string;
+          quality: string;
+          n: number;
+          background?: "transparent" | "opaque";
+        };
+        const body: ImageReqBody = {
+          model: "openai/gpt-image-2",
+          prompt: fullPrompt,
+          size,
+          quality: chosenQuality,
+          n: 1,
+        };
+        if (background === "transparent") body.background = "transparent";
 
         let upstream: Response;
         try {
@@ -47,13 +69,7 @@ export const Route = createFileRoute("/api/generate-image")({
                 Authorization: `Bearer ${key}`,
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({
-                model: "openai/gpt-image-2",
-                prompt: fullPrompt,
-                size,
-                quality: "low",
-                n: 1,
-              }),
+              body: JSON.stringify(body),
             }
           );
         } catch (error) {
