@@ -17,6 +17,7 @@ const BASE_NAV = [
   { to: "/videos", label: "Videos", icon: Film },
   { to: "/carousels", label: "Carousels", icon: Layers },
   { to: "/images", label: "Images", icon: ImageIcon },
+  { to: "/thumbnails", label: "Thumbnails", icon: Sparkles },
   { to: "/captions", label: "Captions", icon: Type },
   { to: "/pricing", label: "Pricing", icon: CreditCard },
   { to: "/billing", label: "Billing", icon: Wallet },
