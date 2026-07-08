@@ -131,6 +131,29 @@ function AuthPage() {
     }
   }
 
+  async function handleLovable(provider: "google" | "apple") {
+    setLoading(true);
+    setAuthError(null);
+    try {
+      // Lovable-managed OAuth: return to the app origin, then bounce to `next`.
+      const safeNext = getSafeAuthRedirect(next);
+      const result = await lovable.auth.signInWithOAuth(provider, {
+        redirect_uri: window.location.origin,
+        extraParams: provider === "google" ? { prompt: "select_account" } : {},
+      });
+      if (result.error) throw result.error;
+      if (result.redirected) return; // full-page redirect
+      // Popup flow: session already set by the SDK
+      toast.success("Signed in");
+      window.location.replace(safeNext);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : `${provider} sign-in failed`;
+      setAuthError(msg);
+      toast.error(msg);
+      setLoading(false);
+    }
+  }
+
   if (initializing) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 py-12">
