@@ -18,6 +18,7 @@ import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiGenerateVideoClipRouteImport } from './routes/api/generate-video-clip'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as AuthenticatedVideosRouteImport } from './routes/_authenticated/videos'
+import { Route as AuthenticatedThumbnailsRouteImport } from './routes/_authenticated/thumbnails'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedPricingRouteImport } from './routes/_authenticated/pricing'
 import { Route as AuthenticatedInvoicesRouteImport } from './routes/_authenticated/invoices'
@@ -75,6 +76,11 @@ const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
 const AuthenticatedVideosRoute = AuthenticatedVideosRouteImport.update({
   id: '/videos',
   path: '/videos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedThumbnailsRoute = AuthenticatedThumbnailsRouteImport.update({
+  id: '/thumbnails',
+  path: '/thumbnails',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
@@ -166,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/invoices': typeof AuthenticatedInvoicesRoute
   '/pricing': typeof AuthenticatedPricingRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
@@ -190,6 +197,7 @@ export interface FileRoutesByTo {
   '/invoices': typeof AuthenticatedInvoicesRoute
   '/pricing': typeof AuthenticatedPricingRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
@@ -216,6 +224,7 @@ export interface FileRoutesById {
   '/_authenticated/invoices': typeof AuthenticatedInvoicesRoute
   '/_authenticated/pricing': typeof AuthenticatedPricingRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/_authenticated/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
@@ -242,6 +251,7 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/pricing'
     | '/settings'
+    | '/thumbnails'
     | '/videos'
     | '/api/generate-image'
     | '/api/generate-video-clip'
@@ -266,6 +276,7 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/pricing'
     | '/settings'
+    | '/thumbnails'
     | '/videos'
     | '/api/generate-image'
     | '/api/generate-video-clip'
@@ -291,6 +302,7 @@ export interface FileRouteTypes {
     | '/_authenticated/invoices'
     | '/_authenticated/pricing'
     | '/_authenticated/settings'
+    | '/_authenticated/thumbnails'
     | '/_authenticated/videos'
     | '/api/generate-image'
     | '/api/generate-video-clip'
@@ -376,6 +388,13 @@ declare module '@tanstack/react-router' {
       path: '/videos'
       fullPath: '/videos'
       preLoaderRoute: typeof AuthenticatedVideosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/thumbnails': {
+      id: '/_authenticated/thumbnails'
+      path: '/thumbnails'
+      fullPath: '/thumbnails'
+      preLoaderRoute: typeof AuthenticatedThumbnailsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings': {
@@ -501,6 +520,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedInvoicesRoute: typeof AuthenticatedInvoicesRoute
   AuthenticatedPricingRoute: typeof AuthenticatedPricingRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedThumbnailsRoute: typeof AuthenticatedThumbnailsRoute
   AuthenticatedVideosRoute: typeof AuthenticatedVideosRoute
   AuthenticatedCreateCarouselRoute: typeof AuthenticatedCreateCarouselRoute
   AuthenticatedProjectsIdRoute: typeof AuthenticatedProjectsIdRoute
@@ -517,6 +537,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInvoicesRoute: AuthenticatedInvoicesRoute,
   AuthenticatedPricingRoute: AuthenticatedPricingRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedThumbnailsRoute: AuthenticatedThumbnailsRoute,
   AuthenticatedVideosRoute: AuthenticatedVideosRoute,
   AuthenticatedCreateCarouselRoute: AuthenticatedCreateCarouselRoute,
   AuthenticatedProjectsIdRoute: AuthenticatedProjectsIdRoute,
