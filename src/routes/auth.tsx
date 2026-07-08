@@ -2,9 +2,10 @@ import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Mail, Lock, User, Loader2, AlertCircle } from "lucide-react";
+import { Sparkles, Mail, Lock, User, Loader2, AlertCircle, Apple } from "lucide-react";
 import { toast } from "sonner";
-import { getAuthCallbackUrl, redirectToSafePath } from "@/lib/auth-redirect";
+import { getAuthCallbackUrl, redirectToSafePath, getSafeAuthRedirect } from "@/lib/auth-redirect";
+import { lovable } from "@/integrations/lovable";
 
 const searchSchema = z.object({
   mode: z.enum(["signin", "signup"]).optional(),
