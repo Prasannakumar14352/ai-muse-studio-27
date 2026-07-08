@@ -343,8 +343,13 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
   const subject = input.continuity.subjectAnchor;
 
   const parts: string[] = [];
+  // Character lock FIRST so the model reads it before anything else.
+  parts.push(
+    `LOCKED CHARACTER SHEET (must match exactly in every image): ` +
+    `${input.continuity.characterSheet}`,
+  );
   parts.push(`${SHOT_TYPE_PHRASES[shotType]} — ${CAMERA_MOVE_PHRASES[cameraMove]}`);
-  parts.push(`Subject: ${subject}, visualizing "${beat}"`);
+  parts.push(`Subject: the SAME locked character above, visualizing "${beat}"`);
   if (sceneCtx) parts.push(`Environment: ${sceneCtx}`);
   parts.push(`Time of day: ${mood.timeOfDay}. Atmosphere: ${mood.weather}`);
   parts.push(`Camera: ${preset.camera}, ${preset.lens} at ${preset.aperture}`);
@@ -352,13 +357,18 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
   parts.push(`Color grade: ${preset.colorGrade}`);
   parts.push(`Look: ${preset.look}`);
   if (preset.extras.length) parts.push(preset.extras.join(", "));
-  parts.push(`Continuity: ${input.continuity.wardrobeAnchor}; ${input.continuity.locationAnchor}`);
+  parts.push(
+    `Continuity RULES: ${input.continuity.wardrobeAnchor}; ` +
+    `${input.continuity.locationAnchor}. ` +
+    `The protagonist's face, hairstyle, and outfit MUST be identical to previous shots — ` +
+    `do not redesign the character.`,
+  );
   if (input.emotion) parts.push(`Emotion: ${input.emotion}`);
   if (input.scenePurpose) parts.push(`Scene purpose: ${input.scenePurpose}`);
   if (input.chapterLabel) parts.push(`Chapter: ${input.chapterLabel}`);
   if (input.sceneNumber != null) parts.push(`Scene ${input.sceneNumber}`);
   parts.push("ultra realistic, HDR, 8K, highly detailed, sharp focus, professional photography");
-  parts.push(`Avoid: ${negativePrompt}`);
+  parts.push(`Avoid: ${negativePrompt}, different person, changed face, new character, wardrobe change, hairstyle change`);
 
   const prompt = optimizePrompt(parts.join(". "), input.styleId);
 
