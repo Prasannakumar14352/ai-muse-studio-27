@@ -138,20 +138,35 @@ function drawScene(
   const { width: W, height: H } = ctx.canvas;
   const p = Math.max(0, Math.min(1, opts.progress));
 
-  // Cinematic camera motion per beat — cycled by the pipeline so consecutive
-  // beats never move the same way (kills the slideshow feel).
+  // Cinematic camera motion per beat — Motion Director picks these per
+  // scene type (product spin for product showcase, page-flip for worksheets,
+  // orbit for mockups, dolly for lifestyle, etc.).
   const motion: CameraMotion = scene.motion ?? "zoomIn";
   let scale = 1.08;
-  let panX = 0; // fraction of W
-  let panY = 0; // fraction of H
+  let panX = 0;             // fraction of W
+  let panY = 0;             // fraction of H
+  let rotate = 0;           // radians
+  let skewX = 0;            // horizontal skew for spin/parallax feel
   switch (motion) {
-    case "zoomIn":    scale = 1.05 + p * 0.12; break;
-    case "zoomOut":   scale = 1.18 - p * 0.12; break;
-    case "pushIn":    scale = 1.02 + p * 0.20; break;
-    case "panLeft":   scale = 1.15; panX = (0.05 - p * 0.10); break;
-    case "panRight":  scale = 1.15; panX = (-0.05 + p * 0.10); break;
-    case "tiltDown":  scale = 1.15; panY = (-0.05 + p * 0.10); break;
-    case "tiltUp":    scale = 1.15; panY = (0.05 - p * 0.10); break;
+    case "zoomIn":       scale = 1.05 + p * 0.12; break;
+    case "zoomOut":      scale = 1.18 - p * 0.12; break;
+    case "pushIn":       scale = 1.02 + p * 0.20; break;
+    case "panLeft":      scale = 1.15; panX = (0.05 - p * 0.10); break;
+    case "panRight":     scale = 1.15; panX = (-0.05 + p * 0.10); break;
+    case "tiltDown":     scale = 1.15; panY = (-0.05 + p * 0.10); break;
+    case "tiltUp":       scale = 1.15; panY = (0.05 - p * 0.10); break;
+    case "orbit":        scale = 1.14 + p * 0.04; panX = Math.sin(p * Math.PI) * 0.06; skewX = Math.sin(p * Math.PI) * 0.05; break;
+    case "dollyLeft":    scale = 1.20; panX = 0.08 - p * 0.16; break;
+    case "dollyRight":   scale = 1.20; panX = -0.08 + p * 0.16; break;
+    case "craneUp":      scale = 1.18 - p * 0.04; panY = 0.08 - p * 0.16; break;
+    case "craneDown":    scale = 1.14 + p * 0.06; panY = -0.08 + p * 0.16; break;
+    case "macroPush":    scale = 1.25 + p * 0.30; break;
+    case "parallax":     scale = 1.16 + p * 0.03; panX = -0.06 + p * 0.12; panY = Math.sin(p * Math.PI * 2) * 0.01; break;
+    case "floating":     scale = 1.10 + Math.sin(p * Math.PI * 2) * 0.02; panY = Math.sin(p * Math.PI * 2) * 0.02; break;
+    case "productSpin":  scale = 1.14; skewX = Math.sin(p * Math.PI * 2) * 0.10; panX = Math.sin(p * Math.PI * 2) * 0.02; break;
+    case "kineticText":  scale = 1.06 + Math.sin(p * Math.PI) * 0.03; panY = Math.sin(p * Math.PI * 2) * 0.01; break;
+    case "pageFlip":     scale = 1.12 + p * 0.04; rotate = (p - 0.5) * 0.06; panX = (p - 0.5) * 0.03; break;
+    case "handInteract": scale = 1.18 + p * 0.06; panY = 0.02 - p * 0.04; break;
   }
 
   ctx.fillStyle = "#0b0b16";
@@ -161,7 +176,19 @@ function drawScene(
     const ratio = Math.max(W / size.w, H / size.h) * scale;
     const dw = size.w * ratio;
     const dh = size.h * ratio;
-    ctx.drawImage(media, (W - dw) / 2 + panX * W, (H - dh) / 2 + panY * H, dw, dh);
+    const dx = (W - dw) / 2 + panX * W;
+    const dy = (H - dh) / 2 + panY * H;
+    if (rotate !== 0 || skewX !== 0) {
+      ctx.save();
+      ctx.translate(W / 2, H / 2);
+      if (rotate !== 0) ctx.rotate(rotate);
+      if (skewX !== 0) ctx.transform(1, 0, skewX, 1, 0, 0);
+      ctx.translate(-W / 2, -H / 2);
+      ctx.drawImage(media, dx, dy, dw, dh);
+      ctx.restore();
+    } else {
+      ctx.drawImage(media, dx, dy, dw, dh);
+    }
   } else {
     const g = ctx.createLinearGradient(0, 0, W, H);
     g.addColorStop(0, opts.accent);
