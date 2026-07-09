@@ -1,6 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import {
+  buildAssetPlanHeuristic,
+  buildBriefFromIntent,
+  detectIntentHeuristic,
+  briefEnrichment,
+  type CreativeBrief,
+  type AssetPlan,
+} from "@/lib/creative-director";
 
 export type AiCarouselSlide = {
   n: number;
