@@ -225,16 +225,18 @@ Return JSON EXACTLY:
       })),
     });
     const out = Schema.parse(parsed);
-    // Prepend the shared brand-lock + character-sheet to EVERY slide's image
-    // prompt so slides 1..N render with the same canvas, character, and brand.
+    // Prepend the shared brand-lock + character-sheet + Creative Director
+    // brief to EVERY slide's image prompt so slides 1..N render with the
+    // same canvas, character, brand, AND respect the visual hero + avoid list.
     const lockHeader = [
+      `CREATIVE DIRECTOR (identical on every slide — obey visual hero + avoid list):\n${directorBlock}`,
       out.brand_lock && `BRAND LOCK (identical on every slide):\n${out.brand_lock}`,
       out.character_sheet && `CHARACTER SHEET (SAME person / product on every slide — do not redesign):\n${out.character_sheet}`,
     ].filter(Boolean).join("\n\n");
     out.slides = out.slides.map((s, i) => ({
       ...s,
       n: i + 1,
-      image_prompt: lockHeader ? `${lockHeader}\n\n---\n\n${s.image_prompt}` : s.image_prompt,
+      image_prompt: `${lockHeader}\n\n---\n\n${s.image_prompt}`,
     }));
     return out;
   });
