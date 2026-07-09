@@ -99,6 +99,7 @@ export type ThumbnailConcept = {
   layers: LayerSpec[];
   ctrScore: number;                  // 0..100 (self-rated by the director)
   reasoning: string;                 // short human-readable "why this works"
+  strategy: ThumbnailStrategy;       // Creative Director strategy (product_focus / curiosity / …)
 };
 
 export type ThumbnailPlan = {
