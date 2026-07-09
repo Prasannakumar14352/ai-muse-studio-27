@@ -102,21 +102,15 @@ function ImagesPage() {
     const errors: string[] = [];
     let lastMeta: DebugInfo["response"] | undefined;
     try {
+      const { fetchGeneratedImage } = await import("@/lib/image-stream");
       const settled = await Promise.allSettled(
-        Array.from({ length: 4 }).map(() =>
-          fetch("/api/generate-image", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: p, style: styleLabel, ratio: r }),
-          }).then(async (res) => {
-            const json = (await res.json().catch(() => ({}))) as {
-              image?: string; error?: string; debug?: DebugInfo["response"];
-            };
-            if (!res.ok || !json.image) throw new Error(json.error || `HTTP ${res.status}`);
-            if (json.debug) lastMeta = json.debug;
-            return json as { image: string; debug?: DebugInfo["response"] };
-          })
-        )
+        Array.from({ length: 4 }).map(async () => {
+          const { image, error, status } = await fetchGeneratedImage({
+            prompt: p, style: styleLabel, ratio: r,
+          });
+          if (!image) throw new Error(error || `HTTP ${status}`);
+          return { image };
+        })
       );
 
       const ok: { image: string }[] = [];
