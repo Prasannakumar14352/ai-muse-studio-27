@@ -11,7 +11,8 @@ import {
   type VideoTitleVariants, type VideoHook, type VideoChapters,
 } from "@/lib/video-ai.functions";
 import { buildFallbackVideoScript } from "@/lib/video-fallback";
-import { renderVideo, type RenderScene, type CameraMotion } from "@/lib/video-renderer";
+import { renderVideo, type RenderScene, type CameraMotion, type TransitionStyle } from "@/lib/video-renderer";
+import { planBeatMotion, type SceneType } from "@/lib/motion-director";
 import { runShotPool } from "@/lib/video-shot-runner";
 import {
   createJob, getJob, saveJob, saveShotBlob, loadShotObjectURL,
