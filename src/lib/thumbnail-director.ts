@@ -16,6 +16,11 @@
 // stays perfectly spelled, editable, and 1280×720.
 
 import { STYLE_PRESETS, type VDStyle } from "@/lib/visual-director";
+import {
+  detectIntentHeuristic,
+  type ContentIntent,
+  type ThumbnailStrategy,
+} from "@/lib/creative-director";
 
 // ---------------- Types ----------------
 
