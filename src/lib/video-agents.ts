@@ -46,8 +46,10 @@ type Beat = {
   isFirstOfScene: boolean;
   text: string;         // narration chunk this beat visually represents
   words: number;
-  imagePrompt: string;  // per-beat image prompt
+  imagePrompt: string;  // per-beat image prompt (motion brief appended)
   motion: CameraMotion;
+  transition: TransitionStyle;
+  sceneType: SceneType;
 };
 
 /** Split a voiceover string into ~10-14-word visual chunks (sentence-aware). */
