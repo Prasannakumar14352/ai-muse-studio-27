@@ -786,6 +786,7 @@ export const RenderAgent = {
       // On-screen text only on the first beat of a scene, using the script's overlay when present.
       on_screen_text: b.isFirstOfScene ? (script.scenes[b.sceneIndex]?.on_screen_text ?? "") : "",
       motion: b.motion,
+      transition: b.transition,
     }));
 
     const result = await renderVideo({
