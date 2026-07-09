@@ -920,6 +920,27 @@ function CarouselsPage() {
           </div>
         </div>
       )}
+
+      {editingSlide && (() => {
+        const row = data?.find((r) => r.id === editingSlide.rowId);
+        const src = row?.display_images?.[editingSlide.idx];
+        if (!row || !src) return null;
+        const cfg = getLayout(row);
+        const slideNum = row.carousel_slides?.[editingSlide.idx]?.n ?? editingSlide.idx + 1;
+        return (
+          <SlideEditor
+            src={src}
+            ratio={cfg.ratio}
+            title={row.title}
+            slideNumber={slideNum}
+            initial={row.slide_overlays[editingSlide.idx] ?? null}
+            onClose={() => setEditingSlide(null)}
+            onSave={async (dataUrl, overlays) => {
+              await saveEditedSlide(row, editingSlide.idx, dataUrl, overlays);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
