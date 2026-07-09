@@ -1471,6 +1471,8 @@ function beatsFromShots(job: JobRecord, style: StyleId): Beat[] {
     words: s.words || Math.max(1, s.text.split(/\s+/).filter(Boolean).length),
     imagePrompt: s.prompt,
     motion: (s.motion as CameraMotion) || "zoomIn",
+    transition: ((s.transition as TransitionStyle) || "fade"),
+    sceneType: ((s.sceneType as SceneType) || "explainer"),
     // Note: buildBeatImagePrompt already applied when the shot was created.
     _styleHint: style,
   } as unknown as Beat));
@@ -1493,6 +1495,8 @@ function planShots(
     words: b.words,
     prompt: b.imagePrompt,
     motion: b.motion,
+    transition: b.transition,
+    sceneType: b.sceneType,
     status: "pending",
     kind: null,
     blobKey: null,
