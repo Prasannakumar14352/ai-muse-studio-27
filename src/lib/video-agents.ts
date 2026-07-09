@@ -144,14 +144,29 @@ function expandScriptToBeats(
         brief: directorLite,
       });
       previousShot = directed.shotType;
+      // Motion Director — classify + pick motion + transition + brief.
+      const plan = planBeatMotion({
+        beatText: chunk,
+        imagePrompt: directed.prompt,
+        intent: brief?.intent ?? null,
+        index: globalIdx,
+        isFirstOfScene: beatIndex === 0,
+      });
+      // Fold motion brief into the image prompt so the still is COMPOSED for
+      // the chosen motion (e.g., a page-flip needs a hand mid-flip shot).
+      const composedPrompt = plan.motionBrief
+        ? `${directed.prompt}\n\nSHOT COMPOSITION FOR MOTION (${plan.motion} / ${plan.sceneType}):\n${plan.motionBrief}`
+        : directed.prompt;
       beats.push({
         sceneIndex,
         beatIndex,
         isFirstOfScene: beatIndex === 0,
         text: chunk,
         words,
-        imagePrompt: directed.prompt,
-        motion: MOTION_CYCLE[globalIdx % MOTION_CYCLE.length],
+        imagePrompt: composedPrompt,
+        motion: plan.motion as CameraMotion,
+        transition: plan.transition,
+        sceneType: plan.sceneType,
       });
       globalIdx += 1;
     });
