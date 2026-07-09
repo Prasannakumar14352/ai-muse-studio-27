@@ -89,6 +89,33 @@ function CarouselsPage() {
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [collapsedSlides, setCollapsedSlides] = useState<Record<string, boolean>>({});
+  const [editingSlide, setEditingSlide] = useState<{ rowId: string; idx: number } | null>(null);
+
+  async function saveEditedSlide(row: CarouselRow, idx: number, dataUrl: string, overlays: SlideOverlaySet) {
+    const versionedId = `carousel:${row.id}:${idx}:v${Date.now()}`;
+    const newKey = await putDataURL(versionedId, dataUrl);
+    const prev = row.carousel_images ?? [];
+    const nextImages: (string | null)[] = prev.length
+      ? [...prev]
+      : new Array(row.image_prompts.length).fill(null);
+    const old = nextImages[idx];
+    nextImages[idx] = newKey;
+    const existing = await getOutput(row.id);
+    const nextOverlays: Record<number, SlideOverlaySet> = {
+      ...(existing?.slide_overlays ?? {}),
+      [idx]: overlays,
+    };
+    await saveOutput(row.id, {
+      carousel_images: nextImages,
+      slide_overlays: nextOverlays,
+    });
+    if (old && isBlobKey(old) && old !== newKey) {
+      try { await deleteBlob(old); } catch { /* ignore */ }
+    }
+    qc.invalidateQueries({ queryKey: ["carousels"] });
+    qc.invalidateQueries({ queryKey: ["project", row.id] });
+  }
+
 
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
