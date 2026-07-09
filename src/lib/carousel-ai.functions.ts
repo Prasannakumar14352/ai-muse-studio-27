@@ -128,6 +128,8 @@ For EACH slide, produce:
 Return JSON EXACTLY:
 {
   "title": "string (Instagram carousel title incl. platform)",
+  "brand_lock": "One paragraph (80-140 words) locking the SHARED design system for ALL ${total} slides: brand name, exact HEX palette (bg + 3-4 accents + text + CTA), typography (font family + weights), photographic style, lighting, composition principles, decorative language. This is copied verbatim onto every slide.",
+  "character_sheet": "One paragraph (80-140 words) locking the SAME HERO CHARACTER for every slide that features a person: gender, approximate age, ethnicity, exact hairstyle + color, eye color, face shape, distinguishing features, exact wardrobe (top, bottom, accessories, colors), and consistent expression tone. Say 'SAME PERSON, identical face and outfit across every slide — do not redesign, do not age, do not change wardrobe.' If the topic is purely product-only with no human, write a HERO PRODUCT SHEET instead with identical product details.",
   "slides": [ { ...fields above... } ]
 }`;
 
