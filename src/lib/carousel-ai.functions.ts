@@ -176,6 +176,8 @@ Return JSON EXACTLY:
 
     const Schema = z.object({
       title: z.string(),
+      brand_lock: z.string().nullish().transform((v) => v ?? ""),
+      character_sheet: z.string().nullish().transform((v) => v ?? ""),
       slides: z.array(z.object({
         n: z.number(),
         role: z.string(),
@@ -190,7 +192,16 @@ Return JSON EXACTLY:
       })),
     });
     const out = Schema.parse(parsed);
-    // normalize slide numbering
-    out.slides = out.slides.map((s, i) => ({ ...s, n: i + 1 }));
+    // Prepend the shared brand-lock + character-sheet to EVERY slide's image
+    // prompt so slides 1..N render with the same canvas, character, and brand.
+    const lockHeader = [
+      out.brand_lock && `BRAND LOCK (identical on every slide):\n${out.brand_lock}`,
+      out.character_sheet && `CHARACTER SHEET (SAME person / product on every slide — do not redesign):\n${out.character_sheet}`,
+    ].filter(Boolean).join("\n\n");
+    out.slides = out.slides.map((s, i) => ({
+      ...s,
+      n: i + 1,
+      image_prompt: lockHeader ? `${lockHeader}\n\n---\n\n${s.image_prompt}` : s.image_prompt,
+    }));
     return out;
   });
