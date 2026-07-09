@@ -6,15 +6,16 @@ import JSZip from "jszip";
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
-import { listOutputs, saveOutput, deleteOutput, type CarouselSlide } from "@/lib/local-store";
+import { listOutputs, saveOutput, deleteOutput, getOutput, type CarouselSlide, type SlideOverlaySet } from "@/lib/local-store";
 import {
-  putDataURL, getObjectURL, getDataURL, deleteBlobsByPrefix, isBlobKey, makeBlobKey,
+  putDataURL, getObjectURL, getDataURL, deleteBlob, deleteBlobsByPrefix, isBlobKey, makeBlobKey,
 } from "@/lib/blob-store";
+import { SlideEditor } from "@/components/slide-editor";
 
 import { confirmDialog } from "@/components/confirm-dialog";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
-  Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2, Film,
+  Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2, Film, Pencil,
 } from "lucide-react";
 
 
