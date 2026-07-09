@@ -21,6 +21,10 @@ import {
   directBeatPrompt, buildContinuityCard,
   type ContinuityCard, type ShotType, type VDStyle,
 } from "@/lib/visual-director";
+import {
+  detectIntentHeuristic, buildBriefFromIntent,
+  type CreativeBrief,
+} from "@/lib/creative-director";
 
 // ---------- Beat expansion (documentary-style visual density) ----------
 //
