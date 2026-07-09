@@ -259,6 +259,16 @@ export function buildContinuityCard(title: string, hint?: string): ContinuityCar
   };
 }
 
+export type CreativeBriefLite = {
+  visualHero: string;
+  visualStyle: string;
+  cameraStyle: string;
+  sceneComposition: string;
+  paletteHint: string;
+  avoid: string[];
+  intent: string;
+};
+
 export type DirectorInput = {
   title: string;
   styleId: VDStyle;
@@ -277,6 +287,8 @@ export type DirectorInput = {
   continuity: ContinuityCard;
   /** The most recent chosen shot type, so we never repeat framing back-to-back. */
   previousShotType?: ShotType | null;
+  /** Optional Creative Director brief — steers hero subject + avoid list. */
+  brief?: CreativeBriefLite | null;
 };
 
 export type DirectorOutput = {
