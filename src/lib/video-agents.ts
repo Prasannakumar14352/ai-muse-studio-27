@@ -643,18 +643,9 @@ async function fetchSceneImage(prompt: string, style: StyleId, ratio: AspectRati
   // (subject, camera, lens, lighting, grade, negatives, continuity). Do NOT
   // pre/post-fix it with another style descriptor — that would fight the
   // Director's shot type + continuity anchor and produce generic images.
-  try {
-    const res = await fetch("/api/generate-image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, ratio }),
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { image?: string };
-    return json.image ?? null;
-  } catch {
-    return null;
-  }
+  const { fetchGeneratedImage } = await import("@/lib/image-stream");
+  const { image } = await fetchGeneratedImage({ prompt, ratio });
+  return image;
 }
 
 /** Try to generate a short AI video clip for a beat. Returns null on any failure. */

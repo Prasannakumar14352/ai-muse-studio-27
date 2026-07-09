@@ -447,21 +447,12 @@ function throwIfAborted(signal?: AbortSignal) {
 }
 
 async function fetchSceneImage(prompt: string, style: string, ratio: string, projectId?: string | null): Promise<string | null> {
-  try {
-    const res = await fetch("/api/generate-image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, style, ratio }),
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { image?: string };
-    if (!json.image) return null;
-    // Deduct 1 credit per successful scene image (admin bypass handled inside).
-    await deductUsage({ amount: 1, projectId: projectId ?? null, description: "Scene image generated" }).catch(() => {});
-    return json.image;
-  } catch {
-    return null;
-  }
+  const { fetchGeneratedImage } = await import("@/lib/image-stream");
+  const { image } = await fetchGeneratedImage({ prompt, style, ratio });
+  if (!image) return null;
+  // Deduct 1 credit per successful scene image (admin bypass handled inside).
+  await deductUsage({ amount: 1, projectId: projectId ?? null, description: "Scene image generated" }).catch(() => {});
+  return image;
 }
 
 async function fetchSceneAudio(text: string, voice: string, ctx: AudioContext): Promise<AudioBuffer | null> {

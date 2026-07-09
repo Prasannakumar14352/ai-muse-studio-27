@@ -29,27 +29,19 @@ export type ThumbnailProgress = {
   message?: string;
 };
 
+import { fetchGeneratedImage } from "@/lib/image-stream";
+
 async function generateImage(
   prompt: string,
   opts: { ratio: "16:9" | "1:1"; transparent: boolean; quality?: "low" | "medium" | "high" },
 ): Promise<string | null> {
-  try {
-    const res = await fetch("/api/generate-image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt,
-        ratio: opts.ratio,
-        background: opts.transparent ? "transparent" : "opaque",
-        quality: opts.quality ?? "medium",
-      }),
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { image?: string; error?: string };
-    return json.image ?? null;
-  } catch {
-    return null;
-  }
+  const { image } = await fetchGeneratedImage({
+    prompt,
+    ratio: opts.ratio,
+    background: opts.transparent ? "transparent" : "opaque",
+    quality: opts.quality ?? "medium",
+  });
+  return image;
 }
 
 /** Run all layers for one concept. */
