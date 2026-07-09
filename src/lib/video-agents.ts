@@ -1215,6 +1215,12 @@ export async function runVideoPipeline(
     }
   };
 
+  // Creative Director — detect intent + build a visual brief FIRST so every
+  // downstream agent (script, storyboard, visuals) obeys the visual hero,
+  // camera style, and avoid list. Uses the heuristic so it never blocks.
+  const cdIntent = detectIntentHeuristic(brief.title);
+  const creativeBrief = buildBriefFromIntent(brief.title, cdIntent.intent, cdIntent.confidence);
+
   const research = await mark("research", () => ResearchAgent.run(brief));
 
   // YouTube Retention Engine — builds the professional documentary blueprint
