@@ -1,99 +1,119 @@
-# Async Parallel Video Pipeline
+# Creative Director Architecture
 
-Rewrite the Videos generation pipeline to feel like a modern batch renderer: fast planning phase, hundreds of short shots generated in parallel with per-shot retry, live progress, resumable state in IndexedDB, and a Scene Viewer the user can browse while rendering continues.
+Goal: stop generating generic "talking-head" AI content. Every generator (video, carousel, image, thumbnail, future ads/posts) runs through the same upstream brain so a "Digital Product" prompt yields product mockups, a "Children's Education" prompt yields worksheets, etc.
 
-## Goals
+## 1. New shared module: `src/lib/creative-director.ts`
 
-- 9-minute doc: planning done in seconds, shots stream in parallel, final render kicks off only when all shots are ready.
-- Never block the UI. Refresh-safe. Per-shot retry, not per-project retry.
-- Real counters ("47 / 132 shots"), not a fake progress bar.
+Single source of truth. Pure TypeScript types + one server function.
 
-## Phase 1 — Planning (seconds, sequential, cheap)
+### Types
 
-Runs the existing agents in this order and persists each output to the job record in IndexedDB:
+```ts
+type ContentIntent =
+  | "digital_product" | "physical_product" | "educational"
+  | "children_education" | "documentary" | "storytelling"
+  | "explainer" | "tutorial" | "saas_demo" | "website_promo"
+  | "business" | "personal_branding" | "social_media"
+  | "news" | "course_promo" | "general";
 
-1. Research
-2. Script
-3. Storyboard (existing beat structure)
-4. Narration (TTS per section, streamed)
-5. Timeline: split storyboard into **3–5 s shots**. For a 9-min video that's ~120–180 shots. Each shot: `{ id, index, start, end, duration, prompt, style, ratio, narrationSliceRef, status: "pending" }`.
+type VisualStyle =
+  | "photoreal" | "premium_product_photo" | "modern_infographic"
+  | "flat_illustration" | "montessori" | "children_illustration"
+  | "minimal" | "corporate" | "luxury" | "editorial"
+  | "3d_illustration" | "comic" | "magazine"
+  | "apple_style" | "pinterest_style" | "canva_premium";
 
-Output: a `VideoJob` object with `shots: Shot[]`. Saved to IDB immediately — this is the resume anchor.
+type CreativeBrief = {
+  intent: ContentIntent;
+  confidence: number;
+  visualHero: string;               // "the product itself" | "worksheets" | ...
+  visualStyle: VisualStyle;
+  cameraStyle: string;              // "top-down macro, soft studio light"
+  sceneComposition: string;         // "hero product 70%, hands 20%, lifestyle 10%"
+  assetMix: { productPct: number; usagePct: number; peoplePct: number; contextPct: number };
+  marketingGoal: string;            // "drive PDF download"
+  avoid: string[];                  // ["random talking heads", "stock people"]
+  paletteHint: string;              // hex list + mood
+  brandVoice: string;
+  ctaStyle: string;
+};
 
-## Phase 2 — Parallel shot generation (the bulk of the work)
+type AssetPlanItem = {
+  index: number;
+  role: string;                     // "Product Hero" | "Feature Highlight" | "CTA"
+  slideType?: "hook"|"problem"|"benefits"|"features"|"comparison"|"process"|"checklist"|"stats"|"case_study"|"offer"|"cta";
+  visualDescription: string;
+  layoutHint: string;
+  shotType: string;
+};
 
-New module `src/lib/video-shot-runner.ts`:
+type AssetPlan = { brief: CreativeBrief; items: AssetPlanItem[] };
+```
 
-- Concurrency-limited worker pool (default 6, configurable). Uses `Promise` scheduling, not sequential `await`s.
-- Each worker pulls the next `pending` shot, calls `/api/generate-video-clip` (falls back to `/api/generate-image` on non-ok), writes the resulting blob to IDB under `shot:<jobId>:<shotId>`, updates shot status to `done | failed`, persists the job.
-- Retry: exponential backoff up to N per shot. On final failure the shot stays `failed` but the pool continues. UI exposes a "Retry failed shots" action that requeues only failed shots.
-- Emits events via an `EventTarget` on the job: `shot:done`, `shot:failed`, `progress`. UI subscribes for live counters and Scene Viewer updates.
-- Cancellable via `AbortController` stored on the job runtime (not persisted).
+### Server functions (in `src/lib/creative-director.functions.ts`)
 
-Shot blob storage reuses `blob-store.ts` (already IDB-backed). Metadata (status, attempts, blob key, error) lives in the job record in localStorage under `cv:<uid>:videojob:<id>` plus an index key.
+- `detectIntent({ prompt, surface })` → `{ intent, confidence, rationale }`.
+  `surface` = "video"|"carousel"|"image"|"thumbnail"|"ad".
+- `buildCreativeBrief({ prompt, intent, surface, extras })` → `CreativeBrief`.
+- `buildAssetPlan({ brief, surface, count })` → `AssetPlan`.
+- `engineerPrompt({ brief, item, model, ratio })` → final rich image/video prompt string.
 
-## Phase 3 — Assembly & render (only after Phase 2 completes, or user hits "Render now")
+All four use `google/gemini-2.5-pro` with `response_format: json_object`, wrapped in `requireSupabaseAuth`. Zod-parsed. One convenience wrapper `runCreativeDirector({ prompt, surface, count, extras })` runs all four sequentially and returns `{ brief, plan }`.
 
-Runs the existing `RenderAgent`, but fed by the IDB shot blobs instead of in-memory arrays. Steps run sequentially inside the render agent and report progress on a separate channel (`render:progress`):
+### Style library
 
-1. Sync narration to timeline (already computed)
-2. Sync subtitles VTT
-3. Mix music bed + SFX
-4. Encode final MP4/WebM
-5. Save via `saveGeneratedVideo` (existing), mark job `complete`
+A `STYLE_LIBRARY: Record<VisualStyle, { lighting, palette, references, doNots }>` object drives the Prompt Engineer. Intent → default style mapping table (e.g. `children_education → montessori`, `digital_product → premium_product_photo`).
 
-Render progress bar shows encoder frame progress and is visually separate from the shots counter.
+## 2. Wire into existing generators
 
-## Phase 4 — Resume
+Minimal, surgical edits — no new UI required.
 
-On app mount, the Videos page:
+### Carousel — `src/lib/carousel-ai.functions.ts`
+- Before the existing "Design a premium carousel" call, run `runCreativeDirector({ prompt: topic, surface: "carousel", count: slideCount })`.
+- Inject `brief` + `plan.items[i].slideType`/`layoutHint` into the existing system prompt so slides get varied types (hook/problem/benefits/…/cta) with distinct layouts, and the shared brand-lock uses `brief.paletteHint` and `brief.visualStyle`.
+- Keep the existing `image_prompt` shape but route it through `engineerPrompt` so product-marketing intents produce product/mockup/flatlay language, not "person holding phone".
 
-1. Loads all jobs from IDB.
-2. For jobs in `planning | generating | rendering` states, offers "Resume".
-3. Resuming re-hydrates the job, spins the worker pool back up, and skips any shot already `done` in IDB.
+### Image — `src/routes/_authenticated/images.tsx` (or wherever the ad-hoc prompt call is)
+- Add an "AI Direct" toggle (on by default). When on, call `runCreativeDirector` first, take `plan.items[0]`, pass through `engineerPrompt`, then hit `/api/generate-image` with the enriched prompt.
 
-## UI changes (`src/routes/_authenticated/videos.tsx`)
+### Video — `src/lib/video-agents.ts`
+- New `IntentDirectorAgent` runs before `ResearchAgent` and stores the `CreativeBrief` on the job.
+- `StoryboardAgent` and beat/shot prompt building use `brief.assetMix` to bias scene composition (e.g. product-marketing → ≥70% product/mockup shots, avoid talking heads unless user explicitly asked).
+- `visual-director.ts` `directBeatPrompt` accepts `CreativeBrief` and folds `cameraStyle` + `avoid` list into every beat prompt.
+- Children's-education intent injects the worksheet/coloring/tracing/montessori vocabulary listed in the request.
 
-- Landing view keeps the library. New card in the library: **in-progress jobs** with shot counter and a Resume/Cancel button.
-- When a job is active, replace the current single-progress screen with a dashboard:
-  - Phase indicator (Planning → Generating shots → Rendering).
-  - "Generated 47 / 132 shots" counter + small sparkline of completion rate.
-  - Failed-shot count with "Retry failed" button.
-  - **Scene Viewer**: grid of shot thumbnails, each clickable to preview the clip/image. Grid updates live as shots complete. Shots still pending show a placeholder tile; failed shots show a retry tile.
-  - Cancel button that aborts the pool without deleting completed shots (so resume still works).
-- Render phase adds a second progress bar labelled "Encoding final video".
-- All of this is non-blocking; the user can navigate away and come back.
+### Thumbnail — `src/lib/thumbnail-director.ts`
+- Extend concept planning with a `strategy` field: `curiosity | shock | comparison | emotion | transformation | before_after | big_numbers | question | product_focus`.
+- Use `brief.intent` to pick default strategy (product intents → `product_focus`, docs → `curiosity`, education → `question`, etc.). Still generate the existing 4 concepts, but each concept declares its strategy so the layered prompts differ meaningfully.
 
-## Files
+### Future surfaces (ads, social posts)
+Not built now, but the shared `runCreativeDirector` + `engineerPrompt` API is the contract they'll use.
 
-- **New**
-  - `src/lib/video-job-store.ts` — IDB+localStorage job persistence (jobs, shots metadata, shot blobs). Modeled on `videoLocalStore.ts`.
-  - `src/lib/video-shot-runner.ts` — worker pool, retry, event emitter, cancel.
-  - `src/lib/video-timeline.ts` — split storyboard into 3–5s shots with narration slices.
-  - `src/components/video/SceneViewer.tsx` — thumbnail grid + preview modal.
-  - `src/components/video/JobDashboard.tsx` — phase indicator, counters, retry, cancel.
-- **Edited**
-  - `src/lib/video-agents.ts` — refactor pipeline into `runPlanning(job)` + delegate shot generation to `video-shot-runner`. Remove the current per-beat serial loop.
-  - `src/lib/video-renderer.ts` — accept shots from IDB blob keys; emit render progress on its own channel.
-  - `src/routes/_authenticated/videos.tsx` — three views: landing (with in-progress jobs), job dashboard, result. Resume-on-mount logic.
-  - `src/routes/api/generate-video-clip.ts` — unchanged contract; still falls back to image when the video model isn't wired.
+## 3. Persistence
 
-## Technical notes
+No new DB tables. Video jobs already live in IndexedDB via `video-job-store.ts`; add `brief` + `plan` fields there. Carousel keeps its existing local storage; brief is transient per generation.
 
-- Concurrency default 6 is a starting point. `/api/generate-video-clip` today returns `ok:false` and the runner falls back to `/api/generate-image`, which is safe to fan out. If a real video model gets wired later, drop concurrency to 2–3 to respect provider limits — a single constant in `video-shot-runner.ts`.
-- No database, no Supabase storage. Everything stays in IDB/localStorage, per the earlier local-first constraint.
-- Job state machine: `planning → generating → (paused | rendering) → complete | failed`. `paused` is what a cancelled or interrupted job becomes; resume flips it back to `generating`.
-- Shot state machine: `pending → running → done | failed`. `failed` is retryable; `done` is skipped on resume.
-- Existing `saveGeneratedVideo` / `thumbnailLocalStore` remain the final delivery surface — this plan only changes how we get there.
+## 4. Files touched
 
-## Out of scope
+**New**
+- `src/lib/creative-director.ts` — types, style library, intent→defaults table, thin client wrapper.
+- `src/lib/creative-director.functions.ts` — the 4 server fns + `runCreativeDirector`.
 
-- Actual text-to-video model wiring (still gated on a working provider).
-- Server-side rendering / offloading encode off the browser.
-- Multi-tab coordination (a second tab resuming the same job). First tab wins; second tab shows read-only view.
+**Edited**
+- `src/lib/carousel-ai.functions.ts` — call director, pass brief + slideType into slide prompt, use `engineerPrompt`.
+- `src/lib/video-agents.ts` — new `IntentDirectorAgent`; storyboard/shot prompts consume brief.
+- `src/lib/visual-director.ts` — accept `CreativeBrief`; append `avoid` list + `cameraStyle` to every prompt.
+- `src/lib/video-job-store.ts` — persist `brief` + `plan`.
+- `src/lib/thumbnail-director.ts` — add `strategy`, intent-driven concept mix.
+- `src/routes/_authenticated/images.tsx` — route the single-image generate through director by default.
 
-## Confirmation
+## 5. Non-goals for this pass
 
-1. OK with default worker-pool concurrency of 6 for image fallback? I'll expose a constant so we can tune later.
-2. Scene Viewer as a grid inside the job dashboard (not a separate route)?
-3. On resume after refresh: auto-resume in the background, or require the user to click "Resume"? I'm defaulting to explicit Resume so we never burn credits without consent.
+- No new "Ad Creatives" or "Social Posts" routes/UI. The engine is ready for them; a follow-up turn adds the pages.
+- No UI change to the Videos or Carousels landing views — the improvements happen inside the pipeline.
+- No changes to auth, billing, or credit costs.
+
+## Open questions
+
+1. Should the detected intent be **overridable by the user** with a dropdown on each generator, or fully automatic based on the prompt? (Default: automatic with a small "AI thinks this is: Digital Product · change" chip.)
+2. For carousels, is it OK if the slide **count I generate still respects the user's chosen count** but slide **types** are chosen by the planner? (i.e. user picks 6, planner picks hook/problem/benefits/features/offer/cta.)
