@@ -11,7 +11,8 @@ import {
   type VideoTitleVariants, type VideoHook, type VideoChapters,
 } from "@/lib/video-ai.functions";
 import { buildFallbackVideoScript } from "@/lib/video-fallback";
-import { renderVideo, type RenderScene, type CameraMotion } from "@/lib/video-renderer";
+import { renderVideo, type RenderScene, type CameraMotion, type TransitionStyle } from "@/lib/video-renderer";
+import { planBeatMotion, type SceneType } from "@/lib/motion-director";
 import { runShotPool } from "@/lib/video-shot-runner";
 import {
   createJob, getJob, saveJob, saveShotBlob, loadShotObjectURL,
@@ -45,8 +46,10 @@ type Beat = {
   isFirstOfScene: boolean;
   text: string;         // narration chunk this beat visually represents
   words: number;
-  imagePrompt: string;  // per-beat image prompt
+  imagePrompt: string;  // per-beat image prompt (motion brief appended)
   motion: CameraMotion;
+  transition: TransitionStyle;
+  sceneType: SceneType;
 };
 
 /** Split a voiceover string into ~10-14-word visual chunks (sentence-aware). */
@@ -141,14 +144,29 @@ function expandScriptToBeats(
         brief: directorLite,
       });
       previousShot = directed.shotType;
+      // Motion Director — classify + pick motion + transition + brief.
+      const plan = planBeatMotion({
+        beatText: chunk,
+        imagePrompt: directed.prompt,
+        intent: brief?.intent ?? null,
+        index: globalIdx,
+        isFirstOfScene: beatIndex === 0,
+      });
+      // Fold motion brief into the image prompt so the still is COMPOSED for
+      // the chosen motion (e.g., a page-flip needs a hand mid-flip shot).
+      const composedPrompt = plan.motionBrief
+        ? `${directed.prompt}\n\nSHOT COMPOSITION FOR MOTION (${plan.motion} / ${plan.sceneType}):\n${plan.motionBrief}`
+        : directed.prompt;
       beats.push({
         sceneIndex,
         beatIndex,
         isFirstOfScene: beatIndex === 0,
         text: chunk,
         words,
-        imagePrompt: directed.prompt,
-        motion: MOTION_CYCLE[globalIdx % MOTION_CYCLE.length],
+        imagePrompt: composedPrompt,
+        motion: plan.motion as CameraMotion,
+        transition: plan.transition,
+        sceneType: plan.sceneType,
       });
       globalIdx += 1;
     });
@@ -768,6 +786,7 @@ export const RenderAgent = {
       // On-screen text only on the first beat of a scene, using the script's overlay when present.
       on_screen_text: b.isFirstOfScene ? (script.scenes[b.sceneIndex]?.on_screen_text ?? "") : "",
       motion: b.motion,
+      transition: b.transition,
     }));
 
     const result = await renderVideo({
@@ -1452,6 +1471,8 @@ function beatsFromShots(job: JobRecord, style: StyleId): Beat[] {
     words: s.words || Math.max(1, s.text.split(/\s+/).filter(Boolean).length),
     imagePrompt: s.prompt,
     motion: (s.motion as CameraMotion) || "zoomIn",
+    transition: ((s.transition as TransitionStyle) || "fade"),
+    sceneType: ((s.sceneType as SceneType) || "explainer"),
     // Note: buildBeatImagePrompt already applied when the shot was created.
     _styleHint: style,
   } as unknown as Beat));
@@ -1474,6 +1495,8 @@ function planShots(
     words: b.words,
     prompt: b.imagePrompt,
     motion: b.motion,
+    transition: b.transition,
+    sceneType: b.sceneType,
     status: "pending",
     kind: null,
     blobKey: null,

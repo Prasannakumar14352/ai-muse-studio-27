@@ -5,15 +5,29 @@
 import { getStyle } from "./constants";
 import { deductUsage } from "./access";
 
-export type CameraMotion = "zoomIn" | "zoomOut" | "panLeft" | "panRight" | "tiltDown" | "tiltUp" | "pushIn";
+// Legacy 7 motions are kept as a subset; the Motion Director adds cinematic
+// variants (orbit, dolly, crane, macro, parallax, floating, spin, page-flip,
+// hand-interact, kinetic-text). All are canvas-implementable transforms.
+export type CameraMotion =
+  | "zoomIn" | "zoomOut" | "panLeft" | "panRight" | "tiltDown" | "tiltUp" | "pushIn"
+  | "orbit" | "dollyLeft" | "dollyRight" | "craneUp" | "craneDown"
+  | "macroPush" | "parallax" | "floating" | "productSpin" | "kineticText"
+  | "pageFlip" | "handInteract";
+
+export type TransitionStyle =
+  | "cut" | "fade" | "whipPan" | "flash"
+  | "slideLeft" | "slideUp" | "maskCircle" | "pageFlip" | "zoomBlur";
+
 export type RenderScene = {
   n: number;
   visual: string;
   voiceover: string;
   duration: string;
   on_screen_text?: string;
-  /** Optional camera motion for this beat. Cycled by the pipeline for cinematic variety. */
+  /** Camera motion for this beat — Motion Director picks it per scene type. */
   motion?: CameraMotion;
+  /** Transition INTO this beat (played over ~0.35s at the start). */
+  transition?: TransitionStyle;
 };
 
 export type RenderOptions = {
@@ -113,6 +127,97 @@ function drawableSize(d: Drawable): { w: number; h: number } {
   return { w: d.width, h: d.height };
 }
 
+/** Overlay a scene-change transition on the incoming beat. `t` is 0..1. */
+function drawTransition(
+  ctx: CanvasRenderingContext2D,
+  kind: TransitionStyle,
+  t: number,
+  W: number,
+  H: number,
+) {
+  const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+  switch (kind) {
+    case "whipPan": {
+      // Motion blur + streaked veil sweeping across.
+      const alpha = (1 - eased) * 0.9;
+      const g = ctx.createLinearGradient(0, 0, W, 0);
+      g.addColorStop(Math.max(0, eased - 0.15), "rgba(0,0,0,0)");
+      g.addColorStop(eased, `rgba(255,255,255,${(alpha * 0.35).toFixed(3)})`);
+      g.addColorStop(Math.min(1, eased + 0.15), "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = `rgba(0,0,0,${(alpha * 0.4).toFixed(3)})`;
+      ctx.fillRect(0, 0, W, H);
+      break;
+    }
+    case "flash": {
+      const a = Math.max(0, 1 - t / 0.6);
+      ctx.fillStyle = `rgba(255,255,255,${(a * 0.95).toFixed(3)})`;
+      ctx.fillRect(0, 0, W, H);
+      break;
+    }
+    case "slideLeft": {
+      const x = W * (1 - eased);
+      ctx.fillStyle = "#0b0b16";
+      ctx.fillRect(x, 0, W - x, H);
+      break;
+    }
+    case "slideUp": {
+      const y = H * (1 - eased);
+      ctx.fillStyle = "#0b0b16";
+      ctx.fillRect(0, y, W, H - y);
+      break;
+    }
+    case "maskCircle": {
+      // Grow a circular window: black everywhere except the expanding disc.
+      const r = Math.hypot(W, H) * eased * 0.6;
+      ctx.save();
+      ctx.fillStyle = "#0b0b16";
+      ctx.beginPath();
+      ctx.rect(0, 0, W, H);
+      ctx.arc(W / 2, H / 2, r, 0, Math.PI * 2, true);
+      ctx.closePath();
+      ctx.fill("evenodd");
+      ctx.restore();
+      break;
+    }
+    case "pageFlip": {
+      // Diagonal wipe with a bright edge — feels like a page flipping in.
+      const w = W * 1.2 * (1 - eased);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(w, 0);
+      ctx.lineTo(w - H * 0.25, H);
+      ctx.lineTo(0, H);
+      ctx.closePath();
+      ctx.fillStyle = "#f5efe4";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.35)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+      break;
+    }
+    case "zoomBlur": {
+      const a = (1 - eased) * 0.75;
+      ctx.fillStyle = `rgba(0,0,0,${a.toFixed(3)})`;
+      ctx.fillRect(0, 0, W, H);
+      // subtle vignette
+      const rg = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) / 2);
+      rg.addColorStop(0, "rgba(255,255,255,0)");
+      rg.addColorStop(1, `rgba(255,255,255,${(a * 0.4).toFixed(3)})`);
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, 0, W, H);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+
+
 function drawScene(
   ctx: CanvasRenderingContext2D,
   media: Drawable,
@@ -124,20 +229,35 @@ function drawScene(
   const { width: W, height: H } = ctx.canvas;
   const p = Math.max(0, Math.min(1, opts.progress));
 
-  // Cinematic camera motion per beat — cycled by the pipeline so consecutive
-  // beats never move the same way (kills the slideshow feel).
+  // Cinematic camera motion per beat — Motion Director picks these per
+  // scene type (product spin for product showcase, page-flip for worksheets,
+  // orbit for mockups, dolly for lifestyle, etc.).
   const motion: CameraMotion = scene.motion ?? "zoomIn";
   let scale = 1.08;
-  let panX = 0; // fraction of W
-  let panY = 0; // fraction of H
+  let panX = 0;             // fraction of W
+  let panY = 0;             // fraction of H
+  let rotate = 0;           // radians
+  let skewX = 0;            // horizontal skew for spin/parallax feel
   switch (motion) {
-    case "zoomIn":    scale = 1.05 + p * 0.12; break;
-    case "zoomOut":   scale = 1.18 - p * 0.12; break;
-    case "pushIn":    scale = 1.02 + p * 0.20; break;
-    case "panLeft":   scale = 1.15; panX = (0.05 - p * 0.10); break;
-    case "panRight":  scale = 1.15; panX = (-0.05 + p * 0.10); break;
-    case "tiltDown":  scale = 1.15; panY = (-0.05 + p * 0.10); break;
-    case "tiltUp":    scale = 1.15; panY = (0.05 - p * 0.10); break;
+    case "zoomIn":       scale = 1.05 + p * 0.12; break;
+    case "zoomOut":      scale = 1.18 - p * 0.12; break;
+    case "pushIn":       scale = 1.02 + p * 0.20; break;
+    case "panLeft":      scale = 1.15; panX = (0.05 - p * 0.10); break;
+    case "panRight":     scale = 1.15; panX = (-0.05 + p * 0.10); break;
+    case "tiltDown":     scale = 1.15; panY = (-0.05 + p * 0.10); break;
+    case "tiltUp":       scale = 1.15; panY = (0.05 - p * 0.10); break;
+    case "orbit":        scale = 1.14 + p * 0.04; panX = Math.sin(p * Math.PI) * 0.06; skewX = Math.sin(p * Math.PI) * 0.05; break;
+    case "dollyLeft":    scale = 1.20; panX = 0.08 - p * 0.16; break;
+    case "dollyRight":   scale = 1.20; panX = -0.08 + p * 0.16; break;
+    case "craneUp":      scale = 1.18 - p * 0.04; panY = 0.08 - p * 0.16; break;
+    case "craneDown":    scale = 1.14 + p * 0.06; panY = -0.08 + p * 0.16; break;
+    case "macroPush":    scale = 1.25 + p * 0.30; break;
+    case "parallax":     scale = 1.16 + p * 0.03; panX = -0.06 + p * 0.12; panY = Math.sin(p * Math.PI * 2) * 0.01; break;
+    case "floating":     scale = 1.10 + Math.sin(p * Math.PI * 2) * 0.02; panY = Math.sin(p * Math.PI * 2) * 0.02; break;
+    case "productSpin":  scale = 1.14; skewX = Math.sin(p * Math.PI * 2) * 0.10; panX = Math.sin(p * Math.PI * 2) * 0.02; break;
+    case "kineticText":  scale = 1.06 + Math.sin(p * Math.PI) * 0.03; panY = Math.sin(p * Math.PI * 2) * 0.01; break;
+    case "pageFlip":     scale = 1.12 + p * 0.04; rotate = (p - 0.5) * 0.06; panX = (p - 0.5) * 0.03; break;
+    case "handInteract": scale = 1.18 + p * 0.06; panY = 0.02 - p * 0.04; break;
   }
 
   ctx.fillStyle = "#0b0b16";
@@ -147,7 +267,19 @@ function drawScene(
     const ratio = Math.max(W / size.w, H / size.h) * scale;
     const dw = size.w * ratio;
     const dh = size.h * ratio;
-    ctx.drawImage(media, (W - dw) / 2 + panX * W, (H - dh) / 2 + panY * H, dw, dh);
+    const dx = (W - dw) / 2 + panX * W;
+    const dy = (H - dh) / 2 + panY * H;
+    if (rotate !== 0 || skewX !== 0) {
+      ctx.save();
+      ctx.translate(W / 2, H / 2);
+      if (rotate !== 0) ctx.rotate(rotate);
+      if (skewX !== 0) ctx.transform(1, 0, skewX, 1, 0, 0);
+      ctx.translate(-W / 2, -H / 2);
+      ctx.drawImage(media, dx, dy, dw, dh);
+      ctx.restore();
+    } else {
+      ctx.drawImage(media, dx, dy, dw, dh);
+    }
   } else {
     const g = ctx.createLinearGradient(0, 0, W, H);
     g.addColorStop(0, opts.accent);
@@ -163,6 +295,14 @@ function drawScene(
   if (veil > 0) {
     ctx.fillStyle = `rgba(0,0,0,${veil.toFixed(3)})`;
     ctx.fillRect(0, 0, W, H);
+  }
+
+  // Motion Director transition — overlaid on the FIRST ~0.35 of the beat so
+  // scene changes feel like edits (whip-pan, flash, mask reveal, page-flip)
+  // instead of hard cuts.
+  const transition: TransitionStyle = scene.transition ?? "fade";
+  if (transition !== "cut" && transition !== "fade" && p < 0.35) {
+    drawTransition(ctx, transition, p / 0.35, W, H);
   }
 
   // Bottom gradient so the voiceover caption stays readable.

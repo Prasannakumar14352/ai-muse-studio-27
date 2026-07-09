@@ -28,6 +28,8 @@ export type ShotRecord = {
   words: number;
   prompt: string;
   motion: string;
+  transition?: string;
+  sceneType?: string;
   status: ShotStatus;
   kind: ShotKind | null;
   blobKey: string | null;
