@@ -145,52 +145,37 @@ function CarouselsPage() {
     projectId: string, idx: number,
     prompt: Prompt, styleLabel: string, ratio: string,
   ): Promise<{ image: string | null; diag: SlideDiag }> {
+    const { fetchGeneratedImage } = await import("@/lib/image-stream");
     const maxAttempts = 3;
     let last: SlideDiag | null = null;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const start = Date.now();
-      try {
-        const res = await fetch("/api/generate-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: prompt.prompt, style: styleLabel, ratio, quality: "medium" }),
-        });
-        const j = (await res.json().catch(() => ({}))) as { image?: string; error?: string };
-        if (!res.ok || !j.image) {
-          last = {
-            at: new Date().toISOString(),
-            ok: false,
-            durationMs: Date.now() - start,
-            httpStatus: res.status,
-            error: `${j.error ?? `HTTP ${res.status}`}${attempt < maxAttempts ? ` (attempt ${attempt}/${maxAttempts})` : ""}`,
-            attempts: attempt,
-            prompt: prompt.prompt,
-            style: styleLabel,
-            ratio,
-          };
-        } else {
-          const key = await putDataURL(`carousel:${projectId}:${idx}`, j.image);
-          return {
-            image: key,
-            diag: {
-              at: new Date().toISOString(), ok: true, durationMs: Date.now() - start, httpStatus: res.status,
-              attempts: attempt, prompt: prompt.prompt, style: styleLabel, ratio,
-            },
-          };
-        }
-      } catch (e) {
-        last = {
-          at: new Date().toISOString(),
-          ok: false,
-          durationMs: Date.now() - start,
-          error: `${e instanceof Error ? e.message : "Network error"}${attempt < maxAttempts ? ` (attempt ${attempt}/${maxAttempts})` : ""}`,
-          attempts: attempt,
-          prompt: prompt.prompt,
-          style: styleLabel,
-          ratio,
+      const { image, error, status } = await fetchGeneratedImage({
+        prompt: prompt.prompt, style: styleLabel, ratio, quality: "medium",
+      });
+      if (image) {
+        const key = await putDataURL(`carousel:${projectId}:${idx}`, image);
+        return {
+          image: key,
+          diag: {
+            at: new Date().toISOString(), ok: true, durationMs: Date.now() - start,
+            httpStatus: status || 200, attempts: attempt,
+            prompt: prompt.prompt, style: styleLabel, ratio,
+          },
         };
       }
-      if (!last || !shouldRetrySlide(last) || attempt === maxAttempts) break;
+      last = {
+        at: new Date().toISOString(),
+        ok: false,
+        durationMs: Date.now() - start,
+        httpStatus: status || undefined,
+        error: `${error ?? `HTTP ${status}`}${attempt < maxAttempts ? ` (attempt ${attempt}/${maxAttempts})` : ""}`,
+        attempts: attempt,
+        prompt: prompt.prompt,
+        style: styleLabel,
+        ratio,
+      };
+      if (!shouldRetrySlide(last) || attempt === maxAttempts) break;
       await sleep(900 * attempt);
     }
     return { image: null, diag: last ?? { at: new Date().toISOString(), ok: false, durationMs: 0, error: "Image generation failed", attempts: maxAttempts, prompt: prompt.prompt, style: styleLabel, ratio } };
