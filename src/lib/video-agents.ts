@@ -94,12 +94,26 @@ function splitVoiceoverIntoBeatTexts(vo: string, targetBeats: number): string[] 
   return chunks.length ? chunks : [clean];
 }
 
-function expandScriptToBeats(script: AiVideoScript, style: StyleId, title: string): Beat[] {
+function expandScriptToBeats(
+  script: AiVideoScript,
+  style: StyleId,
+  title: string,
+  brief?: import("@/lib/creative-director").CreativeBrief | null,
+): Beat[] {
   const beats: Beat[] = [];
   let globalIdx = 0;
   const continuity: ContinuityCard = buildContinuityCard(title);
   const vdStyle = style as VDStyle;
   let previousShot: ShotType | null = null;
+  const directorLite = brief ? {
+    intent: brief.intent,
+    visualHero: brief.visualHero,
+    visualStyle: brief.visualStyle,
+    cameraStyle: brief.cameraStyle,
+    sceneComposition: brief.sceneComposition,
+    paletteHint: brief.paletteHint,
+    avoid: brief.avoid,
+  } : null;
   script.scenes.forEach((scene, sceneIndex) => {
     const sceneDur = parseSec(scene.duration);
     const targetBeats = Math.max(1, Math.round(sceneDur / TARGET_BEAT_SEC));
@@ -120,6 +134,7 @@ function expandScriptToBeats(script: AiVideoScript, style: StyleId, title: strin
         beatIndex: globalIdx,
         continuity,
         previousShotType: previousShot,
+        brief: directorLite,
       });
       previousShot = directed.shotType;
       beats.push({
