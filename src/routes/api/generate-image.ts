@@ -1,63 +1,82 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// Server route for AI image generation via Lovable AI Gateway.
-// Non-streaming: returns { b64_json } after the image is fully rendered.
+/**
+ * Streaming image-generation endpoint.
+ *
+ * The previous implementation buffered the entire upstream response before
+ * responding, which regularly tripped Cloudflare's 100s origin timeout (524)
+ * on high-quality `openai/gpt-image-2` renders. This version:
+ *
+ *   1. Uses `google/gemini-3.1-flash-image` by default (much faster, still
+ *      pro-tier quality), with an opt-in escape hatch for `openai/gpt-image-2`.
+ *   2. Requests `stream: true` and pipes the upstream SSE body straight
+ *      through to the browser — bytes start flowing within a couple seconds
+ *      so Cloudflare never times out.
+ *
+ * The client parses the stream, keeps the latest partial for a live preview,
+ * and treats the final `image_generation.completed` frame as the finished PNG.
+ */
 export const Route = createFileRoute("/api/generate-image")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { prompt, style, ratio, background, quality } = (await request.json()) as {
+        const {
+          prompt,
+          style,
+          ratio,
+          background,
+          quality,
+          model: modelOverride,
+        } = (await request.json()) as {
           prompt: string;
           style?: string;
           ratio?: string;
-          /** "transparent" produces a subject on a transparent PNG (great for thumbnail layer compositing). */
           background?: "transparent" | "opaque";
-          /** "low" | "medium" | "high" — thumbnails default to "medium". */
           quality?: "low" | "medium" | "high";
+          model?: string;
         };
 
         const key = process.env.LOVABLE_API_KEY;
         if (!key) {
-          return new Response(JSON.stringify({ error: "Missing LOVABLE_API_KEY" }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          });
+          return json({ error: "Missing LOVABLE_API_KEY" }, 500);
         }
         if (!prompt || !prompt.trim()) {
-          return new Response(JSON.stringify({ error: "Prompt required" }), {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          });
+          return json({ error: "Prompt required" }, 400);
         }
 
-        // Map aspect ratio to a size the model accepts.
         const size =
           ratio === "9:16"
             ? "1024x1536"
             : ratio === "16:9"
-            ? "1536x1024"
-            : "1024x1024";
+              ? "1536x1024"
+              : "1024x1024";
 
         const stylePrefix = style ? `${style} style. ` : "";
         const fullPrompt = `${stylePrefix}${prompt}`;
-        const chosenQuality = quality ?? "low";
+        const model = modelOverride ?? "google/gemini-3.1-flash-image";
 
-        type ImageReqBody = {
-          model: string;
-          prompt: string;
-          size: string;
-          quality: string;
-          n: number;
-          background?: "transparent" | "opaque";
-        };
-        const body: ImageReqBody = {
-          model: "openai/gpt-image-2",
-          prompt: fullPrompt,
-          size,
-          quality: chosenQuality,
-          n: 1,
-        };
-        if (background === "transparent") body.background = "transparent";
+        // Build request body per model family (see ai-image-generation).
+        let body: Record<string, unknown>;
+        if (model.startsWith("openai/")) {
+          body = {
+            model,
+            prompt: fullPrompt,
+            size,
+            quality: quality ?? "medium",
+            n: 1,
+            stream: true,
+            partial_images: 1,
+          };
+          if (background === "transparent") body.background = "transparent";
+        } else {
+          // Gemini chat-completions image shape.
+          body = {
+            model,
+            messages: [{ role: "user", content: fullPrompt }],
+            modalities: ["image", "text"],
+            stream: true,
+          };
+        }
 
         let upstream: Response;
         try {
@@ -70,68 +89,44 @@ export const Route = createFileRoute("/api/generate-image")({
                 "Content-Type": "application/json",
               },
               body: JSON.stringify(body),
-            }
+            },
           );
         } catch (error) {
-          return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Image service unreachable" }), {
-            status: 502,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-
-        if (!upstream.ok) {
-          const text = await upstream.text().catch(() => "");
-          return new Response(
-            JSON.stringify({ error: text || "Image generation failed" }),
-            { status: upstream.status, headers: { "Content-Type": "application/json" } }
+          return json(
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Image service unreachable",
+            },
+            502,
           );
         }
 
-        const json = (await upstream.json()) as {
-          data?: Array<{ b64_json?: string; url?: string }>;
-        };
-        const first = json.data?.[0];
-        const b64 = first?.b64_json;
-        const url = first?.url;
-        if (!b64 && !url) {
-          return new Response(JSON.stringify({ error: "No image returned" }), {
-            status: 502,
-            headers: { "Content-Type": "application/json" },
-          });
+        if (!upstream.ok || !upstream.body) {
+          const text = await upstream.text().catch(() => "");
+          return json({ error: text || "Image generation failed" }, upstream.status);
         }
 
-        let image = b64 ? `data:image/png;base64,${b64}` : url!;
-        if (!b64 && url) {
-          try {
-            const imageResponse = await fetch(url);
-            if (imageResponse.ok) {
-              const contentType = imageResponse.headers.get("content-type") || "image/png";
-              const bytes = await imageResponse.arrayBuffer();
-              const encoded = Buffer.from(bytes).toString("base64");
-              image = `data:${contentType};base64,${encoded}`;
-            }
-          } catch {
-            // Fall back to the provider URL. The client has a second fallback path.
-          }
-        }
-
-        return new Response(
-          JSON.stringify({
-            image,
-            debug: {
-              model: "openai/gpt-image-2",
-              size,
-              quality: chosenQuality,
-              n: 1,
-              background: background === "transparent" ? "transparent" : "opaque",
-              fullPrompt,
-              originalPrompt: prompt,
-              stylePrefix: stylePrefix || null,
-            },
-          }),
-          { headers: { "Content-Type": "application/json" } }
-        );
+        // Pipe SSE straight to the client. Bytes flow immediately, so
+        // Cloudflare doesn't time out and the browser can render partials.
+        return new Response(upstream.body, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+            "X-Accel-Buffering": "no",
+            "X-Image-Model": model,
+          },
+        });
       },
     },
   },
 });
+
+function json(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
