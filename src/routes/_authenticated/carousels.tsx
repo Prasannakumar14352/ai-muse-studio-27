@@ -73,7 +73,7 @@ const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve
 
 function shouldRetrySlide(diag: SlideDiag) {
   if (!diag.ok && !diag.httpStatus) return true;
-  return Boolean(diag.httpStatus && [408, 409, 425, 429, 500, 502, 503, 504].includes(diag.httpStatus));
+  return Boolean(diag.httpStatus && [408, 409, 425, 429, 500, 502, 503, 504, 520, 522, 524].includes(diag.httpStatus));
 }
 
 function CarouselsPage() {
@@ -153,7 +153,7 @@ function CarouselsPage() {
         const res = await fetch("/api/generate-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: prompt.prompt, style: styleLabel, ratio, quality: "high" }),
+          body: JSON.stringify({ prompt: prompt.prompt, style: styleLabel, ratio, quality: "medium" }),
         });
         const j = (await res.json().catch(() => ({}))) as { image?: string; error?: string };
         if (!res.ok || !j.image) {
