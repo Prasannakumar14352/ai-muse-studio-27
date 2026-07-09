@@ -55,22 +55,47 @@ export const generateAiCarousel = createServerFn({ method: "POST" })
     const total = data.slideCount;
     const pointCount = Math.max(1, total - 2);
 
+    // ---------- Creative Director ----------
+    // Detect the user's intent (product / educational / kids / SaaS / etc.)
+    // and derive a full brief + slide-type plan BEFORE we ask the writer to
+    // design slides. This is what stops the model from spitting out generic
+    // "person holding phone" slides when the topic is a digital product or
+    // Montessori worksheet pack.
+    const { intent, confidence } = detectIntentHeuristic(data.topic);
+    const brief: CreativeBrief = buildBriefFromIntent(data.topic, intent, confidence);
+    const plan: AssetPlan = buildAssetPlanHeuristic(brief, "carousel", total);
+    const slidePlanLines = plan.items.map((it) =>
+      `Slide ${it.index}: ${it.slideType ?? it.role} — layout: ${it.layoutHint} — visual: ${it.visualDescription}`,
+    ).join("\n");
+    const directorBlock = briefEnrichment(brief);
+
     const sys = `You are the Creative Director of a top-tier social media agency
 (think Ogilvy x Apple x Pentagram). You write RIDICULOUSLY detailed, magazine-quality,
 ready-to-render image prompts for premium Instagram carousels. Every "image_prompt"
 you produce is a full agency brief that a modern text-to-image model (gpt-image-2)
 can execute as a finished, on-brand ad slide with perfectly spelled headline,
 subheadline, badges, and CTA rendered inside the image itself. Return STRICT JSON —
-no prose, no markdown fences.`;
+no prose, no markdown fences.
+
+You MUST follow the upstream CREATIVE DIRECTOR BRIEF below verbatim. In
+particular: honor the "Visual hero" (do NOT drift into random presenters if
+the hero is a product / worksheet / dashboard), respect the AVOID list, and
+give EACH slide a DIFFERENT slide type + layout from the SLIDE PLAN — do
+not return N identical slides.`;
 
     const user = `Design a premium Instagram carousel.
+
+${directorBlock}
+
+SLIDE PLAN (obey slide-type + layout per slide — do NOT collapse into identical slides):
+${slidePlanLines}
 
 TOPIC: ${data.topic}
 TONE: ${data.tone}
 PLATFORM: ${data.platform}
 VISUAL STYLE: ${data.styleLabel}
 ASPECT: ${data.aspectRatio} (${sizeHint})
-SLIDE COUNT: ${total} (Slide 1 = Cover, ${pointCount} content slides, last = CTA)
+SLIDE COUNT: ${total} (Slide 1 = Hook, ${pointCount} content slides, last = CTA)
 
 For EACH slide, produce:
 - n: slide number (1..${total})
