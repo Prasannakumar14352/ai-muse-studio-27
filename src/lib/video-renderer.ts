@@ -127,6 +127,97 @@ function drawableSize(d: Drawable): { w: number; h: number } {
   return { w: d.width, h: d.height };
 }
 
+/** Overlay a scene-change transition on the incoming beat. `t` is 0..1. */
+function drawTransition(
+  ctx: CanvasRenderingContext2D,
+  kind: TransitionStyle,
+  t: number,
+  W: number,
+  H: number,
+) {
+  const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+  switch (kind) {
+    case "whipPan": {
+      // Motion blur + streaked veil sweeping across.
+      const alpha = (1 - eased) * 0.9;
+      const g = ctx.createLinearGradient(0, 0, W, 0);
+      g.addColorStop(Math.max(0, eased - 0.15), "rgba(0,0,0,0)");
+      g.addColorStop(eased, `rgba(255,255,255,${(alpha * 0.35).toFixed(3)})`);
+      g.addColorStop(Math.min(1, eased + 0.15), "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = `rgba(0,0,0,${(alpha * 0.4).toFixed(3)})`;
+      ctx.fillRect(0, 0, W, H);
+      break;
+    }
+    case "flash": {
+      const a = Math.max(0, 1 - t / 0.6);
+      ctx.fillStyle = `rgba(255,255,255,${(a * 0.95).toFixed(3)})`;
+      ctx.fillRect(0, 0, W, H);
+      break;
+    }
+    case "slideLeft": {
+      const x = W * (1 - eased);
+      ctx.fillStyle = "#0b0b16";
+      ctx.fillRect(x, 0, W - x, H);
+      break;
+    }
+    case "slideUp": {
+      const y = H * (1 - eased);
+      ctx.fillStyle = "#0b0b16";
+      ctx.fillRect(0, y, W, H - y);
+      break;
+    }
+    case "maskCircle": {
+      // Grow a circular window: black everywhere except the expanding disc.
+      const r = Math.hypot(W, H) * eased * 0.6;
+      ctx.save();
+      ctx.fillStyle = "#0b0b16";
+      ctx.beginPath();
+      ctx.rect(0, 0, W, H);
+      ctx.arc(W / 2, H / 2, r, 0, Math.PI * 2, true);
+      ctx.closePath();
+      ctx.fill("evenodd");
+      ctx.restore();
+      break;
+    }
+    case "pageFlip": {
+      // Diagonal wipe with a bright edge — feels like a page flipping in.
+      const w = W * 1.2 * (1 - eased);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(w, 0);
+      ctx.lineTo(w - H * 0.25, H);
+      ctx.lineTo(0, H);
+      ctx.closePath();
+      ctx.fillStyle = "#f5efe4";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.35)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+      break;
+    }
+    case "zoomBlur": {
+      const a = (1 - eased) * 0.75;
+      ctx.fillStyle = `rgba(0,0,0,${a.toFixed(3)})`;
+      ctx.fillRect(0, 0, W, H);
+      // subtle vignette
+      const rg = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) / 2);
+      rg.addColorStop(0, "rgba(255,255,255,0)");
+      rg.addColorStop(1, `rgba(255,255,255,${(a * 0.4).toFixed(3)})`);
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, 0, W, H);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+
+
 function drawScene(
   ctx: CanvasRenderingContext2D,
   media: Drawable,
