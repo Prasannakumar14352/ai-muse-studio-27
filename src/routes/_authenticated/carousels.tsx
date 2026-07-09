@@ -54,9 +54,10 @@ type CarouselRow = {
   platform: string | null;
   tone: string | null;
   image_prompts: Prompt[];
-  carousel_images: (string | null)[] | null;   // stored refs (idb keys or data URLs)
-  display_images: (string | null)[] | null;    // resolved to blob object URLs for <img>
+  carousel_images: (string | null)[] | null;
+  display_images: (string | null)[] | null;
   carousel_slides: CarouselSlide[] | null;
+  slide_overlays: Record<number, SlideOverlaySet>;
   slide_diagnostics: SlideDiagMap;
   saved_ratio: LayoutSettings["ratio"] | null;
   saved_slide_count: number | null;
