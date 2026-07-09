@@ -1268,7 +1268,7 @@ export async function runVideoPipeline(
   const storyboard = await mark("storyboard", () => StoryboardAgent.run(script));
   const direction = await mark("direction", () => DirectorAgent.run(brief, storyboard));
 
-  const beats = expandScriptToBeats(script, brief.style, brief.title);
+  const beats = expandScriptToBeats(script, brief.style, brief.title, creativeBrief);
 
   const visuals = await mark("visuals", () =>
     VisualGenerationAgent.run(brief, beats, (done, total) =>
