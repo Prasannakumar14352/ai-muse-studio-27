@@ -1521,6 +1521,11 @@ export async function runVideoJobPipeline(
   let storyboard: Storyboard;
   let direction: DirectorPlan;
 
+  // Creative Director (heuristic) — steers visual hero + avoid list.
+  const cdIntent = detectIntentHeuristic(brief.title);
+  const creativeBrief = buildBriefFromIntent(brief.title, cdIntent.intent, cdIntent.confidence);
+
+
   const existing = opts.jobId ? await getJob(opts.jobId) : null;
   if (existing) {
     onEvent({ type: "phase", phase: "planning", note: "Resuming saved job" });
