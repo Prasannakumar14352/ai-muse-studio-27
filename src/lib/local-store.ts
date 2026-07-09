@@ -128,6 +128,7 @@ export async function saveOutput(projectId: string, patch: Partial<LocalOutput>)
     thumbnail_ideas: existing?.thumbnail_ideas ?? [],
     carousel_images: existing?.carousel_images ?? null,
     carousel_slides: existing?.carousel_slides ?? null,
+    slide_overlays: existing?.slide_overlays ?? null,
     aspect_ratio: existing?.aspect_ratio ?? null,
     slide_count: existing?.slide_count ?? null,
     video_url: existing?.video_url ?? null,
