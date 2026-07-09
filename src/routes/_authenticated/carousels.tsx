@@ -73,7 +73,7 @@ const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve
 
 function shouldRetrySlide(diag: SlideDiag) {
   if (!diag.ok && !diag.httpStatus) return true;
-  return Boolean(diag.httpStatus && [408, 409, 425, 429, 500, 502, 503, 504].includes(diag.httpStatus));
+  return Boolean(diag.httpStatus && [408, 409, 425, 429, 500, 502, 503, 504, 520, 522, 524].includes(diag.httpStatus));
 }
 
 function CarouselsPage() {
