@@ -773,7 +773,7 @@ function CarouselsPage() {
                             <span className="absolute top-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-black/70 text-white font-medium">
                               {i + 1}/{slides.length}
                             </span>
-                            {failed && (
+                            {failed ? (
                               <button
                                 onClick={() => retrySlide(row, i)}
                                 disabled={isRetrying}
@@ -782,7 +782,15 @@ function CarouselsPage() {
                               >
                                 {isRetrying ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                               </button>
-                            )}
+                            ) : src ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingSlide({ rowId: row.id, idx: i }); }}
+                                className="absolute bottom-1.5 right-1.5 rounded-md bg-black/80 hover:bg-black text-white p-1"
+                                title="Edit text & logo"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            ) : null}
                           </div>
                         );
                       })}
