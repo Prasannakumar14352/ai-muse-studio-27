@@ -703,6 +703,13 @@ function CarouselsPage() {
                                           {isRetrying ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                                         </button>
                                       )}
+                                      {src && !failed && (
+                                        <button onClick={(e) => { e.stopPropagation(); setEditingSlide({ rowId: row.id, idx: i }); }}
+                                          className="absolute bottom-1 right-1 rounded-md bg-black/80 hover:bg-black text-white p-1"
+                                          title="Edit text & logo">
+                                          <Pencil className="w-3 h-3" />
+                                        </button>
+                                      )}
                                     </div>
                                     <div className="py-2 pr-3 text-xs min-w-0">
                                       <div className="flex items-center gap-1.5 flex-wrap">
