@@ -206,6 +206,14 @@ function drawScene(
     ctx.fillRect(0, 0, W, H);
   }
 
+  // Motion Director transition — overlaid on the FIRST ~0.35 of the beat so
+  // scene changes feel like edits (whip-pan, flash, mask reveal, page-flip)
+  // instead of hard cuts.
+  const transition: TransitionStyle = scene.transition ?? "fade";
+  if (transition !== "cut" && transition !== "fade" && p < 0.35) {
+    drawTransition(ctx, transition, p / 0.35, W, H);
+  }
+
   // Bottom gradient so the voiceover caption stays readable.
   const grad = ctx.createLinearGradient(0, H * 0.55, 0, H);
   grad.addColorStop(0, "rgba(0,0,0,0)");
