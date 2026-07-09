@@ -5,15 +5,29 @@
 import { getStyle } from "./constants";
 import { deductUsage } from "./access";
 
-export type CameraMotion = "zoomIn" | "zoomOut" | "panLeft" | "panRight" | "tiltDown" | "tiltUp" | "pushIn";
+// Legacy 7 motions are kept as a subset; the Motion Director adds cinematic
+// variants (orbit, dolly, crane, macro, parallax, floating, spin, page-flip,
+// hand-interact, kinetic-text). All are canvas-implementable transforms.
+export type CameraMotion =
+  | "zoomIn" | "zoomOut" | "panLeft" | "panRight" | "tiltDown" | "tiltUp" | "pushIn"
+  | "orbit" | "dollyLeft" | "dollyRight" | "craneUp" | "craneDown"
+  | "macroPush" | "parallax" | "floating" | "productSpin" | "kineticText"
+  | "pageFlip" | "handInteract";
+
+export type TransitionStyle =
+  | "cut" | "fade" | "whipPan" | "flash"
+  | "slideLeft" | "slideUp" | "maskCircle" | "pageFlip" | "zoomBlur";
+
 export type RenderScene = {
   n: number;
   visual: string;
   voiceover: string;
   duration: string;
   on_screen_text?: string;
-  /** Optional camera motion for this beat. Cycled by the pipeline for cinematic variety. */
+  /** Camera motion for this beat — Motion Director picks it per scene type. */
   motion?: CameraMotion;
+  /** Transition INTO this beat (played over ~0.35s at the start). */
+  transition?: TransitionStyle;
 };
 
 export type RenderOptions = {
