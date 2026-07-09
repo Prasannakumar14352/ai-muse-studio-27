@@ -6,15 +6,16 @@ import JSZip from "jszip";
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
-import { listOutputs, saveOutput, deleteOutput, type CarouselSlide } from "@/lib/local-store";
+import { listOutputs, saveOutput, deleteOutput, getOutput, type CarouselSlide, type SlideOverlaySet } from "@/lib/local-store";
 import {
-  putDataURL, getObjectURL, getDataURL, deleteBlobsByPrefix, isBlobKey, makeBlobKey,
+  putDataURL, getObjectURL, getDataURL, deleteBlob, deleteBlobsByPrefix, isBlobKey, makeBlobKey,
 } from "@/lib/blob-store";
+import { SlideEditor } from "@/components/slide-editor";
 
 import { confirmDialog } from "@/components/confirm-dialog";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
-  Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2, Film,
+  Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2, Film, Pencil,
 } from "lucide-react";
 
 
@@ -53,9 +54,10 @@ type CarouselRow = {
   platform: string | null;
   tone: string | null;
   image_prompts: Prompt[];
-  carousel_images: (string | null)[] | null;   // stored refs (idb keys or data URLs)
-  display_images: (string | null)[] | null;    // resolved to blob object URLs for <img>
+  carousel_images: (string | null)[] | null;
+  display_images: (string | null)[] | null;
   carousel_slides: CarouselSlide[] | null;
+  slide_overlays: Record<number, SlideOverlaySet>;
   slide_diagnostics: SlideDiagMap;
   saved_ratio: LayoutSettings["ratio"] | null;
   saved_slide_count: number | null;
@@ -87,6 +89,33 @@ function CarouselsPage() {
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [collapsedSlides, setCollapsedSlides] = useState<Record<string, boolean>>({});
+  const [editingSlide, setEditingSlide] = useState<{ rowId: string; idx: number } | null>(null);
+
+  async function saveEditedSlide(row: CarouselRow, idx: number, dataUrl: string, overlays: SlideOverlaySet) {
+    const versionedId = `carousel:${row.id}:${idx}:v${Date.now()}`;
+    const newKey = await putDataURL(versionedId, dataUrl);
+    const prev = row.carousel_images ?? [];
+    const nextImages: (string | null)[] = prev.length
+      ? [...prev]
+      : new Array(row.image_prompts.length).fill(null);
+    const old = nextImages[idx];
+    nextImages[idx] = newKey;
+    const existing = await getOutput(row.id);
+    const nextOverlays: Record<number, SlideOverlaySet> = {
+      ...(existing?.slide_overlays ?? {}),
+      [idx]: overlays,
+    };
+    await saveOutput(row.id, {
+      carousel_images: nextImages,
+      slide_overlays: nextOverlays,
+    });
+    if (old && isBlobKey(old) && old !== newKey) {
+      try { await deleteBlob(old); } catch { /* ignore */ }
+    }
+    qc.invalidateQueries({ queryKey: ["carousels"] });
+    qc.invalidateQueries({ queryKey: ["project", row.id] });
+  }
+
 
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
@@ -119,6 +148,7 @@ function CarouselsPage() {
           carousel_images: stored,
           display_images: display,
           carousel_slides: out?.carousel_slides ?? null,
+          slide_overlays: (out?.slide_overlays ?? {}) as Record<number, SlideOverlaySet>,
           slide_diagnostics: (rd?.slide_diagnostics ?? {}) as SlideDiagMap,
           saved_ratio: (out?.aspect_ratio ?? null) as LayoutSettings["ratio"] | null,
           saved_slide_count: out?.slide_count ?? null,
@@ -673,6 +703,13 @@ function CarouselsPage() {
                                           {isRetrying ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                                         </button>
                                       )}
+                                      {src && !failed && (
+                                        <button onClick={(e) => { e.stopPropagation(); setEditingSlide({ rowId: row.id, idx: i }); }}
+                                          className="absolute bottom-1 right-1 rounded-md bg-black/80 hover:bg-black text-white p-1"
+                                          title="Edit text & logo">
+                                          <Pencil className="w-3 h-3" />
+                                        </button>
+                                      )}
                                     </div>
                                     <div className="py-2 pr-3 text-xs min-w-0">
                                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -736,7 +773,7 @@ function CarouselsPage() {
                             <span className="absolute top-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-black/70 text-white font-medium">
                               {i + 1}/{slides.length}
                             </span>
-                            {failed && (
+                            {failed ? (
                               <button
                                 onClick={() => retrySlide(row, i)}
                                 disabled={isRetrying}
@@ -745,7 +782,15 @@ function CarouselsPage() {
                               >
                                 {isRetrying ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                               </button>
-                            )}
+                            ) : src ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingSlide({ rowId: row.id, idx: i }); }}
+                                className="absolute bottom-1.5 right-1.5 rounded-md bg-black/80 hover:bg-black text-white p-1"
+                                title="Edit text & logo"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            ) : null}
                           </div>
                         );
                       })}
@@ -875,6 +920,27 @@ function CarouselsPage() {
           </div>
         </div>
       )}
+
+      {editingSlide && (() => {
+        const row = data?.find((r) => r.id === editingSlide.rowId);
+        const src = row?.display_images?.[editingSlide.idx];
+        if (!row || !src) return null;
+        const cfg = getLayout(row);
+        const slideNum = row.carousel_slides?.[editingSlide.idx]?.n ?? editingSlide.idx + 1;
+        return (
+          <SlideEditor
+            src={src}
+            ratio={cfg.ratio}
+            title={row.title}
+            slideNumber={slideNum}
+            initial={row.slide_overlays[editingSlide.idx] ?? null}
+            onClose={() => setEditingSlide(null)}
+            onSave={async (dataUrl, overlays) => {
+              await saveEditedSlide(row, editingSlide.idx, dataUrl, overlays);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

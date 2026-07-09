@@ -19,6 +19,33 @@ export type CarouselSlide = {
   bottom_highlight?: string;
 };
 
+export type SlideTextOverlay = {
+  id: string;
+  kind: "text";
+  text: string;
+  xPct: number;
+  yPct: number;
+  widthPct: number;
+  fontSize: number;
+  color: string;
+  bg: string;
+  weight: 400 | 600 | 700 | 800 | 900;
+  align: "left" | "center" | "right";
+  fontFamily: string;
+};
+export type SlideLogoOverlay = {
+  id: string;
+  kind: "logo";
+  src: string;
+  xPct: number;
+  yPct: number;
+  widthPct: number;
+  opacity: number;
+  rounded: boolean;
+};
+export type SlideOverlay = SlideTextOverlay | SlideLogoOverlay;
+export type SlideOverlaySet = { overlays: SlideOverlay[] };
+
 export type LocalOutput = {
   id: string;
   project_id: string;
@@ -32,6 +59,7 @@ export type LocalOutput = {
   thumbnail_ideas: string[];
   carousel_images?: (string | null)[] | null;
   carousel_slides?: CarouselSlide[] | null;
+  slide_overlays?: Record<number, SlideOverlaySet> | null;
   aspect_ratio?: string | null;
   slide_count?: number | null;
   video_url?: string | null;
@@ -100,6 +128,7 @@ export async function saveOutput(projectId: string, patch: Partial<LocalOutput>)
     thumbnail_ideas: existing?.thumbnail_ideas ?? [],
     carousel_images: existing?.carousel_images ?? null,
     carousel_slides: existing?.carousel_slides ?? null,
+    slide_overlays: existing?.slide_overlays ?? null,
     aspect_ratio: existing?.aspect_ratio ?? null,
     slide_count: existing?.slide_count ?? null,
     video_url: existing?.video_url ?? null,
