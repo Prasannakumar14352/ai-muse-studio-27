@@ -121,6 +121,7 @@ function CarouselsPage() {
           carousel_images: stored,
           display_images: display,
           carousel_slides: out?.carousel_slides ?? null,
+          slide_overlays: (out?.slide_overlays ?? {}) as Record<number, SlideOverlaySet>,
           slide_diagnostics: (rd?.slide_diagnostics ?? {}) as SlideDiagMap,
           saved_ratio: (out?.aspect_ratio ?? null) as LayoutSettings["ratio"] | null,
           saved_slide_count: out?.slide_count ?? null,
