@@ -21,6 +21,10 @@ import {
   directBeatPrompt, buildContinuityCard,
   type ContinuityCard, type ShotType, type VDStyle,
 } from "@/lib/visual-director";
+import {
+  detectIntentHeuristic, buildBriefFromIntent,
+  type CreativeBrief,
+} from "@/lib/creative-director";
 
 // ---------- Beat expansion (documentary-style visual density) ----------
 //
@@ -94,12 +98,26 @@ function splitVoiceoverIntoBeatTexts(vo: string, targetBeats: number): string[] 
   return chunks.length ? chunks : [clean];
 }
 
-function expandScriptToBeats(script: AiVideoScript, style: StyleId, title: string): Beat[] {
+function expandScriptToBeats(
+  script: AiVideoScript,
+  style: StyleId,
+  title: string,
+  brief?: import("@/lib/creative-director").CreativeBrief | null,
+): Beat[] {
   const beats: Beat[] = [];
   let globalIdx = 0;
   const continuity: ContinuityCard = buildContinuityCard(title);
   const vdStyle = style as VDStyle;
   let previousShot: ShotType | null = null;
+  const directorLite = brief ? {
+    intent: brief.intent,
+    visualHero: brief.visualHero,
+    visualStyle: brief.visualStyle,
+    cameraStyle: brief.cameraStyle,
+    sceneComposition: brief.sceneComposition,
+    paletteHint: brief.paletteHint,
+    avoid: brief.avoid,
+  } : null;
   script.scenes.forEach((scene, sceneIndex) => {
     const sceneDur = parseSec(scene.duration);
     const targetBeats = Math.max(1, Math.round(sceneDur / TARGET_BEAT_SEC));
@@ -120,6 +138,7 @@ function expandScriptToBeats(script: AiVideoScript, style: StyleId, title: strin
         beatIndex: globalIdx,
         continuity,
         previousShotType: previousShot,
+        brief: directorLite,
       });
       previousShot = directed.shotType;
       beats.push({
@@ -1200,6 +1219,12 @@ export async function runVideoPipeline(
     }
   };
 
+  // Creative Director — detect intent + build a visual brief FIRST so every
+  // downstream agent (script, storyboard, visuals) obeys the visual hero,
+  // camera style, and avoid list. Uses the heuristic so it never blocks.
+  const cdIntent = detectIntentHeuristic(brief.title);
+  const creativeBrief = buildBriefFromIntent(brief.title, cdIntent.intent, cdIntent.confidence);
+
   const research = await mark("research", () => ResearchAgent.run(brief));
 
   // YouTube Retention Engine — builds the professional documentary blueprint
@@ -1243,7 +1268,7 @@ export async function runVideoPipeline(
   const storyboard = await mark("storyboard", () => StoryboardAgent.run(script));
   const direction = await mark("direction", () => DirectorAgent.run(brief, storyboard));
 
-  const beats = expandScriptToBeats(script, brief.style, brief.title);
+  const beats = expandScriptToBeats(script, brief.style, brief.title, creativeBrief);
 
   const visuals = await mark("visuals", () =>
     VisualGenerationAgent.run(brief, beats, (done, total) =>
@@ -1432,8 +1457,13 @@ function beatsFromShots(job: JobRecord, style: StyleId): Beat[] {
   } as unknown as Beat));
 }
 
-function planShots(script: AiVideoScript, style: StyleId, title: string): ShotRecord[] {
-  const beats = expandScriptToBeats(script, style, title);
+function planShots(
+  script: AiVideoScript,
+  style: StyleId,
+  title: string,
+  brief?: CreativeBrief | null,
+): ShotRecord[] {
+  const beats = expandScriptToBeats(script, style, title, brief ?? null);
   return beats.map<ShotRecord>((b, i) => ({
     id: `s${i + 1}`,
     index: i,
@@ -1491,6 +1521,11 @@ export async function runVideoJobPipeline(
   let storyboard: Storyboard;
   let direction: DirectorPlan;
 
+  // Creative Director (heuristic) — steers visual hero + avoid list.
+  const cdIntent = detectIntentHeuristic(brief.title);
+  const creativeBrief = buildBriefFromIntent(brief.title, cdIntent.intent, cdIntent.confidence);
+
+
   const existing = opts.jobId ? await getJob(opts.jobId) : null;
   if (existing) {
     onEvent({ type: "phase", phase: "planning", note: "Resuming saved job" });
@@ -1510,7 +1545,7 @@ export async function runVideoJobPipeline(
     script = await ScriptAgent.run(brief, research, undefined, retentionEngine);
     storyboard = await StoryboardAgent.run(script);
     direction = await DirectorAgent.run(brief, storyboard);
-    const shots = planShots(script, brief.style, brief.title);
+    const shots = planShots(script, brief.style, brief.title, creativeBrief);
     job = await createJob({
       title: brief.title,
       niche: opts.niche,

@@ -16,6 +16,11 @@
 // stays perfectly spelled, editable, and 1280×720.
 
 import { STYLE_PRESETS, type VDStyle } from "@/lib/visual-director";
+import {
+  detectIntentHeuristic,
+  type ContentIntent,
+  type ThumbnailStrategy,
+} from "@/lib/creative-director";
 
 // ---------------- Types ----------------
 
@@ -94,6 +99,7 @@ export type ThumbnailConcept = {
   layers: LayerSpec[];
   ctrScore: number;                  // 0..100 (self-rated by the director)
   reasoning: string;                 // short human-readable "why this works"
+  strategy: ThumbnailStrategy;       // Creative Director strategy (product_focus / curiosity / …)
 };
 
 export type ThumbnailPlan = {
@@ -358,6 +364,7 @@ function buildConcept(
   archetype: CompositionArchetype,
   ctrScore: number,
   reasoning: string,
+  strategy: ThumbnailStrategy,
 ): ThumbnailConcept {
   const preset = findStylePreset(styleId);
   const headline = generateHeadline(topic, emotion);
@@ -382,26 +389,66 @@ function buildConcept(
     layers: defaultLayers(Boolean(secondary)),
     ctrScore,
     reasoning,
+    strategy,
   };
 }
 
 // ---------------- Public API ----------------
 
-/** Plan 4 thumbnail concepts (Fear / Curiosity / Documentary / Minimal) for a topic. */
-export function planThumbnails(topic: string): ThumbnailPlan {
+type ConceptSpec = {
+  label: string;
+  emotion: Emotion;
+  styleId: ThumbnailStyleId;
+  archetype: CompositionArchetype;
+  ctr: number;
+  strategy: ThumbnailStrategy;
+  reason: string;
+};
+
+const DEFAULT_CONCEPTS: ConceptSpec[] = [
+  { label: "Fear",        emotion: "fear",      styleId: "mrbeast",     archetype: "shocked_hero_face",          ctr: 92, strategy: "shock",       reason: "MrBeast-tier shock face + saturated color pop. Highest raw CTR." },
+  { label: "Curiosity",   emotion: "curiosity", styleId: "future_civ",  archetype: "foreground_object_bg_scene", ctr: 88, strategy: "curiosity",   reason: "Neon curiosity cue; giant object anchors the eye." },
+  { label: "Documentary", emotion: "curiosity", styleId: "documentary", archetype: "documentary_hero",           ctr: 82, strategy: "question",    reason: "James Jani / ColdFusion editorial framing." },
+  { label: "Minimal",     emotion: "mystery",   styleId: "minimal",     archetype: "minimal_object",             ctr: 76, strategy: "product_focus", reason: "Negative space + single iconic object." },
+];
+
+// Intent-driven concept sets — product-marketing intents skip the shock-face
+// concept and lead with product_focus / before_after / transformation.
+const PRODUCT_CONCEPTS: ConceptSpec[] = [
+  { label: "Product Focus", emotion: "curiosity", styleId: "minimal",     archetype: "minimal_object",             ctr: 90, strategy: "product_focus", reason: "Hero product on clean stage — highest CTR for product marketing." },
+  { label: "Transformation",emotion: "hope",      styleId: "cinematic",   archetype: "split_before_after",         ctr: 88, strategy: "transformation", reason: "Before / after transformation drives conversions." },
+  { label: "Big Numbers",   emotion: "shock",     styleId: "mrbeast",     archetype: "shocked_hero_face",          ctr: 84, strategy: "big_numbers",   reason: "Giant stat + hero product." },
+  { label: "Editorial",     emotion: "curiosity", styleId: "documentary", archetype: "documentary_hero",           ctr: 78, strategy: "question",      reason: "Trust-forward editorial framing." },
+];
+
+const KIDS_CONCEPTS: ConceptSpec[] = [
+  { label: "Worksheet Hero", emotion: "hope",      styleId: "minimal",     archetype: "minimal_object",       ctr: 88, strategy: "product_focus",  reason: "Worksheet flat lay hero — Montessori aesthetic." },
+  { label: "Kid at Work",    emotion: "hope",      styleId: "documentary", archetype: "documentary_hero",     ctr: 82, strategy: "emotion",        reason: "Child hands completing an activity." },
+  { label: "Before / After", emotion: "hope",      styleId: "cinematic",   archetype: "split_before_after",   ctr: 80, strategy: "transformation", reason: "Progress transformation drives parent conversion." },
+  { label: "Editorial",      emotion: "curiosity", styleId: "documentary", archetype: "documentary_hero",     ctr: 76, strategy: "question",       reason: "Warm editorial framing, trust-first." },
+];
+
+function pickConceptsFor(intent: ContentIntent): ConceptSpec[] {
+  if (intent === "children_education") return KIDS_CONCEPTS;
+  if (
+    intent === "digital_product" || intent === "physical_product" ||
+    intent === "saas_demo" || intent === "website_promo" ||
+    intent === "course_promo"
+  ) return PRODUCT_CONCEPTS;
+  return DEFAULT_CONCEPTS;
+}
+
+/** Plan 4 thumbnail concepts for a topic. Intent-aware: product topics get
+ * product-focus / transformation concepts instead of MrBeast shock face. */
+export function planThumbnails(topic: string, intent?: ContentIntent): ThumbnailPlan {
   const clean = (topic ?? "").trim();
   const detectedEmotion = detectEmotion(clean);
   const kws = keywords(clean);
-  const concepts: ThumbnailConcept[] = [
-    buildConcept(clean, "Fear",       "fear",      "mrbeast",     "shocked_hero_face",         92,
-      "MrBeast-tier shock face + saturated color pop. Highest raw CTR for emotional topics."),
-    buildConcept(clean, "Curiosity",  "curiosity", "future_civ",  "foreground_object_bg_scene",88,
-      "Neon future-civ cue triggers curiosity; giant object anchors the eye."),
-    buildConcept(clean, "Documentary","curiosity", "documentary", "documentary_hero",          82,
-      "James Jani / ColdFusion editorial framing — trusted, high-CTR for long-form docs."),
-    buildConcept(clean, "Minimal",    "mystery",   "minimal",     "minimal_object",            76,
-      "Negative space + single iconic object. Stands out in a busy feed."),
-  ];
+  const effectiveIntent = intent ?? detectIntentHeuristic(clean).intent;
+  const specs = pickConceptsFor(effectiveIntent);
+  const concepts: ThumbnailConcept[] = specs.map((c) =>
+    buildConcept(clean, c.label, c.emotion, c.styleId, c.archetype, c.ctr, c.reason, c.strategy),
+  );
   return { topic: clean, detectedEmotion, keywords: kws, concepts };
 }
 

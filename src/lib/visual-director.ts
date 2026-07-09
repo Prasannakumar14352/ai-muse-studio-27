@@ -259,6 +259,16 @@ export function buildContinuityCard(title: string, hint?: string): ContinuityCar
   };
 }
 
+export type CreativeBriefLite = {
+  visualHero: string;
+  visualStyle: string;
+  cameraStyle: string;
+  sceneComposition: string;
+  paletteHint: string;
+  avoid: string[];
+  intent: string;
+};
+
 export type DirectorInput = {
   title: string;
   styleId: VDStyle;
@@ -277,6 +287,8 @@ export type DirectorInput = {
   continuity: ContinuityCard;
   /** The most recent chosen shot type, so we never repeat framing back-to-back. */
   previousShotType?: ShotType | null;
+  /** Optional Creative Director brief — steers hero subject + avoid list. */
+  brief?: CreativeBriefLite | null;
 };
 
 export type DirectorOutput = {
@@ -343,7 +355,16 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
   void input.continuity.subjectAnchor;
 
   const parts: string[] = [];
-  // Character lock FIRST so the model reads it before anything else.
+  // Creative Director brief FIRST so the model reads intent + hero + avoid.
+  if (input.brief) {
+    parts.push(
+      `CREATIVE DIRECTOR (obey strictly): intent=${input.brief.intent}; ` +
+      `visual hero=${input.brief.visualHero}; style=${input.brief.visualStyle}; ` +
+      `camera=${input.brief.cameraStyle}; composition=${input.brief.sceneComposition}; ` +
+      `palette=${input.brief.paletteHint}.`,
+    );
+  }
+  // Character lock so the model reads it before the scene body.
   parts.push(
     `LOCKED CHARACTER SHEET (must match exactly in every image): ` +
     `${input.continuity.characterSheet}`,
@@ -368,7 +389,8 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
   if (input.chapterLabel) parts.push(`Chapter: ${input.chapterLabel}`);
   if (input.sceneNumber != null) parts.push(`Scene ${input.sceneNumber}`);
   parts.push("ultra realistic, HDR, 8K, highly detailed, sharp focus, professional photography");
-  parts.push(`Avoid: ${negativePrompt}, different person, changed face, new character, wardrobe change, hairstyle change`);
+  const briefAvoid = input.brief?.avoid?.length ? `, ${input.brief.avoid.join(", ")}` : "";
+  parts.push(`Avoid: ${negativePrompt}, different person, changed face, new character, wardrobe change, hairstyle change${briefAvoid}`);
 
   const prompt = optimizePrompt(parts.join(". "), input.styleId);
 
