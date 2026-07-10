@@ -410,6 +410,13 @@ function ProjectView() {
         />
       )}
 
+      {project.content_type !== "carousel" && (
+        <PublishKitPanel
+          project={project as unknown as Parameters<typeof PublishKitPanel>[0]["project"]}
+          output={output as unknown as Parameters<typeof PublishKitPanel>[0]["output"]}
+        />
+      )}
+
       <div className="glass rounded-2xl p-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div><div className="text-xs text-muted-foreground">Voice</div><div className="font-medium">{project.voice}</div></div>
         <div><div className="text-xs text-muted-foreground">Music</div><div className="font-medium">{project.music}</div></div>
