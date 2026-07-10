@@ -3,7 +3,7 @@
 // edits an existing brief. After generation we hand off to that editor —
 // create and edit share both the form component AND the destination.
 
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,8 +15,24 @@ import { deductUsage, getAccessInfo, canGenerate } from "@/lib/access";
 import { saveOutput } from "@/lib/local-store";
 import { useQueryClient } from "@tanstack/react-query";
 import { ProjectBriefForm, type ProjectBrief } from "@/components/project-brief-form";
+import { ContentTypePicker } from "@/components/content-type-picker";
+import { CONTENT_TYPES_BY_ID, type ContentTypeId } from "@/lib/content-types";
+import { ArrowLeft } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/create")({ component: CreatePage });
+const VALID_TYPES = new Set<ContentTypeId>([
+  "long_video", "short_reel", "talking_object", "documentary", "product_promo",
+  "carousel", "ai_image", "thumbnail", "caption_only", "seo_pack",
+]);
+
+export const Route = createFileRoute("/_authenticated/create")({
+  validateSearch: (s: Record<string, unknown>): { type?: ContentTypeId } => {
+    const t = typeof s.type === "string" && VALID_TYPES.has(s.type as ContentTypeId)
+      ? (s.type as ContentTypeId) : undefined;
+    return t ? { type: t } : {};
+  },
+  component: CreatePage,
+});
+
 
 function CreatePage() {
   const navigate = useNavigate();
