@@ -5,9 +5,8 @@ import { toast } from "sonner";
 import { STYLES } from "@/lib/constants";
 import { pushImageGenLog, listImageGenLogs } from "@/lib/local-store";
 import { ProjectsSection } from "@/components/projects-section";
-
-
 import { deductUsage, useAccess, canGenerate } from "@/lib/access";
+import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Wand2, Download, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
@@ -130,6 +129,23 @@ function ImagesPage() {
         // Deduct 1 credit per successful image (admin bypass handled inside).
         for (let i = 0; i < ok.length; i++) {
           await deductUsage({ amount: 1, description: `AI image generated (${styleLabel})` }).catch(() => {});
+        }
+        // Save as a project row so it shows up in "Your image projects".
+        if (access?.userId) {
+          const title = p.trim().slice(0, 80) || `AI image (${styleLabel})`;
+          const { error: pErr } = await supabase.from("projects").insert({
+            user_id: access.userId,
+            title,
+            content_type: "ai_image",
+            topic: p,
+            style: s,
+            status: "generated",
+            thumbnail_url: ok[0].image,
+          });
+          if (pErr) console.warn("[images] project insert failed", pErr);
+          qc.invalidateQueries({ queryKey: ["projects-section"] });
+          qc.invalidateQueries({ queryKey: ["recent-projects"] });
+          qc.invalidateQueries({ queryKey: ["module-counts"] });
         }
         qc.invalidateQueries({ queryKey: ["access"] });
         toast.success(`Generated ${ok.length} of 4 concepts`);
