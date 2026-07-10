@@ -28,6 +28,7 @@ import {
   type LocalThumbnail,
 } from "@/lib/thumbnailLocalStore";
 import { validateRenderedVideo, type VideoValidation } from "@/lib/video-validate";
+import { ProjectsSection } from "@/components/projects-section";
 import { AlertTriangle } from "lucide-react";
 import style3d from "@/assets/style-3d.jpg";
 import styleGhibli from "@/assets/style-ghibli.jpg";
@@ -509,6 +510,11 @@ function VideosPage() {
           {inProgress.length > 0 && (
             <InProgressJobs jobs={inProgress} onResume={resumeJob} onDiscard={discardJob} />
           )}
+          <ProjectsSection
+            contentTypes={["long_video", "short_reel", "ugc"]}
+            title="Your video projects"
+            cacheKey="videos"
+          />
           {library.length > 0 ? (
             <LibrarySection items={library} onOpen={openFromLibrary} onDelete={removeFromLibrary} />
           ) : inProgress.length === 0 ? (
