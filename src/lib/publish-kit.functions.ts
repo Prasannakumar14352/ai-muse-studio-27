@@ -191,12 +191,12 @@ Return ONLY this JSON shape:
     // Clamp captions and hashtag counts against PLATFORM_LIMITS as a safety net.
     const platOut: PublishKit["platforms"] = {};
     for (const p of platforms) {
-      const raw = out.platforms[p];
+      const raw = (out.platforms as Record<string, { caption: string; hashtags?: string[] } | undefined>)[p];
       if (!raw) continue;
       const lim = PLATFORM_LIMITS[p];
       const caption = raw.caption.length > lim.captionMax ? raw.caption.slice(0, lim.captionMax - 1) + "…" : raw.caption;
-      const hashtags = raw.hashtags
-        .map((h) => (h.startsWith("#") ? h : `#${h}`))
+      const hashtags = (raw.hashtags ?? [])
+        .map((h: string) => (h.startsWith("#") ? h : `#${h}`))
         .slice(0, lim.hashtagCount[1]);
       platOut[p] = { caption, hashtags };
     }
