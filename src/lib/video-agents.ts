@@ -26,6 +26,11 @@ import {
   detectIntentHeuristic, buildBriefFromIntent,
   type CreativeBrief,
 } from "@/lib/creative-director";
+import {
+  defaultCharacterBibleFor, bibleToContinuityCard, pickEnvironmentForBeat,
+  type CharacterBible,
+} from "@/lib/character-bible";
+import { classifyTopic } from "@/lib/cinematic-engine";
 
 // ---------- Beat expansion (documentary-style visual density) ----------
 //
