@@ -181,6 +181,18 @@ function expandScriptToBeats(
       const composedPrompt = plan.motionBrief
         ? `${directed.prompt}\n\nSHOT COMPOSITION FOR MOTION (${plan.motion} / ${plan.sceneType}):\n${plan.motionBrief}`
         : directed.prompt;
+      // Dynamic Scene Detection — is this beat continuous human activity
+      // (walking/talking/cooking/…) or a truly static subject (product/logo/
+      // landscape/…)? Dynamic beats must be produced by an AI video model.
+      const detection = detectScene(chunk, composedPrompt);
+      const videoPrompt = detection.kind === "dynamic" && detection.activity
+        ? buildDynamicVideoPrompt({
+            activity: detection.activity,
+            basePrompt: composedPrompt,
+            durationSec: TARGET_BEAT_SEC,
+            aspectRatio: "16:9",
+          })
+        : null;
       beats.push({
         sceneIndex,
         beatIndex,
@@ -191,6 +203,9 @@ function expandScriptToBeats(
         motion: plan.motion as CameraMotion,
         transition: plan.transition,
         sceneType: plan.sceneType,
+        sceneKind: detection.kind,
+        activity: detection.activity,
+        videoPrompt,
       });
       globalIdx += 1;
     });
