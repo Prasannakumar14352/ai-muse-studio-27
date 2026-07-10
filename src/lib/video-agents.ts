@@ -757,12 +757,18 @@ export const VisualGenerationAgent = {
     onProgress?.(0, total);
     const results = await Promise.all(
       beats.map(async (b, i) => {
-        // Try AI video clip first; fall back to still image on any failure.
-        const clip = await fetchBeatClip(b.imagePrompt, brief.style, brief.aspectRatio, TARGET_BEAT_SEC);
-        if (clip) {
-          done += 1;
-          onProgress?.(done, total);
-          return { n: i + 1, kind: "clip" as const, url: clip, duration_sec: TARGET_BEAT_SEC, generated: true };
+        // Dynamic Scene Detection routing (see generateOneShot for details).
+        if (b.sceneKind === "dynamic") {
+          const dynPrompt = b.videoPrompt || b.imagePrompt;
+          const clip = await fetchBeatClip(dynPrompt, brief.style, brief.aspectRatio, TARGET_BEAT_SEC);
+          if (clip) {
+            done += 1;
+            onProgress?.(done, total);
+            return { n: i + 1, kind: "clip" as const, url: clip, duration_sec: TARGET_BEAT_SEC, generated: true };
+          }
+          console.warn(
+            `[scene-detector] Dynamic beat ${i + 1} (${b.activity}) fell back to still image — no video model available.`,
+          );
         }
         const url = await fetchSceneImage(b.imagePrompt, brief.style, brief.aspectRatio);
         done += 1;
