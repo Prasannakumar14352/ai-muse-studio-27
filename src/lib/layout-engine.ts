@@ -255,6 +255,8 @@ export function templatePromptBlock(t: LayoutTemplate): string {
     `- Design the artwork so that if the text zones were painted plain, the`,
     `  image would still read as a finished composition.`,
     `- Prefer sky / soft gradient / bokeh / negative fill inside text zones.`,
+    ``,
+    MARKETING_LAYOUT_RULES,
   ].join("\n");
 }
 
