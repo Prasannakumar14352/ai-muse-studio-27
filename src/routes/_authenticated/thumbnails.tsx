@@ -214,9 +214,11 @@ function ThumbnailsPage() {
       </div>
 
       <ProjectsSection
-        contentTypes={["long_video", "short_reel", "ugc", "ai_image"]}
+        contentTypes={["long_video", "short_reel", "ugc", "ai_image", "thumbnail", "talking_object", "documentary", "product_promo"]}
         title="Your projects — open to edit thumbnails"
         cacheKey="thumbnails"
+        showTypeFilter
+        showStatusFilter
       />
 
       {/* Concept grid */}
