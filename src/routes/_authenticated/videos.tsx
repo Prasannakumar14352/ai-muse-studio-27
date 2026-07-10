@@ -513,7 +513,7 @@ function VideosPage() {
           )}
           <ProjectsSection
             contentTypes={["long_video", "short_reel", "ugc", "talking_object", "documentary", "product_promo"]}
-            title="Your video projects"
+            title="Your videos"
             cacheKey="videos"
             thumbnailAspect="landscape"
             showTypeFilter
@@ -522,7 +522,7 @@ function VideosPage() {
             onCount={setProjectCount}
           />
           {library.length > 0 && (
-            <LibrarySection items={library} onOpen={openFromLibrary} onDelete={removeFromLibrary} />
+            <QuickPlaySection items={library} onOpen={openFromLibrary} onDelete={removeFromLibrary} />
           )}
           {projectCount === 0 && library.length === 0 && inProgress.length === 0 && (
             <EmptyLibrary onNew={() => setView("input")} />
