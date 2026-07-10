@@ -14,6 +14,7 @@ import {
   templatePromptBlock,
   rewriteVisualForTemplate,
   LAYOUT_TEMPLATES,
+  MARKETING_LAYOUT_RULES,
 } from "@/lib/layout-engine";
 
 export type AiCarouselSlide = {
@@ -87,7 +88,9 @@ You MUST follow the upstream CREATIVE DIRECTOR BRIEF below verbatim. In
 particular: honor the "Visual hero" (do NOT drift into random presenters if
 the hero is a product / worksheet / dashboard), respect the AVOID list, and
 give EACH slide a DIFFERENT slide type + layout from the SLIDE PLAN — do
-not return N identical slides.`;
+not return N identical slides.
+
+${MARKETING_LAYOUT_RULES}`;
 
     const user = `Design a premium Instagram carousel.
 

@@ -31,8 +31,91 @@ export type Zone = {
 };
 
 export type ZoneRole =
-  | "headline" | "subhead" | "bullets" | "cta"
+  | "headline" | "subhead" | "bullets" | "cta" | "price"
   | "hero_character" | "hero_product" | "supporting" | "logo" | "sticker";
+
+// -----------------------------------------------------------------------------
+// Marketing Layout Rule (single source of truth for the whole design engine).
+// Every generated marketing creative MUST identify these 6 elements at most
+// once each unless the caller explicitly asks for repetition. Downstream
+// consumers (prompt builder + slide editor auto-layout) enforce this so the
+// artwork never renders duplicate prices, duplicate CTAs, duplicate product
+// names, or competing giant badges that fight the headline.
+// -----------------------------------------------------------------------------
+export type MarketingElementKey =
+  | "primary_message"   // headline
+  | "supporting_message" // subhead / body
+  | "product"
+  | "character"
+  | "price"
+  | "cta";
+
+export const MARKETING_HIERARCHY: MarketingElementKey[] = [
+  "primary_message",
+  "product",
+  "character",
+  "price",
+  "cta",
+  // supporting_message sits under primary_message but above product visually;
+  // it is placed by the subhead slot and is not part of the size ranking.
+];
+
+export const MARKETING_LAYOUT_RULES = `MARKETING LAYOUT RULE (mandatory):
+Identify and place EACH of these elements AT MOST ONCE per creative unless
+repetition is explicitly requested:
+  1. Primary message (headline)
+  2. Supporting message (subhead / one-line body)
+  3. Product (single hero product — one name, one mockup)
+  4. Character (single hero person — same face across the deck)
+  5. Price (single price token — one number, one currency, one placement)
+  6. CTA (single call-to-action button / label)
+
+STRICT anti-duplication:
+- No duplicate numbers, duplicate prices, duplicate CTAs, or duplicate product names.
+- Do NOT repeat the price as a sticker AND a badge AND a chip. Pick ONE.
+- Do NOT restate the CTA in the bullets. The CTA lives in the CTA zone only.
+- Do NOT print the product name twice (e.g. headline + repeat badge).
+
+Typography / visual hierarchy (largest → smallest):
+  Headline  →  Product  →  Character  →  Price  →  CTA  →  Decorative elements
+- Headline is always the largest, boldest element.
+- Decorative badges (sale, sparkle, arrow, sticker) must NEVER compete with
+  the headline in size, weight, or color contrast.
+- Use large badges ONLY when they carry unique information that is not already
+  present in the headline. Otherwise keep decorative badges small and quiet.`;
+
+/** Deduplicate the raw copy so downstream renderers get one of each element.
+ *  Non-destructive: unrepeated fields pass through untouched. */
+export function dedupeMarketingCopy<T extends {
+  headline?: string; subhead?: string; bullets?: string[]; cta?: string; price?: string;
+}>(copy: T): T {
+  const seen = new Set<string>();
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+  const keep = (s?: string) => {
+    if (!s) return s;
+    const k = norm(s);
+    if (seen.has(k)) return "";
+    seen.add(k);
+    return s;
+  };
+  const headline = keep(copy.headline) || copy.headline;
+  if (headline) seen.add(norm(headline));
+  const subhead = keep(copy.subhead);
+  const cta = keep(copy.cta);
+  const price = keep(copy.price);
+  // Bullets: drop entries that duplicate headline / subhead / cta / price /
+  // another bullet, and drop bullets that are just the CTA re-stated.
+  const bullets = (copy.bullets ?? [])
+    .map((b) => (typeof b === "string" ? b : ""))
+    .filter((b) => {
+      if (!b.trim()) return false;
+      const k = norm(b);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  return { ...copy, headline, subhead, cta, price, bullets };
+}
 
 export type Slot = Zone & { role: ZoneRole; align?: "left" | "center" | "right" };
 
@@ -172,6 +255,8 @@ export function templatePromptBlock(t: LayoutTemplate): string {
     `- Design the artwork so that if the text zones were painted plain, the`,
     `  image would still read as a finished composition.`,
     `- Prefer sky / soft gradient / bokeh / negative fill inside text zones.`,
+    ``,
+    MARKETING_LAYOUT_RULES,
   ].join("\n");
 }
 
@@ -236,6 +321,16 @@ export type AutoLayoutInputs = {
  *  - Text is centered on the slot's midpoint (matches SlideEditor which uses
  *    center-anchored transforms). */
 export function autoLayout(inp: AutoLayoutInputs): EditorOverlay[] {
+  // Marketing Layout Rule: dedupe before placing so we never render the same
+  // headline / price / CTA in two zones.
+  const deduped = dedupeMarketingCopy({
+    headline: inp.headline,
+    subhead: inp.subhead,
+    bullets: inp.bullets,
+    cta: inp.cta,
+  });
+  inp = { ...inp, headline: deduped.headline ?? inp.headline,
+    subhead: deduped.subhead, bullets: deduped.bullets, cta: deduped.cta };
   const out: EditorOverlay[] = [];
   const pushForRole = (role: ZoneRole, text: string, base: {
     align: "left" | "center" | "right"; weight: EditorOverlay["weight"]; maxLines: number; sizeRange: [number, number];
