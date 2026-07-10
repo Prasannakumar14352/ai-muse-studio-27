@@ -7,7 +7,7 @@ import { pushImageGenLog, listImageGenLogs } from "@/lib/local-store";
 
 import { deductUsage, useAccess, canGenerate } from "@/lib/access";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Wand2, Download, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Wand2, Download, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight, Plus, ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 
@@ -46,6 +46,7 @@ function ImagesPage() {
   const [showDebug, setShowDebug] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [viewerIdx, setViewerIdx] = useState<number | null>(null);
+  const [view, setView] = useState<"landing" | "input">("landing");
   const qc = useQueryClient();
   const { data: access } = useAccess();
 
@@ -126,11 +127,12 @@ function ImagesPage() {
           ...prev,
         ].slice(0, 40)); // cap to avoid localStorage bloat
         setLastRun({ prompt: p, style: s, ratio: r });
+        setView("landing");
         // Deduct 1 credit per successful image (admin bypass handled inside).
         for (let i = 0; i < ok.length; i++) {
           await deductUsage({ amount: 1, description: `AI image generated (${styleLabel})` }).catch(() => {});
         }
-        // Save as a project row so it shows up in "Your image projects".
+        // Save as a project row so it shows up on the dashboard.
         if (access?.userId) {
           const title = p.trim().slice(0, 80) || `AI image (${styleLabel})`;
           const { error: pErr } = await supabase.from("projects").insert({
@@ -224,169 +226,216 @@ function ImagesPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl md:text-4xl font-bold">AI <span className="gradient-text">Image</span> Generator</h1>
-          <p className="text-muted-foreground mt-1">Describe the shot. Pick a style. Generate.</p>
+          {view === "input" ? (
+            <>
+              <h1 className="text-3xl md:text-4xl font-bold">AI <span className="gradient-text">Image</span> Generator</h1>
+              <p className="text-muted-foreground mt-1">Describe the shot. Pick a style. Generate.</p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-3xl md:text-4xl font-bold">Your <span className="gradient-text">Images</span></h1>
+              <p className="text-muted-foreground mt-1">AI-generated images and concepts.</p>
+            </>
+          )}
         </div>
-        {(results.length > 0 || lastRun) && (
-          <button onClick={clearSession} className="text-xs text-muted-foreground hover:text-rose-400 flex items-center gap-1">
-            <Trash2 className="w-3 h-3" /> Clear saved session
+        {view === "landing" && (
+          <button
+            onClick={() => setView("input")}
+            className="rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-2 shrink-0"
+          >
+            <Plus className="w-4 h-4" /> New generation
           </button>
         )}
       </div>
 
-      <div className="glass rounded-2xl p-6 space-y-4">
-        <textarea rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)}
-          placeholder="A lone astronaut watching Earth rise from a lunar cliff, ultra detailed..."
-          className="w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
-
-        <div>
-          <div className="text-sm text-muted-foreground mb-2">Style</div>
-          <div className="flex flex-wrap gap-2">
-            {STYLES.map((s) => (
-              <button key={s.id} onClick={() => setStyle(s.id)}
-                className={`px-3 py-1.5 rounded-full text-xs border transition ${style === s.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"}`}>
-                {s.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 justify-between">
-          <div className="flex gap-2">
-            {RATIOS.map((r) => (
-              <button key={r} onClick={() => setRatio(r)}
-                className={`px-3 py-1.5 rounded-lg text-xs border ${ratio === r ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>{r}</button>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <button onClick={regenerateExact} disabled={loading || !lastRun}
-              title={lastRun ? "Rerun with the exact last prompt & settings" : "Generate once first"}
-              className="rounded-lg glass border border-border px-4 py-2.5 text-sm font-medium flex items-center gap-2 disabled:opacity-40">
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Regenerate exact
-            </button>
-            <button onClick={generate} disabled={loading}
-              className="rounded-lg gradient-primary text-white px-6 py-2.5 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)]">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} Generate
+      {view === "input" && (
+        <>
+          <div className="flex items-center">
+            <button
+              onClick={() => setView("landing")}
+              className="text-sm text-muted-foreground hover:text-white flex items-center gap-1"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back to your images
             </button>
           </div>
-        </div>
 
-        {prompt && (
-          <div className="rounded-lg border border-border bg-black/30 p-3">
-            <div className="flex items-center justify-between mb-1">
-              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                Exact prompt sent to /api/generate-image
+          <div className="glass rounded-2xl p-6 space-y-4">
+            <textarea rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)}
+              placeholder="A lone astronaut watching Earth rise from a lunar cliff, ultra detailed..."
+              className="w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
+
+            <div>
+              <div className="text-sm text-muted-foreground mb-2">Style</div>
+              <div className="flex flex-wrap gap-2">
+                {STYLES.map((s) => (
+                  <button key={s.id} onClick={() => setStyle(s.id)}
+                    className={`px-3 py-1.5 rounded-full text-xs border transition ${style === s.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"}`}>
+                    {s.label}
+                  </button>
+                ))}
               </div>
-              <button
-                onClick={() => { navigator.clipboard.writeText(previewFullPrompt); toast.success("Prompt copied"); }}
-                className="text-xs text-muted-foreground hover:text-white flex items-center gap-1"
-              >
-                <Copy className="w-3 h-3" /> Copy
-              </button>
             </div>
-            <code className="block text-xs font-mono text-white/90 whitespace-pre-wrap break-words">
-              {previewFullPrompt}
-            </code>
-          </div>
-        )}
-      </div>
 
-      {/* Debug panel */}
-      <div className="glass rounded-2xl">
-        <button onClick={() => setShowDebug((v) => !v)} className="w-full flex items-center justify-between px-6 py-3 text-sm">
-          <span className="flex items-center gap-2">
-            <Bug className="w-4 h-4" /> Debug panel
-            {debug && (
-              <span className="text-xs text-muted-foreground">
-                · {debug.successCount}/{debug.successCount + debug.failureCount} ok · {debug.durationMs}ms
-              </span>
-            )}
-          </span>
-          <span className="text-xs text-muted-foreground">{showDebug ? "Hide" : "Show"}</span>
-        </button>
-        {showDebug && (
-          <div className="px-6 pb-6 space-y-3 text-xs">
-            <div className="flex flex-wrap gap-2">
-              <button onClick={downloadCurrentDebug} disabled={!debug}
-                className="rounded-lg gradient-primary text-white px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-40">
-                <FileDown className="w-3 h-3" /> Download debug JSON
-              </button>
-              <button onClick={loadHistory}
-                className="rounded-lg glass border border-border px-3 py-1.5 flex items-center gap-1.5">
-                <Download className="w-3 h-3" /> Download saved history (last 20)
-              </button>
+            <div className="flex flex-wrap items-center gap-3 justify-between">
+              <div className="flex gap-2">
+                {RATIOS.map((r) => (
+                  <button key={r} onClick={() => setRatio(r)}
+                    className={`px-3 py-1.5 rounded-lg text-xs border ${ratio === r ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>{r}</button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={regenerateExact} disabled={loading || !lastRun}
+                  title={lastRun ? "Rerun with the exact last prompt & settings" : "Generate once first"}
+                  className="rounded-lg glass border border-border px-4 py-2.5 text-sm font-medium flex items-center gap-2 disabled:opacity-40">
+                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Regenerate exact
+                </button>
+                <button onClick={generate} disabled={loading}
+                  className="rounded-lg gradient-primary text-white px-6 py-2.5 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)]">
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} Generate
+                </button>
+              </div>
             </div>
-            {!debug ? (
-              <div className="text-muted-foreground">No generations yet.</div>
-            ) : (
-              <>
-                <Section title="Request">
-                  <pre className="bg-black/40 rounded p-3 overflow-auto">{JSON.stringify(debug.request, null, 2)}</pre>
-                </Section>
-                <Section title="Response metadata (model & params)">
-                  <pre className="bg-black/40 rounded p-3 overflow-auto">
-                    {JSON.stringify(debug.response ?? { note: "No metadata returned" }, null, 2)}
-                  </pre>
-                </Section>
-                <Section title={`Errors (${debug.errors.length})`}>
-                  {debug.errors.length === 0 ? (
-                    <div className="text-emerald-400">None</div>
-                  ) : (
-                    <ul className="space-y-1">
-                      {debug.errors.map((e, i) => (
-                        <li key={i} className="text-rose-400 font-mono break-all">{e}</li>
-                      ))}
-                    </ul>
-                  )}
-                </Section>
-                <div className="text-muted-foreground">
-                  Started {debug.requestedAt} · Took {debug.durationMs}ms · Logged to your account
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
 
-      {results.length === 0 ? (
-        <div className="glass rounded-2xl p-12 text-center">
-          <ImageIcon className="w-10 h-10 mx-auto text-muted-foreground" />
-          <p className="mt-3 text-sm text-muted-foreground">Your generated images will appear here.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {results.map((r, i) => (
-            <div key={r.id} className="glass rounded-xl overflow-hidden group">
-              <button
-                onClick={() => setViewerIdx(i)}
-                className={`${aspectClass[r.ratio]} relative overflow-hidden flex items-end p-3 w-full text-left cursor-zoom-in`}
-                aria-label="View full screen"
-              >
-                <img src={r.image} alt={r.prompt} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-                <span className="relative text-white text-xs glass px-2 py-1 rounded">{r.style} · {r.ratio}</span>
-                <span className="absolute top-2 right-2 rounded-md bg-black/60 backdrop-blur p-1.5 opacity-0 group-hover:opacity-100 transition">
-                  <Maximize2 className="w-3.5 h-3.5 text-white" />
-                </span>
-              </button>
-              <div className="p-3">
-                <div className="text-xs text-muted-foreground line-clamp-2">{r.prompt}</div>
-                <div className="mt-3 flex gap-1.5">
-                  <a href={r.image} download={`creatorvault-${r.id}.png`}
-                    className="flex-1 rounded-lg gradient-primary text-white py-1.5 text-xs flex items-center justify-center gap-1"><Download className="w-3 h-3" /> Download</a>
+            {prompt && (
+              <div className="rounded-lg border border-border bg-black/30 p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Exact prompt sent to /api/generate-image
+                  </div>
                   <button
-                    onClick={() => setResults((prev) => prev.filter((x) => x.id !== r.id))}
-                    className="rounded-lg glass hover:bg-rose-500/20 text-rose-300 py-1.5 px-2 text-xs flex items-center justify-center"
-                    title="Delete image"
-                  ><Trash2 className="w-3 h-3" /></button>
+                    onClick={() => { navigator.clipboard.writeText(previewFullPrompt); toast.success("Prompt copied"); }}
+                    className="text-xs text-muted-foreground hover:text-white flex items-center gap-1"
+                  >
+                    <Copy className="w-3 h-3" /> Copy
+                  </button>
                 </div>
+                <code className="block text-xs font-mono text-white/90 whitespace-pre-wrap break-words">
+                  {previewFullPrompt}
+                </code>
+              </div>
+            )}
+          </div>
+
+          {/* Debug panel */}
+          <div className="glass rounded-2xl">
+            <button onClick={() => setShowDebug((v) => !v)} className="w-full flex items-center justify-between px-6 py-3 text-sm">
+              <span className="flex items-center gap-2">
+                <Bug className="w-4 h-4" /> Debug panel
+                {debug && (
+                  <span className="text-xs text-muted-foreground">
+                    · {debug.successCount}/{debug.successCount + debug.failureCount} ok · {debug.durationMs}ms
+                  </span>
+                )}
+              </span>
+              <span className="text-xs text-muted-foreground">{showDebug ? "Hide" : "Show"}</span>
+            </button>
+            {showDebug && (
+              <div className="px-6 pb-6 space-y-3 text-xs">
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={downloadCurrentDebug} disabled={!debug}
+                    className="rounded-lg gradient-primary text-white px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-40">
+                    <FileDown className="w-3 h-3" /> Download debug JSON
+                  </button>
+                  <button onClick={loadHistory}
+                    className="rounded-lg glass border border-border px-3 py-1.5 flex items-center gap-1.5">
+                    <Download className="w-3 h-3" /> Download saved history (last 20)
+                  </button>
+                </div>
+                {!debug ? (
+                  <div className="text-muted-foreground">No generations yet.</div>
+                ) : (
+                  <>
+                    <Section title="Request">
+                      <pre className="bg-black/40 rounded p-3 overflow-auto">{JSON.stringify(debug.request, null, 2)}</pre>
+                    </Section>
+                    <Section title="Response metadata (model & params)">
+                      <pre className="bg-black/40 rounded p-3 overflow-auto">
+                        {JSON.stringify(debug.response ?? { note: "No metadata returned" }, null, 2)}
+                      </pre>
+                    </Section>
+                    <Section title={`Errors (${debug.errors.length})`}>
+                      {debug.errors.length === 0 ? (
+                        <div className="text-emerald-400">None</div>
+                      ) : (
+                        <ul className="space-y-1">
+                          {debug.errors.map((e, i) => (
+                            <li key={i} className="text-rose-400 font-mono break-all">{e}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </Section>
+                    <div className="text-muted-foreground">
+                      Started {debug.requestedAt} · Took {debug.durationMs}ms · Logged to your account
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {view === "landing" && (
+        <>
+          {results.length === 0 ? (
+            <div className="glass rounded-2xl p-16 flex flex-col items-center justify-center text-center border border-border">
+              <div className="w-14 h-14 rounded-full glass flex items-center justify-center mb-4 border border-border">
+                <ImageIcon className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <h2 className="text-lg font-semibold">No images yet</h2>
+              <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                Generate your first AI image — describe a scene, pick a style, and get multiple concepts instantly.
+              </p>
+              <button
+                onClick={() => setView("input")}
+                className="mt-5 rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> New generation
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">{results.length} generated {results.length === 1 ? "image" : "images"}</div>
+                <button onClick={clearSession} className="text-xs text-muted-foreground hover:text-rose-400 flex items-center gap-1">
+                  <Trash2 className="w-3 h-3" /> Clear saved session
+                </button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {results.map((r, i) => (
+                  <div key={r.id} className="glass rounded-xl overflow-hidden group">
+                    <button
+                      onClick={() => setViewerIdx(i)}
+                      className={`${aspectClass[r.ratio]} relative overflow-hidden flex items-end p-3 w-full text-left cursor-zoom-in`}
+                      aria-label="View full screen"
+                    >
+                      <img src={r.image} alt={r.prompt} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                      <span className="relative text-white text-xs glass px-2 py-1 rounded">{r.style} · {r.ratio}</span>
+                      <span className="absolute top-2 right-2 rounded-md bg-black/60 backdrop-blur p-1.5 opacity-0 group-hover:opacity-100 transition">
+                        <Maximize2 className="w-3.5 h-3.5 text-white" />
+                      </span>
+                    </button>
+                    <div className="p-3">
+                      <div className="text-xs text-muted-foreground line-clamp-2">{r.prompt}</div>
+                      <div className="mt-3 flex gap-1.5">
+                        <a href={r.image} download={`creatorvault-${r.id}.png`}
+                          className="flex-1 rounded-lg gradient-primary text-white py-1.5 text-xs flex items-center justify-center gap-1"><Download className="w-3 h-3" /> Download</a>
+                        <button
+                          onClick={() => setResults((prev) => prev.filter((x) => x.id !== r.id))}
+                          className="rounded-lg glass hover:bg-rose-500/20 text-rose-300 py-1.5 px-2 text-xs flex items-center justify-center"
+                          title="Delete image"
+                        ><Trash2 className="w-3 h-3" /></button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {viewerIdx !== null && results[viewerIdx] && (
