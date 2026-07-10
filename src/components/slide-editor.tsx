@@ -190,6 +190,46 @@ export function SlideEditor(props: SlideEditorProps) {
     }
   }
 
+  const [lastTemplate, setLastTemplate] = useState<LayoutTemplate | null>(null);
+
+  function applyAutoLayout(templateOverride?: LayoutTemplate) {
+    const copy = props.copy;
+    if (!copy || !copy.headline) {
+      toast.error("No slide copy available to auto-layout");
+      return;
+    }
+    const candidates = templateOverride ? [templateOverride] : LAYOUT_TEMPLATES;
+    const { template, overlays: placed, score } = pickBestLayout(
+      { ratio: props.ratio, headline: copy.headline, subhead: copy.subhead, bullets: copy.bullets, cta: copy.cta },
+      candidates,
+    );
+    setLastTemplate(template);
+    // Preserve existing logo overlays, replace text overlays.
+    const kept = overlays.filter((o) => o.kind !== "text");
+    const added: SlideOverlay[] = placed.map((p) => ({
+      id: uid(),
+      kind: "text",
+      text: p.text,
+      xPct: p.xPct, yPct: p.yPct, widthPct: p.widthPct,
+      fontSize: p.fontSize,
+      color: "#ffffff",
+      bg: p.role === "cta" ? "#111827" : "transparent",
+      weight: p.weight,
+      align: p.align,
+      fontFamily: "Inter, system-ui, sans-serif",
+    }));
+    setOverlays([...kept, ...added]);
+    setSelectedId(null);
+    const collisions = score.collisions.length;
+    if (collisions === 0 && score.total >= 90) {
+      toast.success(`Auto layout: ${template.label} — score ${score.total}`);
+    } else if (collisions > 0) {
+      toast.warning(`Auto layout used ${template.label}; ${collisions} collision(s) auto-adjusted`);
+    } else {
+      toast.info(`Auto layout: ${template.label} — score ${score.total}`);
+    }
+  }
+
   const overlayNodes = useMemo(() => overlays, [overlays]);
 
   return (
