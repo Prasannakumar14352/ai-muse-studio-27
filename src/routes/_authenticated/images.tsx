@@ -127,11 +127,12 @@ function ImagesPage() {
           ...prev,
         ].slice(0, 40)); // cap to avoid localStorage bloat
         setLastRun({ prompt: p, style: s, ratio: r });
+        setView("landing");
         // Deduct 1 credit per successful image (admin bypass handled inside).
         for (let i = 0; i < ok.length; i++) {
           await deductUsage({ amount: 1, description: `AI image generated (${styleLabel})` }).catch(() => {});
         }
-        // Save as a project row so it shows up in "Your image projects".
+        // Save as a project row so it shows up on the dashboard.
         if (access?.userId) {
           const title = p.trim().slice(0, 80) || `AI image (${styleLabel})`;
           const { error: pErr } = await supabase.from("projects").insert({
