@@ -11,6 +11,19 @@ import { useAccess, getAvailableCredits } from "@/lib/access";
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { BrandLogo } from "@/components/brand-logo";
 
+// Map a project's `content_type` to the top-level sidebar tab that should
+// show the "active" highlight while the user is editing that project at
+// `/projects/$id`. Without this the sidebar looks empty on project pages
+// because none of the nav items literally start with `/projects/`.
+const CONTENT_TYPE_TO_NAV: Record<string, string> = {
+  long_video: "/videos",
+  short_reel: "/videos",
+  ugc: "/videos",
+  ai_image: "/images",
+  carousel: "/carousels",
+  caption_only: "/captions",
+};
+
 const BASE_NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/create", label: "New Project", icon: Plus },
@@ -37,6 +50,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   const NAV = access?.isAdmin
     ? [...BASE_NAV, { to: "/admin" as const, label: "Admin", icon: Crown }]
     : BASE_NAV;
+
+  // On `/projects/:id` no nav item matches the path directly, so nothing
+  // highlights. Derive the "owning" tab from the project's content_type
+  // (populated in the ["project", id] cache by the editor route) and fall
+  // back to Dashboard while the cache is empty on first paint.
+  const projectMatch = /^\/projects\/([^/]+)/.exec(pathname);
+  const projectId = projectMatch?.[1];
+  const projectData = projectId
+    ? (qc.getQueryData<{ project: { content_type?: string | null } | null }>(["project", projectId]))
+    : undefined;
+  const derivedNav = projectId
+    ? (projectData?.project?.content_type
+        ? (CONTENT_TYPE_TO_NAV[projectData.project.content_type] ?? "/dashboard")
+        : "/dashboard")
+    : null;
 
   async function signOut() {
     await qc.cancelQueries();
@@ -69,7 +97,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV.map((n) => {
-            const active = pathname === n.to || (n.to !== "/dashboard" && pathname.startsWith(n.to));
+            const active = derivedNav
+              ? derivedNav === n.to
+              : pathname === n.to || (n.to !== "/dashboard" && pathname.startsWith(n.to));
             return (
               <Link key={n.to} to={n.to}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${

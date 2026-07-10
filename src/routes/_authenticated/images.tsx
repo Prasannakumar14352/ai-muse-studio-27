@@ -4,6 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { STYLES } from "@/lib/constants";
 import { pushImageGenLog, listImageGenLogs } from "@/lib/local-store";
+import { ProjectsSection } from "@/components/projects-section";
+
 
 import { deductUsage, useAccess, canGenerate } from "@/lib/access";
 import { Loader2, Wand2, Download, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
@@ -332,6 +334,12 @@ function ImagesPage() {
           </div>
         )}
       </div>
+
+      <ProjectsSection
+        contentTypes={["ai_image"]}
+        title="Your image projects"
+        cacheKey="images"
+      />
 
       {results.length === 0 ? (
         <div className="glass rounded-2xl p-12 text-center">

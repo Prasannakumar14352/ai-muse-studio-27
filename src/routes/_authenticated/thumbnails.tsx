@@ -14,6 +14,7 @@ import {
 } from "@/lib/thumbnail-director";
 import { renderConcept, regenerateLayer, type RenderedThumbnail } from "@/lib/thumbnail-agents";
 import { saveGeneratedThumbnail, getGeneratedThumbnails, deleteGeneratedThumbnail, loadThumbnailImageURL, type LocalThumbnail } from "@/lib/thumbnailLocalStore";
+import { ProjectsSection } from "@/components/projects-section";
 
 export const Route = createFileRoute("/_authenticated/thumbnails")({
   head: () => ({
@@ -211,6 +212,12 @@ function ThumbnailsPage() {
           </button>
         </div>
       </div>
+
+      <ProjectsSection
+        contentTypes={["long_video", "short_reel", "ugc", "ai_image"]}
+        title="Your projects — open to edit thumbnails"
+        cacheKey="thumbnails"
+      />
 
       {/* Concept grid */}
       {plan && (
