@@ -308,6 +308,13 @@ export type DirectorInput = {
   previousShotType?: ShotType | null;
   /** Optional Creative Director brief — steers hero subject + avoid list. */
   brief?: CreativeBriefLite | null;
+  /** Optional environment override — bypasses cinematic-engine enrichment
+   * so the caller (Character Bible pipeline) can rotate locations across
+   * beats to guarantee variety. */
+  environmentOverride?: string | null;
+  /** Optional Master Character Reference URL — surfaced in the prompt as an
+   * identity anchor cue for models that support reference-image conditioning. */
+  masterReferenceUrl?: string | null;
 };
 
 export type DirectorOutput = {
