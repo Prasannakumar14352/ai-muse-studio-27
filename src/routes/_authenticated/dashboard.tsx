@@ -237,10 +237,7 @@ function UserDashboard() {
           {recent && recent.length > 0 ? (
             <div className="grid sm:grid-cols-2 gap-4">
               {recent.map((p) => (
-                <Link key={p.id} to="/projects/$id" params={{ id: p.id }} className="glass rounded-xl p-5 hover:border-white/20 transition block">
-                  <div className="text-xs text-muted-foreground uppercase tracking-wider">{p.content_type ?? "project"}</div>
-                  <div className="mt-2 font-semibold line-clamp-2">{p.title}</div>
-                </Link>
+                <RecentProjectCard key={p.id} project={p as { id: string; title: string; content_type: string | null }} />
               ))}
             </div>
           ) : (
