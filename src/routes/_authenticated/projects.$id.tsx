@@ -419,7 +419,113 @@ function ProjectView() {
   );
 }
 
+// Collapsible brief editor. Uses the shared ProjectBriefForm so create + edit
+// present identical inputs. Persists to the projects row and re-runs the
+// generator so downstream views (script, scenes, images) refresh together.
+function EditBriefPanel({ project, onSaved }: { project: { id: string; content_type: string | null; topic: string | null; audience: string | null; platform: string | null; tone: string | null; style: string | null; voice: string | null; music: string | null; }; onSaved: () => void; }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const initial: Partial<ProjectBrief> = {
+    content_type: project.content_type ?? DEFAULT_BRIEF.content_type,
+    topic: project.topic ?? "",
+    audience: project.audience ?? "",
+    platform: project.platform ?? DEFAULT_BRIEF.platform,
+    tone: project.tone ?? DEFAULT_BRIEF.tone,
+    style: project.style ?? DEFAULT_BRIEF.style,
+    voice: project.voice ?? DEFAULT_BRIEF.voice,
+    music: project.music ?? DEFAULT_BRIEF.music,
+  };
+
+  async function handleSave(form: ProjectBrief) {
+    setBusy(true);
+    try {
+      const { error: uErr } = await supabase.from("projects").update({
+        topic: form.topic, audience: form.audience, platform: form.platform,
+        tone: form.tone, style: form.style, voice: form.voice, music: form.music,
+      }).eq("id", project.id);
+      if (uErr) throw uErr;
+
+      const styleLabel = STYLES.find((s) => s.id === form.style)?.label ?? form.style;
+      const contentType = project.content_type ?? "short_reel";
+
+      if (contentType === "carousel") {
+        const ai = await generateAiCarousel({
+          data: { topic: form.topic, tone: form.tone, platform: form.platform,
+            styleLabel, slideCount: form.slide_count, aspectRatio: form.aspect_ratio },
+        });
+        const slides = ai.slides;
+        const script = slides.map((s) => `Slide ${s.n} — ${s.role} [${s.label}]\n${s.headline}\n\n${s.body}\nVisual: ${s.visual}`).join("\n\n---\n\n");
+        const hashtags = generateCarousel({ topic: form.topic, tone: form.tone, platform: form.platform, style: form.style, slideCount: form.slide_count, aspectRatio: form.aspect_ratio }).hashtags;
+        await saveOutput(project.id, {
+          title: ai.title, hook: slides[0]?.headline ?? "", script,
+          captions: `${ai.title}\n\n${slides[0]?.headline ?? ""}`,
+          hashtags, scenes: [],
+          image_prompts: slides.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel })),
+          thumbnail_ideas: [],
+          carousel_slides: slides.map((s) => ({ n: s.n, role: s.role, headline: s.headline, body: s.body, visual: s.visual, label: s.label, emoji: s.emoji, bullets: s.bullets, bottom_highlight: s.bottom_highlight })),
+          aspect_ratio: form.aspect_ratio, slide_count: form.slide_count,
+        });
+      } else {
+        const ai = await generateAiVideoScript({
+          data: { topic: form.topic, tone: form.tone, platform: form.platform, styleLabel,
+            contentType, audience: form.audience,
+            ...(contentType === "long_video" ? { targetLengthSec: form.long_video_length_sec } : {}) },
+        });
+        const scenes = ai.scenes.map((s) => ({ n: s.n, visual: s.visual, voiceover: s.voiceover, duration: s.duration || "3s", on_screen_text: s.on_screen_text || "" }));
+        const script = ai.scenes.map((s) => `Scene ${s.n} (${s.time_range}) — ${s.role}\nVoiceover: ${s.voiceover}\nVisual: ${s.visual}`).join("\n\n---\n\n");
+        await saveOutput(project.id, {
+          title: ai.reel_title || ai.title, hook: ai.scenes[0]?.voiceover ?? "",
+          script, captions: ai.caption || generateCaptions(form.topic, form.platform, form.tone).join("\n\n---\n\n"),
+          hashtags: ai.hashtags?.length ? ai.hashtags : generateHashtags(form.topic, form.platform),
+          scenes, image_prompts: ai.scenes.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel })),
+          thumbnail_ideas: [],
+        });
+        await supabase.from("projects").update({ title: ai.reel_title || ai.title }).eq("id", project.id);
+      }
+
+      toast.success("Brief saved & regenerated");
+      onSaved();
+      setOpen(false);
+    } catch (e) {
+      console.error("[edit-brief] failed", e);
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="glass rounded-2xl overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between p-4 hover:bg-white/5"
+      >
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <Edit3 className="w-4 h-4 text-[color:var(--neon-purple)]" />
+          Edit brief & regenerate
+          <span className="text-xs text-muted-foreground font-normal ml-2">(same form used to create the project)</span>
+        </div>
+        {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+      </button>
+      {open && (
+        <div className="p-4 border-t border-border">
+          <ProjectBriefForm
+            initial={initial}
+            loading={busy}
+            lockContentType
+            submitLabel="Save brief & regenerate"
+            submitIcon="wand"
+            onSubmit={handleSave}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 type Scene = { n: number; visual: string; voiceover: string; duration: string; on_screen_text?: string };
+
 
 function VideoPreview({
   scenes, title, styleImage, styleId, platform, contentType, music,
