@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { generateCaptions, generateHashtags } from "@/lib/generators";
 import { PLATFORMS, TONES } from "@/lib/constants";
 import { Copy, Wand2 } from "lucide-react";
+import { ProjectsSection } from "@/components/projects-section";
 
 export const Route = createFileRoute("/_authenticated/captions")({ component: CaptionsPage });
 
@@ -111,6 +112,13 @@ function CaptionsPage() {
           </div>
         </div>
       )}
+      <ProjectsSection
+        contentTypes={["caption_only", "seo_pack"]}
+        title="Your caption & SEO projects"
+        cacheKey="captions"
+        showTypeFilter
+        showStatusFilter
+      />
     </div>
   );
 }
