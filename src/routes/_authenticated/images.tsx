@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_authenticated/images")({ component: Imag
 
 
 const RATIOS = ["1:1", "9:16", "16:9", "4:5"];
-const LS_STATE = "creatorvault:images:v2";
+const LS_STATE = "creatorvault:images:v3";
 
 type ResultItem = { id: string; prompt: string; style: string; ratio: string; image: string };
 
