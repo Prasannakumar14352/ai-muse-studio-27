@@ -1,11 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccess } from "@/lib/access";
+import { toast } from "sonner";
+import { confirmDialog } from "@/components/confirm-dialog";
+import { MODULE_CONTENT_TYPES, type ModuleId } from "@/lib/content-types";
 
 import {
   Plus, Video, Film, Image as ImageIcon, Type, Sparkles, TrendingUp, Layers,
-  Crown, Users, Zap, Calendar, ArrowUpRight,
+  Crown, Users, Zap, Calendar, ArrowUpRight, Trash2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
