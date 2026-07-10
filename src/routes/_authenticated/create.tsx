@@ -39,8 +39,8 @@ function CreatePage() {
   const qc = useQueryClient();
   const search = Route.useSearch();
   const [loading, setLoading] = useState(false);
-  const selectedType = search.type;
-  const selectedMeta = selectedType ? CONTENT_TYPES_BY_ID[selectedType] : null;
+  const selectedType = search.type as ContentTypeId | undefined;
+  const selectedMeta = selectedType ? CONTENT_TYPES_BY_ID[selectedType] ?? null : null;
 
 
   async function handleGenerate(form: ProjectBrief) {
