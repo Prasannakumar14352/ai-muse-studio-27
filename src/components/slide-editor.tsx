@@ -302,6 +302,25 @@ export function SlideEditor(props: SlideEditorProps) {
             Layers ({overlays.length})
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {props.copy?.headline && (
+              <div className="rounded-lg border border-border bg-black/30 p-2.5 space-y-1.5">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                  <Wand2 className="w-3 h-3" /> Layout templates
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {LAYOUT_TEMPLATES.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => applyAutoLayout(t)}
+                      title={t.description}
+                      className={`text-[10px] rounded border px-1.5 py-1 text-left ${lastTemplate?.id === t.id ? "border-[color:var(--neon-purple)] bg-white/5" : "border-border hover:bg-white/5"}`}
+                    >
+                      {t.id.replace(/_/g, " ")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="space-y-1">
               {overlays.length === 0 && (
                 <div className="text-[11px] text-muted-foreground text-center py-4">
