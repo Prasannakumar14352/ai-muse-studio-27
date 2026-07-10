@@ -37,7 +37,11 @@ export const Route = createFileRoute("/_authenticated/create")({
 function CreatePage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const search = Route.useSearch();
   const [loading, setLoading] = useState(false);
+  const selectedType = search.type;
+  const selectedMeta = selectedType ? CONTENT_TYPES_BY_ID[selectedType] : null;
+
 
   async function handleGenerate(form: ProjectBrief) {
     if (!form.topic.trim()) { toast.error("Please enter a topic"); return; }
