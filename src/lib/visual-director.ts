@@ -1,11 +1,22 @@
 // Visual Director — reusable creative engine for the AI Studio.
 //
-// The user provides a topic (and the pipeline generates a storyboard). This
-// module turns each storyboard beat into a fully-realized cinematic image
-// prompt: subject, action, environment, camera + lens, lighting, color grade,
-// composition, style, negatives, and continuity anchor. Designed to be reused
-// by videos, standalone images, carousels, thumbnails, and social posts —
-// nothing here depends on the video pipeline.
+// Turns each storyboard beat into a Netflix-doc / Apple-commercial grade
+// cinematic prompt. Composes: locked character, shot type, camera kit, lens,
+// aperture, lighting recipe, environment expansion, story details, mood,
+// palette, emotion, and continuity anchor. All inference is deterministic
+// and topic-aware via `cinematic-engine.ts` — no LLM calls in this file.
+
+import {
+  classifyTopic,
+  pickCameraKit,
+  inferEmotion,
+  pickPalette,
+  enrichEnvironment,
+  storyDetailsFor,
+  inferMood,
+  lightingRecipe,
+  reviewPromptQuality,
+} from "./cinematic-engine";
 
 export type VDStyle =
   | "documentary" | "cinematic" | "realistic" | "ghibli" | "anime"
