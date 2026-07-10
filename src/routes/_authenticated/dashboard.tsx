@@ -270,3 +270,99 @@ function UserDashboard() {
     </div>
   );
 }
+
+const MODULE_META: Array<{ id: ModuleId; label: string; to: string; icon: typeof Video; hue: string }> = [
+  { id: "videos", label: "Videos", to: "/videos", icon: Video, hue: "from-pink-500 to-rose-600" },
+  { id: "carousels", label: "Carousels", to: "/carousels", icon: Layers, hue: "from-fuchsia-500 to-purple-600" },
+  { id: "images", label: "Images", to: "/images", icon: ImageIcon, hue: "from-indigo-500 to-purple-600" },
+  { id: "thumbnails", label: "Thumbnails", to: "/thumbnails", icon: Sparkles, hue: "from-amber-400 to-orange-500" },
+  { id: "captions", label: "Captions", to: "/captions", icon: Type, hue: "from-emerald-400 to-teal-500" },
+];
+
+function ModuleCounts() {
+  const { data: counts } = useQuery({
+    queryKey: ["module-counts"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("projects").select("content_type");
+      if (error) throw error;
+      const c: Record<ModuleId, number> = { videos: 0, carousels: 0, images: 0, thumbnails: 0, captions: 0 };
+      const inv: Record<string, ModuleId> = {};
+      (Object.keys(MODULE_CONTENT_TYPES) as ModuleId[]).forEach((m) => {
+        MODULE_CONTENT_TYPES[m].forEach((ct) => { inv[ct] = m; });
+      });
+      for (const row of data ?? []) {
+        const m = row.content_type ? inv[row.content_type] : undefined;
+        if (m) c[m] += 1;
+      }
+      return c;
+    },
+    staleTime: 30_000,
+  });
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      {MODULE_META.map((m) => (
+        <Link
+          key={m.id}
+          to={m.to}
+          className="glass rounded-2xl p-5 hover:border-white/20 transition group block"
+        >
+          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${m.hue} flex items-center justify-center mb-4`}>
+            <m.icon className="w-5 h-5 text-white" />
+          </div>
+          <div className="text-2xl font-bold">{counts?.[m.id] ?? 0}</div>
+          <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+            {m.label} <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition" />
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function RecentProjectCard({ project }: { project: { id: string; title: string; content_type: string | null } }) {
+  const qc = useQueryClient();
+  async function del(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const ok = await confirmDialog({
+      title: "Delete this project?",
+      description: `"${project.title}" will be permanently removed.`,
+      confirmText: "Delete",
+      tone: "destructive",
+    });
+    if (!ok) return;
+    const { error } = await supabase.from("projects").delete().eq("id", project.id);
+    if (error) {
+      toast.error("Couldn't delete", { description: error.message });
+      return;
+    }
+    toast.success("Project deleted");
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["recent-projects"] }),
+      qc.invalidateQueries({ queryKey: ["stats"] }),
+      qc.invalidateQueries({ queryKey: ["module-counts"] }),
+      qc.invalidateQueries({ queryKey: ["projects-section"] }),
+      qc.invalidateQueries({ queryKey: ["admin-recent-projects"] }),
+      qc.invalidateQueries({ queryKey: ["admin-stats"] }),
+    ]);
+  }
+  return (
+    <div className="relative group">
+      <button
+        type="button"
+        onClick={del}
+        aria-label="Delete project"
+        title="Delete project"
+        className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition rounded-lg bg-black/70 hover:bg-rose-600 text-white p-1.5"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+      <Link to="/projects/$id" params={{ id: project.id }} className="glass rounded-xl p-5 hover:border-white/20 transition block">
+        <div className="text-xs text-muted-foreground uppercase tracking-wider">{project.content_type ?? "project"}</div>
+        <div className="mt-2 font-semibold line-clamp-2">{project.title}</div>
+      </Link>
+    </div>
+  );
+}
+
