@@ -13,6 +13,7 @@ import {
 import { buildFallbackVideoScript } from "@/lib/video-fallback";
 import { renderVideo, type RenderScene, type CameraMotion, type TransitionStyle } from "@/lib/video-renderer";
 import { planBeatMotion, type SceneType } from "@/lib/motion-director";
+import { detectScene, buildDynamicVideoPrompt, type SceneKind, type DynamicActivity } from "@/lib/scene-detector";
 import { runShotPool } from "@/lib/video-shot-runner";
 import {
   createJob, getJob, saveJob, saveShotBlob, loadShotObjectURL,
@@ -55,6 +56,12 @@ type Beat = {
   motion: CameraMotion;
   transition: TransitionStyle;
   sceneType: SceneType;
+  /** Dynamic Scene Detection: how this beat must be produced. */
+  sceneKind: SceneKind;
+  /** Activity name when sceneKind === "dynamic" (walking, cooking, ...). */
+  activity: DynamicActivity | null;
+  /** Rich AI-video prompt when dynamic; null for static beats. */
+  videoPrompt: string | null;
 };
 
 /** Split a voiceover string into ~10-14-word visual chunks (sentence-aware). */
@@ -174,6 +181,18 @@ function expandScriptToBeats(
       const composedPrompt = plan.motionBrief
         ? `${directed.prompt}\n\nSHOT COMPOSITION FOR MOTION (${plan.motion} / ${plan.sceneType}):\n${plan.motionBrief}`
         : directed.prompt;
+      // Dynamic Scene Detection — is this beat continuous human activity
+      // (walking/talking/cooking/…) or a truly static subject (product/logo/
+      // landscape/…)? Dynamic beats must be produced by an AI video model.
+      const detection = detectScene(chunk, composedPrompt);
+      const videoPrompt = detection.kind === "dynamic" && detection.activity
+        ? buildDynamicVideoPrompt({
+            activity: detection.activity,
+            basePrompt: composedPrompt,
+            durationSec: TARGET_BEAT_SEC,
+            aspectRatio: "16:9",
+          })
+        : null;
       beats.push({
         sceneIndex,
         beatIndex,
@@ -184,6 +203,9 @@ function expandScriptToBeats(
         motion: plan.motion as CameraMotion,
         transition: plan.transition,
         sceneType: plan.sceneType,
+        sceneKind: detection.kind,
+        activity: detection.activity,
+        videoPrompt,
       });
       globalIdx += 1;
     });
@@ -735,12 +757,18 @@ export const VisualGenerationAgent = {
     onProgress?.(0, total);
     const results = await Promise.all(
       beats.map(async (b, i) => {
-        // Try AI video clip first; fall back to still image on any failure.
-        const clip = await fetchBeatClip(b.imagePrompt, brief.style, brief.aspectRatio, TARGET_BEAT_SEC);
-        if (clip) {
-          done += 1;
-          onProgress?.(done, total);
-          return { n: i + 1, kind: "clip" as const, url: clip, duration_sec: TARGET_BEAT_SEC, generated: true };
+        // Dynamic Scene Detection routing (see generateOneShot for details).
+        if (b.sceneKind === "dynamic") {
+          const dynPrompt = b.videoPrompt || b.imagePrompt;
+          const clip = await fetchBeatClip(dynPrompt, brief.style, brief.aspectRatio, TARGET_BEAT_SEC);
+          if (clip) {
+            done += 1;
+            onProgress?.(done, total);
+            return { n: i + 1, kind: "clip" as const, url: clip, duration_sec: TARGET_BEAT_SEC, generated: true };
+          }
+          console.warn(
+            `[scene-detector] Dynamic beat ${i + 1} (${b.activity}) fell back to still image — no video model available.`,
+          );
         }
         const url = await fetchSceneImage(b.imagePrompt, brief.style, brief.aspectRatio);
         done += 1;
@@ -1490,6 +1518,9 @@ function beatsFromShots(job: JobRecord, style: StyleId): Beat[] {
     motion: (s.motion as CameraMotion) || "zoomIn",
     transition: ((s.transition as TransitionStyle) || "fade"),
     sceneType: ((s.sceneType as SceneType) || "explainer"),
+    sceneKind: (s.sceneKind as SceneKind) || "static",
+    activity: (s.activity as DynamicActivity | null) ?? null,
+    videoPrompt: s.videoPrompt ?? null,
     // Note: buildBeatImagePrompt already applied when the shot was created.
     _styleHint: style,
   } as unknown as Beat));
@@ -1514,6 +1545,9 @@ function planShots(
     motion: b.motion,
     transition: b.transition,
     sceneType: b.sceneType,
+    sceneKind: b.sceneKind,
+    activity: b.activity,
+    videoPrompt: b.videoPrompt,
     status: "pending",
     kind: null,
     blobKey: null,
@@ -1530,14 +1564,27 @@ async function generateOneShot(
   signal: AbortSignal,
 ): Promise<{ blobKey: string; kind: "clip" | "image"; mime: string; previewUrl: string }> {
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-  // Try clip first; on any failure fall back to image. Both return data URLs
-  // today (see /api/generate-image and /api/generate-video-clip).
-  const clip = await fetchBeatClip(shot.prompt, brief.style, brief.aspectRatio, TARGET_BEAT_SEC);
-  if (clip) {
-    const blob = await dataUrlToBlob(clip);
-    const key = await saveShotBlob(jobId, shot.id, blob);
-    const url = await loadShotObjectURL(key);
-    return { blobKey: key, kind: "clip", mime: blob.type || "video/mp4", previewUrl: url ?? clip };
+
+  // Dynamic Scene Detection routing:
+  //   • dynamic beats  → AI video clip using the rich motion prompt.
+  //   • static beats   → still image + Motion Director camera move; never
+  //     waste a video call on a truly static subject (product / logo /
+  //     landscape / document).
+  //
+  // Dynamic beats fall back to an image ONLY if the video model is
+  // unavailable — the ideal is to never ship a still for a dynamic beat.
+  if (shot.sceneKind === "dynamic") {
+    const dynPrompt = shot.videoPrompt || shot.prompt;
+    const clip = await fetchBeatClip(dynPrompt, brief.style, brief.aspectRatio, TARGET_BEAT_SEC);
+    if (clip) {
+      const blob = await dataUrlToBlob(clip);
+      const key = await saveShotBlob(jobId, shot.id, blob);
+      const url = await loadShotObjectURL(key);
+      return { blobKey: key, kind: "clip", mime: blob.type || "video/mp4", previewUrl: url ?? clip };
+    }
+    console.warn(
+      `[scene-detector] Dynamic beat ${shot.id} (${shot.activity}) fell back to still image — no video model available.`,
+    );
   }
   const img = await fetchSceneImage(shot.prompt, brief.style, brief.aspectRatio);
   if (!img) throw new Error("Image generation failed");

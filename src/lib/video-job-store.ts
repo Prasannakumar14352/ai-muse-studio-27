@@ -30,6 +30,12 @@ export type ShotRecord = {
   motion: string;
   transition?: string;
   sceneType?: string;
+  /** Dynamic Scene Detection classification. */
+  sceneKind?: "static" | "dynamic";
+  /** Activity name when sceneKind === "dynamic". */
+  activity?: string | null;
+  /** Rich AI-video prompt for dynamic beats (null for static). */
+  videoPrompt?: string | null;
   status: ShotStatus;
   kind: ShotKind | null;
   blobKey: string | null;
