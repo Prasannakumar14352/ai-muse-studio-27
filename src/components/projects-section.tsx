@@ -199,52 +199,81 @@ export function ProjectsSection({
     );
   }
 
+  const rows = filtered ?? [];
+
   return (
     <section className="space-y-3">
       {Header}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {data.map((p) => {
-          const ct = (p.content_type ?? "").toLowerCase();
-          const cardAspect: "portrait" | "landscape" | "square" =
-            thumbnailAspect === "landscape" && (ct === "short_reel" || ct.includes("short") || ct.includes("reel"))
-              ? "portrait"
-              : thumbnailAspect === "landscape" && ct === "long_video"
-              ? "landscape"
-              : thumbnailAspect;
-          const thumb =
-            (p as { thumbnail_url?: string | null }).thumbnail_url ||
-            (p as { cover_image_url?: string | null }).cover_image_url ||
-            (p as { poster_url?: string | null }).poster_url ||
-            null;
-          return (
-            <Link
-              key={p.id}
-              to="/projects/$id"
-              params={{ id: p.id }}
-              className="glass rounded-xl overflow-hidden hover:border-white/20 transition block border border-border group"
-            >
-              <ProjectThumbnail
-                title={p.title}
-                contentType={p.content_type}
-                style={p.style}
-                platform={p.platform}
-                thumbnailUrl={thumb}
-                status={(p as { status?: string | null }).status}
-                aspect={cardAspect}
-              />
-              <div className="p-3">
-                <div className="font-semibold line-clamp-2 text-sm">{p.title}</div>
-                <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
-                  {p.style && <span className="glass px-1.5 py-0.5 rounded">{p.style}</span>}
-                  <span className="ml-auto">
-                    {new Date(p.updated_at ?? p.created_at).toLocaleDateString()}
-                  </span>
+      {FilterChips}
+      {rows.length === 0 ? (
+        <div className="glass rounded-2xl p-6 text-center text-sm text-muted-foreground border border-dashed border-white/10">
+          No projects match these filters.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {rows.map((p) => {
+            const ct = (p.content_type ?? "").toLowerCase();
+            const cardAspect: "portrait" | "landscape" | "square" =
+              thumbnailAspect === "landscape" && (ct === "short_reel" || ct.includes("short") || ct.includes("reel"))
+                ? "portrait"
+                : thumbnailAspect === "landscape" && ct === "long_video"
+                ? "landscape"
+                : thumbnailAspect;
+            const thumb =
+              (p as { thumbnail_url?: string | null }).thumbnail_url ||
+              (p as { cover_image_url?: string | null }).cover_image_url ||
+              (p as { poster_url?: string | null }).poster_url ||
+              null;
+            return (
+              <Link
+                key={p.id}
+                to="/projects/$id"
+                params={{ id: p.id }}
+                className="glass rounded-xl overflow-hidden hover:border-white/20 transition block border border-border group"
+              >
+                <ProjectThumbnail
+                  title={p.title}
+                  contentType={p.content_type}
+                  style={p.style}
+                  platform={p.platform}
+                  thumbnailUrl={thumb}
+                  status={(p as { status?: string | null }).status}
+                  aspect={cardAspect}
+                />
+                <div className="p-3">
+                  <div className="font-semibold line-clamp-2 text-sm">{p.title}</div>
+                  <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                    {p.style && <span className="glass px-1.5 py-0.5 rounded">{p.style}</span>}
+                    <span className="ml-auto">
+                      {new Date(p.updated_at ?? p.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
+}
+
+function FilterChip({
+  active, onClick, children,
+}: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-2.5 py-1 rounded-full text-xs transition border ${
+        active
+          ? "bg-[color:var(--neon-pink)]/20 border-[color:var(--neon-pink)]/50 text-white"
+          : "glass border-white/10 hover:border-white/20 text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 }
