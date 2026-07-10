@@ -81,9 +81,47 @@ export function ProjectsSection({
     }
   }, [error, refetch, title]);
 
+  const filtered = useMemo(() => {
+    if (!data) return data;
+    return data.filter((p) => {
+      const okType = typeFilter === "all" || (p.content_type ?? "") === typeFilter;
+      const okStatus = statusFilter === "all" || (p.status ?? "") === statusFilter;
+      return okType && okStatus;
+    });
+  }, [data, typeFilter, statusFilter]);
+
   useEffect(() => {
-    if (!isLoading && !error && onCount) onCount(data?.length ?? 0);
-  }, [data, isLoading, error, onCount]);
+    if (!isLoading && !error && onCount) onCount(filtered?.length ?? 0);
+  }, [filtered, isLoading, error, onCount]);
+
+  const FilterChips = (showTypeFilter || showStatusFilter) && data && data.length > 0 ? (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      {showTypeFilter && (
+        <div className="flex flex-wrap gap-1.5">
+          <FilterChip active={typeFilter === "all"} onClick={() => setTypeFilter("all")}>All</FilterChip>
+          {contentTypes.map((ct) => {
+            const meta = CONTENT_TYPES_BY_ID[ct as ContentTypeId];
+            return (
+              <FilterChip key={ct} active={typeFilter === ct} onClick={() => setTypeFilter(ct)}>
+                {meta?.short ?? ct}
+              </FilterChip>
+            );
+          })}
+        </div>
+      )}
+      {showStatusFilter && (
+        <div className="flex flex-wrap gap-1.5 ml-auto">
+          <FilterChip active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>All statuses</FilterChip>
+          {PROJECT_STATUSES.map((s) => (
+            <FilterChip key={s.id} active={statusFilter === s.id} onClick={() => setStatusFilter(s.id)}>
+              {s.label}
+            </FilterChip>
+          ))}
+        </div>
+      )}
+    </div>
+  ) : null;
+
 
   const Header = (
     <div className="flex items-center justify-between">
