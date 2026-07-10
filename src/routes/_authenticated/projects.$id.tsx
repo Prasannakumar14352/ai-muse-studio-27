@@ -337,6 +337,14 @@ function ProjectView() {
         </div>
       </div>
 
+      {/* Edit brief & regenerate — same <ProjectBriefForm/> used on /create,
+          so creating and editing a project use identical UI. Saving updates
+          the projects row and re-runs the same generator "Regenerate All"
+          uses, keeping the two paths behaviorally identical. */}
+      <EditBriefPanel project={project} onSaved={() => qc.invalidateQueries({ queryKey: ["project", id] })} />
+
+
+
 
       {/* Preview — carousels have their own preview page */}
       {project.content_type === "carousel" ? (
