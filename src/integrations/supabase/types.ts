@@ -115,9 +115,12 @@ export type Database = {
           audience: string | null
           content_type: string | null
           created_at: string
+          distribution: Json | null
+          format: string
           id: string
           music: string | null
           platform: string | null
+          quality_report: Json | null
           status: string | null
           style: string | null
           title: string
@@ -131,9 +134,12 @@ export type Database = {
           audience?: string | null
           content_type?: string | null
           created_at?: string
+          distribution?: Json | null
+          format?: string
           id?: string
           music?: string | null
           platform?: string | null
+          quality_report?: Json | null
           status?: string | null
           style?: string | null
           title: string
@@ -147,9 +153,12 @@ export type Database = {
           audience?: string | null
           content_type?: string | null
           created_at?: string
+          distribution?: Json | null
+          format?: string
           id?: string
           music?: string | null
           platform?: string | null
+          quality_report?: Json | null
           status?: string | null
           style?: string | null
           title?: string
