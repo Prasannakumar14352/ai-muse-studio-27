@@ -114,15 +114,21 @@ export type Database = {
         Row: {
           audience: string | null
           content_type: string | null
+          cover_image_url: string | null
           created_at: string
           distribution: Json | null
           format: string
           id: string
           music: string | null
           platform: string | null
+          poster_url: string | null
           quality_report: Json | null
           status: string | null
           style: string | null
+          thumbnail_generated_at: string | null
+          thumbnail_prompt: string | null
+          thumbnail_status: string | null
+          thumbnail_url: string | null
           title: string
           tone: string | null
           topic: string | null
@@ -133,15 +139,21 @@ export type Database = {
         Insert: {
           audience?: string | null
           content_type?: string | null
+          cover_image_url?: string | null
           created_at?: string
           distribution?: Json | null
           format?: string
           id?: string
           music?: string | null
           platform?: string | null
+          poster_url?: string | null
           quality_report?: Json | null
           status?: string | null
           style?: string | null
+          thumbnail_generated_at?: string | null
+          thumbnail_prompt?: string | null
+          thumbnail_status?: string | null
+          thumbnail_url?: string | null
           title: string
           tone?: string | null
           topic?: string | null
@@ -152,15 +164,21 @@ export type Database = {
         Update: {
           audience?: string | null
           content_type?: string | null
+          cover_image_url?: string | null
           created_at?: string
           distribution?: Json | null
           format?: string
           id?: string
           music?: string | null
           platform?: string | null
+          poster_url?: string | null
           quality_report?: Json | null
           status?: string | null
           style?: string | null
+          thumbnail_generated_at?: string | null
+          thumbnail_prompt?: string | null
+          thumbnail_status?: string | null
+          thumbnail_url?: string | null
           title?: string
           tone?: string | null
           topic?: string | null
