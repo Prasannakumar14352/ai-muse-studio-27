@@ -339,6 +339,7 @@ function ImagesPage() {
         contentTypes={["ai_image"]}
         title="Your image projects"
         cacheKey="images"
+        showStatusFilter
       />
 
       {results.length === 0 ? (
