@@ -13,6 +13,11 @@ import { isBlobKey, getDataURL } from "@/lib/blob-store";
 import { deductUsage } from "@/lib/access";
 import { toast } from "sonner";
 import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles, AlertTriangle, Bug, CheckCircle2, X, Package, Edit3, Save, Eye, EyeOff, ImageOff, Volume2, ChevronDown, ChevronRight, History, FileText, Wand2 } from "lucide-react";
+import { ProjectBriefForm, DEFAULT_BRIEF, type ProjectBrief } from "@/components/project-brief-form";
+import { generateAiVideoScript } from "@/lib/video-ai.functions";
+import { generateAiCarousel } from "@/lib/carousel-ai.functions";
+import { generateCarousel, generateCaptions, generateHashtags } from "@/lib/generators";
+import { STYLES } from "@/lib/constants";
 
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
