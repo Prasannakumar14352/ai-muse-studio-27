@@ -351,13 +351,6 @@ function ImagesPage() {
         )}
       </div>
 
-      <ProjectsSection
-        contentTypes={["ai_image"]}
-        title="Your image projects"
-        cacheKey="images"
-        showStatusFilter
-      />
-
       {results.length === 0 ? (
         <div className="glass rounded-2xl p-12 text-center">
           <ImageIcon className="w-10 h-10 mx-auto text-muted-foreground" />
