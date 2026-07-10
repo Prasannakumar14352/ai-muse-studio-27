@@ -13,6 +13,7 @@ import {
 import { buildFallbackVideoScript } from "@/lib/video-fallback";
 import { renderVideo, type RenderScene, type CameraMotion, type TransitionStyle } from "@/lib/video-renderer";
 import { planBeatMotion, type SceneType } from "@/lib/motion-director";
+import { detectScene, buildDynamicVideoPrompt, type SceneKind, type DynamicActivity } from "@/lib/scene-detector";
 import { runShotPool } from "@/lib/video-shot-runner";
 import {
   createJob, getJob, saveJob, saveShotBlob, loadShotObjectURL,
