@@ -4,13 +4,14 @@
 // logging, and a manual refresh button so the tab always reflects backend state.
 
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, FolderOpen, RefreshCw, Sparkles, AlertTriangle, Plus } from "lucide-react";
+import { Loader2, FolderOpen, RefreshCw, Sparkles, AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { ProjectThumbnail } from "@/components/project-thumbnail";
 import { CONTENT_TYPES_BY_ID, PROJECT_STATUSES, type ContentTypeId } from "@/lib/content-types";
+import { confirmDialog } from "@/components/confirm-dialog";
 
 type Props = {
   /** Content-type values in the `projects.content_type` column. */
