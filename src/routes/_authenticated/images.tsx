@@ -472,7 +472,7 @@ function ImagesPage() {
                         <a href={r.image} download={`creatorvault-${r.id}.png`}
                           className="flex-1 rounded-lg gradient-primary text-white py-1.5 text-xs flex items-center justify-center gap-1"><Download className="w-3 h-3" /> Download</a>
                         <button
-                          onClick={() => setResults((prev) => prev.filter((x) => x.id !== r.id))}
+                          onClick={() => deleteImage(r.id)}
                           className="rounded-lg glass hover:bg-rose-500/20 text-rose-300 py-1.5 px-2 text-xs flex items-center justify-center"
                           title="Delete image"
                         ><Trash2 className="w-3 h-3" /></button>
