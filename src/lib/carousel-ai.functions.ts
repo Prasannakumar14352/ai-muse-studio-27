@@ -239,10 +239,34 @@ Return JSON EXACTLY:
       out.brand_lock && `BRAND LOCK (identical on every slide):\n${out.brand_lock}`,
       out.character_sheet && `CHARACTER SHEET (SAME person / product on every slide — do not redesign):\n${out.character_sheet}`,
     ].filter(Boolean).join("\n\n");
-    out.slides = out.slides.map((s, i) => ({
-      ...s,
-      n: i + 1,
-      image_prompt: `${lockHeader}\n\n---\n\n${s.image_prompt}`,
-    }));
+    // Detect "product-led" vs "character-led" from the brief so each slide
+    // picks an on-brand layout template instead of always defaulting to A.
+    const briefText = `${brief.visualHero ?? ""} ${brief.avoid ?? ""}`.toLowerCase();
+    const heroIsProduct = /product|worksheet|dashboard|app|screen|book|pack|kit|tablet/.test(briefText);
+    const heroIsHuman = /child|kid|person|founder|creator|presenter|human|face/.test(briefText);
+
+    out.slides = out.slides.map((s, i) => {
+      const template = pickTemplate({
+        slideRole: s.role,
+        hasCharacter: heroIsHuman,
+        hasProduct: heroIsProduct,
+        bulletCount: s.bullets?.length ?? 0,
+      });
+      const layoutBlock = templatePromptBlock(template);
+      const visualCompositional = rewriteVisualForTemplate(s.visual, template);
+      const compositionalPrompt =
+        `${lockHeader}\n\n---\n\n${layoutBlock}\n\n---\n\n` +
+        `LAYOUT-AWARE VISUAL DIRECTION:\n${visualCompositional}\n\n---\n\n${s.image_prompt}`;
+      return {
+        ...s,
+        n: i + 1,
+        visual: visualCompositional,
+        image_prompt: compositionalPrompt,
+        // stash template id in visual metadata via a marker the editor can parse
+        // (kept in `visual` because the schema doesn't accept new fields)
+      };
+    });
+    // Silence unused-var warning for LAYOUT_TEMPLATES import (used by editor).
+    void LAYOUT_TEMPLATES;
     return out;
   });
