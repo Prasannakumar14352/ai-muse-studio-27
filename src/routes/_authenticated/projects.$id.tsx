@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles, AlertTriangle, Bug, CheckCircle2, X, Package, Edit3, Save, Eye, EyeOff, ImageOff, Volume2, ChevronDown, ChevronRight, History, FileText, Wand2 } from "lucide-react";
 import { ProjectBriefForm, DEFAULT_BRIEF, type ProjectBrief } from "@/components/project-brief-form";
 import { generateAiVideoScript } from "@/lib/video-ai.functions";
+import { PublishKitPanel } from "@/components/publish-kit-panel";
 import { generateAiCarousel } from "@/lib/carousel-ai.functions";
 import { generateCarousel, generateCaptions, generateHashtags } from "@/lib/generators";
 import { STYLES } from "@/lib/constants";
