@@ -4,13 +4,14 @@
 // logging, and a manual refresh button so the tab always reflects backend state.
 
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, FolderOpen, RefreshCw, Sparkles, AlertTriangle, Plus } from "lucide-react";
+import { Loader2, FolderOpen, RefreshCw, Sparkles, AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { ProjectThumbnail } from "@/components/project-thumbnail";
 import { CONTENT_TYPES_BY_ID, PROJECT_STATUSES, type ContentTypeId } from "@/lib/content-types";
+import { confirmDialog } from "@/components/confirm-dialog";
 
 type Props = {
   /** Content-type values in the `projects.content_type` column. */
@@ -49,6 +50,27 @@ export function ProjectsSection({
 }: Props) {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const qc = useQueryClient();
+
+  async function handleDelete(id: string, title: string) {
+    const ok = await confirmDialog({
+      title: "Delete this project?",
+      description: `"${title}" will be permanently removed from your library.`,
+      confirmText: "Delete",
+      tone: "destructive",
+    });
+    if (!ok) return;
+    const { error } = await supabase.from("projects").delete().eq("id", id);
+    if (error) {
+      toast.error("Couldn't delete project", { description: error.message });
+      return;
+    }
+    toast.success("Project deleted");
+    await qc.invalidateQueries({ queryKey: ["projects-section"] });
+    await qc.invalidateQueries({ queryKey: ["recent-projects"] });
+    await qc.invalidateQueries({ queryKey: ["module-counts"] });
+    await qc.invalidateQueries({ queryKey: ["stats"] });
+  }
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["projects-section", cacheKey, ...contentTypes],
@@ -225,31 +247,48 @@ export function ProjectsSection({
               (p as { poster_url?: string | null }).poster_url ||
               null;
             return (
-              <Link
+              <div
                 key={p.id}
-                to="/projects/$id"
-                params={{ id: p.id }}
-                className="glass rounded-xl overflow-hidden hover:border-white/20 transition block border border-border group"
+                className="glass rounded-xl overflow-hidden hover:border-white/20 transition border border-border group relative"
               >
-                <ProjectThumbnail
-                  title={p.title}
-                  contentType={p.content_type}
-                  style={p.style}
-                  platform={p.platform}
-                  thumbnailUrl={thumb}
-                  status={(p as { status?: string | null }).status}
-                  aspect={cardAspect}
-                />
-                <div className="p-3">
-                  <div className="font-semibold line-clamp-2 text-sm">{p.title}</div>
-                  <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
-                    {p.style && <span className="glass px-1.5 py-0.5 rounded">{p.style}</span>}
-                    <span className="ml-auto">
-                      {new Date(p.updated_at ?? p.created_at).toLocaleDateString()}
-                    </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void handleDelete(p.id, p.title);
+                  }}
+                  aria-label="Delete project"
+                  title="Delete project"
+                  className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition rounded-lg bg-black/70 hover:bg-rose-600 text-white p-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                <Link
+                  to="/projects/$id"
+                  params={{ id: p.id }}
+                  className="block"
+                >
+                  <ProjectThumbnail
+                    title={p.title}
+                    contentType={p.content_type}
+                    style={p.style}
+                    platform={p.platform}
+                    thumbnailUrl={thumb}
+                    status={(p as { status?: string | null }).status}
+                    aspect={cardAspect}
+                  />
+                  <div className="p-3">
+                    <div className="font-semibold line-clamp-2 text-sm">{p.title}</div>
+                    <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                      {p.style && <span className="glass px-1.5 py-0.5 rounded">{p.style}</span>}
+                      <span className="ml-auto">
+                        {new Date(p.updated_at ?? p.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+              </div>
             );
           })}
         </div>
