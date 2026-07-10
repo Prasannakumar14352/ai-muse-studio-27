@@ -181,15 +181,23 @@ export const STYLE_PRESETS: Record<VDStyle, StylePreset> = {
   },
 };
 
-/** Global negative-prompt vocabulary. Illustrated styles drop the "cartoon" negative. */
+/** Global negative-prompt vocabulary. Illustrated styles drop the photo-only
+ * negatives (cartoon/anime/illustration/cgi) so those styles aren't fought. */
 const PHOTO_NEGATIVES = [
-  "low quality", "blurry", "deformed", "duplicate", "extra fingers", "bad anatomy",
-  "low resolution", "watermark", "logo", "caption", "text", "jpeg artifacts",
-  "oversaturated", "cartoon",
+  "low quality", "low resolution", "blurry", "noise", "artifacts", "jpeg artifacts",
+  "oversaturated", "deformed anatomy", "bad anatomy", "distorted body",
+  "bad hands", "extra fingers", "duplicate people", "cropped face", "bad eyes",
+  "text", "logo", "watermark", "caption",
+  "cartoon", "anime", "illustration", "cgi",
+  "different person", "changed face", "new character", "identity drift",
+  "wardrobe change", "hairstyle change", "outfit change", "accessory change",
 ];
 const ILLUSTRATED_NEGATIVES = [
-  "low quality", "blurry", "deformed", "duplicate", "extra fingers", "bad anatomy",
-  "low resolution", "watermark", "logo", "caption", "text", "jpeg artifacts",
+  "low quality", "low resolution", "blurry", "noise", "artifacts", "jpeg artifacts",
+  "deformed anatomy", "bad anatomy", "distorted body",
+  "bad hands", "extra fingers", "duplicate people", "cropped face", "bad eyes",
+  "text", "logo", "watermark", "caption",
+  "different character", "identity drift", "wardrobe change", "hairstyle change",
 ];
 
 /** Deterministic non-repeating shot-type rotation. Uses the beat index and a
@@ -300,6 +308,13 @@ export type DirectorInput = {
   previousShotType?: ShotType | null;
   /** Optional Creative Director brief — steers hero subject + avoid list. */
   brief?: CreativeBriefLite | null;
+  /** Optional environment override — bypasses cinematic-engine enrichment
+   * so the caller (Character Bible pipeline) can rotate locations across
+   * beats to guarantee variety. */
+  environmentOverride?: string | null;
+  /** Optional Master Character Reference URL — surfaced in the prompt as an
+   * identity anchor cue for models that support reference-image conditioning. */
+  masterReferenceUrl?: string | null;
 };
 
 export type DirectorOutput = {
@@ -347,7 +362,9 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
     ? { camera: preset.camera, lens: preset.lens, aperture: preset.aperture }
     : pickCameraKit(input.beatIndex, input.styleId);
   const palette = input.brief?.paletteHint || pickPalette(topic, input.beatIndex);
-  const environment = enrichEnvironment(input.sceneContext, topic, mood.timeOfDay);
+  const environment = input.environmentOverride && input.environmentOverride.trim().length > 0
+    ? input.environmentOverride.trim()
+    : enrichEnvironment(input.sceneContext, topic, mood.timeOfDay);
   const storyDetail = storyDetailsFor(topic, input.beatIndex);
   const lighting = preset.isIllustrated ? preset.lighting : lightingRecipe(topic, mood, emotion);
 
@@ -371,6 +388,13 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
       `LOCKED CHARACTER SHEET (must match exactly in every image): ` +
       `${input.continuity.characterSheet}`,
     );
+    if (input.masterReferenceUrl) {
+      parts.push(
+        `Master Character Reference Image: ${input.masterReferenceUrl} — ` +
+        `treat this portrait as the identity anchor. Match the exact face, ` +
+        `eyes, hair, wardrobe, and accessories from this reference.`,
+      );
+    }
     // Shot rationale — tell the model WHY this framing.
     parts.push(
       `Shot: ${SHOT_TYPE_PHRASES[shotType]} with ${CAMERA_MOVE_PHRASES[cameraMove]}, ` +
