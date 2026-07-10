@@ -512,10 +512,12 @@ function VideosPage() {
             <InProgressJobs jobs={inProgress} onResume={resumeJob} onDiscard={discardJob} />
           )}
           <ProjectsSection
-            contentTypes={["long_video", "short_reel", "ugc"]}
+            contentTypes={["long_video", "short_reel", "ugc", "talking_object", "documentary", "product_promo"]}
             title="Your video projects"
             cacheKey="videos"
             thumbnailAspect="landscape"
+            showTypeFilter
+            showStatusFilter
             hideEmptyState
             onCount={setProjectCount}
           />
