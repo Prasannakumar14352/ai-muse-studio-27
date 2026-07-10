@@ -112,6 +112,13 @@ function CaptionsPage() {
           </div>
         </div>
       )}
+      <ProjectsSection
+        contentTypes={["caption_only", "seo_pack"]}
+        title="Your caption & SEO projects"
+        cacheKey="captions"
+        showTypeFilter
+        showStatusFilter
+      />
     </div>
   );
 }
