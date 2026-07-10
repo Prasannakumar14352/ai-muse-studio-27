@@ -521,9 +521,6 @@ function VideosPage() {
             hideEmptyState
             onCount={setProjectCount}
           />
-          {library.length > 0 && (
-            <QuickPlaySection items={library} onOpen={openFromLibrary} onDelete={removeFromLibrary} />
-          )}
           {projectCount === 0 && library.length === 0 && inProgress.length === 0 && (
             <EmptyLibrary onNew={() => setView("input")} />
           )}
