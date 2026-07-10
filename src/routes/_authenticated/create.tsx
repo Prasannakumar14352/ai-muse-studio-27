@@ -1,9 +1,7 @@
-// "Quick brief" create screen. The heavy configuration/regeneration UI
-// (Regenerate All, Re-run script / scenes / captions / images, JSON inputs,
-// review-before-render, etc.) lives on the unified project editor at
-// `/projects/$id`. This screen just collects the minimum inputs, seeds a
-// project row + initial local output, and hands off to the editor — so
-// "create" and "edit" become one continuous flow.
+// "Quick brief" create screen. Uses the shared <ProjectBriefForm/> so the
+// input UI matches exactly what the /projects/$id editor shows when a user
+// edits an existing brief. After generation we hand off to that editor —
+// create and edit share both the form component AND the destination.
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -12,39 +10,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateProject, generateCarousel, generateCaptions, generateHashtags } from "@/lib/generators";
 import { generateAiCarousel } from "@/lib/carousel-ai.functions";
 import { generateAiVideoScript } from "@/lib/video-ai.functions";
-import { CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, NICHES, GENERATION_COST } from "@/lib/constants";
+import { STYLES, GENERATION_COST } from "@/lib/constants";
 import { deductUsage, getAccessInfo, canGenerate } from "@/lib/access";
 import { saveOutput } from "@/lib/local-store";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Wand2, ArrowRight } from "lucide-react";
+import { ProjectBriefForm, type ProjectBrief } from "@/components/project-brief-form";
 
 export const Route = createFileRoute("/_authenticated/create")({ component: CreatePage });
-
-const CAROUSEL_RATIOS = ["1:1", "4:5", "9:16", "16:9"] as const;
 
 function CreatePage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    content_type: "short_reel",
-    topic: "",
-    audience: "",
-    platform: "instagram",
-    tone: "Viral",
-    style: "cinematic",
-    voice: "energetic_creator",
-    music: "Cinematic",
-    aspect_ratio: "4:5" as (typeof CAROUSEL_RATIOS)[number],
-    slide_count: 5,
-    long_video_length_sec: 90,
-  });
 
-  function update<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
-    setForm((f) => ({ ...f, [k]: v }));
-  }
-
-  async function handleGenerate() {
+  async function handleGenerate(form: ProjectBrief) {
     if (!form.topic.trim()) return toast.error("Please enter a topic");
     setLoading(true);
     try {
@@ -216,6 +195,7 @@ function CreatePage() {
       toast.success(access.isAdmin ? "Generated (admin — no credits used)" : "Project generated!");
       navigate({ to: "/projects/$id", params: { id: project.id } });
     } catch (err) {
+      console.error("[create] generation failed", err);
       toast.error(err instanceof Error ? err.message : "Generation failed");
     } finally {
       setLoading(false);
@@ -236,146 +216,16 @@ function CreatePage() {
       <div className="glass rounded-2xl p-4 border border-[color:var(--neon-purple)]/40 bg-[color:var(--neon-purple)]/5 text-sm">
         <span className="font-semibold">One flow for create + edit.</span>{" "}
         <span className="text-muted-foreground">
-          After generation you'll go to the project editor — the same screen you see when opening any saved project — to regenerate script, scenes, captions, images or render the final output.
+          The same brief form appears on the project editor — regenerate script, scenes, captions, images or render from there.
         </span>
       </div>
 
-      <Section title="1. What are you creating?">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {CONTENT_TYPES.map((c) => (
-            <Card key={c.id} active={form.content_type === c.id} onClick={() => update("content_type", c.id)}>
-              <c.icon className="w-5 h-5 mb-2 text-[color:var(--neon-purple)]" />
-              <div className="font-medium text-sm">{c.label}</div>
-              <div className="text-xs text-muted-foreground mt-1">{c.desc}</div>
-            </Card>
-          ))}
-        </div>
-      </Section>
-
-      {form.content_type === "carousel" && (
-        <div className="glass rounded-2xl p-4 border border-[color:var(--neon-purple)]/40 bg-[color:var(--neon-purple)]/5 flex items-center justify-between gap-4 flex-wrap">
-          <div className="text-sm">
-            <div className="font-semibold">Carousels have a dedicated builder</div>
-            <div className="text-muted-foreground text-xs mt-0.5">Cover → point slides → CTA with AI text + matching visual.</div>
-          </div>
-          <a href="/create/carousel" className="rounded-lg gradient-primary text-white px-4 py-2 text-xs font-medium">Open carousel builder →</a>
-        </div>
-      )}
-
-      {form.content_type === "long_video" && (
-        <Section title="Long video length">
-          <div className="flex flex-wrap gap-2">
-            {[60, 90, 120, 180, 240, 300, 420, 600, 900, 1200, 1800].map((sec) => (
-              <button
-                key={sec}
-                type="button"
-                onClick={() => update("long_video_length_sec", sec)}
-                className={`px-4 py-2 rounded-full text-sm border transition ${
-                  form.long_video_length_sec === sec
-                    ? "gradient-primary text-white border-transparent shadow-lg"
-                    : "glass border-border hover:border-white/20"
-                }`}
-              >
-                {sec >= 60 ? `${Math.round(sec / 60)}${sec % 60 ? `:${String(sec % 60).padStart(2, "0")}` : " min"}` : `${sec}s`}
-              </button>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      <Section title="2. Suggested niches (optional — auto-fills a trending topic)">
-        <div className="flex flex-wrap gap-2">
-          {NICHES.map((n) => (
-            <button key={n.id} type="button"
-              onClick={() => update("topic", n.topics[Math.floor(Math.random() * n.topics.length)])}
-              className="glass border border-border hover:border-[color:var(--neon-purple)] rounded-full px-3 py-1.5 text-xs flex items-center gap-1.5 transition">
-              <span>{n.emoji}</span> {n.label}
-            </button>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="3. What's it about?">
-        <input value={form.topic} onChange={(e) => update("topic", e.target.value)}
-          placeholder="e.g. Why silent walking is the new meditation"
-          className="w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
-        <input value={form.audience} onChange={(e) => update("audience", e.target.value)}
-          placeholder="Target audience (optional) — e.g. Gen Z fitness enthusiasts"
-          className="mt-3 w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
-      </Section>
-
-      <Section title="4. Platform & tone">
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-            {PLATFORMS.map((p) => (
-              <Card key={p.id} active={form.platform === p.id} onClick={() => update("platform", p.id)} compact>
-                <p.icon className="w-4 h-4" /> <span className="text-sm">{p.label}</span>
-              </Card>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {TONES.map((t) => (
-              <button key={t} onClick={() => update("tone", t)}
-                className={`px-4 py-2 rounded-full text-sm border transition ${
-                  form.tone === t ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-white/20"
-                }`}>{t}</button>
-            ))}
-          </div>
-        </div>
-      </Section>
-
-      <Section title="5. Visual style">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {STYLES.map((s) => (
-            <button key={s.id} onClick={() => update("style", s.id)}
-              className={`relative aspect-[4/5] rounded-xl overflow-hidden p-3 flex items-end text-left transition group ${
-                form.style === s.id ? "ring-2 ring-white shadow-[var(--shadow-glow)]" : "opacity-85 hover:opacity-100"
-              }`}>
-              <img src={s.image} alt={s.label} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition group-hover:scale-105" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-              <span className="relative text-white font-semibold text-sm drop-shadow">{s.label}</span>
-            </button>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="6. Voice">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-          {VOICES.map((v) => (
-            <Card key={v.id} active={form.voice === v.id} onClick={() => update("voice", v.id)} compact>
-              <span className="text-sm">{v.label}</span>
-            </Card>
-          ))}
-        </div>
-      </Section>
-
-      <div className="flex justify-end pt-2">
-        <button onClick={handleGenerate} disabled={loading}
-          className="rounded-xl gradient-primary text-white px-8 py-3.5 font-semibold shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-          Generate & open editor <ArrowRight className="w-4 h-4" />
-        </button>
-      </div>
+      <ProjectBriefForm
+        initial={{}}
+        loading={loading}
+        onSubmit={handleGenerate}
+        submitLabel="Generate & open editor"
+      />
     </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="glass rounded-2xl p-6">
-      <h3 className="font-semibold mb-4">{title}</h3>
-      {children}
-    </div>
-  );
-}
-
-function Card({ active, onClick, children, compact }: {
-  active: boolean; onClick: () => void; children: React.ReactNode; compact?: boolean;
-}) {
-  return (
-    <button onClick={onClick}
-      className={`text-left rounded-xl border p-4 transition flex ${compact ? "items-center gap-2" : "flex-col"} ${
-        active ? "border-[color:var(--neon-purple)] bg-[color:var(--neon-purple)]/10 shadow-[var(--shadow-glow)]" : "border-border hover:border-white/20 bg-white/[0.02]"
-      }`}>{children}</button>
   );
 }
