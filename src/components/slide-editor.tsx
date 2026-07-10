@@ -75,6 +75,14 @@ export type SlideEditorProps = {
   title: string;
   slideNumber: number;
   initial?: SlideOverlaySet | null;
+  /** Optional copy the auto-layout engine will use to place text into the
+   *  template's safe zones without covering hero subjects. */
+  copy?: {
+    headline?: string;
+    subhead?: string;
+    bullets?: string[];
+    cta?: string;
+  } | null;
   onClose: () => void;
   onSave: (dataURL: string, overlays: SlideOverlaySet) => Promise<void> | void;
 };
