@@ -321,6 +321,16 @@ export type AutoLayoutInputs = {
  *  - Text is centered on the slot's midpoint (matches SlideEditor which uses
  *    center-anchored transforms). */
 export function autoLayout(inp: AutoLayoutInputs): EditorOverlay[] {
+  // Marketing Layout Rule: dedupe before placing so we never render the same
+  // headline / price / CTA in two zones.
+  const deduped = dedupeMarketingCopy({
+    headline: inp.headline,
+    subhead: inp.subhead,
+    bullets: inp.bullets,
+    cta: inp.cta,
+  });
+  inp = { ...inp, headline: deduped.headline ?? inp.headline,
+    subhead: deduped.subhead, bullets: deduped.bullets, cta: deduped.cta };
   const out: EditorOverlay[] = [];
   const pushForRole = (role: ZoneRole, text: string, base: {
     align: "left" | "center" | "right"; weight: EditorOverlay["weight"]; maxLines: number; sizeRange: [number, number];
