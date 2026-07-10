@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
   Wand2, Youtube, Play, RefreshCw, Send, Check, Trash2, Clock, Plus, Video,
-  X, RotateCw,
+  X, RotateCw, Maximize2, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import {
   runVideoJobPipeline, retryFailedShots,
