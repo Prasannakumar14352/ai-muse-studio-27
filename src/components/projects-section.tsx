@@ -7,9 +7,10 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, FolderOpen, RefreshCw, Sparkles, AlertTriangle, Plus } from "lucide-react";
 import { ProjectThumbnail } from "@/components/project-thumbnail";
+import { CONTENT_TYPES_BY_ID, PROJECT_STATUSES, type ContentTypeId } from "@/lib/content-types";
 
 type Props = {
   /** Content-type values in the `projects.content_type` column. */
@@ -28,6 +29,10 @@ type Props = {
   onCount?: (count: number) => void;
   /** Aspect ratio for the card thumbnails. */
   thumbnailAspect?: "portrait" | "landscape" | "square";
+  /** Show sub-type filter chips (only meaningful when the tab spans multiple types). */
+  showTypeFilter?: boolean;
+  /** Show status filter chips (Drafts / Ready / Rendering / etc). */
+  showStatusFilter?: boolean;
 };
 
 export function ProjectsSection({
@@ -39,7 +44,12 @@ export function ProjectsSection({
   hideEmptyState = false,
   onCount,
   thumbnailAspect = "landscape",
+  showTypeFilter = false,
+  showStatusFilter = false,
 }: Props) {
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["projects-section", cacheKey, ...contentTypes],
     queryFn: async () => {
