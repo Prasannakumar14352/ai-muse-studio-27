@@ -40,7 +40,6 @@ function ImagesPage() {
   const [style, setStyle] = useState("cinematic");
   const [ratio, setRatio] = useState("1:1");
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<ResultItem[]>([]);
   const [lastRun, setLastRun] = useState<{ prompt: string; style: string; ratio: string } | null>(null);
   const [debug, setDebug] = useState<DebugInfo | null>(null);
   const [showDebug, setShowDebug] = useState(false);
@@ -49,6 +48,35 @@ function ImagesPage() {
   const [view, setView] = useState<"landing" | "input">("landing");
   const qc = useQueryClient();
   const { data: access } = useAccess();
+
+  // Source of truth for generated images: the `projects` table.
+  // Base64 images are too large for localStorage (~5MB quota), so we store
+  // them in the DB alongside the sidebar count and hydrate from there.
+  const { data: results = [] } = useQuery({
+    queryKey: ["images-library", access?.userId],
+    enabled: !!access?.userId,
+    staleTime: 30_000,
+    queryFn: async (): Promise<ResultItem[]> => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, topic, style, thumbnail_url, created_at")
+        .eq("user_id", access!.userId)
+        .eq("content_type", "ai_image")
+        .not("thumbnail_url", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data ?? [])
+        .filter((r) => !!r.thumbnail_url)
+        .map((r) => ({
+          id: r.id as string,
+          prompt: (r.topic as string) ?? "",
+          style: (r.style as string) ?? "cinematic",
+          ratio: "1:1",
+          image: r.thumbnail_url as string,
+        }));
+    },
+  });
 
   // Keyboard nav for fullscreen viewer.
   useEffect(() => {
@@ -64,19 +92,18 @@ function ImagesPage() {
     return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prevOverflow; };
   }, [viewerIdx, results.length]);
 
-  // Restore last session from localStorage.
+  // Restore only lightweight prefs from localStorage (no base64 images).
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_STATE);
       if (raw) {
         const s = JSON.parse(raw) as {
           prompt?: string; style?: string; ratio?: string;
-          results?: ResultItem[]; lastRun?: typeof lastRun; debug?: DebugInfo | null;
+          lastRun?: typeof lastRun; debug?: DebugInfo | null;
         };
         if (s.prompt) setPrompt(s.prompt);
         if (s.style) setStyle(s.style);
         if (s.ratio) setRatio(s.ratio);
-        if (s.results) setResults(s.results);
         if (s.lastRun) setLastRun(s.lastRun);
         if (s.debug) setDebug(s.debug);
       }
@@ -84,13 +111,12 @@ function ImagesPage() {
     setHydrated(true);
   }, []);
 
-  // Persist on change (skip first render before hydration).
   useEffect(() => {
     if (!hydrated) return;
     try {
-      localStorage.setItem(LS_STATE, JSON.stringify({ prompt, style, ratio, results, lastRun, debug }));
-    } catch { /* quota exceeded — ignore */ }
-  }, [prompt, style, ratio, results, lastRun, debug, hydrated]);
+      localStorage.setItem(LS_STATE, JSON.stringify({ prompt, style, ratio, lastRun, debug }));
+    } catch { /* ignore */ }
+  }, [prompt, style, ratio, lastRun, debug, hydrated]);
 
   async function runGeneration(p: string, s: string, r: string) {
     // Preflight credit check — need up to 4 credits (1 per concept).
@@ -98,11 +124,15 @@ function ImagesPage() {
       toast.error("Not enough credits to generate 4 images. Top up in Pricing.");
       return;
     }
+    if (!access?.userId) {
+      toast.error("Sign in required");
+      return;
+    }
     setLoading(true);
     const styleLabel = STYLES.find((x) => x.id === s)?.label ?? s;
     const startedAt = Date.now();
     const errors: string[] = [];
-    let lastMeta: DebugInfo["response"] | undefined;
+    const lastMeta: DebugInfo["response"] | undefined = undefined;
     try {
       const { fetchGeneratedImage } = await import("@/lib/image-stream");
       const settled = await Promise.allSettled(
@@ -122,33 +152,32 @@ function ImagesPage() {
       });
 
       if (ok.length) {
-        setResults((prev) => [
-          ...ok.map((res) => ({ id: crypto.randomUUID(), prompt: p, style: s, ratio: r, image: res.image })),
-          ...prev,
-        ].slice(0, 40)); // cap to avoid localStorage bloat
         setLastRun({ prompt: p, style: s, ratio: r });
         setView("landing");
         // Deduct 1 credit per successful image (admin bypass handled inside).
         for (let i = 0; i < ok.length; i++) {
           await deductUsage({ amount: 1, description: `AI image generated (${styleLabel})` }).catch(() => {});
         }
-        // Save as a project row so it shows up on the dashboard.
-        if (access?.userId) {
-          const title = p.trim().slice(0, 80) || `AI image (${styleLabel})`;
-          const { error: pErr } = await supabase.from("projects").insert({
-            user_id: access.userId,
-            title,
-            content_type: "ai_image",
-            topic: p,
-            style: s,
-            status: "generated",
-            thumbnail_url: ok[0].image,
-          });
-          if (pErr) console.warn("[images] project insert failed", pErr);
-          qc.invalidateQueries({ queryKey: ["projects-section"] });
-          qc.invalidateQueries({ queryKey: ["recent-projects"] });
-          qc.invalidateQueries({ queryKey: ["module-counts"] });
+        // Save one project row PER image so the gallery and sidebar count match.
+        const title = p.trim().slice(0, 80) || `AI image (${styleLabel})`;
+        const rows = ok.map((res) => ({
+          user_id: access.userId,
+          title,
+          content_type: "ai_image",
+          topic: p,
+          style: s,
+          status: "generated",
+          thumbnail_url: res.image,
+        }));
+        const { error: pErr } = await supabase.from("projects").insert(rows);
+        if (pErr) {
+          console.warn("[images] project insert failed", pErr);
+          toast.error("Saved images could not be persisted");
         }
+        qc.invalidateQueries({ queryKey: ["images-library"] });
+        qc.invalidateQueries({ queryKey: ["projects-section"] });
+        qc.invalidateQueries({ queryKey: ["recent-projects"] });
+        qc.invalidateQueries({ queryKey: ["module-counts"] });
         qc.invalidateQueries({ queryKey: ["access"] });
         toast.success(`Generated ${ok.length} of 4 concepts`);
       } else {
@@ -166,7 +195,6 @@ function ImagesPage() {
       };
       setDebug(info);
 
-      // Save log locally (per-user browser storage).
       await pushImageGenLog({
         prompt: p,
         style: s,
@@ -207,15 +235,35 @@ function ImagesPage() {
     downloadJson(`creatorvault-image-debug-${Date.now()}.json`, debug);
   }
 
-
-
-
-
-  function clearSession() {
-    setResults([]); setLastRun(null); setDebug(null);
-    localStorage.removeItem(LS_STATE);
-    toast.success("Cleared saved session");
+  async function deleteImage(id: string) {
+    const { error } = await supabase.from("projects").delete().eq("id", id);
+    if (error) { toast.error("Delete failed"); return; }
+    qc.invalidateQueries({ queryKey: ["images-library"] });
+    qc.invalidateQueries({ queryKey: ["module-counts"] });
+    qc.invalidateQueries({ queryKey: ["projects-section"] });
+    qc.invalidateQueries({ queryKey: ["recent-projects"] });
   }
+
+  async function clearSession() {
+    if (!access?.userId) return;
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("user_id", access.userId)
+      .eq("content_type", "ai_image");
+    if (error) { toast.error("Clear failed"); return; }
+    setLastRun(null); setDebug(null);
+    localStorage.removeItem(LS_STATE);
+    qc.invalidateQueries({ queryKey: ["images-library"] });
+    qc.invalidateQueries({ queryKey: ["module-counts"] });
+    qc.invalidateQueries({ queryKey: ["projects-section"] });
+    qc.invalidateQueries({ queryKey: ["recent-projects"] });
+    toast.success("Cleared all generated images");
+  }
+
+  // Keep unused-import quiet.
+  useMemo(() => results.length, [results.length]);
+
 
   const aspectClass: Record<string, string> = {
     "1:1": "aspect-square", "9:16": "aspect-[9/16]", "16:9": "aspect-video", "4:5": "aspect-[4/5]",
