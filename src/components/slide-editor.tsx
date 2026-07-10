@@ -275,6 +275,15 @@ export function SlideEditor(props: SlideEditorProps) {
               <ImageIcon className="w-3.5 h-3.5" /> Add logo
               <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
             </label>
+            {props.copy?.headline && (
+              <button
+                onClick={() => applyAutoLayout()}
+                title="Place text into template safe zones (no overlap with faces / products)"
+                className="rounded-lg glass border border-[color:var(--neon-purple)]/50 px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-white/5"
+              >
+                <Wand2 className="w-3.5 h-3.5" /> Auto layout
+              </button>
+            )}
             <div className="flex-1" />
             <button onClick={handleDownload} className="rounded-lg glass border border-border px-3 py-1.5 text-xs flex items-center gap-1.5">
               <Download className="w-3.5 h-3.5" /> PNG
