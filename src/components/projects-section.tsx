@@ -7,9 +7,10 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, FolderOpen, RefreshCw, Sparkles, AlertTriangle, Plus } from "lucide-react";
 import { ProjectThumbnail } from "@/components/project-thumbnail";
+import { CONTENT_TYPES_BY_ID, PROJECT_STATUSES, type ContentTypeId } from "@/lib/content-types";
 
 type Props = {
   /** Content-type values in the `projects.content_type` column. */
@@ -28,6 +29,10 @@ type Props = {
   onCount?: (count: number) => void;
   /** Aspect ratio for the card thumbnails. */
   thumbnailAspect?: "portrait" | "landscape" | "square";
+  /** Show sub-type filter chips (only meaningful when the tab spans multiple types). */
+  showTypeFilter?: boolean;
+  /** Show status filter chips (Drafts / Ready / Rendering / etc). */
+  showStatusFilter?: boolean;
 };
 
 export function ProjectsSection({
@@ -39,7 +44,12 @@ export function ProjectsSection({
   hideEmptyState = false,
   onCount,
   thumbnailAspect = "landscape",
+  showTypeFilter = false,
+  showStatusFilter = false,
 }: Props) {
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["projects-section", cacheKey, ...contentTypes],
     queryFn: async () => {
@@ -71,9 +81,47 @@ export function ProjectsSection({
     }
   }, [error, refetch, title]);
 
+  const filtered = useMemo(() => {
+    if (!data) return data;
+    return data.filter((p) => {
+      const okType = typeFilter === "all" || (p.content_type ?? "") === typeFilter;
+      const okStatus = statusFilter === "all" || (p.status ?? "") === statusFilter;
+      return okType && okStatus;
+    });
+  }, [data, typeFilter, statusFilter]);
+
   useEffect(() => {
-    if (!isLoading && !error && onCount) onCount(data?.length ?? 0);
-  }, [data, isLoading, error, onCount]);
+    if (!isLoading && !error && onCount) onCount(filtered?.length ?? 0);
+  }, [filtered, isLoading, error, onCount]);
+
+  const FilterChips = (showTypeFilter || showStatusFilter) && data && data.length > 0 ? (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      {showTypeFilter && (
+        <div className="flex flex-wrap gap-1.5">
+          <FilterChip active={typeFilter === "all"} onClick={() => setTypeFilter("all")}>All</FilterChip>
+          {contentTypes.map((ct) => {
+            const meta = CONTENT_TYPES_BY_ID[ct as ContentTypeId];
+            return (
+              <FilterChip key={ct} active={typeFilter === ct} onClick={() => setTypeFilter(ct)}>
+                {meta?.short ?? ct}
+              </FilterChip>
+            );
+          })}
+        </div>
+      )}
+      {showStatusFilter && (
+        <div className="flex flex-wrap gap-1.5 ml-auto">
+          <FilterChip active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>All statuses</FilterChip>
+          {PROJECT_STATUSES.map((s) => (
+            <FilterChip key={s.id} active={statusFilter === s.id} onClick={() => setStatusFilter(s.id)}>
+              {s.label}
+            </FilterChip>
+          ))}
+        </div>
+      )}
+    </div>
+  ) : null;
+
 
   const Header = (
     <div className="flex items-center justify-between">
@@ -151,52 +199,80 @@ export function ProjectsSection({
     );
   }
 
+  const rows = filtered ?? [];
+
   return (
     <section className="space-y-3">
       {Header}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {data.map((p) => {
-          const ct = (p.content_type ?? "").toLowerCase();
-          const cardAspect: "portrait" | "landscape" | "square" =
-            thumbnailAspect === "landscape" && (ct === "short_reel" || ct.includes("short") || ct.includes("reel"))
-              ? "portrait"
-              : thumbnailAspect === "landscape" && ct === "long_video"
-              ? "landscape"
-              : thumbnailAspect;
-          const thumb =
-            (p as { thumbnail_url?: string | null }).thumbnail_url ||
-            (p as { cover_image_url?: string | null }).cover_image_url ||
-            (p as { poster_url?: string | null }).poster_url ||
-            null;
-          return (
-            <Link
-              key={p.id}
-              to="/projects/$id"
-              params={{ id: p.id }}
-              className="glass rounded-xl overflow-hidden hover:border-white/20 transition block border border-border group"
-            >
-              <ProjectThumbnail
-                title={p.title}
-                contentType={p.content_type}
-                style={p.style}
-                platform={p.platform}
-                thumbnailUrl={thumb}
-                status={(p as { status?: string | null }).status}
-                aspect={cardAspect}
-              />
-              <div className="p-3">
-                <div className="font-semibold line-clamp-2 text-sm">{p.title}</div>
-                <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
-                  {p.style && <span className="glass px-1.5 py-0.5 rounded">{p.style}</span>}
-                  <span className="ml-auto">
-                    {new Date(p.updated_at ?? p.created_at).toLocaleDateString()}
-                  </span>
+      {FilterChips}
+      {rows.length === 0 ? (
+        <div className="glass rounded-2xl p-6 text-center text-sm text-muted-foreground border border-dashed border-white/10">
+          No projects match these filters.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {rows.map((p) => {
+            const ct = (p.content_type ?? "").toLowerCase();
+            const cardAspect: "portrait" | "landscape" | "square" =
+              thumbnailAspect === "landscape" && (ct === "short_reel" || ct.includes("short") || ct.includes("reel"))
+                ? "portrait"
+                : thumbnailAspect === "landscape" && ct === "long_video"
+                ? "landscape"
+                : thumbnailAspect;
+            const thumb =
+              (p as { thumbnail_url?: string | null }).thumbnail_url ||
+              (p as { cover_image_url?: string | null }).cover_image_url ||
+              (p as { poster_url?: string | null }).poster_url ||
+              null;
+            return (
+              <Link
+                key={p.id}
+                to="/projects/$id"
+                params={{ id: p.id }}
+                className="glass rounded-xl overflow-hidden hover:border-white/20 transition block border border-border group"
+              >
+                <ProjectThumbnail
+                  title={p.title}
+                  contentType={p.content_type}
+                  style={p.style}
+                  platform={p.platform}
+                  thumbnailUrl={thumb}
+                  status={(p as { status?: string | null }).status}
+                  aspect={cardAspect}
+                />
+                <div className="p-3">
+                  <div className="font-semibold line-clamp-2 text-sm">{p.title}</div>
+                  <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                    {p.style && <span className="glass px-1.5 py-0.5 rounded">{p.style}</span>}
+                    <span className="ml-auto">
+                      {new Date(p.updated_at ?? p.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
+
+function FilterChip({
+  active, onClick, children,
+}: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-2.5 py-1 rounded-full text-xs transition border ${
+        active
+          ? "bg-[color:var(--neon-pink)]/20 border-[color:var(--neon-pink)]/50 text-white"
+          : "glass border-white/10 hover:border-white/20 text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+

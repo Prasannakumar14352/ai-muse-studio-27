@@ -14,6 +14,218 @@ export type Database = {
   }
   public: {
     Tables: {
+      brand_kits: {
+        Row: {
+          body_font: string | null
+          brand_name: string
+          created_at: string
+          heading_font: string | null
+          id: string
+          instagram_handle: string | null
+          logo_url: string | null
+          metadata: Json
+          palette: Json
+          primary_color: string | null
+          tone: string | null
+          updated_at: string
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          body_font?: string | null
+          brand_name: string
+          created_at?: string
+          heading_font?: string | null
+          id?: string
+          instagram_handle?: string | null
+          logo_url?: string | null
+          metadata?: Json
+          palette?: Json
+          primary_color?: string | null
+          tone?: string | null
+          updated_at?: string
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          body_font?: string | null
+          brand_name?: string
+          created_at?: string
+          heading_font?: string | null
+          id?: string
+          instagram_handle?: string | null
+          logo_url?: string | null
+          metadata?: Json
+          palette?: Json
+          primary_color?: string | null
+          tone?: string | null
+          updated_at?: string
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
+      carousel_slides: {
+        Row: {
+          background_type: string | null
+          content: Json
+          created_at: string
+          export_url: string | null
+          html: string | null
+          id: string
+          image_urls: Json
+          layout: Json
+          metadata: Json
+          project_id: string
+          slide_number: number
+          slide_type: string | null
+          styles: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          background_type?: string | null
+          content?: Json
+          created_at?: string
+          export_url?: string | null
+          html?: string | null
+          id?: string
+          image_urls?: Json
+          layout?: Json
+          metadata?: Json
+          project_id: string
+          slide_number: number
+          slide_type?: string | null
+          styles?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          background_type?: string | null
+          content?: Json
+          created_at?: string
+          export_url?: string | null
+          html?: string | null
+          id?: string
+          image_urls?: Json
+          layout?: Json
+          metadata?: Json
+          project_id?: string
+          slide_number?: number
+          slide_type?: string | null
+          styles?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carousel_slides_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      characters: {
+        Row: {
+          character_lock: Json
+          character_type: string | null
+          created_at: string
+          id: string
+          metadata: Json
+          name: string
+          reference_image_url: string | null
+          seed: string | null
+          style: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          character_lock?: Json
+          character_type?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          name: string
+          reference_image_url?: string | null
+          seed?: string | null
+          style?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          character_lock?: Json
+          character_type?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          name?: string
+          reference_image_url?: string | null
+          seed?: string | null
+          style?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      generated_assets: {
+        Row: {
+          asset_type: string
+          created_at: string
+          id: string
+          metadata: Json
+          project_id: string | null
+          prompt: string | null
+          provider: string | null
+          scene_id: string | null
+          storage_path: string | null
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          asset_type: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          project_id?: string | null
+          prompt?: string | null
+          provider?: string | null
+          scene_id?: string | null
+          storage_path?: string | null
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          asset_type?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          project_id?: string | null
+          prompt?: string | null
+          provider?: string | null
+          scene_id?: string | null
+          storage_path?: string | null
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_assets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_assets_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "project_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount_cents: number
@@ -110,18 +322,110 @@ export type Database = {
         }
         Relationships: []
       }
+      project_scenes: {
+        Row: {
+          audio_url: string | null
+          caption_data: Json
+          created_at: string
+          dialogue: string | null
+          duration: number | null
+          end_time: number | null
+          id: string
+          image_prompt: string | null
+          image_url: string | null
+          metadata: Json
+          motion_prompt: string | null
+          narration: string | null
+          negative_prompt: string | null
+          on_screen_text: string | null
+          project_id: string
+          scene_number: number
+          sound_effect: string | null
+          start_time: number | null
+          transition: string | null
+          updated_at: string
+          user_id: string
+          video_url: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          caption_data?: Json
+          created_at?: string
+          dialogue?: string | null
+          duration?: number | null
+          end_time?: number | null
+          id?: string
+          image_prompt?: string | null
+          image_url?: string | null
+          metadata?: Json
+          motion_prompt?: string | null
+          narration?: string | null
+          negative_prompt?: string | null
+          on_screen_text?: string | null
+          project_id: string
+          scene_number: number
+          sound_effect?: string | null
+          start_time?: number | null
+          transition?: string | null
+          updated_at?: string
+          user_id: string
+          video_url?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          caption_data?: Json
+          created_at?: string
+          dialogue?: string | null
+          duration?: number | null
+          end_time?: number | null
+          id?: string
+          image_prompt?: string | null
+          image_url?: string | null
+          metadata?: Json
+          motion_prompt?: string | null
+          narration?: string | null
+          negative_prompt?: string | null
+          on_screen_text?: string | null
+          project_id?: string
+          scene_number?: number
+          sound_effect?: string | null
+          start_time?: number | null
+          transition?: string | null
+          updated_at?: string
+          user_id?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_scenes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
+          aspect_ratio: string | null
           audience: string | null
+          brand: string | null
           content_type: string | null
           cover_image_url: string | null
           created_at: string
+          cta: string | null
           distribution: Json | null
+          duration_sec: number | null
           format: string
           id: string
+          language: string | null
+          metadata: Json
           music: string | null
+          objective: string | null
+          output_url: string | null
           platform: string | null
           poster_url: string | null
+          project_name: string | null
           quality_report: Json | null
           status: string | null
           style: string | null
@@ -137,16 +441,25 @@ export type Database = {
           voice: string | null
         }
         Insert: {
+          aspect_ratio?: string | null
           audience?: string | null
+          brand?: string | null
           content_type?: string | null
           cover_image_url?: string | null
           created_at?: string
+          cta?: string | null
           distribution?: Json | null
+          duration_sec?: number | null
           format?: string
           id?: string
+          language?: string | null
+          metadata?: Json
           music?: string | null
+          objective?: string | null
+          output_url?: string | null
           platform?: string | null
           poster_url?: string | null
+          project_name?: string | null
           quality_report?: Json | null
           status?: string | null
           style?: string | null
@@ -162,16 +475,25 @@ export type Database = {
           voice?: string | null
         }
         Update: {
+          aspect_ratio?: string | null
           audience?: string | null
+          brand?: string | null
           content_type?: string | null
           cover_image_url?: string | null
           created_at?: string
+          cta?: string | null
           distribution?: Json | null
+          duration_sec?: number | null
           format?: string
           id?: string
+          language?: string | null
+          metadata?: Json
           music?: string | null
+          objective?: string | null
+          output_url?: string | null
           platform?: string | null
           poster_url?: string | null
+          project_name?: string | null
           quality_report?: Json | null
           status?: string | null
           style?: string | null
@@ -226,6 +548,65 @@ export type Database = {
           signature_verified?: boolean
         }
         Relationships: []
+      }
+      render_jobs: {
+        Row: {
+          created_at: string
+          current_step: string | null
+          error_code: string | null
+          id: string
+          job_type: string
+          metadata: Json
+          output_url: string | null
+          progress: number
+          project_id: string
+          provider: string | null
+          safe_error_message: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_step?: string | null
+          error_code?: string | null
+          id?: string
+          job_type: string
+          metadata?: Json
+          output_url?: string | null
+          progress?: number
+          project_id: string
+          provider?: string | null
+          safe_error_message?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_step?: string | null
+          error_code?: string | null
+          id?: string
+          job_type?: string
+          metadata?: Json
+          output_url?: string | null
+          progress?: number
+          project_id?: string
+          provider?: string | null
+          safe_error_message?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "render_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {

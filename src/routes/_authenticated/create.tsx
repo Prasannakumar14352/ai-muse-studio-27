@@ -3,7 +3,7 @@
 // edits an existing brief. After generation we hand off to that editor —
 // create and edit share both the form component AND the destination.
 
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,13 +15,33 @@ import { deductUsage, getAccessInfo, canGenerate } from "@/lib/access";
 import { saveOutput } from "@/lib/local-store";
 import { useQueryClient } from "@tanstack/react-query";
 import { ProjectBriefForm, type ProjectBrief } from "@/components/project-brief-form";
+import { ContentTypePicker } from "@/components/content-type-picker";
+import { CONTENT_TYPES_BY_ID, type ContentTypeId } from "@/lib/content-types";
+import { ArrowLeft } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/create")({ component: CreatePage });
+const VALID_TYPES = new Set<ContentTypeId>([
+  "long_video", "short_reel", "talking_object", "documentary", "product_promo",
+  "carousel", "ai_image", "thumbnail", "caption_only", "seo_pack",
+]);
+
+export const Route = createFileRoute("/_authenticated/create")({
+  validateSearch: (s: Record<string, unknown>): { type?: ContentTypeId } => {
+    const t = typeof s.type === "string" && VALID_TYPES.has(s.type as ContentTypeId)
+      ? (s.type as ContentTypeId) : undefined;
+    return t ? { type: t } : {};
+  },
+  component: CreatePage,
+});
+
 
 function CreatePage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const search = Route.useSearch();
   const [loading, setLoading] = useState(false);
+  const selectedType = search.type as ContentTypeId | undefined;
+  const selectedMeta = selectedType ? CONTENT_TYPES_BY_ID[selectedType] ?? null : null;
+
 
   async function handleGenerate(form: ProjectBrief) {
     if (!form.topic.trim()) { toast.error("Please enter a topic"); return; }
@@ -202,15 +222,61 @@ function CreatePage() {
     }
   }
 
+  // Step 1: content-type hub. Shown when no ?type= is set.
+  if (!selectedMeta) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold">
+            Start a <span className="gradient-text">new project</span>
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Pick the kind of content you want to create — each type opens a guided workflow tuned for it.
+          </p>
+        </div>
+        <ContentTypePicker />
+      </div>
+    );
+  }
+
+  // Carousel has its own dedicated multi-step workflow.
+  if (selectedMeta.route === "/create/carousel") {
+    // Soft redirect via Link — keeps back button clean.
+    return (
+      <div className="max-w-3xl mx-auto space-y-4">
+        <Link to="/create" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="w-4 h-4" /> Change content type
+        </Link>
+        <div className="glass rounded-2xl p-6 border">
+          <div className="font-semibold">{selectedMeta.label}</div>
+          <p className="text-sm text-muted-foreground mt-1">{selectedMeta.description}</p>
+          <Link
+            to="/create/carousel"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)]"
+          >
+            Open Carousel workflow →
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2: full brief form, preseeded with the chosen content type.
+  const initialBrief: Partial<ProjectBrief> = {
+    content_type: selectedMeta.id,
+    ...(selectedMeta.aspect ? { aspect_ratio: selectedMeta.aspect } : {}),
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      <Link to="/create" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="w-4 h-4" /> Change content type
+      </Link>
       <div>
         <h1 className="text-3xl md:text-4xl font-bold">
-          Create a <span className="gradient-text">new project</span>
+          New <span className="gradient-text">{selectedMeta.label}</span>
         </h1>
-        <p className="text-muted-foreground mt-1">
-          Fill in the brief — you'll land on the full editor next to review, regenerate, tweak inputs and render.
-        </p>
+        <p className="text-muted-foreground mt-1">{selectedMeta.description}</p>
       </div>
 
       <div className="glass rounded-2xl p-4 border border-[color:var(--neon-purple)]/40 bg-[color:var(--neon-purple)]/5 text-sm">
@@ -221,7 +287,7 @@ function CreatePage() {
       </div>
 
       <ProjectBriefForm
-        initial={{}}
+        initial={initialBrief}
         loading={loading}
         onSubmit={handleGenerate}
         submitLabel="Generate & open editor"
@@ -229,3 +295,4 @@ function CreatePage() {
     </div>
   );
 }
+

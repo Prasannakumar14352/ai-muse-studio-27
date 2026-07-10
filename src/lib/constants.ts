@@ -17,9 +17,14 @@ import styleMinimal from "@/assets/style-minimal.jpg";
 export const CONTENT_TYPES = [
   { id: "long_video", label: "Long YouTube Video", icon: Video, desc: "5–15 min structured video" },
   { id: "short_reel", label: "Short Reel", icon: Film, desc: "15–60s vertical reel" },
+  { id: "talking_object", label: "AI Talking Object", icon: Film, desc: "Product/mascot as lip-synced character" },
+  { id: "documentary", label: "Documentary", icon: Video, desc: "Cinematic story-driven explainer" },
+  { id: "product_promo", label: "Product Promotion", icon: Film, desc: "Punchy product spot with CTA" },
   { id: "carousel", label: "Instagram Carousel", icon: Layers, desc: "5–10 slide carousel" },
   { id: "ai_image", label: "AI Image", icon: ImageIcon, desc: "Single AI-generated image" },
+  { id: "thumbnail", label: "Thumbnail", icon: ImageIcon, desc: "High-CTR YouTube/Reel cover" },
   { id: "caption_only", label: "Caption Only", icon: Type, desc: "Caption + hashtags pack" },
+  { id: "seo_pack", label: "SEO Content Pack", icon: Type, desc: "Title, description, keywords, tags" },
 ];
 
 export const PLATFORMS = [
