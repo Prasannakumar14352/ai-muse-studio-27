@@ -330,80 +330,90 @@ function pickCameraMove(beatIndex: number): CameraMove {
   return CAMERA_MOVE_ROTATION[beatIndex % CAMERA_MOVE_ROTATION.length];
 }
 
-/** Detect a rough "time of day / mood" cue from the narration. Cheap heuristics
- * — no LLM call — because the optimizer already enriches the prompt further. */
-function inferMoodCues(text: string): { timeOfDay: string; weather: string } {
-  const s = text.toLowerCase();
-  const timeOfDay =
-    /night|midnight|dark/.test(s) ? "night" :
-    /dawn|sunrise|morning/.test(s) ? "sunrise" :
-    /dusk|sunset|evening/.test(s) ? "golden hour" :
-    "diffused daylight";
-  const weather =
-    /rain|storm|wet/.test(s) ? "light rain, wet reflections" :
-    /snow|winter|frozen/.test(s) ? "soft snowfall" :
-    /fog|mist|haze/.test(s) ? "atmospheric haze" :
-    "clean atmosphere";
-  return { timeOfDay, weather };
-}
-
 /**
- * Core creative engine: turn one beat into a professional image prompt.
- * Pure function — safe to call from any generator (video, image, carousel,
- * thumbnail, social) without side effects.
+ * Core creative engine: turn one beat into a Netflix-grade cinematic prompt.
+ * Pure function. Topic-aware: infers palette, environment, lighting recipe,
+ * emotion, and story details from the beat + title without any LLM call.
  */
 export function directBeatPrompt(input: DirectorInput): DirectorOutput {
   const preset = STYLE_PRESETS[input.styleId] ?? STYLE_PRESETS.cinematic;
   const shotType = pickShotType(input.beatIndex, input.previousShotType);
   const cameraMove = pickCameraMove(input.beatIndex);
-  const mood = inferMoodCues(input.beatText);
+
+  const topic = classifyTopic(`${input.title} ${input.beatText} ${input.sceneContext ?? ""} ${input.brief?.intent ?? ""}`);
+  const mood = inferMood(input.beatText);
+  const emotion = inferEmotion(input.beatText, input.emotion ?? null);
+  const cameraKit = preset.isIllustrated
+    ? { camera: preset.camera, lens: preset.lens, aperture: preset.aperture }
+    : pickCameraKit(input.beatIndex, input.styleId);
+  const palette = input.brief?.paletteHint || pickPalette(topic, input.beatIndex);
+  const environment = enrichEnvironment(input.sceneContext, topic, mood.timeOfDay);
+  const storyDetail = storyDetailsFor(topic, input.beatIndex);
+  const lighting = preset.isIllustrated ? preset.lighting : lightingRecipe(topic, mood, emotion);
 
   const negatives = preset.isIllustrated ? ILLUSTRATED_NEGATIVES : PHOTO_NEGATIVES;
   const negativePrompt = negatives.join(", ");
 
-  const sceneCtx = (input.sceneContext ?? "").trim();
   const beat = input.beatText.trim().replace(/\s+/g, " ");
   void input.continuity.subjectAnchor;
 
-  const parts: string[] = [];
-  // Creative Director brief FIRST so the model reads intent + hero + avoid.
-  if (input.brief) {
+  const compose = (retry: boolean): string => {
+    const parts: string[] = [];
+    if (input.brief) {
+      parts.push(
+        `CREATIVE DIRECTOR (obey strictly): intent=${input.brief.intent}; ` +
+        `visual hero=${input.brief.visualHero}; style=${input.brief.visualStyle}; ` +
+        `camera=${input.brief.cameraStyle}; composition=${input.brief.sceneComposition}; ` +
+        `palette=${input.brief.paletteHint}.`,
+      );
+    }
     parts.push(
-      `CREATIVE DIRECTOR (obey strictly): intent=${input.brief.intent}; ` +
-      `visual hero=${input.brief.visualHero}; style=${input.brief.visualStyle}; ` +
-      `camera=${input.brief.cameraStyle}; composition=${input.brief.sceneComposition}; ` +
-      `palette=${input.brief.paletteHint}.`,
+      `LOCKED CHARACTER SHEET (must match exactly in every image): ` +
+      `${input.continuity.characterSheet}`,
     );
-  }
-  // Character lock so the model reads it before the scene body.
-  parts.push(
-    `LOCKED CHARACTER SHEET (must match exactly in every image): ` +
-    `${input.continuity.characterSheet}`,
-  );
-  parts.push(`${SHOT_TYPE_PHRASES[shotType]} — ${CAMERA_MOVE_PHRASES[cameraMove]}`);
-  parts.push(`Subject: the SAME locked character above, visualizing "${beat}"`);
-  if (sceneCtx) parts.push(`Environment: ${sceneCtx}`);
-  parts.push(`Time of day: ${mood.timeOfDay}. Atmosphere: ${mood.weather}`);
-  parts.push(`Camera: ${preset.camera}, ${preset.lens} at ${preset.aperture}`);
-  parts.push(`Lighting: ${preset.lighting}`);
-  parts.push(`Color grade: ${preset.colorGrade}`);
-  parts.push(`Look: ${preset.look}`);
-  if (preset.extras.length) parts.push(preset.extras.join(", "));
-  parts.push(
-    `Continuity RULES: ${input.continuity.wardrobeAnchor}; ` +
-    `${input.continuity.locationAnchor}. ` +
-    `The protagonist's face, hairstyle, and outfit MUST be identical to previous shots — ` +
-    `do not redesign the character.`,
-  );
-  if (input.emotion) parts.push(`Emotion: ${input.emotion}`);
-  if (input.scenePurpose) parts.push(`Scene purpose: ${input.scenePurpose}`);
-  if (input.chapterLabel) parts.push(`Chapter: ${input.chapterLabel}`);
-  if (input.sceneNumber != null) parts.push(`Scene ${input.sceneNumber}`);
-  parts.push("ultra realistic, HDR, 8K, highly detailed, sharp focus, professional photography");
-  const briefAvoid = input.brief?.avoid?.length ? `, ${input.brief.avoid.join(", ")}` : "";
-  parts.push(`Avoid: ${negativePrompt}, different person, changed face, new character, wardrobe change, hairstyle change${briefAvoid}`);
+    // Shot rationale — tell the model WHY this framing.
+    parts.push(
+      `Shot: ${SHOT_TYPE_PHRASES[shotType]} with ${CAMERA_MOVE_PHRASES[cameraMove]}, ` +
+      `composed on the rule of thirds with layered foreground, midground, and background`,
+    );
+    parts.push(`Subject: the SAME locked character above, visualizing "${beat}"`);
+    parts.push(`Environment: ${environment}`);
+    parts.push(`Environmental storytelling detail: ${storyDetail}`);
+    parts.push(`Time of day: ${mood.timeOfDay}. Atmosphere: ${mood.weather}. Energy: ${mood.energy}`);
+    parts.push(`Camera: ${cameraKit.camera}, ${cameraKit.lens} at ${cameraKit.aperture}, shallow depth of field, sharp focus on subject eyes`);
+    parts.push(`Lighting: ${lighting}`);
+    parts.push(`Color palette and grade: ${palette}`);
+    parts.push(`Look: ${preset.look} — Netflix documentary / Apple commercial / National Geographic quality`);
+    if (preset.extras.length) parts.push(preset.extras.join(", "));
+    parts.push(
+      `Continuity RULES: ${input.continuity.wardrobeAnchor}; ` +
+      `${input.continuity.locationAnchor}. ` +
+      `The protagonist's face, hairstyle, and outfit MUST be identical to previous shots — ` +
+      `do not redesign the character.`,
+    );
+    parts.push(`Emotion driving the frame: ${emotion}${input.scenePurpose ? ` — ${input.scenePurpose}` : ""}`);
+    if (input.chapterLabel) parts.push(`Chapter: ${input.chapterLabel}`);
+    if (input.sceneNumber != null) parts.push(`Scene ${input.sceneNumber}`);
+    parts.push(
+      "photorealistic, ultra realistic skin texture, HDR, 8K, premium color grading, " +
+      "subtle film grain, ARRI / Sony / RED cinema quality, ultra detailed, sharp focus, " +
+      "professional cinematography — never stock-photo, never generic",
+    );
+    if (retry) {
+      parts.push(
+        "MUST be a specific cinematic frame with named lighting, layered composition, " +
+        "and rich environmental detail — no single-word settings, no generic descriptions",
+      );
+    }
+    const briefAvoid = input.brief?.avoid?.length ? `, ${input.brief.avoid.join(", ")}` : "";
+    parts.push(`Avoid: ${negativePrompt}, generic stock photography, single-word locations, different person, changed face, new character, wardrobe change, hairstyle change${briefAvoid}`);
+    return optimizePrompt(parts.join(". "), input.styleId);
+  };
 
-  const prompt = optimizePrompt(parts.join(". "), input.styleId);
+  // Self-review + one automatic repair pass if the heuristic score is low.
+  let prompt = compose(false);
+  const review = reviewPromptQuality(prompt);
+  if (review.score < 8) prompt = compose(true);
 
   return {
     prompt,
@@ -416,7 +426,7 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
       styleId: input.styleId,
       sceneNumber: input.sceneNumber ?? null,
       chapter: input.chapterLabel ?? null,
-      emotion: input.emotion ?? null,
+      emotion,
       scenePurpose: input.scenePurpose ?? null,
     },
   };
