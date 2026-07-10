@@ -86,7 +86,8 @@ export function PublishKitPanel({ project, output }: { project: PanelProject; ou
   }, [output?.scenes]);
 
   async function persist(next: { distribution?: PublishKit | null; quality_report?: QualityReport | null }) {
-    await supabase.from("projects").update(next as unknown as Record<string, unknown>).eq("id", project.id);
+    // Cast through unknown — the generated Supabase type is a JSON union.
+    await supabase.from("projects").update(next as never).eq("id", project.id);
   }
 
   async function handleGenerate() {
