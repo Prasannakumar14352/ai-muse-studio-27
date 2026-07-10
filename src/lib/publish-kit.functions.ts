@@ -343,7 +343,7 @@ Return ONLY this JSON:
         score: Math.round(v.score),
         threshold,
         passed: v.score >= threshold,
-        notes: v.notes,
+        notes: v.notes ?? "",
       };
     });
 
@@ -359,7 +359,7 @@ Return ONLY this JSON:
       passed: failed.length === 0,
       scores,
       weakest_section: weakest,
-      suggestions: out.suggestions.slice(0, 6),
+      suggestions: (out.suggestions ?? []).slice(0, 6),
       generated_at: new Date().toISOString(),
     };
   });
