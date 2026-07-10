@@ -362,7 +362,9 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
     ? { camera: preset.camera, lens: preset.lens, aperture: preset.aperture }
     : pickCameraKit(input.beatIndex, input.styleId);
   const palette = input.brief?.paletteHint || pickPalette(topic, input.beatIndex);
-  const environment = enrichEnvironment(input.sceneContext, topic, mood.timeOfDay);
+  const environment = input.environmentOverride && input.environmentOverride.trim().length > 0
+    ? input.environmentOverride.trim()
+    : enrichEnvironment(input.sceneContext, topic, mood.timeOfDay);
   const storyDetail = storyDetailsFor(topic, input.beatIndex);
   const lighting = preset.isIllustrated ? preset.lighting : lightingRecipe(topic, mood, emotion);
 
