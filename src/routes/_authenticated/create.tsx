@@ -1,3 +1,10 @@
+// "Quick brief" create screen. The heavy configuration/regeneration UI
+// (Regenerate All, Re-run script / scenes / captions / images, JSON inputs,
+// review-before-render, etc.) lives on the unified project editor at
+// `/projects/$id`. This screen just collects the minimum inputs, seeds a
+// project row + initial local output, and hands off to the editor — so
+// "create" and "edit" become one continuous flow.
+
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -5,12 +12,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateProject, generateCarousel, generateCaptions, generateHashtags } from "@/lib/generators";
 import { generateAiCarousel } from "@/lib/carousel-ai.functions";
 import { generateAiVideoScript } from "@/lib/video-ai.functions";
-import { CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, MUSIC, NICHES, GENERATION_COST } from "@/lib/constants";
+import { CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, NICHES, GENERATION_COST } from "@/lib/constants";
 import { deductUsage, getAccessInfo, canGenerate } from "@/lib/access";
 import { saveOutput } from "@/lib/local-store";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Wand2, ArrowRight } from "lucide-react";
-
 
 export const Route = createFileRoute("/_authenticated/create")({ component: CreatePage });
 
@@ -19,7 +25,6 @@ const CAROUSEL_RATIOS = ["1:1", "4:5", "9:16", "16:9"] as const;
 function CreatePage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     content_type: "short_reel",
@@ -56,9 +61,6 @@ function CreatePage() {
 
       const isCarousel = form.content_type === "carousel";
 
-      // For carousels, try the AI-driven structured generator first (rich
-      // slides + baked-in infographic image prompts). Fall back to the local
-      // template if the AI call fails so the user still gets output.
       let aiCarousel: Awaited<ReturnType<typeof generateAiCarousel>> | null = null;
       if (isCarousel) {
         try {
@@ -198,8 +200,6 @@ function CreatePage() {
         }
       }
 
-
-      // Deduct credits (admin bypass handled server-side + client-side)
       const result = await deductUsage({
         amount: GENERATION_COST,
         projectId: project.id,
@@ -211,6 +211,8 @@ function CreatePage() {
 
       qc.invalidateQueries({ queryKey: ["access"] });
       qc.invalidateQueries({ queryKey: ["stats"] });
+      qc.invalidateQueries({ queryKey: ["projects-section"] });
+      qc.invalidateQueries({ queryKey: ["recent-projects"] });
       toast.success(access.isAdmin ? "Generated (admin — no credits used)" : "Project generated!");
       navigate({ to: "/projects/$id", params: { id: project.id } });
     } catch (err) {
@@ -221,207 +223,139 @@ function CreatePage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl md:text-4xl font-bold">Create a <span className="gradient-text">new project</span></h1>
-        <p className="text-muted-foreground mt-1">Step {step} of 3 — configure your generation.</p>
+        <h1 className="text-3xl md:text-4xl font-bold">
+          Create a <span className="gradient-text">new project</span>
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Fill in the brief — you'll land on the full editor next to review, regenerate, tweak inputs and render.
+        </p>
       </div>
 
-      {step === 1 && (
-        <div className="space-y-6">
-          <Section title="1. What are you creating?">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {CONTENT_TYPES.map((c) => (
-                <Card key={c.id} active={form.content_type === c.id} onClick={() => update("content_type", c.id)}>
-                  <c.icon className="w-5 h-5 mb-3 text-[color:var(--neon-purple)]" />
-                  <div className="font-medium text-sm">{c.label}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{c.desc}</div>
-                </Card>
-              ))}
-            </div>
-          </Section>
+      <div className="glass rounded-2xl p-4 border border-[color:var(--neon-purple)]/40 bg-[color:var(--neon-purple)]/5 text-sm">
+        <span className="font-semibold">One flow for create + edit.</span>{" "}
+        <span className="text-muted-foreground">
+          After generation you'll go to the project editor — the same screen you see when opening any saved project — to regenerate script, scenes, captions, images or render the final output.
+        </span>
+      </div>
 
-          {form.content_type === "carousel" && (
-            <div className="glass rounded-2xl p-4 border border-[color:var(--neon-purple)]/40 bg-[color:var(--neon-purple)]/5 flex items-center justify-between gap-4 flex-wrap">
-              <div className="text-sm">
-                <div className="font-semibold">Carousels now have a dedicated builder</div>
-                <div className="text-muted-foreground text-xs mt-0.5">Cover → point slides → CTA, each with AI text + matching visual.</div>
-              </div>
-              <a href="/create/carousel" className="rounded-lg gradient-primary text-white px-4 py-2 text-xs font-medium">Open carousel builder →</a>
-            </div>
-          )}
+      <Section title="1. What are you creating?">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {CONTENT_TYPES.map((c) => (
+            <Card key={c.id} active={form.content_type === c.id} onClick={() => update("content_type", c.id)}>
+              <c.icon className="w-5 h-5 mb-2 text-[color:var(--neon-purple)]" />
+              <div className="font-medium text-sm">{c.label}</div>
+              <div className="text-xs text-muted-foreground mt-1">{c.desc}</div>
+            </Card>
+          ))}
+        </div>
+      </Section>
 
-          {form.content_type === "long_video" && (
-            <Section title="1b. Long video length">
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {[60, 90, 120, 180, 240, 300, 420, 510, 600, 900, 1200, 1800].map((sec) => (
-                    <button
-                      key={sec}
-                      type="button"
-                      onClick={() => update("long_video_length_sec", sec)}
-                      className={`px-4 py-2 rounded-full text-sm border transition ${
-                        form.long_video_length_sec === sec
-                          ? "gradient-primary text-white border-transparent shadow-lg"
-                          : "glass border-border hover:border-white/20"
-                      }`}
-                    >
-                      {sec >= 60 ? `${Math.round(sec / 60)}${sec % 60 ? `:${String(sec % 60).padStart(2, "0")}` : " min"}` : `${sec}s`}
-                    </button>
-                  ))}
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-2">
-                    Custom length: {form.long_video_length_sec}s
-                    {form.long_video_length_sec >= 60
-                      ? ` (~${Math.floor(form.long_video_length_sec / 60)}m ${form.long_video_length_sec % 60}s)`
-                      : ""}
-                  </div>
-                  <input
-                    type="range"
-                    min={30}
-                    max={1800}
-                    step={15}
-                    value={form.long_video_length_sec}
-                    onChange={(e) => update("long_video_length_sec", parseInt(e.target.value))}
-                    className="w-full max-w-md"
-                  />
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    We'll auto-scale the number of scenes to fit the length you pick (30s – 30 min).
-                  </div>
-                </div>
-              </div>
-            </Section>
-          )}
-
-          <Section title="2. Pick a niche (optional — for topic ideas)">
-            <div className="flex flex-wrap gap-2">
-              {NICHES.map((n) => (
-                <button key={n.id} type="button"
-                  onClick={() => update("topic", n.topics[Math.floor(Math.random() * n.topics.length)])}
-                  className="glass border border-border hover:border-[color:var(--neon-purple)] rounded-full px-3 py-1.5 text-xs flex items-center gap-1.5 transition">
-                  <span>{n.emoji}</span> {n.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-3">Tap a niche to auto-fill a trending topic. You can still edit it below.</p>
-          </Section>
-
-          <Section title="3. What's it about?">
-            <input value={form.topic} onChange={(e) => update("topic", e.target.value)}
-              placeholder="e.g. Why silent walking is the new meditation"
-              className="w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
-            <input value={form.audience} onChange={(e) => update("audience", e.target.value)}
-              placeholder="Target audience (optional) — e.g. Gen Z fitness enthusiasts"
-              className="mt-3 w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
-          </Section>
-
-          <Section title="3. Platform">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-              {PLATFORMS.map((p) => (
-                <Card key={p.id} active={form.platform === p.id} onClick={() => update("platform", p.id)} compact>
-                  <p.icon className="w-4 h-4" /> <span className="text-sm">{p.label}</span>
-                </Card>
-              ))}
-            </div>
-          </Section>
-
-          <NavRow onNext={() => setStep(2)} nextLabel="Next: Style" />
+      {form.content_type === "carousel" && (
+        <div className="glass rounded-2xl p-4 border border-[color:var(--neon-purple)]/40 bg-[color:var(--neon-purple)]/5 flex items-center justify-between gap-4 flex-wrap">
+          <div className="text-sm">
+            <div className="font-semibold">Carousels have a dedicated builder</div>
+            <div className="text-muted-foreground text-xs mt-0.5">Cover → point slides → CTA with AI text + matching visual.</div>
+          </div>
+          <a href="/create/carousel" className="rounded-lg gradient-primary text-white px-4 py-2 text-xs font-medium">Open carousel builder →</a>
         </div>
       )}
 
-      {step === 2 && (
-        <div className="space-y-6">
-          <Section title="4. Tone">
-            <div className="flex flex-wrap gap-2">
-              {TONES.map((t) => (
-                <button key={t} onClick={() => update("tone", t)}
-                  className={`px-4 py-2 rounded-full text-sm border transition ${
-                    form.tone === t ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-white/20"
-                  }`}>{t}</button>
-              ))}
-            </div>
-          </Section>
-
-          <Section title="5. Visual Style">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {STYLES.map((s) => (
-                <button key={s.id} onClick={() => update("style", s.id)}
-                  className={`relative aspect-[4/5] rounded-xl overflow-hidden p-3 flex items-end text-left transition group ${
-                    form.style === s.id ? "ring-2 ring-white shadow-[var(--shadow-glow)]" : "opacity-85 hover:opacity-100"
-                  }`}>
-                  <img src={s.image} alt={s.label} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition group-hover:scale-105" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                  <span className="relative text-white font-semibold text-sm drop-shadow">{s.label}</span>
-                </button>
-              ))}
-            </div>
-          </Section>
-
-          {form.content_type === "carousel" && (
-            <Section title="5b. Carousel layout">
-              <div className="space-y-4">
-                <div>
-                  <div className="text-xs text-muted-foreground mb-2">Aspect ratio</div>
-                  <div className="flex flex-wrap gap-2">
-                    {CAROUSEL_RATIOS.map((r) => (
-                      <button key={r} type="button" onClick={() => update("aspect_ratio", r)}
-                        className={`px-4 py-2 rounded-full text-sm border ${form.aspect_ratio === r ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-white/20"}`}>
-                        {r}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-2">Number of slides ({form.slide_count})</div>
-                  <input type="range" min={3} max={10} value={form.slide_count}
-                    onChange={(e) => update("slide_count", parseInt(e.target.value))}
-                    className="w-full max-w-md" />
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    Auto-scripts a cover, {Math.max(1, form.slide_count - 2)} point slide{form.slide_count - 2 === 1 ? "" : "s"}, and a CTA.
-                  </div>
-                </div>
-              </div>
-            </Section>
-          )}
-
-          <NavRow onBack={() => setStep(1)} onNext={() => setStep(3)} nextLabel="Next: Voice & Music" />
-        </div>
+      {form.content_type === "long_video" && (
+        <Section title="Long video length">
+          <div className="flex flex-wrap gap-2">
+            {[60, 90, 120, 180, 240, 300, 420, 600, 900, 1200, 1800].map((sec) => (
+              <button
+                key={sec}
+                type="button"
+                onClick={() => update("long_video_length_sec", sec)}
+                className={`px-4 py-2 rounded-full text-sm border transition ${
+                  form.long_video_length_sec === sec
+                    ? "gradient-primary text-white border-transparent shadow-lg"
+                    : "glass border-border hover:border-white/20"
+                }`}
+              >
+                {sec >= 60 ? `${Math.round(sec / 60)}${sec % 60 ? `:${String(sec % 60).padStart(2, "0")}` : " min"}` : `${sec}s`}
+              </button>
+            ))}
+          </div>
+        </Section>
       )}
 
-      {step === 3 && (
-        <div className="space-y-6">
-          <Section title="6. Voice">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {VOICES.map((v) => (
-                <Card key={v.id} active={form.voice === v.id} onClick={() => update("voice", v.id)} compact>
-                  <span className="text-sm">{v.label}</span>
-                </Card>
-              ))}
-            </div>
-          </Section>
-
-          <Section title="7. Background Music">
-            <div className="flex flex-wrap gap-2">
-              {MUSIC.map((m) => (
-                <button key={m} onClick={() => update("music", m)}
-                  className={`px-4 py-2 rounded-full text-sm border transition ${
-                    form.music === m ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-white/20"
-                  }`}>{m}</button>
-              ))}
-            </div>
-          </Section>
-
-          <div className="flex justify-between items-center pt-4">
-            <button onClick={() => setStep(2)} className="text-sm text-muted-foreground hover:text-foreground">← Back</button>
-            <button onClick={handleGenerate} disabled={loading}
-              className="rounded-xl gradient-primary text-white px-8 py-3.5 font-semibold shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-              Generate Project
+      <Section title="2. Suggested niches (optional — auto-fills a trending topic)">
+        <div className="flex flex-wrap gap-2">
+          {NICHES.map((n) => (
+            <button key={n.id} type="button"
+              onClick={() => update("topic", n.topics[Math.floor(Math.random() * n.topics.length)])}
+              className="glass border border-border hover:border-[color:var(--neon-purple)] rounded-full px-3 py-1.5 text-xs flex items-center gap-1.5 transition">
+              <span>{n.emoji}</span> {n.label}
             </button>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="3. What's it about?">
+        <input value={form.topic} onChange={(e) => update("topic", e.target.value)}
+          placeholder="e.g. Why silent walking is the new meditation"
+          className="w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
+        <input value={form.audience} onChange={(e) => update("audience", e.target.value)}
+          placeholder="Target audience (optional) — e.g. Gen Z fitness enthusiasts"
+          className="mt-3 w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
+      </Section>
+
+      <Section title="4. Platform & tone">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            {PLATFORMS.map((p) => (
+              <Card key={p.id} active={form.platform === p.id} onClick={() => update("platform", p.id)} compact>
+                <p.icon className="w-4 h-4" /> <span className="text-sm">{p.label}</span>
+              </Card>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {TONES.map((t) => (
+              <button key={t} onClick={() => update("tone", t)}
+                className={`px-4 py-2 rounded-full text-sm border transition ${
+                  form.tone === t ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-white/20"
+                }`}>{t}</button>
+            ))}
           </div>
         </div>
-      )}
+      </Section>
+
+      <Section title="5. Visual style">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {STYLES.map((s) => (
+            <button key={s.id} onClick={() => update("style", s.id)}
+              className={`relative aspect-[4/5] rounded-xl overflow-hidden p-3 flex items-end text-left transition group ${
+                form.style === s.id ? "ring-2 ring-white shadow-[var(--shadow-glow)]" : "opacity-85 hover:opacity-100"
+              }`}>
+              <img src={s.image} alt={s.label} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition group-hover:scale-105" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+              <span className="relative text-white font-semibold text-sm drop-shadow">{s.label}</span>
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="6. Voice">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          {VOICES.map((v) => (
+            <Card key={v.id} active={form.voice === v.id} onClick={() => update("voice", v.id)} compact>
+              <span className="text-sm">{v.label}</span>
+            </Card>
+          ))}
+        </div>
+      </Section>
+
+      <div className="flex justify-end pt-2">
+        <button onClick={handleGenerate} disabled={loading}
+          className="rounded-xl gradient-primary text-white px-8 py-3.5 font-semibold shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+          Generate & open editor <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -443,16 +377,5 @@ function Card({ active, onClick, children, compact }: {
       className={`text-left rounded-xl border p-4 transition flex ${compact ? "items-center gap-2" : "flex-col"} ${
         active ? "border-[color:var(--neon-purple)] bg-[color:var(--neon-purple)]/10 shadow-[var(--shadow-glow)]" : "border-border hover:border-white/20 bg-white/[0.02]"
       }`}>{children}</button>
-  );
-}
-
-function NavRow({ onBack, onNext, nextLabel }: { onBack?: () => void; onNext: () => void; nextLabel: string }) {
-  return (
-    <div className="flex justify-between items-center pt-4">
-      {onBack ? <button onClick={onBack} className="text-sm text-muted-foreground hover:text-foreground">← Back</button> : <span />}
-      <button onClick={onNext} className="rounded-lg gradient-primary text-white px-6 py-3 text-sm font-medium flex items-center gap-2 shadow-lg">
-        {nextLabel} <ArrowRight className="w-4 h-4" />
-      </button>
-    </div>
   );
 }
