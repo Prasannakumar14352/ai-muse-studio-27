@@ -1512,6 +1512,9 @@ function beatsFromShots(job: JobRecord, style: StyleId): Beat[] {
     motion: (s.motion as CameraMotion) || "zoomIn",
     transition: ((s.transition as TransitionStyle) || "fade"),
     sceneType: ((s.sceneType as SceneType) || "explainer"),
+    sceneKind: (s.sceneKind as SceneKind) || "static",
+    activity: (s.activity as DynamicActivity | null) ?? null,
+    videoPrompt: s.videoPrompt ?? null,
     // Note: buildBeatImagePrompt already applied when the shot was created.
     _styleHint: style,
   } as unknown as Beat));
@@ -1536,6 +1539,9 @@ function planShots(
     motion: b.motion,
     transition: b.transition,
     sceneType: b.sceneType,
+    sceneKind: b.sceneKind,
+    activity: b.activity,
+    videoPrompt: b.videoPrompt,
     status: "pending",
     kind: null,
     blobKey: null,
@@ -1552,14 +1558,27 @@ async function generateOneShot(
   signal: AbortSignal,
 ): Promise<{ blobKey: string; kind: "clip" | "image"; mime: string; previewUrl: string }> {
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-  // Try clip first; on any failure fall back to image. Both return data URLs
-  // today (see /api/generate-image and /api/generate-video-clip).
-  const clip = await fetchBeatClip(shot.prompt, brief.style, brief.aspectRatio, TARGET_BEAT_SEC);
-  if (clip) {
-    const blob = await dataUrlToBlob(clip);
-    const key = await saveShotBlob(jobId, shot.id, blob);
-    const url = await loadShotObjectURL(key);
-    return { blobKey: key, kind: "clip", mime: blob.type || "video/mp4", previewUrl: url ?? clip };
+
+  // Dynamic Scene Detection routing:
+  //   • dynamic beats  → AI video clip using the rich motion prompt.
+  //   • static beats   → still image + Motion Director camera move; never
+  //     waste a video call on a truly static subject (product / logo /
+  //     landscape / document).
+  //
+  // Dynamic beats fall back to an image ONLY if the video model is
+  // unavailable — the ideal is to never ship a still for a dynamic beat.
+  if (shot.sceneKind === "dynamic") {
+    const dynPrompt = shot.videoPrompt || shot.prompt;
+    const clip = await fetchBeatClip(dynPrompt, brief.style, brief.aspectRatio, TARGET_BEAT_SEC);
+    if (clip) {
+      const blob = await dataUrlToBlob(clip);
+      const key = await saveShotBlob(jobId, shot.id, blob);
+      const url = await loadShotObjectURL(key);
+      return { blobKey: key, kind: "clip", mime: blob.type || "video/mp4", previewUrl: url ?? clip };
+    }
+    console.warn(
+      `[scene-detector] Dynamic beat ${shot.id} (${shot.activity}) fell back to still image — no video model available.`,
+    );
   }
   const img = await fetchSceneImage(shot.prompt, brief.style, brief.aspectRatio);
   if (!img) throw new Error("Image generation failed");
