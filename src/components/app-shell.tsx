@@ -51,6 +51,21 @@ export function AppShell({ children }: { children: ReactNode }) {
     ? [...BASE_NAV, { to: "/admin" as const, label: "Admin", icon: Crown }]
     : BASE_NAV;
 
+  // On `/projects/:id` no nav item matches the path directly, so nothing
+  // highlights. Derive the "owning" tab from the project's content_type
+  // (populated in the ["project", id] cache by the editor route) and fall
+  // back to Dashboard while the cache is empty on first paint.
+  const projectMatch = /^\/projects\/([^/]+)/.exec(pathname);
+  const projectId = projectMatch?.[1];
+  const projectData = projectId
+    ? (qc.getQueryData<{ project: { content_type?: string | null } | null }>(["project", projectId]))
+    : undefined;
+  const derivedNav = projectId
+    ? (projectData?.project?.content_type
+        ? (CONTENT_TYPE_TO_NAV[projectData.project.content_type] ?? "/dashboard")
+        : "/dashboard")
+    : null;
+
   async function signOut() {
     await qc.cancelQueries();
     qc.clear();
@@ -82,7 +97,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV.map((n) => {
-            const active = pathname === n.to || (n.to !== "/dashboard" && pathname.startsWith(n.to));
+            const active = derivedNav
+              ? derivedNav === n.to
+              : pathname === n.to || (n.to !== "/dashboard" && pathname.startsWith(n.to));
             return (
               <Link key={n.to} to={n.to}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${
