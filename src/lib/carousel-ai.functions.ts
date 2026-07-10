@@ -14,6 +14,7 @@ import {
   templatePromptBlock,
   rewriteVisualForTemplate,
   LAYOUT_TEMPLATES,
+  MARKETING_LAYOUT_RULES,
 } from "@/lib/layout-engine";
 
 export type AiCarouselSlide = {
