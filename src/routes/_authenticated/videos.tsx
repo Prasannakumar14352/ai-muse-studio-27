@@ -515,12 +515,16 @@ function VideosPage() {
             contentTypes={["long_video", "short_reel", "ugc"]}
             title="Your video projects"
             cacheKey="videos"
+            thumbnailAspect="landscape"
+            hideEmptyState
+            onCount={setProjectCount}
           />
-          {library.length > 0 ? (
+          {library.length > 0 && (
             <LibrarySection items={library} onOpen={openFromLibrary} onDelete={removeFromLibrary} />
-          ) : inProgress.length === 0 ? (
+          )}
+          {projectCount === 0 && library.length === 0 && inProgress.length === 0 && (
             <EmptyLibrary onNew={() => setView("input")} />
-          ) : null}
+          )}
           {thumbLibrary.length > 0 && (
             <ThumbnailLibrarySection items={thumbLibrary} onDelete={removeThumb} />
           )}
