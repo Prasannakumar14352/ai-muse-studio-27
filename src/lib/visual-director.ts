@@ -388,6 +388,13 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
       `LOCKED CHARACTER SHEET (must match exactly in every image): ` +
       `${input.continuity.characterSheet}`,
     );
+    if (input.masterReferenceUrl) {
+      parts.push(
+        `Master Character Reference Image: ${input.masterReferenceUrl} — ` +
+        `treat this portrait as the identity anchor. Match the exact face, ` +
+        `eyes, hair, wardrobe, and accessories from this reference.`,
+      );
+    }
     // Shot rationale — tell the model WHY this framing.
     parts.push(
       `Shot: ${SHOT_TYPE_PHRASES[shotType]} with ${CAMERA_MOVE_PHRASES[cameraMove]}, ` +
