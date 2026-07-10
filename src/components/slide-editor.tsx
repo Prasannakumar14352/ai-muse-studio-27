@@ -3,11 +3,14 @@ import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import {
   X, Type, Image as ImageIcon, Trash2, Plus, Loader2, Download, Save,
-  AlignLeft, AlignCenter, AlignRight,
+  AlignLeft, AlignCenter, AlignRight, Wand2,
 } from "lucide-react";
 import type {
   SlideOverlay, SlideTextOverlay, SlideLogoOverlay, SlideOverlaySet,
 } from "@/lib/local-store";
+import {
+  pickBestLayout, LAYOUT_TEMPLATES, type LayoutTemplate,
+} from "@/lib/layout-engine";
 
 type Ratio = "1:1" | "4:5" | "9:16" | "16:9";
 
