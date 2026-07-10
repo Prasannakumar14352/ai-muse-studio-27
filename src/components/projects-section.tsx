@@ -8,7 +8,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useEffect } from "react";
-import { Loader2, FolderOpen, RefreshCw, Sparkles, AlertTriangle } from "lucide-react";
+import { Loader2, FolderOpen, RefreshCw, Sparkles, AlertTriangle, Plus } from "lucide-react";
+import { ProjectThumbnail } from "@/components/project-thumbnail";
 
 type Props = {
   /** Content-type values in the `projects.content_type` column. */
@@ -21,6 +22,12 @@ type Props = {
   limit?: number;
   /** Copy for the empty state CTA. */
   emptyLabel?: string;
+  /** Optional: hide the internal empty state so the parent can render its own. */
+  hideEmptyState?: boolean;
+  /** Optional callback with the current count (0 = empty). */
+  onCount?: (count: number) => void;
+  /** Aspect ratio for the card thumbnails. */
+  thumbnailAspect?: "portrait" | "landscape" | "square";
 };
 
 export function ProjectsSection({
@@ -29,19 +36,21 @@ export function ProjectsSection({
   cacheKey,
   limit = 24,
   emptyLabel = "Create your first project",
+  hideEmptyState = false,
+  onCount,
+  thumbnailAspect = "landscape",
 }: Props) {
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["projects-section", cacheKey, ...contentTypes],
     queryFn: async () => {
-      // Same shape and filter the dashboard uses so the two views can never
-      // disagree. We log both the request and the response so category-tab
-      // "why don't I see my project?" issues are debuggable from devtools.
       console.info("[projects-section] fetching", { cacheKey, contentTypes, limit });
       const { data, error } = await supabase
         .from("projects")
-        .select("id, title, content_type, created_at, style, platform")
+        .select(
+          "id, title, content_type, created_at, updated_at, style, platform, status, thumbnail_url, cover_image_url, poster_url",
+        )
         .in("content_type", contentTypes)
-        .order("created_at", { ascending: false })
+        .order("updated_at", { ascending: false })
         .limit(limit);
       if (error) {
         console.error("[projects-section] supabase error", { cacheKey, error });
@@ -53,7 +62,6 @@ export function ProjectsSection({
     retry: 1,
   });
 
-  // Toast on error so a silent failure is never mistaken for "no projects".
   useEffect(() => {
     if (error) {
       toast.error(`Couldn't load ${title.toLowerCase()}`, {
@@ -62,6 +70,10 @@ export function ProjectsSection({
       });
     }
   }, [error, refetch, title]);
+
+  useEffect(() => {
+    if (!isLoading && !error && onCount) onCount(data?.length ?? 0);
+  }, [data, isLoading, error, onCount]);
 
   const Header = (
     <div className="flex items-center justify-between">
@@ -118,6 +130,7 @@ export function ProjectsSection({
   }
 
   if (!data || data.length === 0) {
+    if (hideEmptyState) return null;
     return (
       <section className="space-y-3">
         {Header}
@@ -131,7 +144,7 @@ export function ProjectsSection({
             to="/create"
             className="inline-flex items-center gap-1.5 mt-4 rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)]"
           >
-            {emptyLabel}
+            <Plus className="w-4 h-4" /> {emptyLabel}
           </Link>
         </div>
       </section>
@@ -141,25 +154,48 @@ export function ProjectsSection({
   return (
     <section className="space-y-3">
       {Header}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {data.map((p) => (
-          <Link
-            key={p.id}
-            to="/projects/$id"
-            params={{ id: p.id }}
-            className="glass rounded-xl p-4 hover:border-white/20 transition block border border-border"
-          >
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              {p.content_type ?? "project"}
-            </div>
-            <div className="mt-1.5 font-semibold line-clamp-2 text-sm">{p.title}</div>
-            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-              {p.style && <span className="glass px-2 py-0.5 rounded">{p.style}</span>}
-              {p.platform && <span className="glass px-2 py-0.5 rounded">{p.platform}</span>}
-              <span className="ml-auto">{new Date(p.created_at).toLocaleDateString()}</span>
-            </div>
-          </Link>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {data.map((p) => {
+          const ct = (p.content_type ?? "").toLowerCase();
+          const cardAspect: "portrait" | "landscape" | "square" =
+            thumbnailAspect === "landscape" && (ct === "short_reel" || ct.includes("short") || ct.includes("reel"))
+              ? "portrait"
+              : thumbnailAspect === "landscape" && ct === "long_video"
+              ? "landscape"
+              : thumbnailAspect;
+          const thumb =
+            (p as { thumbnail_url?: string | null }).thumbnail_url ||
+            (p as { cover_image_url?: string | null }).cover_image_url ||
+            (p as { poster_url?: string | null }).poster_url ||
+            null;
+          return (
+            <Link
+              key={p.id}
+              to="/projects/$id"
+              params={{ id: p.id }}
+              className="glass rounded-xl overflow-hidden hover:border-white/20 transition block border border-border group"
+            >
+              <ProjectThumbnail
+                title={p.title}
+                contentType={p.content_type}
+                style={p.style}
+                platform={p.platform}
+                thumbnailUrl={thumb}
+                status={(p as { status?: string | null }).status}
+                aspect={cardAspect}
+              />
+              <div className="p-3">
+                <div className="font-semibold line-clamp-2 text-sm">{p.title}</div>
+                <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                  {p.style && <span className="glass px-1.5 py-0.5 rounded">{p.style}</span>}
+                  <span className="ml-auto">
+                    {new Date(p.updated_at ?? p.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
