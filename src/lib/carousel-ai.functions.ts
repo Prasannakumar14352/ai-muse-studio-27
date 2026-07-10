@@ -9,6 +9,12 @@ import {
   type CreativeBrief,
   type AssetPlan,
 } from "@/lib/creative-director";
+import {
+  pickTemplate,
+  templatePromptBlock,
+  rewriteVisualForTemplate,
+  LAYOUT_TEMPLATES,
+} from "@/lib/layout-engine";
 
 export type AiCarouselSlide = {
   n: number;
