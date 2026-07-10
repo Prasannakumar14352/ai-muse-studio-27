@@ -207,7 +207,7 @@ Return ONLY this JSON shape:
       primary_platform: data.primary_platform,
       seo_title: out.seo_title.slice(0, 60),
       seo_description: out.seo_description.slice(0, 160),
-      keywords: out.keywords.slice(0, 10),
+      keywords: (out.keywords ?? []).slice(0, 10),
       cta_type: ctaType,
       cta_line: out.cta_line,
       pinned_comment: out.pinned_comment,
