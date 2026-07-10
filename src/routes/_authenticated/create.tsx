@@ -24,7 +24,7 @@ function CreatePage() {
   const [loading, setLoading] = useState(false);
 
   async function handleGenerate(form: ProjectBrief) {
-    if (!form.topic.trim()) return toast.error("Please enter a topic");
+    if (!form.topic.trim()) { toast.error("Please enter a topic"); return; }
     setLoading(true);
     try {
       const access = await getAccessInfo();
