@@ -210,22 +210,8 @@ function UserDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Total Projects", value: stats?.total ?? 0, icon: Layers, hue: "from-fuchsia-500 to-purple-600" },
-          { label: "Videos Generated", value: stats?.videos ?? 0, icon: Video, hue: "from-pink-500 to-rose-600" },
-          { label: "Images Generated", value: stats?.images ?? 0, icon: ImageIcon, hue: "from-indigo-500 to-purple-600" },
-          { label: "Plan", value: access?.plan ?? "free", icon: TrendingUp, hue: "from-emerald-400 to-teal-500" },
-        ].map((c) => (
-          <div key={c.label} className="glass rounded-2xl p-5">
-            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${c.hue} flex items-center justify-center mb-4`}>
-              <c.icon className="w-5 h-5 text-white" />
-            </div>
-            <div className="text-2xl font-bold capitalize">{c.value}</div>
-            <div className="text-xs text-muted-foreground mt-1">{c.label}</div>
-          </div>
-        ))}
-      </div>
+      <ModuleCounts />
+
 
       <div>
         <h2 className="text-lg font-semibold mb-3">Quick generate</h2>
