@@ -50,6 +50,27 @@ export function ProjectsSection({
 }: Props) {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const qc = useQueryClient();
+
+  async function handleDelete(id: string, title: string) {
+    const ok = await confirmDialog({
+      title: "Delete this project?",
+      description: `"${title}" will be permanently removed from your library.`,
+      confirmText: "Delete",
+      tone: "destructive",
+    });
+    if (!ok) return;
+    const { error } = await supabase.from("projects").delete().eq("id", id);
+    if (error) {
+      toast.error("Couldn't delete project", { description: error.message });
+      return;
+    }
+    toast.success("Project deleted");
+    await qc.invalidateQueries({ queryKey: ["projects-section"] });
+    await qc.invalidateQueries({ queryKey: ["recent-projects"] });
+    await qc.invalidateQueries({ queryKey: ["module-counts"] });
+    await qc.invalidateQueries({ queryKey: ["stats"] });
+  }
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["projects-section", cacheKey, ...contentTypes],
