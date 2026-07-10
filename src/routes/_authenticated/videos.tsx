@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
   Wand2, Youtube, Play, RefreshCw, Send, Check, Trash2, Clock, Plus, Video,
-  X, RotateCw,
+  X, RotateCw, Maximize2, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import {
   runVideoJobPipeline, retryFailedShots,
@@ -817,9 +817,29 @@ function JobDashboard({
   onRetryFailed: () => void;
   onBack: () => void;
 }) {
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const shotPct = dash.shotsTotal > 0 ? Math.round((dash.shotsDone / dash.shotsTotal) * 100) : 0;
   const renderPct = Math.round(dash.renderProgress * 100);
   const currentPhaseIdx = PHASE_ORDER.indexOf(dash.phase);
+  const viewableShots = useMemo(() => dash.shots.filter((s) => s.previewUrl), [dash.shots]);
+
+  const openLightbox = useCallback((shot: ShotProgress) => {
+    const idx = viewableShots.findIndex((s) => s.id === shot.id);
+    setLightboxIdx(idx >= 0 ? idx : null);
+  }, [viewableShots]);
+  const closeLightbox = useCallback(() => setLightboxIdx(null), []);
+  const nextLightbox = useCallback(() => {
+    setLightboxIdx((prev) => {
+      if (prev == null) return null;
+      return prev < viewableShots.length - 1 ? prev + 1 : 0;
+    });
+  }, [viewableShots.length]);
+  const prevLightbox = useCallback(() => {
+    setLightboxIdx((prev) => {
+      if (prev == null) return null;
+      return prev > 0 ? prev - 1 : viewableShots.length - 1;
+    });
+  }, [viewableShots.length]);
 
   return (
     <div className="space-y-4">
@@ -914,7 +934,7 @@ function JobDashboard({
             </div>
             <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1.5 max-h-[420px] overflow-y-auto pr-1">
               {dash.shots.map((s) => (
-                <SceneTile key={s.id} shot={s} />
+                <SceneTile key={s.id} shot={s} onClick={() => openLightbox(s)} />
               ))}
             </div>
           </div>
@@ -953,20 +973,37 @@ function JobDashboard({
           </button>
         </div>
       )}
+
+      {lightboxIdx != null && viewableShots.length > 0 && (
+        <SceneLightbox
+          shot={viewableShots[lightboxIdx]}
+          current={lightboxIdx + 1}
+          total={viewableShots.length}
+          hasNext={viewableShots.length > 1}
+          hasPrev={viewableShots.length > 1}
+          onClose={closeLightbox}
+          onNext={nextLightbox}
+          onPrev={prevLightbox}
+        />
+      )}
     </div>
   );
 }
 
-function SceneTile({ shot }: { shot: ShotProgress }) {
+function SceneTile({ shot, onClick }: { shot: ShotProgress; onClick?: () => void }) {
   const status = shot.status;
   const bg = status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
              status === "failed" ? "bg-rose-500/10 border-rose-500/40" :
              status === "running" ? "bg-white/5 border-white/20" :
              "bg-white/5 border-border";
+  const hasPreview = !!shot.previewUrl;
   return (
-    <div
-      className={`relative aspect-square rounded border overflow-hidden ${bg}`}
-      title={shot.error ? `Shot ${shot.index + 1}: ${shot.error}` : `Shot ${shot.index + 1}`}
+    <button
+      type="button"
+      disabled={!hasPreview}
+      onClick={onClick}
+      className={`relative aspect-square rounded border overflow-hidden text-left ${bg} ${hasPreview ? "cursor-zoom-in hover:ring-2 hover:ring-[color:var(--neon-cyan)]/50 transition" : "cursor-default"}`}
+      title={shot.error ? `Shot ${shot.index + 1}: ${shot.error}` : `Shot ${shot.index + 1}${hasPreview ? " — click to view fullscreen" : ""}`}
     >
       {shot.previewUrl && shot.kind === "image" && (
         <img src={shot.previewUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
@@ -981,8 +1018,132 @@ function SceneTile({ shot }: { shot: ShotProgress }) {
           {status === "failed" && <AlertCircle className="w-3.5 h-3.5 text-rose-400" />}
         </div>
       )}
+      {hasPreview && (
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/20">
+          <Maximize2 className="w-5 h-5 text-white drop-shadow" />
+        </div>
+      )}
       <div className="absolute bottom-0 right-0 text-[9px] font-mono text-white/70 bg-black/40 px-1 rounded-tl">
         {shot.index + 1}
+      </div>
+    </button>
+  );
+}
+
+function SceneLightbox({
+  shot, current, total, hasNext, hasPrev, onClose, onNext, onPrev,
+}: {
+  shot: ShotProgress;
+  current: number;
+  total: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  onClose: () => void;
+  onNext: () => void;
+  onPrev: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (isFullscreen && document.fullscreenElement) {
+          void document.exitFullscreen();
+        } else {
+          onClose();
+        }
+      } else if (e.key === "ArrowRight") {
+        onNext();
+      } else if (e.key === "ArrowLeft") {
+        onPrev();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose, onNext, onPrev, isFullscreen]);
+
+  useEffect(() => {
+    const onFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement && containerRef.current) {
+        await containerRef.current.requestFullscreen();
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // ignore unsupported
+    }
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="fixed inset-0 z-50 bg-black/95 backdrop-blur flex flex-col"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="text-sm text-white/80">
+          Scene {current} of {total} · {shot.kind === "clip" ? "Video clip" : "Still image"}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleFullscreen}
+            className="rounded-lg bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 text-xs flex items-center gap-1.5"
+          >
+            <Maximize2 className="w-3.5 h-3.5" /> {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-white/10 hover:bg-white/20 text-white p-1.5"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Main stage */}
+      <div className="flex-1 flex items-center justify-center px-2 pb-2 relative overflow-hidden">
+        {hasPrev && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onPrev(); }}
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/60 hover:bg-black/80 text-white p-2"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        )}
+        {shot.previewUrl && shot.kind === "image" && (
+          <img
+            src={shot.previewUrl}
+            alt={`Scene ${current}`}
+            className="max-w-full max-h-full object-contain rounded shadow-2xl"
+          />
+        )}
+        {shot.previewUrl && shot.kind === "clip" && (
+          <video
+            src={shot.previewUrl}
+            controls
+            autoPlay
+            playsInline
+            className="max-w-full max-h-full object-contain rounded shadow-2xl"
+          />
+        )}
+        {hasNext && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onNext(); }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/60 hover:bg-black/80 text-white p-2"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        )}
       </div>
     </div>
   );
