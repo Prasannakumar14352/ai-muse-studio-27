@@ -3,11 +3,14 @@ import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import {
   X, Type, Image as ImageIcon, Trash2, Plus, Loader2, Download, Save,
-  AlignLeft, AlignCenter, AlignRight,
+  AlignLeft, AlignCenter, AlignRight, Wand2,
 } from "lucide-react";
 import type {
   SlideOverlay, SlideTextOverlay, SlideLogoOverlay, SlideOverlaySet,
 } from "@/lib/local-store";
+import {
+  pickBestLayout, LAYOUT_TEMPLATES, type LayoutTemplate,
+} from "@/lib/layout-engine";
 
 type Ratio = "1:1" | "4:5" | "9:16" | "16:9";
 
@@ -72,6 +75,14 @@ export type SlideEditorProps = {
   title: string;
   slideNumber: number;
   initial?: SlideOverlaySet | null;
+  /** Optional copy the auto-layout engine will use to place text into the
+   *  template's safe zones without covering hero subjects. */
+  copy?: {
+    headline?: string;
+    subhead?: string;
+    bullets?: string[];
+    cta?: string;
+  } | null;
   onClose: () => void;
   onSave: (dataURL: string, overlays: SlideOverlaySet) => Promise<void> | void;
 };
@@ -179,6 +190,46 @@ export function SlideEditor(props: SlideEditorProps) {
     }
   }
 
+  const [lastTemplate, setLastTemplate] = useState<LayoutTemplate | null>(null);
+
+  function applyAutoLayout(templateOverride?: LayoutTemplate) {
+    const copy = props.copy;
+    if (!copy || !copy.headline) {
+      toast.error("No slide copy available to auto-layout");
+      return;
+    }
+    const candidates = templateOverride ? [templateOverride] : LAYOUT_TEMPLATES;
+    const { template, overlays: placed, score } = pickBestLayout(
+      { ratio: props.ratio, headline: copy.headline, subhead: copy.subhead, bullets: copy.bullets, cta: copy.cta },
+      candidates,
+    );
+    setLastTemplate(template);
+    // Preserve existing logo overlays, replace text overlays.
+    const kept = overlays.filter((o) => o.kind !== "text");
+    const added: SlideOverlay[] = placed.map((p) => ({
+      id: uid(),
+      kind: "text",
+      text: p.text,
+      xPct: p.xPct, yPct: p.yPct, widthPct: p.widthPct,
+      fontSize: p.fontSize,
+      color: "#ffffff",
+      bg: p.role === "cta" ? "#111827" : "transparent",
+      weight: p.weight,
+      align: p.align,
+      fontFamily: "Inter, system-ui, sans-serif",
+    }));
+    setOverlays([...kept, ...added]);
+    setSelectedId(null);
+    const collisions = score.collisions.length;
+    if (collisions === 0 && score.total >= 90) {
+      toast.success(`Auto layout: ${template.label} — score ${score.total}`);
+    } else if (collisions > 0) {
+      toast.warning(`Auto layout used ${template.label}; ${collisions} collision(s) auto-adjusted`);
+    } else {
+      toast.info(`Auto layout: ${template.label} — score ${score.total}`);
+    }
+  }
+
   const overlayNodes = useMemo(() => overlays, [overlays]);
 
   return (
@@ -224,6 +275,15 @@ export function SlideEditor(props: SlideEditorProps) {
               <ImageIcon className="w-3.5 h-3.5" /> Add logo
               <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
             </label>
+            {props.copy?.headline && (
+              <button
+                onClick={() => applyAutoLayout()}
+                title="Place text into template safe zones (no overlap with faces / products)"
+                className="rounded-lg glass border border-[color:var(--neon-purple)]/50 px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-white/5"
+              >
+                <Wand2 className="w-3.5 h-3.5" /> Auto layout
+              </button>
+            )}
             <div className="flex-1" />
             <button onClick={handleDownload} className="rounded-lg glass border border-border px-3 py-1.5 text-xs flex items-center gap-1.5">
               <Download className="w-3.5 h-3.5" /> PNG
@@ -242,6 +302,25 @@ export function SlideEditor(props: SlideEditorProps) {
             Layers ({overlays.length})
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {props.copy?.headline && (
+              <div className="rounded-lg border border-border bg-black/30 p-2.5 space-y-1.5">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                  <Wand2 className="w-3 h-3" /> Layout templates
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {LAYOUT_TEMPLATES.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => applyAutoLayout(t)}
+                      title={t.description}
+                      className={`text-[10px] rounded border px-1.5 py-1 text-left ${lastTemplate?.id === t.id ? "border-[color:var(--neon-purple)] bg-white/5" : "border-border hover:bg-white/5"}`}
+                    >
+                      {t.id.replace(/_/g, " ")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="space-y-1">
               {overlays.length === 0 && (
                 <div className="text-[11px] text-muted-foreground text-center py-4">

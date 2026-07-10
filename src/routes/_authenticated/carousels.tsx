@@ -927,6 +927,13 @@ function CarouselsPage() {
         if (!row || !src) return null;
         const cfg = getLayout(row);
         const slideNum = row.carousel_slides?.[editingSlide.idx]?.n ?? editingSlide.idx + 1;
+        const slide = row.carousel_slides?.[editingSlide.idx];
+        const copy = slide ? {
+          headline: slide.headline,
+          subhead: slide.body,
+          bullets: slide.bullets ?? [],
+          cta: slide.bottom_highlight,
+        } : null;
         return (
           <SlideEditor
             src={src}
@@ -934,6 +941,7 @@ function CarouselsPage() {
             title={row.title}
             slideNumber={slideNum}
             initial={row.slide_overlays[editingSlide.idx] ?? null}
+            copy={copy}
             onClose={() => setEditingSlide(null)}
             onSave={async (dataUrl, overlays) => {
               await saveEditedSlide(row, editingSlide.idx, dataUrl, overlays);
