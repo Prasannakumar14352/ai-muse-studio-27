@@ -56,6 +56,12 @@ type Beat = {
   motion: CameraMotion;
   transition: TransitionStyle;
   sceneType: SceneType;
+  /** Dynamic Scene Detection: how this beat must be produced. */
+  sceneKind: SceneKind;
+  /** Activity name when sceneKind === "dynamic" (walking, cooking, ...). */
+  activity: DynamicActivity | null;
+  /** Rich AI-video prompt when dynamic; null for static beats. */
+  videoPrompt: string | null;
 };
 
 /** Split a voiceover string into ~10-14-word visual chunks (sentence-aware). */
