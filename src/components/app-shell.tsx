@@ -11,6 +11,19 @@ import { useAccess, getAvailableCredits } from "@/lib/access";
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { BrandLogo } from "@/components/brand-logo";
 
+// Map a project's `content_type` to the top-level sidebar tab that should
+// show the "active" highlight while the user is editing that project at
+// `/projects/$id`. Without this the sidebar looks empty on project pages
+// because none of the nav items literally start with `/projects/`.
+const CONTENT_TYPE_TO_NAV: Record<string, string> = {
+  long_video: "/videos",
+  short_reel: "/videos",
+  ugc: "/videos",
+  ai_image: "/images",
+  carousel: "/carousels",
+  caption_only: "/captions",
+};
+
 const BASE_NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/create", label: "New Project", icon: Plus },
