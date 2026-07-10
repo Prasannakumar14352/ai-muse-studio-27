@@ -132,7 +132,7 @@ function ImagesPage() {
     const styleLabel = STYLES.find((x) => x.id === s)?.label ?? s;
     const startedAt = Date.now();
     const errors: string[] = [];
-    const lastMeta: DebugInfo["response"] | undefined = undefined;
+    let lastMeta: DebugInfo["response"] | undefined = undefined;
     try {
       const { fetchGeneratedImage } = await import("@/lib/image-stream");
       const settled = await Promise.allSettled(
