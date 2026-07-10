@@ -1,53 +1,87 @@
-## Goals (from user feedback)
 
-1. **Sidebar highlight is empty when viewing a project.** Opening a recent project from the dashboard lands on `/projects/$id`, but no sidebar item shows the active state — because that path doesn't start with `/videos`, `/carousels`, etc.
-2. **Videos / Images / Carousels / Thumbnails tabs don't show the user's projects.** Dashboard reads `projects` from the backend and shows all recent work; those tabs only read their own local IndexedDB stores (or in the case of Carousels, only `content_type='carousel'`). So a `long_video` project visible on the dashboard doesn't appear on the Videos tab.
-3. **Create flow and Edit flow are two different screens.** The screenshot in image 1 is the "edit an existing project" screen (`/projects/$id`) — regenerate all / re-run script / re-run scenes / re-run captions / re-run images, exact JSON inputs, review-before-render. The current "New Project" screen (`/create`) is a 3-step wizard that ends by inserting a row and navigating away. User wants **one canonical experience** used for both creating and editing, matching image 1.
+## Goal
 
-## Plan
+Ship a "Short Video Engine" that produces production-ready reels (IG / TikTok / YT Shorts / FB) AND upgrades the existing long-form pipeline with the same intelligence (adaptive structures, viral hook engine, distribution package, self-scoring quality loop).
 
-### A. Fix sidebar active-state for `/projects/$id`
+## What ships
 
-- In `src/components/app-shell.tsx`, when `pathname` starts with `/projects/`, read the loaded project's `content_type` from the `["project", id]` query cache and map it to the correct top-level nav item:
-  - `long_video`, `short_reel`, `ugc`, `ai_image` (video-based) → **Videos**
-  - `carousel` → **Carousels**
-  - fallback → **Dashboard** (so something is always highlighted)
-- Fallback (cache miss on first paint): highlight **Dashboard**. When the project query resolves, the sidebar re-renders and switches to the right item.
+### 1. New "Shorts" mode in `/videos`
 
-### B. Show backend projects in Videos / Carousels / Images / Thumbnails tabs
+- Toggle at the top of the New Video view: **Short (9:16, 15–60s)** vs **Long (16:9, existing flow)**.
+- Preset durations: 15s / 30s / 45s / 60s. Aspect 9:16 forced.
+- Reuses existing project storage — new `format: "short" | "long"` field on the job.
+- Renderer branch: `video-renderer.ts` gets a 9:16 output path (1080x1920, 30fps).
 
-Extend each tab's landing "library" grid with a **"Your projects"** section fed from Supabase `projects`, filtered by matching `content_type`. Each card links to `/projects/$id` (the canonical editor from A). Purely additive — the existing local-only sections (rendered MP4s, generated thumbnails, generated images) stay as their own sections above.
+### 2. Shared "Short Video Engine" library
 
-- **Videos** (`videos.tsx`): add `useQuery(["projects","videos"])` filtered by `content_type IN ('long_video','short_reel','ugc')`. New section rendered on the `landing` view, above `LibrarySection`, titled **"Your video projects"**.
-- **Carousels** (`carousels.tsx`): already queries carousels — no change beyond keeping current behaviour.
-- **Images** (`images.tsx`): add "Your image projects" section for `content_type = 'ai_image'`.
-- **Thumbnails** (`thumbnails.tsx`): add "Your projects with thumbnails" section listing any `projects` row whose local output has `thumbnail_ideas`. (Backend has no thumbnail flag — read from local-store index.)
+New `src/lib/short-video-engine.ts` (pure logic, no I/O) with:
+- **Topic classifier** → maps free-text topic to one of the 26 topic buckets in the spec.
+- **Structure picker** → chooses the story pattern per topic (Problem→Solution, Myth→Truth, Before→After, Listicle, Case Study, etc.). Deterministic table + AI override for edge cases.
+- **Hook Engine** → 12 hook archetypes (Curiosity, Contrarian, Shocking Stat, FOMO, Mystery, Prediction, Personal Story, Challenge, Social Proof, Before/After, Unexpected Comparison, Emotional Question). Banned openers list ("Hi everyone", "Did you know", "In today's video", etc.) enforced.
+- **Retention rules** → every 2–3s: new visual/angle/motion/info/emotion. Enforced by scene planner and validated by Quality Agent.
+- **CTA picker** → chooses CTA type from goal (Comment, Save, Share, Follow, Shop, DM, Visit, Download, Waitlist, Learn More).
 
-Empty-state copy is kept, but shown only when both sections are empty.
+### 3. Adaptive pipeline (shared by Shorts and Long-form)
 
-### C. Unify Create and Edit into one screen
+Extend `src/lib/video-agents.ts`:
+- **New `TopicIntentAgent`** — runs first, produces `{ topicBucket, tone, structurePattern, hookArchetype, ctaType, platform }`.
+- **`RetentionEngineAgent`** (exists) → upgraded to accept `structurePattern` and generate variable scene counts (not fixed 90–120).
+- **`ScriptAgent`** → prompt rewritten to enforce: banned openers, chosen hook archetype, chosen structure, VO tone table, ≤6-word on-screen text, 2–3s beat cadence.
+- **`VisualDirectorAgent`** (exists) → forbid repeating environment/angle/lighting/palette within a 3-beat window.
+- **Hybrid clip generation** — new `HeroBeatSelector`: picks 2–3 "hero" beats (hook + reveal + CTA/climax). Those call `videogen--generate_video` at render time (or the runtime AI video route); others use image + Motion Director.
+- **Factual guardrails** — `ScriptAgent` prompt bakes in "Research suggests / Evidence indicates / Experts generally agree" hedging for health/finance/science/psychology topics.
 
-Replace the 3-step wizard at `/create` with a "draft" version of the project editor:
+### 4. Distribution package generation
 
-1. **Create route** (`src/routes/_authenticated/create.tsx`) collects only the minimum inputs required to seed a project (topic, content type, tone/style/voice/platform, plus type-specific: long-video length, carousel ratio/slide count). Everything else (scenes, script, captions, thumbnail concepts, image prompts) is generated by the same server functions the editor already uses.
-2. On submit, insert the `projects` row + initial `saveOutput(...)` exactly like today, then `navigate({ to: "/projects/$id" })`.
-3. The heavy configuration/regeneration UI (Regenerate All, Re-run script / scenes / captions / images, inputs JSON viewer, review-before-render, brand handles, render UGC video) all lives in `/projects/$id` — which the user already showed in image 1 as the desired final experience. No duplication.
+New `DistributionAgent` (`src/lib/distribution-agent.ts`) produces per-video:
+- SEO title (≤60 char) + description (≤160 char)
+- Keywords (5–10)
+- Hashtags — 3 platform-specific sets (IG, TikTok, YT Shorts, FB)
+- Caption — 3 variants sized per platform (IG ≤2200, TikTok ≤300, YT Shorts ≤100, FB ≤400)
+- Pinned first comment
+- CTA line (from CTA picker)
+- Thumbnail concept + prompt (9:16 for shorts, 16:9 for long) → routed through existing Thumbnail Studio.
 
-Practically, this means:
-- Slim `create.tsx` from 458 lines down to a compact "quick brief" form (~150 lines): topic, content type, tone, style, voice, platform, plus the two type-specific extras. No 3-step navigation.
-- Reuse the same `generateProject / generateAiVideoScript / generateAiCarousel` calls already in `create.tsx` — no logic changes to the generators.
-- Immediately redirect to `/projects/$id`, so from the user's perspective creating and editing feel like **one continuous flow** — the editing screen is the "final" one.
+Stored on the project as `distribution` JSON blob (Supabase `projects` table, new column via migration). Rendered in a new **"Publish Kit"** tab on the project page with copy-to-clipboard per field per platform.
 
-### D. Verification
+### 5. Quality Review Agent (self-scoring loop)
 
-- Build/typecheck runs automatically after edits.
-- Manually walk: `/create` → generate → land on `/projects/$id` → sidebar shows correct tab highlighted (Videos or Carousels) → navigate back to `/videos` → new project appears under "Your video projects".
+New `src/lib/quality-review-agent.ts`:
+- Runs after full generation. Scores 0–100 across:
+  1. Hook strength (≥80 required)
+  2. Storytelling coherence (≥75)
+  3. Factual/hedging correctness (≥85)
+  4. Visual diversity (≥75) — checks repeats in environment/angle/palette
+  5. Thumbnail quality (≥75) — checks contrast, subject clarity, text ≤6 words
+  6. SEO completeness (≥90) — all distribution fields populated & within limits
+  7. CTA suitability (≥75) — matches goal
+  8. Retention (≥75) — beat cadence & pattern-interrupt density
+- Per-section threshold from a single config const (user can tune later).
+- On sub-threshold → regenerate ONLY that section (targeted agent re-run, max 2 attempts). Old drafts discarded; user sees only final output.
+- Score panel visible in DEV mode; user-facing view shows only the final asset + a green "Production Quality" badge.
 
-## Technical notes (implementation details)
+### 6. UI changes
 
-- Project-type-to-tab map lives in `app-shell.tsx` as a small const; the sidebar reads it via `useQueryClient().getQueryData(["project", id])` — no extra network call, purely reactive to the cache the editor already populates.
-- New project sections use `useQuery(["projects","videos"|"images"|…])` and `Link to="/projects/$id" params={{ id }}` cards styled to match the existing `LibrarySection` cards.
-- Thumbnails project section relies on `local-store` `listOutputs()` (already used by the dashboard for image counts) + a Supabase `projects` fetch to hydrate titles.
-- No schema changes, no new tables, no new server functions.
+- `src/routes/_authenticated/videos.tsx` — add format toggle (Short/Long), duration presets update based on format, new "Publish Kit" section on project page.
+- `src/routes/_authenticated/projects.$id.tsx` — new **Publish Kit** tab with per-platform caption/hashtag/CTA blocks, copy buttons, thumbnail preview.
+- Existing carousel/thumbnail routes: unchanged.
 
-Once you approve I'll implement A→C in parallel edits and verify the build.
+## Technical details
+
+- **Storage**: extend `video-job-store.ts` with `format`, `platform`, `distribution`, `qualityReport`. Backend `projects` table gets `distribution jsonb` and `quality_report jsonb` columns via migration (with GRANTs).
+- **Models**: `google/gemini-3.5-flash` for classifier/hook/distribution/quality (cheap+fast structured JSON); `google/gemini-2.5-pro` retained for Script + Visual Director (quality). Image models unchanged. AI video clips via existing `/api/generate-video-clip`.
+- **Renderer**: `video-renderer.ts` gains `aspectRatio` + `size` params. 9:16 path uses 1080×1920. Motion Director unchanged (already resolution-agnostic).
+- **Streaming/limits**: Quality regen loop bounded to 2 attempts per section, hard cap 8 total regenerations per video to avoid runaway cost.
+- **Backwards compat**: existing projects default `format: "long"`, empty `distribution` and `qualityReport` render gracefully.
+
+## Files
+
+New: `src/lib/short-video-engine.ts`, `src/lib/distribution-agent.ts`, `src/lib/quality-review-agent.ts`, `src/components/publish-kit-panel.tsx`, one Supabase migration.
+
+Modified: `src/lib/video-agents.ts`, `src/lib/video-ai.functions.ts`, `src/lib/video-renderer.ts`, `src/lib/video-job-store.ts`, `src/routes/_authenticated/videos.tsx`, `src/routes/_authenticated/projects.$id.tsx`.
+
+## Out of scope for v1
+
+- Auto-scheduling / auto-publishing to platforms (kit is copy-paste).
+- Voice cloning / custom TTS voices (uses current voice stack).
+- A/B testing hooks with real analytics feedback.
