@@ -111,12 +111,18 @@ function expandScriptToBeats(
   style: StyleId,
   title: string,
   brief?: import("@/lib/creative-director").CreativeBrief | null,
+  bible?: CharacterBible | null,
 ): Beat[] {
   const beats: Beat[] = [];
   let globalIdx = 0;
-  const continuity: ContinuityCard = buildContinuityCard(title);
+  const activeBible: CharacterBible = bible ?? defaultCharacterBibleFor(title, brief?.intent);
+  const continuity: ContinuityCard = bibleToContinuityCard(activeBible);
+  // Silence unused-warning for the legacy hint-only builder (kept exported).
+  void buildContinuityCard;
   const vdStyle = style as VDStyle;
   let previousShot: ShotType | null = null;
+  const topic = classifyTopic(`${title} ${brief?.intent ?? ""}`);
+  const recentEnvs: string[] = [];
   const directorLite = brief ? {
     intent: brief.intent,
     visualHero: brief.visualHero,
@@ -131,6 +137,10 @@ function expandScriptToBeats(
     const targetBeats = Math.max(1, Math.round(sceneDur / TARGET_BEAT_SEC));
     const chunks = splitVoiceoverIntoBeatTexts(scene.voiceover ?? "", targetBeats);
     const baseVisual = scene.visual || scene.image_prompt || `${scene.voiceover?.slice(0, 80)}`;
+    // One environment per scene keeps continuity within the scene, but rotates
+    // across scenes so a project never becomes "forest, forest, forest".
+    const sceneEnv = pickEnvironmentForBeat(topic, sceneIndex, recentEnvs);
+    recentEnvs.push(sceneEnv);
     chunks.forEach((chunk, beatIndex) => {
       const words = chunk.split(/\s+/).filter(Boolean).length || 1;
       const directed = directBeatPrompt({
@@ -138,7 +148,7 @@ function expandScriptToBeats(
         styleId: vdStyle,
         ratio: "16:9",
         beatText: chunk,
-        sceneContext: baseVisual,
+        sceneContext: `${sceneEnv}. ${baseVisual}`,
         sceneNumber: scene.n,
         chapterLabel: scene.role ?? null,
         scenePurpose: scene.role ?? null,
@@ -147,6 +157,8 @@ function expandScriptToBeats(
         continuity,
         previousShotType: previousShot,
         brief: directorLite,
+        environmentOverride: sceneEnv,
+        masterReferenceUrl: activeBible.masterReferenceUrl ?? null,
       });
       previousShot = directed.shotType;
       // Motion Director — classify + pick motion + transition + brief.
