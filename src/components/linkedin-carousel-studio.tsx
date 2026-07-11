@@ -44,6 +44,8 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
   const [active, setActive] = useState(0);
   const [slideCount, setSlideCount] = useState(8);
   const refs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
 
   function update(next: LinkedinCarouselContent) {
     setState(next);
