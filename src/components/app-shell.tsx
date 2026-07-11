@@ -3,7 +3,7 @@ import { type ReactNode, useState } from "react";
 import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
   Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug,
-  ChevronLeft, ChevronRight, Linkedin,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -59,7 +59,6 @@ const SECTIONS: readonly NavSection[] = [
     label: "Publishing",
     items: [
       { to: "/connections", label: "Connections", icon: Plug },
-      { to: "/connections", label: "LinkedIn Posts", icon: Linkedin },
     ],
   },
   {
