@@ -54,7 +54,16 @@ function LinkedinPostViewPage() {
     engagement_strategy?: string; image_concept?: string; image_prompt?: string;
     carousel_concept?: string; accessibility_alt?: string;
     post_type?: string; industry?: string; goal?: string; language?: string; brand?: string;
+    carousel?: LinkedinCarouselContent | null;
+    linkedin_image?: LinkedinImageState | null;
   };
+
+  async function saveMetaPatch(patch: Record<string, unknown>) {
+    const nextMeta = { ...(data.metadata ?? {}), ...patch };
+    const { error } = await supabase.from("projects").update({ metadata: nextMeta as never }).eq("id", data.id);
+    if (error) toast.error("Save failed", { description: error.message });
+    else qc.invalidateQueries({ queryKey: ["linkedin-post", id] });
+  }
 
   async function copy(text: string) { await navigator.clipboard.writeText(text); toast.success("Copied"); }
 
