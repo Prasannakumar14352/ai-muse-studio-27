@@ -226,6 +226,45 @@ export type Database = {
           },
         ]
       }
+      oauth_provider_configs: {
+        Row: {
+          client_id: string | null
+          client_secret_encrypted: string | null
+          client_secret_iv: string | null
+          enabled: boolean
+          last_test_at: string | null
+          last_test_error: string | null
+          last_test_ok: boolean | null
+          provider: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          client_secret_encrypted?: string | null
+          client_secret_iv?: string | null
+          enabled?: boolean
+          last_test_at?: string | null
+          last_test_error?: string | null
+          last_test_ok?: boolean | null
+          provider: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          client_secret_encrypted?: string | null
+          client_secret_iv?: string | null
+          enabled?: boolean
+          last_test_at?: string | null
+          last_test_error?: string | null
+          last_test_ok?: boolean | null
+          provider?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       oauth_states: {
         Row: {
           code_verifier: string | null
