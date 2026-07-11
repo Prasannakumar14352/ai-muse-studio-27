@@ -90,6 +90,7 @@ function CarouselsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [collapsedSlides, setCollapsedSlides] = useState<Record<string, boolean>>({});
   const [editingSlide, setEditingSlide] = useState<{ rowId: string; idx: number } | null>(null);
+  const deleteProject = useProjectDelete();
 
   async function saveEditedSlide(row: CarouselRow, idx: number, dataUrl: string, overlays: SlideOverlaySet) {
     const versionedId = `carousel:${row.id}:${idx}:v${Date.now()}`;
