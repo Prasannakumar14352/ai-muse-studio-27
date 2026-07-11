@@ -12,7 +12,7 @@ import {
 } from "@/lib/blob-store";
 import { SlideEditor } from "@/components/slide-editor";
 
-import { confirmDialog } from "@/components/confirm-dialog";
+import { useProjectDelete } from "@/hooks/use-project-delete";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
   Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2, Film, Pencil,
