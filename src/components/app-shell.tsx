@@ -201,49 +201,38 @@ export function AppShell({ children }: { children: ReactNode }) {
           collapsed ? "md:w-[72px]" : "md:w-[264px]"
         }`}
       >
-        {/* Brand section */}
-        <div className="relative px-3 pt-5 pb-4">
-          <div
-            className={`relative rounded-2xl border border-white/[0.06] overflow-hidden ${
-              collapsed ? "px-2 py-3" : "px-4 py-4"
-            }`}
-            style={{
-              background:
-                "linear-gradient(140deg, oklch(0.68 0.19 55 / 0.14), oklch(0.68 0.26 15 / 0.10) 55%, oklch(0.18 0.02 40 / 0.35))",
-              boxShadow: "inset 0 1px 0 oklch(1 0 0 / 0.06), 0 8px 24px -16px oklch(0.68 0.19 55 / 0.4)",
-            }}
-          >
-            <div
-              className="pointer-events-none absolute inset-0 opacity-60"
-              aria-hidden
-              style={{
-                background:
-                  "radial-gradient(120% 60% at 50% 0%, oklch(0.78 0.20 65 / 0.15), transparent 60%)",
-              }}
-            />
-            <div className={`relative flex ${collapsed ? "flex-col items-center gap-2" : "flex-col items-center gap-3"}`}>
+        {/* Brand section — compact workspace header */}
+        <div className="relative px-3 pt-4 pb-3 border-b border-border/40">
+          {collapsed ? (
+            <Link
+              to="/dashboard"
+              aria-label="CreatorVault AI home"
+              className="flex items-center justify-center rounded-xl p-1.5 transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <BrandLogo alt="" className="h-9 w-auto object-contain" />
+            </Link>
+          ) : (
+            <div className="flex items-center gap-3">
               <Link
                 to="/dashboard"
                 aria-label="CreatorVault AI home"
-                className="flex items-center justify-center rounded-xl p-1.5 transition hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="shrink-0 flex items-center justify-center rounded-lg p-1 transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <BrandLogo
-                  alt=""
-                  className={collapsed ? "h-10 w-auto object-contain" : "h-16 w-auto object-contain drop-shadow-[0_4px_12px_oklch(0.68_0.19_55/0.35)]"}
-                />
+                <BrandLogo alt="" className="h-[52px] w-auto max-w-[64px] object-contain" />
               </Link>
-              {!collapsed && (
-                <div className="flex flex-col items-center gap-0.5 text-center">
-                  <span className="text-[17px] font-bold tracking-tight leading-none bg-gradient-to-r from-[color:var(--brand-orange)] via-[color:var(--brand-orange-glow)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
+              <div className="min-w-0 flex-1 flex flex-col gap-1">
+                <div className="flex flex-col leading-tight">
+                  <span className="text-[15px] font-semibold tracking-tight text-foreground truncate">
                     CreatorVault AI
                   </span>
-                  <span className="text-[10px] font-medium tracking-[0.18em] uppercase text-muted-foreground/80">
-                    Create · Publish · Grow
+                  <span className="text-[11px] text-muted-foreground/80 truncate">
+                    by ProdXStore
                   </span>
                 </div>
-              )}
+                <PlanPill />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Circular collapse toggle */}
           <button
@@ -251,11 +240,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={toggleCollapse}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="absolute -right-3 top-8 z-10 h-7 w-7 rounded-full border border-border/60 bg-background/95 backdrop-blur text-muted-foreground shadow-md flex items-center justify-center transition-all duration-200 hover:text-foreground hover:scale-110 hover:border-[color:var(--brand-orange)]/50 hover:shadow-[0_0_16px_-2px_oklch(0.68_0.19_55/0.55)]"
+            className="absolute -right-3 top-6 z-10 h-7 w-7 rounded-full border border-border/60 bg-background/95 backdrop-blur text-muted-foreground shadow-md flex items-center justify-center transition-all duration-200 hover:text-foreground hover:scale-110 hover:border-[color:var(--brand-orange)]/50 hover:shadow-[0_0_16px_-2px_oklch(0.68_0.19_55/0.55)]"
           >
             {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
           </button>
         </div>
+
 
         {/* Navigation */}
         <nav className={`flex-1 overflow-y-auto ${collapsed ? "px-2" : "px-3"} pb-3 space-y-4 scrollbar-thin`}>
