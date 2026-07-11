@@ -1,6 +1,7 @@
 // User-facing server functions: start OAuth flow, list connections, disconnect,
 // select a destination account, and report which providers are available.
-import { createServerFn, getRequest } from "@tanstack/react-start";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PROVIDERS, PLATFORM_TO_PROVIDER, callbackUrl, type PlatformId } from "./oauth-providers.server";
