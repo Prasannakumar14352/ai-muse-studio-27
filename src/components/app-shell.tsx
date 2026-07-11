@@ -2,8 +2,8 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
-  Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug,
-  ChevronLeft, ChevronRight,
+  Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug, Linkedin,
+  ChevronLeft,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
