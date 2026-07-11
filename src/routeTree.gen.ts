@@ -33,8 +33,10 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
 import { Route as AuthenticatedCreateCarouselRouteImport } from './routes/_authenticated/create_.carousel'
 import { Route as AuthenticatedAdminWebhooksRouteImport } from './routes/_authenticated/admin.webhooks'
+import { Route as AuthenticatedAdminIntegrationsRouteImport } from './routes/_authenticated/admin.integrations'
 import { Route as ApiPublicWebhooksRazorpayRouteImport } from './routes/api/public/webhooks/razorpay'
 import { Route as ApiPublicHooksPublishScheduledRouteImport } from './routes/api/public/hooks/publish-scheduled'
+import { Route as ApiPublicOauthPlatformCallbackRouteImport } from './routes/api/public/oauth/$platform.callback'
 
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
@@ -158,6 +160,12 @@ const AuthenticatedAdminWebhooksRoute =
     path: '/webhooks',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminIntegrationsRoute =
+  AuthenticatedAdminIntegrationsRouteImport.update({
+    id: '/integrations',
+    path: '/integrations',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const ApiPublicWebhooksRazorpayRoute =
   ApiPublicWebhooksRazorpayRouteImport.update({
     id: '/api/public/webhooks/razorpay',
@@ -168,6 +176,12 @@ const ApiPublicHooksPublishScheduledRoute =
   ApiPublicHooksPublishScheduledRouteImport.update({
     id: '/api/public/hooks/publish-scheduled',
     path: '/api/public/hooks/publish-scheduled',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicOauthPlatformCallbackRoute =
+  ApiPublicOauthPlatformCallbackRouteImport.update({
+    id: '/api/public/oauth/$platform/callback',
+    path: '/api/public/oauth/$platform/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
 
@@ -192,11 +206,13 @@ export interface FileRoutesByFullPath {
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/tts': typeof ApiTtsRoute
+  '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
+  '/api/public/oauth/$platform/callback': typeof ApiPublicOauthPlatformCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -219,11 +235,13 @@ export interface FileRoutesByTo {
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/tts': typeof ApiTtsRoute
+  '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
+  '/api/public/oauth/$platform/callback': typeof ApiPublicOauthPlatformCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -248,11 +266,13 @@ export interface FileRoutesById {
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/tts': typeof ApiTtsRoute
+  '/_authenticated/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/_authenticated/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/_authenticated/create_/carousel': typeof AuthenticatedCreateCarouselRoute
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
+  '/api/public/oauth/$platform/callback': typeof ApiPublicOauthPlatformCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -277,11 +297,13 @@ export interface FileRouteTypes {
     | '/api/generate-image'
     | '/api/generate-video-clip'
     | '/api/tts'
+    | '/admin/integrations'
     | '/admin/webhooks'
     | '/create/carousel'
     | '/projects/$id'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/webhooks/razorpay'
+    | '/api/public/oauth/$platform/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -304,11 +326,13 @@ export interface FileRouteTypes {
     | '/api/generate-image'
     | '/api/generate-video-clip'
     | '/api/tts'
+    | '/admin/integrations'
     | '/admin/webhooks'
     | '/create/carousel'
     | '/projects/$id'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/webhooks/razorpay'
+    | '/api/public/oauth/$platform/callback'
   id:
     | '__root__'
     | '/'
@@ -332,11 +356,13 @@ export interface FileRouteTypes {
     | '/api/generate-image'
     | '/api/generate-video-clip'
     | '/api/tts'
+    | '/_authenticated/admin/integrations'
     | '/_authenticated/admin/webhooks'
     | '/_authenticated/create_/carousel'
     | '/_authenticated/projects/$id'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/webhooks/razorpay'
+    | '/api/public/oauth/$platform/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -350,6 +376,7 @@ export interface RootRouteChildren {
   ApiTtsRoute: typeof ApiTtsRoute
   ApiPublicHooksPublishScheduledRoute: typeof ApiPublicHooksPublishScheduledRoute
   ApiPublicWebhooksRazorpayRoute: typeof ApiPublicWebhooksRazorpayRoute
+  ApiPublicOauthPlatformCallbackRoute: typeof ApiPublicOauthPlatformCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -522,6 +549,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminWebhooksRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/integrations': {
+      id: '/_authenticated/admin/integrations'
+      path: '/integrations'
+      fullPath: '/admin/integrations'
+      preLoaderRoute: typeof AuthenticatedAdminIntegrationsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/api/public/webhooks/razorpay': {
       id: '/api/public/webhooks/razorpay'
       path: '/api/public/webhooks/razorpay'
@@ -536,14 +570,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPublishScheduledRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/oauth/$platform/callback': {
+      id: '/api/public/oauth/$platform/callback'
+      path: '/api/public/oauth/$platform/callback'
+      fullPath: '/api/public/oauth/$platform/callback'
+      preLoaderRoute: typeof ApiPublicOauthPlatformCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminIntegrationsRoute: typeof AuthenticatedAdminIntegrationsRoute
   AuthenticatedAdminWebhooksRoute: typeof AuthenticatedAdminWebhooksRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminIntegrationsRoute: AuthenticatedAdminIntegrationsRoute,
   AuthenticatedAdminWebhooksRoute: AuthenticatedAdminWebhooksRoute,
 }
 
@@ -600,17 +643,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTtsRoute: ApiTtsRoute,
   ApiPublicHooksPublishScheduledRoute: ApiPublicHooksPublishScheduledRoute,
   ApiPublicWebhooksRazorpayRoute: ApiPublicWebhooksRazorpayRoute,
+  ApiPublicOauthPlatformCallbackRoute: ApiPublicOauthPlatformCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
