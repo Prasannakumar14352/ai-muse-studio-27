@@ -76,6 +76,7 @@ const SECTIONS: readonly NavSection[] = [
     adminOnly: true,
     items: [
       { to: "/admin", label: "Admin", icon: Crown },
+      { to: "/admin/integrations", label: "Social Publishing", icon: Plug },
     ],
   },
   {
