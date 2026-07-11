@@ -30,7 +30,7 @@ function LinkedinPostViewPage() {
   const qc = useQueryClient();
   const del = useProjectDelete();
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data: project, isLoading, refetch } = useQuery({
     queryKey: ["linkedin-post", id],
     queryFn: async (): Promise<ProjectRow | null> => {
       const { data, error } = await supabase.from("projects").select("*").eq("id", id).maybeSingle();
@@ -40,7 +40,8 @@ function LinkedinPostViewPage() {
   });
 
   if (isLoading) return <div className="text-sm text-muted-foreground">Loading…</div>;
-  if (!data) return <div className="text-sm text-muted-foreground">Post not found.</div>;
+  if (!project) return <div className="text-sm text-muted-foreground">Post not found.</div>;
+  const data = project;
 
   const meta = (data.metadata ?? {}) as {
     headlines?: string[]; hooks?: string[]; recommended_hook?: string;

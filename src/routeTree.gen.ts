@@ -33,6 +33,7 @@ import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
 import { Route as AuthenticatedLinkedinPostsNewRouteImport } from './routes/_authenticated/linkedin-posts.new'
+import { Route as AuthenticatedLinkedinPostsIdRouteImport } from './routes/_authenticated/linkedin-posts.$id'
 import { Route as AuthenticatedCreateCarouselRouteImport } from './routes/_authenticated/create_.carousel'
 import { Route as AuthenticatedAdminWebhooksRouteImport } from './routes/_authenticated/admin.webhooks'
 import { Route as AuthenticatedAdminIntegrationsRouteImport } from './routes/_authenticated/admin.integrations'
@@ -162,6 +163,12 @@ const AuthenticatedLinkedinPostsNewRoute =
     path: '/new',
     getParentRoute: () => AuthenticatedLinkedinPostsRoute,
   } as any)
+const AuthenticatedLinkedinPostsIdRoute =
+  AuthenticatedLinkedinPostsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedLinkedinPostsRoute,
+  } as any)
 const AuthenticatedCreateCarouselRoute =
   AuthenticatedCreateCarouselRouteImport.update({
     id: '/create_/carousel',
@@ -224,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
+  '/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRoute
   '/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
@@ -255,6 +263,7 @@ export interface FileRoutesByTo {
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
+  '/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRoute
   '/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
@@ -288,6 +297,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/_authenticated/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/_authenticated/create_/carousel': typeof AuthenticatedCreateCarouselRoute
+  '/_authenticated/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRoute
   '/_authenticated/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
@@ -321,6 +331,7 @@ export interface FileRouteTypes {
     | '/admin/integrations'
     | '/admin/webhooks'
     | '/create/carousel'
+    | '/linkedin-posts/$id'
     | '/linkedin-posts/new'
     | '/projects/$id'
     | '/api/public/hooks/publish-scheduled'
@@ -352,6 +363,7 @@ export interface FileRouteTypes {
     | '/admin/integrations'
     | '/admin/webhooks'
     | '/create/carousel'
+    | '/linkedin-posts/$id'
     | '/linkedin-posts/new'
     | '/projects/$id'
     | '/api/public/hooks/publish-scheduled'
@@ -384,6 +396,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/integrations'
     | '/_authenticated/admin/webhooks'
     | '/_authenticated/create_/carousel'
+    | '/_authenticated/linkedin-posts/$id'
     | '/_authenticated/linkedin-posts/new'
     | '/_authenticated/projects/$id'
     | '/api/public/hooks/publish-scheduled'
@@ -575,6 +588,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLinkedinPostsNewRouteImport
       parentRoute: typeof AuthenticatedLinkedinPostsRoute
     }
+    '/_authenticated/linkedin-posts/$id': {
+      id: '/_authenticated/linkedin-posts/$id'
+      path: '/$id'
+      fullPath: '/linkedin-posts/$id'
+      preLoaderRoute: typeof AuthenticatedLinkedinPostsIdRouteImport
+      parentRoute: typeof AuthenticatedLinkedinPostsRoute
+    }
     '/_authenticated/create_/carousel': {
       id: '/_authenticated/create_/carousel'
       path: '/create/carousel'
@@ -634,11 +654,13 @@ const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
 interface AuthenticatedLinkedinPostsRouteChildren {
+  AuthenticatedLinkedinPostsIdRoute: typeof AuthenticatedLinkedinPostsIdRoute
   AuthenticatedLinkedinPostsNewRoute: typeof AuthenticatedLinkedinPostsNewRoute
 }
 
 const AuthenticatedLinkedinPostsRouteChildren: AuthenticatedLinkedinPostsRouteChildren =
   {
+    AuthenticatedLinkedinPostsIdRoute: AuthenticatedLinkedinPostsIdRoute,
     AuthenticatedLinkedinPostsNewRoute: AuthenticatedLinkedinPostsNewRoute,
   }
 
