@@ -321,33 +321,11 @@ function ModuleCounts() {
 }
 
 function RecentProjectCard({ project }: { project: { id: string; title: string; content_type: string | null } }) {
-  const qc = useQueryClient();
+  const deleteProject = useProjectDelete();
   async function del(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    const ok = await confirmDialog({
-      title: "Delete this project?",
-      description: `"${project.title}" will be permanently removed.`,
-      confirmText: "Delete",
-      tone: "destructive",
-    });
-    if (!ok) return;
-    const { error } = await supabase.from("projects").delete().eq("id", project.id);
-    if (error) {
-      toast.error("Couldn't delete", { description: error.message });
-      return;
-    }
-    toast.success("Project deleted");
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: ["recent-projects"] }),
-      qc.invalidateQueries({ queryKey: ["stats"] }),
-      qc.invalidateQueries({ queryKey: ["module-counts"] }),
-      qc.invalidateQueries({ queryKey: ["projects-section"] }),
-      qc.invalidateQueries({ queryKey: ["admin-recent-projects"] }),
-      qc.invalidateQueries({ queryKey: ["admin-stats"] }),
-      qc.invalidateQueries({ queryKey: ["images-library"] }),
-      qc.invalidateQueries({ queryKey: ["carousels"] }),
-    ]);
+    await deleteProject({ id: project.id, title: project.title });
   }
   return (
     <div className="relative group">
