@@ -388,3 +388,23 @@ function CreditsChip() {
     </Link>
   );
 }
+
+function PlanPill() {
+  const { data: access } = useAccess();
+  if (!access) return null;
+  const unlimited = access.unlimited;
+  const planName = unlimited ? "Unlimited Plan" : "Creator Plan";
+  return (
+    <Link
+      to="/pricing"
+      className={`inline-flex items-center gap-1.5 self-start rounded-full px-2 py-0.5 text-[10.5px] font-medium border transition ${
+        unlimited
+          ? "border-amber-500/30 bg-amber-500/[0.08] text-amber-200 hover:bg-amber-500/[0.14]"
+          : "border-border/60 bg-white/[0.03] text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+      }`}
+    >
+      <Crown className={`w-3 h-3 ${unlimited ? "text-amber-300" : "text-muted-foreground"}`} />
+      <span>{planName}</span>
+    </Link>
+  );
+}
