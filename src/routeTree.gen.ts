@@ -21,6 +21,7 @@ import { Route as AuthenticatedVideosRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedThumbnailsRouteImport } from './routes/_authenticated/thumbnails'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedPricingRouteImport } from './routes/_authenticated/pricing'
+import { Route as AuthenticatedLinkedinPostsRouteImport } from './routes/_authenticated/linkedin-posts'
 import { Route as AuthenticatedInvoicesRouteImport } from './routes/_authenticated/invoices'
 import { Route as AuthenticatedImagesRouteImport } from './routes/_authenticated/images'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -31,11 +32,14 @@ import { Route as AuthenticatedCaptionsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticated/billing'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
+import { Route as AuthenticatedLinkedinPostsNewRouteImport } from './routes/_authenticated/linkedin-posts.new'
+import { Route as AuthenticatedLinkedinPostsIdRouteImport } from './routes/_authenticated/linkedin-posts.$id'
 import { Route as AuthenticatedCreateCarouselRouteImport } from './routes/_authenticated/create_.carousel'
 import { Route as AuthenticatedAdminWebhooksRouteImport } from './routes/_authenticated/admin.webhooks'
 import { Route as AuthenticatedAdminIntegrationsRouteImport } from './routes/_authenticated/admin.integrations'
 import { Route as ApiPublicWebhooksRazorpayRouteImport } from './routes/api/public/webhooks/razorpay'
 import { Route as ApiPublicHooksPublishScheduledRouteImport } from './routes/api/public/hooks/publish-scheduled'
+import { Route as AuthenticatedLinkedinPostsIdEditRouteImport } from './routes/_authenticated/linkedin-posts.$id.edit'
 import { Route as ApiPublicOauthPlatformCallbackRouteImport } from './routes/api/public/oauth/$platform.callback'
 
 const ContactRoute = ContactRouteImport.update({
@@ -97,6 +101,12 @@ const AuthenticatedPricingRoute = AuthenticatedPricingRouteImport.update({
   path: '/pricing',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedLinkedinPostsRoute =
+  AuthenticatedLinkedinPostsRouteImport.update({
+    id: '/linkedin-posts',
+    path: '/linkedin-posts',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedInvoicesRoute = AuthenticatedInvoicesRouteImport.update({
   id: '/invoices',
   path: '/invoices',
@@ -148,6 +158,18 @@ const AuthenticatedProjectsIdRoute = AuthenticatedProjectsIdRouteImport.update({
   path: '/projects/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedLinkedinPostsNewRoute =
+  AuthenticatedLinkedinPostsNewRouteImport.update({
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => AuthenticatedLinkedinPostsRoute,
+  } as any)
+const AuthenticatedLinkedinPostsIdRoute =
+  AuthenticatedLinkedinPostsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedLinkedinPostsRoute,
+  } as any)
 const AuthenticatedCreateCarouselRoute =
   AuthenticatedCreateCarouselRouteImport.update({
     id: '/create_/carousel',
@@ -178,6 +200,12 @@ const ApiPublicHooksPublishScheduledRoute =
     path: '/api/public/hooks/publish-scheduled',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AuthenticatedLinkedinPostsIdEditRoute =
+  AuthenticatedLinkedinPostsIdEditRouteImport.update({
+    id: '/edit',
+    path: '/edit',
+    getParentRoute: () => AuthenticatedLinkedinPostsIdRoute,
+  } as any)
 const ApiPublicOauthPlatformCallbackRoute =
   ApiPublicOauthPlatformCallbackRouteImport.update({
     id: '/api/public/oauth/$platform/callback',
@@ -199,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/images': typeof AuthenticatedImagesRoute
   '/invoices': typeof AuthenticatedInvoicesRoute
+  '/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
   '/pricing': typeof AuthenticatedPricingRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/thumbnails': typeof AuthenticatedThumbnailsRoute
@@ -209,7 +238,10 @@ export interface FileRoutesByFullPath {
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
+  '/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
+  '/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
   '/api/public/oauth/$platform/callback': typeof ApiPublicOauthPlatformCallbackRoute
@@ -228,6 +260,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/images': typeof AuthenticatedImagesRoute
   '/invoices': typeof AuthenticatedInvoicesRoute
+  '/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
   '/pricing': typeof AuthenticatedPricingRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/thumbnails': typeof AuthenticatedThumbnailsRoute
@@ -238,7 +271,10 @@ export interface FileRoutesByTo {
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
+  '/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
+  '/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
   '/api/public/oauth/$platform/callback': typeof ApiPublicOauthPlatformCallbackRoute
@@ -259,6 +295,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/images': typeof AuthenticatedImagesRoute
   '/_authenticated/invoices': typeof AuthenticatedInvoicesRoute
+  '/_authenticated/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
   '/_authenticated/pricing': typeof AuthenticatedPricingRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/thumbnails': typeof AuthenticatedThumbnailsRoute
@@ -269,7 +306,10 @@ export interface FileRoutesById {
   '/_authenticated/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/_authenticated/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/_authenticated/create_/carousel': typeof AuthenticatedCreateCarouselRoute
+  '/_authenticated/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
+  '/_authenticated/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/_authenticated/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
   '/api/public/oauth/$platform/callback': typeof ApiPublicOauthPlatformCallbackRoute
@@ -290,6 +330,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/images'
     | '/invoices'
+    | '/linkedin-posts'
     | '/pricing'
     | '/settings'
     | '/thumbnails'
@@ -300,7 +341,10 @@ export interface FileRouteTypes {
     | '/admin/integrations'
     | '/admin/webhooks'
     | '/create/carousel'
+    | '/linkedin-posts/$id'
+    | '/linkedin-posts/new'
     | '/projects/$id'
+    | '/linkedin-posts/$id/edit'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/webhooks/razorpay'
     | '/api/public/oauth/$platform/callback'
@@ -319,6 +363,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/images'
     | '/invoices'
+    | '/linkedin-posts'
     | '/pricing'
     | '/settings'
     | '/thumbnails'
@@ -329,7 +374,10 @@ export interface FileRouteTypes {
     | '/admin/integrations'
     | '/admin/webhooks'
     | '/create/carousel'
+    | '/linkedin-posts/$id'
+    | '/linkedin-posts/new'
     | '/projects/$id'
+    | '/linkedin-posts/$id/edit'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/webhooks/razorpay'
     | '/api/public/oauth/$platform/callback'
@@ -349,6 +397,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/images'
     | '/_authenticated/invoices'
+    | '/_authenticated/linkedin-posts'
     | '/_authenticated/pricing'
     | '/_authenticated/settings'
     | '/_authenticated/thumbnails'
@@ -359,7 +408,10 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/integrations'
     | '/_authenticated/admin/webhooks'
     | '/_authenticated/create_/carousel'
+    | '/_authenticated/linkedin-posts/$id'
+    | '/_authenticated/linkedin-posts/new'
     | '/_authenticated/projects/$id'
+    | '/_authenticated/linkedin-posts/$id/edit'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/webhooks/razorpay'
     | '/api/public/oauth/$platform/callback'
@@ -465,6 +517,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPricingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/linkedin-posts': {
+      id: '/_authenticated/linkedin-posts'
+      path: '/linkedin-posts'
+      fullPath: '/linkedin-posts'
+      preLoaderRoute: typeof AuthenticatedLinkedinPostsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/invoices': {
       id: '/_authenticated/invoices'
       path: '/invoices'
@@ -535,6 +594,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/linkedin-posts/new': {
+      id: '/_authenticated/linkedin-posts/new'
+      path: '/new'
+      fullPath: '/linkedin-posts/new'
+      preLoaderRoute: typeof AuthenticatedLinkedinPostsNewRouteImport
+      parentRoute: typeof AuthenticatedLinkedinPostsRoute
+    }
+    '/_authenticated/linkedin-posts/$id': {
+      id: '/_authenticated/linkedin-posts/$id'
+      path: '/$id'
+      fullPath: '/linkedin-posts/$id'
+      preLoaderRoute: typeof AuthenticatedLinkedinPostsIdRouteImport
+      parentRoute: typeof AuthenticatedLinkedinPostsRoute
+    }
     '/_authenticated/create_/carousel': {
       id: '/_authenticated/create_/carousel'
       path: '/create/carousel'
@@ -570,6 +643,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPublishScheduledRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/linkedin-posts/$id/edit': {
+      id: '/_authenticated/linkedin-posts/$id/edit'
+      path: '/edit'
+      fullPath: '/linkedin-posts/$id/edit'
+      preLoaderRoute: typeof AuthenticatedLinkedinPostsIdEditRouteImport
+      parentRoute: typeof AuthenticatedLinkedinPostsIdRoute
+    }
     '/api/public/oauth/$platform/callback': {
       id: '/api/public/oauth/$platform/callback'
       path: '/api/public/oauth/$platform/callback'
@@ -593,6 +673,38 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
 const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
+interface AuthenticatedLinkedinPostsIdRouteChildren {
+  AuthenticatedLinkedinPostsIdEditRoute: typeof AuthenticatedLinkedinPostsIdEditRoute
+}
+
+const AuthenticatedLinkedinPostsIdRouteChildren: AuthenticatedLinkedinPostsIdRouteChildren =
+  {
+    AuthenticatedLinkedinPostsIdEditRoute:
+      AuthenticatedLinkedinPostsIdEditRoute,
+  }
+
+const AuthenticatedLinkedinPostsIdRouteWithChildren =
+  AuthenticatedLinkedinPostsIdRoute._addFileChildren(
+    AuthenticatedLinkedinPostsIdRouteChildren,
+  )
+
+interface AuthenticatedLinkedinPostsRouteChildren {
+  AuthenticatedLinkedinPostsIdRoute: typeof AuthenticatedLinkedinPostsIdRouteWithChildren
+  AuthenticatedLinkedinPostsNewRoute: typeof AuthenticatedLinkedinPostsNewRoute
+}
+
+const AuthenticatedLinkedinPostsRouteChildren: AuthenticatedLinkedinPostsRouteChildren =
+  {
+    AuthenticatedLinkedinPostsIdRoute:
+      AuthenticatedLinkedinPostsIdRouteWithChildren,
+    AuthenticatedLinkedinPostsNewRoute: AuthenticatedLinkedinPostsNewRoute,
+  }
+
+const AuthenticatedLinkedinPostsRouteWithChildren =
+  AuthenticatedLinkedinPostsRoute._addFileChildren(
+    AuthenticatedLinkedinPostsRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedBillingRoute: typeof AuthenticatedBillingRoute
@@ -603,6 +715,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedImagesRoute: typeof AuthenticatedImagesRoute
   AuthenticatedInvoicesRoute: typeof AuthenticatedInvoicesRoute
+  AuthenticatedLinkedinPostsRoute: typeof AuthenticatedLinkedinPostsRouteWithChildren
   AuthenticatedPricingRoute: typeof AuthenticatedPricingRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedThumbnailsRoute: typeof AuthenticatedThumbnailsRoute
@@ -621,6 +734,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedImagesRoute: AuthenticatedImagesRoute,
   AuthenticatedInvoicesRoute: AuthenticatedInvoicesRoute,
+  AuthenticatedLinkedinPostsRoute: AuthenticatedLinkedinPostsRouteWithChildren,
   AuthenticatedPricingRoute: AuthenticatedPricingRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedThumbnailsRoute: AuthenticatedThumbnailsRoute,

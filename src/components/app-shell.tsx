@@ -2,8 +2,8 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
-  Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug,
-  ChevronLeft, ChevronRight,
+  Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug, Linkedin,
+  ChevronLeft,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -59,6 +59,7 @@ const SECTIONS: readonly NavSection[] = [
     label: "Publishing",
     items: [
       { to: "/connections", label: "Connections", icon: Plug },
+      { to: "/linkedin-posts", label: "LinkedIn Posts", icon: Linkedin, moduleId: "linkedin" },
     ],
   },
   {
@@ -95,7 +96,7 @@ function useModuleCounts() {
       const { data, error } = await supabase.from("projects").select("content_type");
       if (error) throw error;
       const counts: Record<ModuleId, number> = {
-        videos: 0, carousels: 0, images: 0, thumbnails: 0, captions: 0,
+        videos: 0, carousels: 0, images: 0, thumbnails: 0, captions: 0, linkedin: 0,
       };
       const inv: Record<string, ModuleId> = {};
       (Object.keys(MODULE_CONTENT_TYPES) as ModuleId[]).forEach((m) => {
