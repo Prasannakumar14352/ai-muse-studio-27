@@ -185,6 +185,10 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
           <option value="dark">Dark</option>
           <option value="light">Light</option>
         </select>
+        <button onClick={downloadAll} disabled={busy}
+          className="rounded-lg border border-border/60 px-3 py-1.5 text-xs inline-flex items-center gap-1 hover:bg-white/5">
+          <Package className="w-3.5 h-3.5" /> Download all (ZIP)
+        </button>
         <button onClick={exportPdf} disabled={busy}
           className="rounded-lg border border-border/60 px-3 py-1.5 text-xs inline-flex items-center gap-1 hover:bg-white/5">
           <FileDown className="w-3.5 h-3.5" /> Export PDF
@@ -192,20 +196,45 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
       </div>
 
       <div className="grid lg:grid-cols-[280px_1fr_320px] gap-4">
-        {/* Reorder rail */}
+        {/* Reorder rail — drag the handle to reorder */}
         <div className="glass rounded-2xl p-3 space-y-2 max-h-[70vh] overflow-auto">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-1 pb-1">Drag <GripVertical className="w-3 h-3 inline -mt-0.5" /> to reorder · autosaves</div>
           {state.slides.map((s, i) => (
-            <div key={s.id} className={`rounded-lg p-2 border cursor-pointer ${active === i ? "border-[color:var(--brand-orange)] bg-white/5" : "border-border/40 hover:bg-white/5"}`}
-              onClick={() => setActive(i)}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{s.kind} · {i + 1}</span>
+            <div
+              key={s.id}
+              onClick={() => setActive(i)}
+              onDragOver={(e) => { e.preventDefault(); if (dragOver !== i) setDragOver(i); }}
+              onDragLeave={() => { if (dragOver === i) setDragOver(null); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragFrom !== null) reorder(dragFrom, i);
+                setDragFrom(null); setDragOver(null);
+              }}
+              className={`rounded-lg p-2 border cursor-pointer transition-colors ${
+                active === i ? "border-[color:var(--brand-orange)] bg-white/5" : "border-border/40 hover:bg-white/5"
+              } ${dragOver === i && dragFrom !== null && dragFrom !== i ? "ring-2 ring-[color:var(--brand-orange)]/60" : ""} ${
+                dragFrom === i ? "opacity-40" : ""
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <button
+                  draggable
+                  onDragStart={(e) => { setDragFrom(i); e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", String(i)); } catch { /* noop */ } }}
+                  onDragEnd={() => { setDragFrom(null); setDragOver(null); }}
+                  onClick={(e) => e.stopPropagation()}
+                  title="Drag to reorder"
+                  className="p-1 rounded hover:bg-white/10 cursor-grab active:cursor-grabbing text-muted-foreground"
+                >
+                  <GripVertical className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground flex-1">{s.kind} · {i + 1}</span>
                 <div className="flex items-center gap-1">
                   <button onClick={(e) => { e.stopPropagation(); move(i, -1); }} className="p-1 hover:bg-white/10 rounded" title="Move up"><ArrowUp className="w-3 h-3" /></button>
                   <button onClick={(e) => { e.stopPropagation(); move(i, 1); }} className="p-1 hover:bg-white/10 rounded" title="Move down"><ArrowDown className="w-3 h-3" /></button>
                   <button onClick={(e) => { e.stopPropagation(); del(i); }} className="p-1 hover:bg-white/10 rounded text-rose-300" title="Delete"><Trash2 className="w-3 h-3" /></button>
                 </div>
               </div>
-              <p className="text-xs font-medium line-clamp-2">{s.title}</p>
+              <p className="text-xs font-medium line-clamp-2 pl-6">{s.title}</p>
             </div>
           ))}
           <div className="flex gap-1 pt-1">
