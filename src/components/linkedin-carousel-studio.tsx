@@ -1,0 +1,357 @@
+// LinkedIn Document Carousel Studio — render, edit, reorder, download, PDF export.
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { toPng } from "html-to-image";
+import { jsPDF } from "jspdf";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  generateLinkedinCarousel,
+  type LinkedinCarouselContent,
+  type LinkedinCarouselSlide,
+} from "@/lib/linkedin-carousel-ai.functions";
+import { ArrowDown, ArrowUp, Copy, Download, FileDown, Plus, Trash2, Wand2 } from "lucide-react";
+
+// LinkedIn document carousels display best at portrait ~4:5 (1080x1350).
+const SLIDE_W = 1080;
+const SLIDE_H = 1350;
+
+type Props = {
+  initial?: LinkedinCarouselContent | null;
+  topic: string;
+  audience?: string;
+  tone?: string;
+  body?: string;
+  brand?: string;
+  cta?: string;
+  onChange?: (content: LinkedinCarouselContent) => void;
+};
+
+function newSlide(kind: LinkedinCarouselSlide["kind"] = "content"): LinkedinCarouselSlide {
+  const id = Math.random().toString(36).slice(2, 9);
+  if (kind === "cover") return { id, kind, eyebrow: "Insight", title: "New cover title", body: "One-line sub-hook.", footer: "Swipe →" };
+  if (kind === "cta") return { id, kind, title: "Follow for more like this.", body: "Save this post.", footer: "" };
+  return { id, kind, eyebrow: "01 / N", title: "New point", bullets: ["Bullet one", "Bullet two"] };
+}
+
+export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, brand, cta, onChange }: Props) {
+  const run = useServerFn(generateLinkedinCarousel);
+  const [busy, setBusy] = useState(false);
+  const [state, setState] = useState<LinkedinCarouselContent>(
+    initial ?? { slides: [newSlide("cover"), newSlide("content"), newSlide("cta")], design: { palette: ["#0A66C2", "#F3F6F8", "#111827"], theme: "dark" } },
+  );
+  const [active, setActive] = useState(0);
+  const [slideCount, setSlideCount] = useState(8);
+  const refs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  function update(next: LinkedinCarouselContent) {
+    setState(next);
+    onChange?.(next);
+  }
+
+  async function regenerate() {
+    setBusy(true);
+    try {
+      const res = await run({
+        data: {
+          topic, audience: audience ?? "", tone: tone ?? "Professional", body: body ?? "",
+          slide_count: slideCount, brand: brand ?? "", cta: cta ?? "", theme: state.design.theme,
+        },
+      });
+      update(res.content);
+      setActive(0);
+      if (res.mode === "demo") toast.message("Draft carousel shown", { description: res.safeError });
+      else toast.success("Carousel generated");
+    } catch (e) {
+      toast.error("Couldn't generate", { description: e instanceof Error ? e.message : undefined });
+    } finally { setBusy(false); }
+  }
+
+  function patchSlide(idx: number, patch: Partial<LinkedinCarouselSlide>) {
+    const slides = state.slides.slice();
+    slides[idx] = { ...slides[idx], ...patch };
+    update({ ...state, slides });
+  }
+  function move(idx: number, dir: -1 | 1) {
+    const j = idx + dir;
+    if (j < 0 || j >= state.slides.length) return;
+    const slides = state.slides.slice();
+    [slides[idx], slides[j]] = [slides[j], slides[idx]];
+    update({ ...state, slides });
+    setActive(j);
+  }
+  function del(idx: number) {
+    if (state.slides.length <= 2) return toast.error("Keep at least 2 slides");
+    const slides = state.slides.slice(); slides.splice(idx, 1);
+    update({ ...state, slides }); setActive(Math.max(0, idx - 1));
+  }
+  function add(after: number, kind: LinkedinCarouselSlide["kind"] = "content") {
+    const slides = state.slides.slice();
+    slides.splice(after + 1, 0, newSlide(kind));
+    update({ ...state, slides }); setActive(after + 1);
+  }
+
+  async function captureSlide(id: string): Promise<string | null> {
+    const node = refs.current[id];
+    if (!node) return null;
+    return await toPng(node, { pixelRatio: 1, cacheBust: true, width: SLIDE_W, height: SLIDE_H });
+  }
+
+  async function downloadOne(idx: number) {
+    const s = state.slides[idx];
+    try {
+      const dataUrl = await captureSlide(s.id);
+      if (!dataUrl) throw new Error("Slide not rendered");
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `linkedin-slide-${String(idx + 1).padStart(2, "0")}.png`;
+      a.click();
+    } catch (e) {
+      toast.error("Download failed", { description: e instanceof Error ? e.message : undefined });
+    }
+  }
+
+  async function exportPdf() {
+    setBusy(true);
+    try {
+      const pdf = new jsPDF({ unit: "px", format: [SLIDE_W, SLIDE_H], orientation: "portrait" });
+      for (let i = 0; i < state.slides.length; i++) {
+        const dataUrl = await captureSlide(state.slides[i].id);
+        if (!dataUrl) continue;
+        if (i > 0) pdf.addPage([SLIDE_W, SLIDE_H], "portrait");
+        pdf.addImage(dataUrl, "PNG", 0, 0, SLIDE_W, SLIDE_H, undefined, "FAST");
+      }
+      pdf.save(`linkedin-carousel-${Date.now()}.pdf`);
+      toast.success("PDF exported");
+    } catch (e) {
+      toast.error("PDF export failed", { description: e instanceof Error ? e.message : undefined });
+    } finally { setBusy(false); }
+  }
+
+  const cur = state.slides[active];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={regenerate} disabled={busy || !topic}
+          className="rounded-lg gradient-primary text-white px-3 py-1.5 text-xs inline-flex items-center gap-1 shadow-[var(--shadow-glow)] disabled:opacity-60">
+          <Wand2 className="w-3.5 h-3.5" /> {busy ? "Working…" : (state.slides.length ? "Regenerate with AI" : "Generate with AI")}
+        </button>
+        <label className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+          Slides
+          <input type="number" min={4} max={12} value={slideCount}
+            onChange={(e) => setSlideCount(Math.min(12, Math.max(4, Number(e.target.value) || 8)))}
+            className="w-16 bg-input/50 border border-border rounded px-2 py-1 text-xs" />
+        </label>
+        <div className="flex-1" />
+        <select
+          value={state.design.theme}
+          onChange={(e) => update({ ...state, design: { ...state.design, theme: e.target.value as "light" | "dark" } })}
+          className="bg-input/50 border border-border rounded px-2 py-1 text-xs"
+        >
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+        </select>
+        <button onClick={exportPdf} disabled={busy}
+          className="rounded-lg border border-border/60 px-3 py-1.5 text-xs inline-flex items-center gap-1 hover:bg-white/5">
+          <FileDown className="w-3.5 h-3.5" /> Export PDF
+        </button>
+      </div>
+
+      <div className="grid lg:grid-cols-[280px_1fr_320px] gap-4">
+        {/* Reorder rail */}
+        <div className="glass rounded-2xl p-3 space-y-2 max-h-[70vh] overflow-auto">
+          {state.slides.map((s, i) => (
+            <div key={s.id} className={`rounded-lg p-2 border cursor-pointer ${active === i ? "border-[color:var(--brand-orange)] bg-white/5" : "border-border/40 hover:bg-white/5"}`}
+              onClick={() => setActive(i)}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{s.kind} · {i + 1}</span>
+                <div className="flex items-center gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); move(i, -1); }} className="p-1 hover:bg-white/10 rounded" title="Move up"><ArrowUp className="w-3 h-3" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); move(i, 1); }} className="p-1 hover:bg-white/10 rounded" title="Move down"><ArrowDown className="w-3 h-3" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); del(i); }} className="p-1 hover:bg-white/10 rounded text-rose-300" title="Delete"><Trash2 className="w-3 h-3" /></button>
+                </div>
+              </div>
+              <p className="text-xs font-medium line-clamp-2">{s.title}</p>
+            </div>
+          ))}
+          <div className="flex gap-1 pt-1">
+            <button onClick={() => add(state.slides.length - 1, "content")} className="flex-1 text-xs rounded border border-dashed border-border/60 py-1.5 inline-flex items-center justify-center gap-1 hover:bg-white/5"><Plus className="w-3 h-3" /> Content</button>
+            <button onClick={() => add(state.slides.length - 1, "cta")} className="flex-1 text-xs rounded border border-dashed border-border/60 py-1.5 hover:bg-white/5">+ CTA</button>
+          </div>
+        </div>
+
+        {/* Canvas */}
+        <div className="glass rounded-2xl p-4 flex items-center justify-center overflow-auto">
+          <div className="relative" style={{ width: SLIDE_W / 3, height: SLIDE_H / 3 }}>
+            <div
+              className="absolute top-0 left-0 origin-top-left"
+              style={{ transform: "scale(0.3333)", width: SLIDE_W, height: SLIDE_H }}
+            >
+              {state.slides.map((s, i) => (
+                <div key={s.id} style={{ display: i === active ? "block" : "none" }}>
+                  <SlideCanvas
+                    slide={s}
+                    theme={state.design.theme}
+                    palette={state.design.palette}
+                    slideNum={i + 1}
+                    total={state.slides.length}
+                    innerRef={(el) => { refs.current[s.id] = el; }}
+                  />
+                </div>
+              ))}
+              {/* Off-screen render for capture-any-slide */}
+              <div style={{ position: "absolute", left: -99999, top: 0 }}>
+                {state.slides.map((s, i) => (
+                  i === active ? null : (
+                    <SlideCanvas
+                      key={s.id}
+                      slide={s}
+                      theme={state.design.theme}
+                      palette={state.design.palette}
+                      slideNum={i + 1}
+                      total={state.slides.length}
+                      innerRef={(el) => { refs.current[s.id] = el; }}
+                    />
+                  )
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Editor */}
+        <div className="glass rounded-2xl p-4 space-y-3 max-h-[70vh] overflow-auto">
+          <div className="flex items-center justify-between">
+            <span className="text-xs uppercase tracking-wide text-muted-foreground">Edit slide {active + 1}</span>
+            <button onClick={() => downloadOne(active)} className="text-xs inline-flex items-center gap-1 hover:text-foreground text-muted-foreground">
+              <Download className="w-3.5 h-3.5" /> PNG
+            </button>
+          </div>
+          <TextField label="Eyebrow" value={cur.eyebrow ?? ""} onChange={(v) => patchSlide(active, { eyebrow: v })} />
+          <TextField label="Title" value={cur.title} onChange={(v) => patchSlide(active, { title: v })} multiline />
+          <TextField label="Body" value={cur.body ?? ""} onChange={(v) => patchSlide(active, { body: v })} multiline />
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1.5">Bullets</div>
+            <textarea
+              rows={4}
+              value={(cur.bullets ?? []).join("\n")}
+              onChange={(e) => patchSlide(active, { bullets: e.target.value.split("\n").filter(Boolean) })}
+              placeholder="One bullet per line"
+              className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-xs"
+            />
+          </div>
+          <TextField label="Footer" value={cur.footer ?? ""} onChange={(v) => patchSlide(active, { footer: v })} />
+          <div className="pt-2 border-t border-border/40">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1.5">Palette</div>
+            <div className="flex gap-2">
+              {state.design.palette.map((c, i) => (
+                <input key={i} type="color" value={c}
+                  onChange={(e) => {
+                    const palette = state.design.palette.slice();
+                    palette[i] = e.target.value;
+                    update({ ...state, design: { ...state.design, palette } });
+                  }}
+                  className="w-8 h-8 rounded cursor-pointer bg-transparent border border-border/60"
+                />
+              ))}
+            </div>
+          </div>
+          <button
+            onClick={() => { navigator.clipboard.writeText(JSON.stringify(state, null, 2)); toast.success("Copied JSON"); }}
+            className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+          >
+            <Copy className="w-3.5 h-3.5" /> Copy carousel JSON
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TextField({ label, value, onChange, multiline }: { label: string; value: string; onChange: (v: string) => void; multiline?: boolean }) {
+  return (
+    <label className="block">
+      <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1.5">{label}</div>
+      {multiline ? (
+        <textarea rows={3} value={value} onChange={(e) => onChange(e.target.value)}
+          className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-xs" />
+      ) : (
+        <input value={value} onChange={(e) => onChange(e.target.value)}
+          className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-xs" />
+      )}
+    </label>
+  );
+}
+
+function SlideCanvas({
+  slide, theme, palette, slideNum, total, innerRef,
+}: {
+  slide: LinkedinCarouselSlide;
+  theme: "light" | "dark";
+  palette: string[];
+  slideNum: number;
+  total: number;
+  innerRef: (el: HTMLDivElement | null) => void;
+}) {
+  const isDark = theme === "dark";
+  const accent = palette[0] ?? "#0A66C2";
+  const surface = palette[2] ?? (isDark ? "#0B1220" : "#F3F6F8");
+  const ink = isDark ? "#F8FAFC" : "#0B1220";
+  const sub = isDark ? "rgba(248,250,252,0.72)" : "rgba(11,18,32,0.72)";
+  const bg = isDark
+    ? `radial-gradient(circle at 12% 8%, ${accent}33 0%, transparent 55%), linear-gradient(180deg, ${surface} 0%, #05070d 100%)`
+    : `radial-gradient(circle at 12% 8%, ${accent}22 0%, transparent 55%), linear-gradient(180deg, #ffffff 0%, ${surface} 100%)`;
+
+  return (
+    <div
+      ref={innerRef}
+      style={{
+        width: SLIDE_W, height: SLIDE_H,
+        padding: 96,
+        background: bg,
+        color: ink,
+        fontFamily: "Inter, system-ui, sans-serif",
+        position: "relative", boxSizing: "border-box",
+        display: "flex", flexDirection: "column",
+      }}
+    >
+      {slide.eyebrow && (
+        <div style={{ fontSize: 26, letterSpacing: 4, textTransform: "uppercase", color: accent, fontWeight: 600 }}>
+          {slide.eyebrow}
+        </div>
+      )}
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: slide.kind === "cover" ? "flex-end" : "center", paddingTop: 40, paddingBottom: 40 }}>
+        <h1 style={{
+          fontSize: slide.kind === "cover" ? 96 : 68,
+          lineHeight: 1.05, fontWeight: 800, letterSpacing: -1,
+          margin: 0, color: ink,
+        }}>
+          {slide.title}
+        </h1>
+        {slide.body && (
+          <p style={{ fontSize: 32, lineHeight: 1.35, color: sub, marginTop: 28, maxWidth: 820 }}>
+            {slide.body}
+          </p>
+        )}
+        {slide.bullets && slide.bullets.length > 0 && (
+          <ul style={{ listStyle: "none", padding: 0, margin: "36px 0 0", display: "flex", flexDirection: "column", gap: 20 }}>
+            {slide.bullets.map((b, i) => (
+              <li key={i} style={{ fontSize: 30, lineHeight: 1.4, color: sub, display: "flex", gap: 20, alignItems: "flex-start" }}>
+                <span style={{ display: "inline-block", width: 14, height: 14, borderRadius: 999, background: accent, marginTop: 14, flexShrink: 0 }} />
+                <span>{b}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 22, color: sub }}>
+        <span>{slide.footer || ""}</span>
+        <span>{String(slideNum).padStart(2, "0")} / {String(total).padStart(2, "0")}</span>
+      </div>
+
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 8, background: accent }} />
+    </div>
+  );
+}
