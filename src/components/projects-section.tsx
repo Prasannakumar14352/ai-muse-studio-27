@@ -70,6 +70,10 @@ export function ProjectsSection({
     await qc.invalidateQueries({ queryKey: ["recent-projects"] });
     await qc.invalidateQueries({ queryKey: ["module-counts"] });
     await qc.invalidateQueries({ queryKey: ["stats"] });
+    await qc.invalidateQueries({ queryKey: ["admin-recent-projects"] });
+    await qc.invalidateQueries({ queryKey: ["admin-stats"] });
+    await qc.invalidateQueries({ queryKey: ["images-library"] });
+    await qc.invalidateQueries({ queryKey: ["carousels"] });
   }
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
