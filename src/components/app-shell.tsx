@@ -239,11 +239,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             type="button"
             onClick={toggleCollapse}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-pressed={collapsed}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="absolute -right-3 top-6 z-10 h-7 w-7 rounded-full border border-border/60 bg-background/95 backdrop-blur text-muted-foreground shadow-md flex items-center justify-center transition-all duration-200 hover:text-foreground hover:scale-110 hover:border-[color:var(--brand-orange)]/50 hover:shadow-[0_0_16px_-2px_oklch(0.68_0.19_55/0.55)]"
+            className="group absolute -right-3 top-6 z-10 h-7 w-7 rounded-full border border-border/60 bg-background/95 backdrop-blur text-muted-foreground shadow-md flex items-center justify-center transition-all duration-300 ease-out hover:text-foreground hover:scale-110 hover:border-[color:var(--brand-orange)]/60 hover:shadow-[0_0_18px_-2px_oklch(0.68_0.19_55/0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--brand-orange)]/60 active:scale-95"
           >
-            {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+            <ChevronLeft
+              className={`w-3.5 h-3.5 transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                collapsed ? "rotate-180" : "rotate-0"
+              }`}
+            />
           </button>
+
         </div>
 
 
