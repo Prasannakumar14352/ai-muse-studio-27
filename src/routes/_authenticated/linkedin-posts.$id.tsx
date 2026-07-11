@@ -74,7 +74,7 @@ function LinkedinPostViewPage() {
       topic: data.topic, audience: data.audience, tone: data.tone,
       content_type: "linkedin_post", format: "text",
       status: "draft", publish_status: "unpublished",
-      metadata: data.metadata ?? {},
+      metadata: (data.metadata ?? {}) as never,
     }).select("id").single();
     if (error) return toast.error(error.message);
     toast.success("Duplicated");
