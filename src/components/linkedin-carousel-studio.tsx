@@ -83,6 +83,14 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
     update({ ...state, slides });
     setActive(j);
   }
+  function reorder(from: number, to: number) {
+    if (from === to || from < 0 || to < 0 || from >= state.slides.length || to >= state.slides.length) return;
+    const slides = state.slides.slice();
+    const [moved] = slides.splice(from, 1);
+    slides.splice(to, 0, moved);
+    update({ ...state, slides });
+    setActive(to);
+  }
   function del(idx: number) {
     if (state.slides.length <= 2) return toast.error("Keep at least 2 slides");
     const slides = state.slides.slice(); slides.splice(idx, 1);
