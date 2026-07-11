@@ -226,6 +226,33 @@ export type Database = {
           },
         ]
       }
+      oauth_states: {
+        Row: {
+          code_verifier: string | null
+          created_at: string
+          platform: string
+          redirect_to: string | null
+          state: string
+          user_id: string
+        }
+        Insert: {
+          code_verifier?: string | null
+          created_at?: string
+          platform: string
+          redirect_to?: string | null
+          state: string
+          user_id: string
+        }
+        Update: {
+          code_verifier?: string | null
+          created_at?: string
+          platform?: string
+          redirect_to?: string | null
+          state?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount_cents: number
@@ -276,38 +303,62 @@ export type Database = {
       }
       platform_connections: {
         Row: {
+          access_token_encrypted: string | null
           account_id: string | null
           account_label: string | null
+          avatar_url: string | null
           created_at: string
+          expires_at: string | null
           id: string
+          last_error: string | null
           metadata: Json
           platform: string
+          profile_url: string | null
+          refresh_iv: string | null
+          refresh_token_encrypted: string | null
           scopes: string[]
           status: string
+          token_iv: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          access_token_encrypted?: string | null
           account_id?: string | null
           account_label?: string | null
+          avatar_url?: string | null
           created_at?: string
+          expires_at?: string | null
           id?: string
+          last_error?: string | null
           metadata?: Json
           platform: string
+          profile_url?: string | null
+          refresh_iv?: string | null
+          refresh_token_encrypted?: string | null
           scopes?: string[]
           status?: string
+          token_iv?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          access_token_encrypted?: string | null
           account_id?: string | null
           account_label?: string | null
+          avatar_url?: string | null
           created_at?: string
+          expires_at?: string | null
           id?: string
+          last_error?: string | null
           metadata?: Json
           platform?: string
+          profile_url?: string | null
+          refresh_iv?: string | null
+          refresh_token_encrypted?: string | null
           scopes?: string[]
           status?: string
+          token_iv?: string | null
           updated_at?: string
           user_id?: string
         }
