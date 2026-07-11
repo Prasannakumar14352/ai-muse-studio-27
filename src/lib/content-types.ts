@@ -6,7 +6,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Film, Zap, MessageCircleMore, Camera, Package, Layers,
-  Image as ImageIcon, Sparkles, Type, Search,
+  Image as ImageIcon, Sparkles, Type, Search, Linkedin,
 } from "lucide-react";
 
 export type ContentTypeId =
@@ -19,9 +19,10 @@ export type ContentTypeId =
   | "ai_image"
   | "thumbnail"
   | "caption_only"
-  | "seo_pack";
+  | "seo_pack"
+  | "linkedin_post";
 
-export type ModuleId = "videos" | "carousels" | "images" | "thumbnails" | "captions";
+export type ModuleId = "videos" | "carousels" | "images" | "thumbnails" | "captions" | "linkedin";
 
 export type ContentTypeMeta = {
   id: ContentTypeId;
