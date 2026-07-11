@@ -345,6 +345,8 @@ function RecentProjectCard({ project }: { project: { id: string; title: string; 
       qc.invalidateQueries({ queryKey: ["projects-section"] }),
       qc.invalidateQueries({ queryKey: ["admin-recent-projects"] }),
       qc.invalidateQueries({ queryKey: ["admin-stats"] }),
+      qc.invalidateQueries({ queryKey: ["images-library"] }),
+      qc.invalidateQueries({ queryKey: ["carousels"] }),
     ]);
   }
   return (
