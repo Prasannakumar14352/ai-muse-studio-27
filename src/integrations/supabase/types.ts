@@ -274,6 +274,45 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_connections: {
+        Row: {
+          account_id: string | null
+          account_label: string | null
+          created_at: string
+          id: string
+          metadata: Json
+          platform: string
+          scopes: string[]
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          account_label?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          platform: string
+          scopes?: string[]
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          account_label?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          platform?: string
+          scopes?: string[]
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           brand_name: string | null
@@ -419,13 +458,16 @@ export type Database = {
           format: string
           id: string
           language: string | null
+          manually_published_at: string | null
           metadata: Json
           music: string | null
           objective: string | null
           output_url: string | null
           platform: string | null
+          platform_urls: Json
           poster_url: string | null
           project_name: string | null
+          publish_status: string
           quality_report: Json | null
           status: string | null
           style: string | null
@@ -453,13 +495,16 @@ export type Database = {
           format?: string
           id?: string
           language?: string | null
+          manually_published_at?: string | null
           metadata?: Json
           music?: string | null
           objective?: string | null
           output_url?: string | null
           platform?: string | null
+          platform_urls?: Json
           poster_url?: string | null
           project_name?: string | null
+          publish_status?: string
           quality_report?: Json | null
           status?: string | null
           style?: string | null
@@ -487,13 +532,16 @@ export type Database = {
           format?: string
           id?: string
           language?: string | null
+          manually_published_at?: string | null
           metadata?: Json
           music?: string | null
           objective?: string | null
           output_url?: string | null
           platform?: string | null
+          platform_urls?: Json
           poster_url?: string | null
           project_name?: string | null
+          publish_status?: string
           quality_report?: Json | null
           status?: string | null
           style?: string | null
@@ -601,6 +649,81 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "render_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_posts: {
+        Row: {
+          attempts: number
+          caption: string | null
+          connection_id: string | null
+          created_at: string
+          external_post_id: string | null
+          external_post_url: string | null
+          hashtags: string | null
+          id: string
+          last_error: string | null
+          media_urls: Json
+          platform: string
+          project_id: string | null
+          published_at: string | null
+          scheduled_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          caption?: string | null
+          connection_id?: string | null
+          created_at?: string
+          external_post_id?: string | null
+          external_post_url?: string | null
+          hashtags?: string | null
+          id?: string
+          last_error?: string | null
+          media_urls?: Json
+          platform: string
+          project_id?: string | null
+          published_at?: string | null
+          scheduled_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          caption?: string | null
+          connection_id?: string | null
+          created_at?: string
+          external_post_id?: string | null
+          external_post_url?: string | null
+          hashtags?: string | null
+          id?: string
+          last_error?: string | null
+          media_urls?: Json
+          platform?: string
+          project_id?: string | null
+          published_at?: string | null
+          scheduled_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "platform_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
