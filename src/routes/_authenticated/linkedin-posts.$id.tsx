@@ -1,10 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Linkedin, ArrowLeft, Copy, Pencil, CheckCircle2, Copy as Dup } from "lucide-react";
 import { toast } from "sonner";
 import { buildLinkedInPost } from "@/lib/downloads";
 import { useProjectDelete } from "@/hooks/use-project-delete";
+import { LinkedinCarouselStudio } from "@/components/linkedin-carousel-studio";
+import { LinkedinImageStudio, type LinkedinImageState } from "@/components/linkedin-image-studio";
+import type { LinkedinCarouselContent } from "@/lib/linkedin-carousel-ai.functions";
 
 export const Route = createFileRoute("/_authenticated/linkedin-posts/$id")({
   component: LinkedinPostViewPage,
