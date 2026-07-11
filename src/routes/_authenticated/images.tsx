@@ -7,6 +7,7 @@ import { pushImageGenLog, listImageGenLogs } from "@/lib/local-store";
 
 import { deductUsage, useAccess, canGenerate } from "@/lib/access";
 import { supabase } from "@/integrations/supabase/client";
+import { useProjectDelete } from "@/hooks/use-project-delete";
 import { Loader2, Wand2, Download, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight, Plus, ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
@@ -235,16 +236,10 @@ function ImagesPage() {
     downloadJson(`creatorvault-image-debug-${Date.now()}.json`, debug);
   }
 
+  const deleteProject = useProjectDelete();
   async function deleteImage(id: string) {
-    const { error } = await supabase.from("projects").delete().eq("id", id);
-    if (error) { toast.error("Delete failed"); return; }
-    qc.invalidateQueries({ queryKey: ["images-library"] });
-    qc.invalidateQueries({ queryKey: ["module-counts"] });
-    qc.invalidateQueries({ queryKey: ["projects-section"] });
-    qc.invalidateQueries({ queryKey: ["recent-projects"] });
-    qc.invalidateQueries({ queryKey: ["stats"] });
-    qc.invalidateQueries({ queryKey: ["admin-recent-projects"] });
-    qc.invalidateQueries({ queryKey: ["admin-stats"] });
+    const row = results.find((r) => r.id === id);
+    await deleteProject({ id, title: row?.prompt || "Generated image" });
   }
 
   async function clearSession() {

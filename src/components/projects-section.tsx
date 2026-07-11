@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2, FolderOpen, RefreshCw, Sparkles, AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { ProjectThumbnail } from "@/components/project-thumbnail";
 import { CONTENT_TYPES_BY_ID, PROJECT_STATUSES, type ContentTypeId } from "@/lib/content-types";
-import { confirmDialog } from "@/components/confirm-dialog";
+import { useProjectDelete } from "@/hooks/use-project-delete";
 
 type Props = {
   /** Content-type values in the `projects.content_type` column. */
@@ -51,29 +51,10 @@ export function ProjectsSection({
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const qc = useQueryClient();
+  const deleteProject = useProjectDelete();
 
   async function handleDelete(id: string, title: string) {
-    const ok = await confirmDialog({
-      title: "Delete this project?",
-      description: `"${title}" will be permanently removed from your library.`,
-      confirmText: "Delete",
-      tone: "destructive",
-    });
-    if (!ok) return;
-    const { error } = await supabase.from("projects").delete().eq("id", id);
-    if (error) {
-      toast.error("Couldn't delete project", { description: error.message });
-      return;
-    }
-    toast.success("Project deleted");
-    await qc.invalidateQueries({ queryKey: ["projects-section"] });
-    await qc.invalidateQueries({ queryKey: ["recent-projects"] });
-    await qc.invalidateQueries({ queryKey: ["module-counts"] });
-    await qc.invalidateQueries({ queryKey: ["stats"] });
-    await qc.invalidateQueries({ queryKey: ["admin-recent-projects"] });
-    await qc.invalidateQueries({ queryKey: ["admin-stats"] });
-    await qc.invalidateQueries({ queryKey: ["images-library"] });
-    await qc.invalidateQueries({ queryKey: ["carousels"] });
+    await deleteProject({ id, title });
   }
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({

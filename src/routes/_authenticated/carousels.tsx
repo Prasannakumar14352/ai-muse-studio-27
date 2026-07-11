@@ -12,7 +12,7 @@ import {
 } from "@/lib/blob-store";
 import { SlideEditor } from "@/components/slide-editor";
 
-import { confirmDialog } from "@/components/confirm-dialog";
+import { useProjectDelete } from "@/hooks/use-project-delete";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
   Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2, Film, Pencil,
@@ -90,6 +90,7 @@ function CarouselsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [collapsedSlides, setCollapsedSlides] = useState<Record<string, boolean>>({});
   const [editingSlide, setEditingSlide] = useState<{ rowId: string; idx: number } | null>(null);
+  const deleteProject = useProjectDelete();
 
   async function saveEditedSlide(row: CarouselRow, idx: number, dataUrl: string, overlays: SlideOverlaySet) {
     const versionedId = `carousel:${row.id}:${idx}:v${Date.now()}`;
@@ -440,31 +441,16 @@ function CarouselsPage() {
   }
 
   async function deleteCarousel(row: CarouselRow) {
-    const ok = await confirmDialog({
-      title: "Delete this carousel?",
-      description: `"${row.title}" and all its slides will be removed. This cannot be undone.`,
-      confirmText: "Delete",
-      tone: "destructive",
-    });
-    if (!ok) return;
     setDeletingId(row.id);
     try {
-      await deleteOutput(row.id);
-      await deleteBlobsByPrefix(`carousel:${row.id}:`);
-      // best-effort clear of blob keys created by putDataURL (they store the raw id without prefix)
-      const { error } = await supabase.from("projects").delete().eq("id", row.id);
-      if (error) throw error;
-      toast.success("Carousel deleted");
-      qc.invalidateQueries({ queryKey: ["carousels"] });
-      qc.invalidateQueries({ queryKey: ["projects"] });
-      qc.invalidateQueries({ queryKey: ["projects-section"] });
-      qc.invalidateQueries({ queryKey: ["recent-projects"] });
-      qc.invalidateQueries({ queryKey: ["module-counts"] });
-      qc.invalidateQueries({ queryKey: ["stats"] });
-      qc.invalidateQueries({ queryKey: ["admin-recent-projects"] });
-      qc.invalidateQueries({ queryKey: ["admin-stats"] });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Delete failed");
+      await deleteProject({
+        id: row.id,
+        title: row.title,
+        onCommit: async () => {
+          await deleteOutput(row.id);
+          await deleteBlobsByPrefix(`carousel:${row.id}:`);
+        },
+      });
     } finally {
       setDeletingId(null);
     }
