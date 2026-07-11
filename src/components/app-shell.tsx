@@ -2,7 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
-  Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles,
+  Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug,
   ChevronsLeft, ChevronsRight,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,6 +45,7 @@ const BASE_NAV: readonly NavItem[] = [
   { to: "/images", label: "Images", icon: ImageIcon, moduleId: "images" },
   { to: "/thumbnails", label: "Thumbnails", icon: Sparkles, moduleId: "thumbnails" },
   { to: "/captions", label: "Captions", icon: Type, moduleId: "captions" },
+  { to: "/connections", label: "Connections", icon: Plug },
   { to: "/pricing", label: "Pricing", icon: CreditCard },
   { to: "/billing", label: "Billing", icon: Wallet },
   { to: "/invoices", label: "Invoices", icon: Receipt },
