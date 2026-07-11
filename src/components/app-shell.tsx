@@ -3,7 +3,7 @@ import { type ReactNode, useState } from "react";
 import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
   Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug,
-  ChevronsLeft, ChevronsRight,
+  ChevronLeft, ChevronRight, Linkedin,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -33,24 +33,57 @@ type NavItem = {
   to: string;
   label: string;
   icon: typeof LayoutDashboard;
-  /** Optional module scope used to show a count badge for that content type. */
   moduleId?: ModuleId;
 };
 
-const BASE_NAV: readonly NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/create", label: "New Project", icon: Plus },
-  { to: "/videos", label: "Videos", icon: Film, moduleId: "videos" },
-  { to: "/carousels", label: "Carousels", icon: Layers, moduleId: "carousels" },
-  { to: "/images", label: "Images", icon: ImageIcon, moduleId: "images" },
-  { to: "/thumbnails", label: "Thumbnails", icon: Sparkles, moduleId: "thumbnails" },
-  { to: "/captions", label: "Captions", icon: Type, moduleId: "captions" },
-  { to: "/connections", label: "Connections", icon: Plug },
-  { to: "/pricing", label: "Pricing", icon: CreditCard },
-  { to: "/billing", label: "Billing", icon: Wallet },
-  { to: "/invoices", label: "Invoices", icon: Receipt },
-  { to: "/contact", label: "Contact Us", icon: Mail },
-  { to: "/settings", label: "Settings", icon: Settings },
+type NavSection = {
+  label: string;
+  items: readonly NavItem[];
+  adminOnly?: boolean;
+};
+
+const SECTIONS: readonly NavSection[] = [
+  {
+    label: "Create",
+    items: [
+      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/create", label: "New Project", icon: Plus },
+      { to: "/videos", label: "Videos", icon: Film, moduleId: "videos" },
+      { to: "/carousels", label: "Carousels", icon: Layers, moduleId: "carousels" },
+      { to: "/images", label: "Images", icon: ImageIcon, moduleId: "images" },
+      { to: "/thumbnails", label: "Thumbnails", icon: Sparkles, moduleId: "thumbnails" },
+      { to: "/captions", label: "Captions", icon: Type, moduleId: "captions" },
+    ],
+  },
+  {
+    label: "Publishing",
+    items: [
+      { to: "/connections", label: "Connections", icon: Plug },
+      { to: "/connections", label: "LinkedIn Posts", icon: Linkedin },
+    ],
+  },
+  {
+    label: "Manage",
+    items: [
+      { to: "/pricing", label: "Pricing", icon: CreditCard },
+      { to: "/billing", label: "Billing", icon: Wallet },
+      { to: "/invoices", label: "Invoices", icon: Receipt },
+      { to: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
+  {
+    label: "Admin",
+    adminOnly: true,
+    items: [
+      { to: "/admin", label: "Admin", icon: Crown },
+    ],
+  },
+  {
+    label: "Support",
+    items: [
+      { to: "/contact", label: "Contact Us", icon: Mail },
+    ],
+  },
 ];
 
 const SIDEBAR_COLLAPSED_KEY = "cvai:sidebar:collapsed";
@@ -90,9 +123,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { data: access } = useAccess();
   const { data: counts } = useModuleCounts();
 
-  const NAV: readonly NavItem[] = access?.isAdmin
-    ? [...BASE_NAV, { to: "/admin", label: "Admin", icon: Crown }]
-    : BASE_NAV;
+  const sections = SECTIONS.filter((s) => !s.adminOnly || access?.isAdmin);
 
   function toggleCollapse() {
     setCollapsed((prev) => {
@@ -122,78 +153,137 @@ export function AppShell({ children }: { children: ReactNode }) {
     navigate({ to: "/auth", replace: true });
   }
 
+  function isActive(to: string): boolean {
+    if (derivedNav) return derivedNav === to;
+    if (to === "/dashboard") return pathname === "/dashboard";
+    return pathname === to || pathname.startsWith(to + "/");
+  }
+
+  function renderNavItem(n: NavItem, onClick?: () => void) {
+    const active = isActive(n.to);
+    const count = n.moduleId ? counts?.[n.moduleId] ?? 0 : null;
+    return (
+      <Link
+        key={`${n.to}-${n.label}`}
+        to={n.to}
+        onClick={onClick}
+        title={collapsed ? n.label : undefined}
+        className={`group relative flex items-center ${collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2"} rounded-xl text-sm font-medium transition-all duration-200 ${
+          active
+            ? "gradient-primary text-white shadow-[0_8px_24px_-8px_oklch(0.68_0.19_55/0.55)]"
+            : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+        }`}
+      >
+        {active && !collapsed && (
+          <span className="absolute -left-3 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-white/80" aria-hidden />
+        )}
+        <n.icon className={`w-4 h-4 shrink-0 transition-transform duration-200 ${!active ? "group-hover:scale-110" : ""}`} />
+        {!collapsed && <span className="flex-1 truncate">{n.label}</span>}
+        {!collapsed && count !== null && count > 0 && (
+          <span className={`ml-auto inline-flex items-center justify-center min-w-[22px] h-[20px] px-1.5 text-[10px] font-semibold rounded-full ${
+            active
+              ? "bg-white/25 text-white"
+              : "bg-white/[0.06] text-muted-foreground group-hover:bg-white/10 group-hover:text-foreground"
+          }`}>
+            {count}
+          </span>
+        )}
+      </Link>
+    );
+  }
+
   return (
     <div className="h-screen flex overflow-hidden">
       {/* Sidebar desktop */}
       <aside
-        className={`hidden md:flex shrink-0 flex-col border-r border-border/50 bg-sidebar/60 backdrop-blur-xl overflow-y-auto transition-[width] duration-200 ${
-          collapsed ? "md:w-16" : "md:w-64"
+        className={`hidden md:flex shrink-0 flex-col border-r border-border/40 bg-sidebar/70 backdrop-blur-2xl overflow-hidden transition-[width] duration-300 ease-out ${
+          collapsed ? "md:w-[72px]" : "md:w-[264px]"
         }`}
       >
-        <div className={`flex ${collapsed ? "flex-col items-center gap-2 py-4 px-2" : "flex-col items-center gap-3 py-5 px-4"} border-b border-border/50`}>
-          <Link
-            to="/dashboard"
-            aria-label="CreatorVault AI home"
-            className="flex items-center justify-center rounded-lg p-1 transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        {/* Brand section */}
+        <div className="relative px-3 pt-5 pb-4">
+          <div
+            className={`relative rounded-2xl border border-white/[0.06] overflow-hidden ${
+              collapsed ? "px-2 py-3" : "px-4 py-4"
+            }`}
+            style={{
+              background:
+                "linear-gradient(140deg, oklch(0.68 0.19 55 / 0.14), oklch(0.68 0.26 15 / 0.10) 55%, oklch(0.18 0.02 40 / 0.35))",
+              boxShadow: "inset 0 1px 0 oklch(1 0 0 / 0.06), 0 8px 24px -16px oklch(0.68 0.19 55 / 0.4)",
+            }}
           >
-            <BrandLogo alt="" className={collapsed ? "h-8 w-auto object-contain" : "h-10 w-auto object-contain"} />
-          </Link>
-          {!collapsed && (
-            <Link
-              to="/dashboard"
-              aria-label="CreatorVault AI home"
-              className="flex items-center justify-center rounded-lg p-1 transition hover:bg-white/5"
-            >
-              <span className="text-base font-bold tracking-tight whitespace-nowrap bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
-                CreatorVault AI
-              </span>
-            </Link>
-          )}
+            <div
+              className="pointer-events-none absolute inset-0 opacity-60"
+              aria-hidden
+              style={{
+                background:
+                  "radial-gradient(120% 60% at 50% 0%, oklch(0.78 0.20 65 / 0.15), transparent 60%)",
+              }}
+            />
+            <div className={`relative flex ${collapsed ? "flex-col items-center gap-2" : "flex-col items-center gap-3"}`}>
+              <Link
+                to="/dashboard"
+                aria-label="CreatorVault AI home"
+                className="flex items-center justify-center rounded-xl p-1.5 transition hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <BrandLogo
+                  alt=""
+                  className={collapsed ? "h-10 w-auto object-contain" : "h-16 w-auto object-contain drop-shadow-[0_4px_12px_oklch(0.68_0.19_55/0.35)]"}
+                />
+              </Link>
+              {!collapsed && (
+                <div className="flex flex-col items-center gap-0.5 text-center">
+                  <span className="text-[17px] font-bold tracking-tight leading-none bg-gradient-to-r from-[color:var(--brand-orange)] via-[color:var(--brand-orange-glow)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
+                    CreatorVault AI
+                  </span>
+                  <span className="text-[10px] font-medium tracking-[0.18em] uppercase text-muted-foreground/80">
+                    Create · Publish · Grow
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Circular collapse toggle */}
           <button
             type="button"
             onClick={toggleCollapse}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="mt-1 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-white/5 transition"
+            className="absolute -right-3 top-8 z-10 h-7 w-7 rounded-full border border-border/60 bg-background/95 backdrop-blur text-muted-foreground shadow-md flex items-center justify-center transition-all duration-200 hover:text-foreground hover:scale-110 hover:border-[color:var(--brand-orange)]/50 hover:shadow-[0_0_16px_-2px_oklch(0.68_0.19_55/0.55)]"
           >
-            {collapsed ? <ChevronsRight className="w-4 h-4" /> : <ChevronsLeft className="w-4 h-4" />}
+            {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
           </button>
         </div>
-        <nav className={`flex-1 ${collapsed ? "px-2" : "px-3"} py-4 space-y-1`}>
-          {NAV.map((n) => {
-            const active = derivedNav
-              ? derivedNav === n.to
-              : pathname === n.to || (n.to !== "/dashboard" && pathname.startsWith(n.to));
-            const count = n.moduleId ? counts?.[n.moduleId] ?? 0 : null;
-            return (
-              <Link
-                key={n.to}
-                to={n.to}
-                title={collapsed ? n.label : undefined}
-                className={`flex items-center gap-3 ${collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5"} rounded-lg text-sm transition ${
-                  active ? "gradient-primary text-white shadow-lg" : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-                }`}
-              >
-                <n.icon className="w-4 h-4 shrink-0" />
-                {!collapsed && <span className="flex-1 truncate">{n.label}</span>}
-                {!collapsed && count !== null && count > 0 && (
-                  <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full ${
-                    active ? "bg-white/20 text-white" : "bg-white/5 text-muted-foreground"
-                  }`}>
-                    {count}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+
+        {/* Navigation */}
+        <nav className={`flex-1 overflow-y-auto ${collapsed ? "px-2" : "px-3"} pb-3 space-y-4 scrollbar-thin`}>
+          {sections.map((section) => (
+            <div key={section.label} className="space-y-1">
+              {!collapsed && (
+                <div className="px-3 pt-2 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase text-muted-foreground/60">
+                  {section.label}
+                </div>
+              )}
+              {collapsed && <div className="mx-3 my-2 h-px bg-border/40" />}
+              <div className="space-y-0.5">
+                {section.items.map((n) => renderNavItem(n))}
+              </div>
+            </div>
+          ))}
         </nav>
-        <button
-          onClick={signOut}
-          title={collapsed ? "Sign out" : undefined}
-          className={`flex items-center gap-3 ${collapsed ? "justify-center mx-2" : "mx-3"} mb-4 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-white/5`}
-        >
-          <LogOut className="w-4 h-4 shrink-0" /> {!collapsed && "Sign out"}
-        </button>
+
+        {/* Bottom */}
+        <div className={`${collapsed ? "px-2" : "px-3"} pb-4 pt-3 border-t border-border/40`}>
+          <button
+            onClick={signOut}
+            title={collapsed ? "Sign out" : undefined}
+            className={`w-full flex items-center ${collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2"} rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition`}
+          >
+            <LogOut className="w-4 h-4 shrink-0" />
+            {!collapsed && <span>Sign out</span>}
+          </button>
+        </div>
       </aside>
 
       {/* Mobile top bar */}
@@ -230,22 +320,36 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Mobile sheet */}
       {open && (
         <div className="md:hidden fixed inset-0 z-30 pt-14 bg-background/95 backdrop-blur-xl overflow-y-auto">
-          <nav className="p-4 space-y-1">
-            {NAV.map((n) => {
-              const count = n.moduleId ? counts?.[n.moduleId] ?? 0 : null;
-              return (
-                <Link key={n.to} to={n.to} onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm hover:bg-white/5">
-                  <n.icon className="w-4 h-4" />
-                  <span className="flex-1">{n.label}</span>
-                  {count !== null && count > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-muted-foreground">{count}</span>
-                  )}
-                </Link>
-              );
-            })}
+          <nav className="p-4 space-y-5">
+            {sections.map((section) => (
+              <div key={section.label} className="space-y-1">
+                <div className="px-3 text-[10px] font-semibold tracking-[0.14em] uppercase text-muted-foreground/60">
+                  {section.label}
+                </div>
+                {section.items.map((n) => {
+                  const count = n.moduleId ? counts?.[n.moduleId] ?? 0 : null;
+                  const active = isActive(n.to);
+                  return (
+                    <Link
+                      key={`${n.to}-${n.label}`}
+                      to={n.to}
+                      onClick={() => setOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm ${
+                        active ? "gradient-primary text-white" : "hover:bg-white/5"
+                      }`}
+                    >
+                      <n.icon className="w-4 h-4" />
+                      <span className="flex-1">{n.label}</span>
+                      {count !== null && count > 0 && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${active ? "bg-white/25 text-white" : "bg-white/10 text-muted-foreground"}`}>{count}</span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
             <button onClick={signOut}
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm hover:bg-white/5">
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm hover:bg-white/5 border-t border-border/40 mt-4 pt-4">
               <LogOut className="w-4 h-4" /> Sign out
             </button>
           </nav>
