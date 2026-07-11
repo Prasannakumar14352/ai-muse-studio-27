@@ -21,6 +21,7 @@ import { Route as AuthenticatedVideosRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedThumbnailsRouteImport } from './routes/_authenticated/thumbnails'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedPricingRouteImport } from './routes/_authenticated/pricing'
+import { Route as AuthenticatedLinkedinPostsRouteImport } from './routes/_authenticated/linkedin-posts'
 import { Route as AuthenticatedInvoicesRouteImport } from './routes/_authenticated/invoices'
 import { Route as AuthenticatedImagesRouteImport } from './routes/_authenticated/images'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -97,6 +98,12 @@ const AuthenticatedPricingRoute = AuthenticatedPricingRouteImport.update({
   path: '/pricing',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedLinkedinPostsRoute =
+  AuthenticatedLinkedinPostsRouteImport.update({
+    id: '/linkedin-posts',
+    path: '/linkedin-posts',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedInvoicesRoute = AuthenticatedInvoicesRouteImport.update({
   id: '/invoices',
   path: '/invoices',
@@ -199,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/images': typeof AuthenticatedImagesRoute
   '/invoices': typeof AuthenticatedInvoicesRoute
+  '/linkedin-posts': typeof AuthenticatedLinkedinPostsRoute
   '/pricing': typeof AuthenticatedPricingRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/thumbnails': typeof AuthenticatedThumbnailsRoute
@@ -228,6 +236,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/images': typeof AuthenticatedImagesRoute
   '/invoices': typeof AuthenticatedInvoicesRoute
+  '/linkedin-posts': typeof AuthenticatedLinkedinPostsRoute
   '/pricing': typeof AuthenticatedPricingRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/thumbnails': typeof AuthenticatedThumbnailsRoute
@@ -259,6 +268,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/images': typeof AuthenticatedImagesRoute
   '/_authenticated/invoices': typeof AuthenticatedInvoicesRoute
+  '/_authenticated/linkedin-posts': typeof AuthenticatedLinkedinPostsRoute
   '/_authenticated/pricing': typeof AuthenticatedPricingRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/thumbnails': typeof AuthenticatedThumbnailsRoute
@@ -290,6 +300,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/images'
     | '/invoices'
+    | '/linkedin-posts'
     | '/pricing'
     | '/settings'
     | '/thumbnails'
@@ -319,6 +330,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/images'
     | '/invoices'
+    | '/linkedin-posts'
     | '/pricing'
     | '/settings'
     | '/thumbnails'
@@ -349,6 +361,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/images'
     | '/_authenticated/invoices'
+    | '/_authenticated/linkedin-posts'
     | '/_authenticated/pricing'
     | '/_authenticated/settings'
     | '/_authenticated/thumbnails'
@@ -463,6 +476,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof AuthenticatedPricingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/linkedin-posts': {
+      id: '/_authenticated/linkedin-posts'
+      path: '/linkedin-posts'
+      fullPath: '/linkedin-posts'
+      preLoaderRoute: typeof AuthenticatedLinkedinPostsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/invoices': {
@@ -603,6 +623,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedImagesRoute: typeof AuthenticatedImagesRoute
   AuthenticatedInvoicesRoute: typeof AuthenticatedInvoicesRoute
+  AuthenticatedLinkedinPostsRoute: typeof AuthenticatedLinkedinPostsRoute
   AuthenticatedPricingRoute: typeof AuthenticatedPricingRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedThumbnailsRoute: typeof AuthenticatedThumbnailsRoute
@@ -621,6 +642,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedImagesRoute: AuthenticatedImagesRoute,
   AuthenticatedInvoicesRoute: AuthenticatedInvoicesRoute,
+  AuthenticatedLinkedinPostsRoute: AuthenticatedLinkedinPostsRoute,
   AuthenticatedPricingRoute: AuthenticatedPricingRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedThumbnailsRoute: AuthenticatedThumbnailsRoute,
