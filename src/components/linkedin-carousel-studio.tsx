@@ -139,6 +139,28 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
     } finally { setBusy(false); }
   }
 
+  async function downloadAll() {
+    setBusy(true);
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder("linkedin-carousel")!;
+      let n = 0;
+      for (let i = 0; i < state.slides.length; i++) {
+        const dataUrl = await captureSlide(state.slides[i].id);
+        if (!dataUrl) continue;
+        const base64 = dataUrl.split(",")[1];
+        folder.file(`slide-${String(i + 1).padStart(2, "0")}.png`, base64, { base64: true });
+        n++;
+      }
+      if (!n) throw new Error("No slides captured");
+      const blob = await zip.generateAsync({ type: "blob" });
+      saveBlob(blob, `linkedin-carousel-${Date.now()}.zip`);
+      toast.success(`Downloaded ${n} slides`);
+    } catch (e) {
+      toast.error("ZIP export failed", { description: e instanceof Error ? e.message : undefined });
+    } finally { setBusy(false); }
+  }
+
   const cur = state.slides[active];
 
   return (
