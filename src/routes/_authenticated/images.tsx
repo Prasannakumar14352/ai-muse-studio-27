@@ -242,6 +242,9 @@ function ImagesPage() {
     qc.invalidateQueries({ queryKey: ["module-counts"] });
     qc.invalidateQueries({ queryKey: ["projects-section"] });
     qc.invalidateQueries({ queryKey: ["recent-projects"] });
+    qc.invalidateQueries({ queryKey: ["stats"] });
+    qc.invalidateQueries({ queryKey: ["admin-recent-projects"] });
+    qc.invalidateQueries({ queryKey: ["admin-stats"] });
   }
 
   async function clearSession() {
