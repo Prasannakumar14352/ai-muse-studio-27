@@ -59,7 +59,6 @@ const SECTIONS: readonly NavSection[] = [
     label: "Publishing",
     items: [
       { to: "/connections", label: "Connections", icon: Plug },
-      { to: "/connections", label: "LinkedIn Posts", icon: Linkedin },
     ],
   },
   {
