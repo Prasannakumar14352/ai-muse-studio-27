@@ -67,7 +67,7 @@ function LinkedinPostsPage() {
     const meta = (row.metadata ?? {}) as { body?: string; cta?: string; hashtags?: string[] };
     const text = buildLinkedInPost({
       caption: meta.body ?? "",
-      hashtags: meta.hashtags ?? [],
+      hashtags: (meta.hashtags ?? []).join(" "),
       cta: meta.cta ?? "",
     });
     await navigator.clipboard.writeText(text);
