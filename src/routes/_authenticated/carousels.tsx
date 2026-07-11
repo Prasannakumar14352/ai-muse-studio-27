@@ -457,6 +457,12 @@ function CarouselsPage() {
       toast.success("Carousel deleted");
       qc.invalidateQueries({ queryKey: ["carousels"] });
       qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["projects-section"] });
+      qc.invalidateQueries({ queryKey: ["recent-projects"] });
+      qc.invalidateQueries({ queryKey: ["module-counts"] });
+      qc.invalidateQueries({ queryKey: ["stats"] });
+      qc.invalidateQueries({ queryKey: ["admin-recent-projects"] });
+      qc.invalidateQueries({ queryKey: ["admin-stats"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Delete failed");
     } finally {
