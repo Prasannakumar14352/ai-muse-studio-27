@@ -700,6 +700,10 @@ function CreditPacksSection() {
   const navigate = useNavigate();
 
   async function handleBuy(pack: CreditPack) {
+    if (!access?.email) {
+      navigate({ to: "/auth", search: { next: "/pricing" } });
+      return;
+    }
     setBuyingId(pack.id);
     try {
       const ok = await loadRazorpayScript();
