@@ -204,9 +204,12 @@ function NewLinkedinPostPage() {
 
           <div className="flex flex-wrap gap-4 text-sm">
             <Toggle label="Include hashtags" value={includeHashtags} onChange={setIncludeHashtags} />
-            <Toggle label="Image concept (Phase 2 render)" value={includeImage} onChange={setIncludeImage} />
-            <Toggle label="Carousel concept (Phase 2 render)" value={includeCarousel} onChange={setIncludeCarousel} />
+            <Toggle label="Plan a LinkedIn image" value={includeImage} onChange={setIncludeImage} />
+            <Toggle label="Plan a document carousel" value={includeCarousel} onChange={setIncludeCarousel} />
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            After you save this post, open it to generate the final LinkedIn image and document carousel in the built-in studios.
+          </p>
 
           <button
             onClick={generate}
