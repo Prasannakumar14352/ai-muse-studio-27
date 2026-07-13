@@ -9,7 +9,7 @@ import { createRazorpayOrder, verifyRazorpayPayment, createRazorpayPlanOrder } f
 import { toast } from "sonner";
 import { Check, Sparkles, Crown, X, Image as ImageIcon, Layers, Film, Video, ChevronDown, Calculator, Minus, Plus, Zap, Loader2, Info, ArrowRight } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/pricing")({ component: PricingPage });
+export const Route = createFileRoute("/pricing")({ component: PricingPage });
 
 
 function PricingPage() {

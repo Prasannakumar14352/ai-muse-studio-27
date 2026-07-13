@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AuthCallbackRouteImport } from './routes/auth-callback'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -20,7 +21,6 @@ import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-imag
 import { Route as AuthenticatedVideosRouteImport } from './routes/_authenticated/videos'
 import { Route as AuthenticatedThumbnailsRouteImport } from './routes/_authenticated/thumbnails'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
-import { Route as AuthenticatedPricingRouteImport } from './routes/_authenticated/pricing'
 import { Route as AuthenticatedLinkedinPostsRouteImport } from './routes/_authenticated/linkedin-posts'
 import { Route as AuthenticatedInvoicesRouteImport } from './routes/_authenticated/invoices'
 import { Route as AuthenticatedImagesRouteImport } from './routes/_authenticated/images'
@@ -42,6 +42,11 @@ import { Route as ApiPublicHooksPublishScheduledRouteImport } from './routes/api
 import { Route as AuthenticatedLinkedinPostsIdEditRouteImport } from './routes/_authenticated/linkedin-posts.$id.edit'
 import { Route as ApiPublicOauthPlatformCallbackRouteImport } from './routes/api/public/oauth/$platform.callback'
 
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
@@ -94,11 +99,6 @@ const AuthenticatedThumbnailsRoute = AuthenticatedThumbnailsRouteImport.update({
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedPricingRoute = AuthenticatedPricingRouteImport.update({
-  id: '/pricing',
-  path: '/pricing',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedLinkedinPostsRoute =
@@ -218,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/auth-callback': typeof AuthCallbackRoute
   '/contact': typeof ContactRoute
+  '/pricing': typeof PricingRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/billing': typeof AuthenticatedBillingRoute
   '/captions': typeof AuthenticatedCaptionsRoute
@@ -228,7 +229,6 @@ export interface FileRoutesByFullPath {
   '/images': typeof AuthenticatedImagesRoute
   '/invoices': typeof AuthenticatedInvoicesRoute
   '/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
-  '/pricing': typeof AuthenticatedPricingRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/videos': typeof AuthenticatedVideosRoute
@@ -251,6 +251,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/auth-callback': typeof AuthCallbackRoute
   '/contact': typeof ContactRoute
+  '/pricing': typeof PricingRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/billing': typeof AuthenticatedBillingRoute
   '/captions': typeof AuthenticatedCaptionsRoute
@@ -261,7 +262,6 @@ export interface FileRoutesByTo {
   '/images': typeof AuthenticatedImagesRoute
   '/invoices': typeof AuthenticatedInvoicesRoute
   '/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
-  '/pricing': typeof AuthenticatedPricingRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/videos': typeof AuthenticatedVideosRoute
@@ -286,6 +286,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/auth-callback': typeof AuthCallbackRoute
   '/contact': typeof ContactRoute
+  '/pricing': typeof PricingRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/billing': typeof AuthenticatedBillingRoute
   '/_authenticated/captions': typeof AuthenticatedCaptionsRoute
@@ -296,7 +297,6 @@ export interface FileRoutesById {
   '/_authenticated/images': typeof AuthenticatedImagesRoute
   '/_authenticated/invoices': typeof AuthenticatedInvoicesRoute
   '/_authenticated/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
-  '/_authenticated/pricing': typeof AuthenticatedPricingRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/_authenticated/videos': typeof AuthenticatedVideosRoute
@@ -321,6 +321,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/auth-callback'
     | '/contact'
+    | '/pricing'
     | '/admin'
     | '/billing'
     | '/captions'
@@ -331,7 +332,6 @@ export interface FileRouteTypes {
     | '/images'
     | '/invoices'
     | '/linkedin-posts'
-    | '/pricing'
     | '/settings'
     | '/thumbnails'
     | '/videos'
@@ -354,6 +354,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/auth-callback'
     | '/contact'
+    | '/pricing'
     | '/admin'
     | '/billing'
     | '/captions'
@@ -364,7 +365,6 @@ export interface FileRouteTypes {
     | '/images'
     | '/invoices'
     | '/linkedin-posts'
-    | '/pricing'
     | '/settings'
     | '/thumbnails'
     | '/videos'
@@ -388,6 +388,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/auth-callback'
     | '/contact'
+    | '/pricing'
     | '/_authenticated/admin'
     | '/_authenticated/billing'
     | '/_authenticated/captions'
@@ -398,7 +399,6 @@ export interface FileRouteTypes {
     | '/_authenticated/images'
     | '/_authenticated/invoices'
     | '/_authenticated/linkedin-posts'
-    | '/_authenticated/pricing'
     | '/_authenticated/settings'
     | '/_authenticated/thumbnails'
     | '/_authenticated/videos'
@@ -423,6 +423,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   ContactRoute: typeof ContactRoute
+  PricingRoute: typeof PricingRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   ApiGenerateVideoClipRoute: typeof ApiGenerateVideoClipRoute
   ApiTtsRoute: typeof ApiTtsRoute
@@ -433,6 +434,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/contact': {
       id: '/contact'
       path: '/contact'
@@ -508,13 +516,6 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/pricing': {
-      id: '/_authenticated/pricing'
-      path: '/pricing'
-      fullPath: '/pricing'
-      preLoaderRoute: typeof AuthenticatedPricingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/linkedin-posts': {
@@ -716,7 +717,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedImagesRoute: typeof AuthenticatedImagesRoute
   AuthenticatedInvoicesRoute: typeof AuthenticatedInvoicesRoute
   AuthenticatedLinkedinPostsRoute: typeof AuthenticatedLinkedinPostsRouteWithChildren
-  AuthenticatedPricingRoute: typeof AuthenticatedPricingRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedThumbnailsRoute: typeof AuthenticatedThumbnailsRoute
   AuthenticatedVideosRoute: typeof AuthenticatedVideosRoute
@@ -735,7 +735,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedImagesRoute: AuthenticatedImagesRoute,
   AuthenticatedInvoicesRoute: AuthenticatedInvoicesRoute,
   AuthenticatedLinkedinPostsRoute: AuthenticatedLinkedinPostsRouteWithChildren,
-  AuthenticatedPricingRoute: AuthenticatedPricingRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedThumbnailsRoute: AuthenticatedThumbnailsRoute,
   AuthenticatedVideosRoute: AuthenticatedVideosRoute,
@@ -752,6 +751,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   ContactRoute: ContactRoute,
+  PricingRoute: PricingRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   ApiGenerateVideoClipRoute: ApiGenerateVideoClipRoute,
   ApiTtsRoute: ApiTtsRoute,
