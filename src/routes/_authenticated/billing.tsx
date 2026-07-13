@@ -3,9 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMySubscription } from "@/lib/razorpay.functions";
 import { PLANS } from "@/lib/constants";
+import { TopUpPacks } from "@/components/topup-packs";
 import {
   Wallet, Crown, CheckCircle2, Clock, XCircle, ArrowRight,
-  Receipt, RefreshCw, Zap, Calendar, Sparkles,
+  Receipt, RefreshCw, Calendar, Sparkles,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/billing")({
@@ -175,15 +176,11 @@ function BillingPage() {
             </div>
           </section>
 
+          {/* Inline top-up packs — buy extra credits without leaving Billing */}
+          <TopUpPacks />
+
           {/* Quick actions */}
-          <section className="grid gap-4 md:grid-cols-3">
-            <ActionCard
-              icon={<Zap className="w-5 h-5" />}
-              title="Top up credits"
-              desc="One-time credit packs — never expire."
-              to="/pricing"
-              cta="Buy credits"
-            />
+          <section className="grid gap-4 md:grid-cols-2">
             <ActionCard
               icon={<Sparkles className="w-5 h-5" />}
               title={planKey === "free" ? "Upgrade to Creator" : "Change subscription"}
