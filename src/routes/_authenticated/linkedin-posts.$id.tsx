@@ -8,6 +8,7 @@ import { buildLinkedInPost } from "@/lib/downloads";
 import { useProjectDelete } from "@/hooks/use-project-delete";
 import { LinkedinCarouselStudio } from "@/components/linkedin-carousel-studio";
 import { LinkedinImageStudio, type LinkedinImageState } from "@/components/linkedin-image-studio";
+import { PublishActions } from "@/components/publish-actions";
 import type { LinkedinCarouselContent } from "@/lib/linkedin-carousel-ai.functions";
 
 export const Route = createFileRoute("/_authenticated/linkedin-posts/$id")({
@@ -33,7 +34,7 @@ function LinkedinPostViewPage() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
   const del = useProjectDelete();
-  const [tab, setTab] = useState<"post" | "image" | "carousel">("post");
+  const [tab, setTab] = useState<"post" | "image" | "carousel" | "preview">("post");
 
   const { data: project, isLoading, refetch } = useQuery({
     queryKey: ["linkedin-post", id],
@@ -154,14 +155,14 @@ function LinkedinPostViewPage() {
         </div>
       </div>
 
-      <div className="flex gap-1 border-b border-border/40">
-        {(["post", "image", "carousel"] as const).map((k) => (
+      <div className="flex gap-1 border-b border-border/40 overflow-x-auto">
+        {(["post", "image", "carousel", "preview"] as const).map((k) => (
           <button
             key={k}
             onClick={() => setTab(k)}
-            className={`px-4 py-2 text-xs uppercase tracking-wide border-b-2 -mb-px ${tab === k ? "border-[color:var(--brand-orange)] text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            className={`px-4 py-2 text-xs uppercase tracking-wide border-b-2 -mb-px whitespace-nowrap ${tab === k ? "border-[color:var(--brand-orange)] text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
           >
-            {k === "post" ? "Post" : k === "image" ? "LinkedIn image" : "Document carousel"}
+            {k === "post" ? "Post" : k === "image" ? "LinkedIn image" : k === "carousel" ? "Document carousel" : "Preview / Publish"}
           </button>
         ))}
       </div>
@@ -275,6 +276,45 @@ function LinkedinPostViewPage() {
           initial={meta.carousel ?? null}
           onChange={(c) => { void saveMetaPatch({ carousel: c }); }}
         />
+      )}
+
+      {tab === "preview" && (
+        <div className="space-y-4">
+          <div className="glass rounded-2xl p-5">
+            <h2 className="font-semibold mb-3">Final LinkedIn preview</h2>
+            <div className="rounded-xl border border-border/60 bg-black/20 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Linkedin className="w-4 h-4 text-[#0A66C2]" />
+                <span>{meta.brand || data.title}</span>
+              </div>
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">{meta.body}</p>
+              {meta.linkedin_image?.image && (
+                <img src={meta.linkedin_image.image} alt={meta.accessibility_alt ?? ""} className="rounded-lg border border-border/40 max-h-96 w-auto" />
+              )}
+              {meta.carousel?.slides && meta.carousel.slides.length > 0 && (
+                <div className="text-xs text-muted-foreground">📎 Document carousel · {meta.carousel.slides.length} slides ready to export</div>
+              )}
+              {meta.hashtags && meta.hashtags.length > 0 && (
+                <div className="text-xs text-[#0A66C2]">{meta.hashtags.join(" ")}</div>
+              )}
+              {meta.first_comment && (
+                <div className="mt-3 pt-3 border-t border-border/40">
+                  <div className="text-[10px] uppercase text-muted-foreground mb-1">First comment</div>
+                  <p className="text-xs whitespace-pre-wrap">{meta.first_comment}</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <PublishActions
+            projectId={data.id}
+            title={data.title}
+            caption={meta.body ?? ""}
+            hashtags={(meta.hashtags ?? []).join(" ")}
+            cta={meta.cta ?? ""}
+            altText={meta.accessibility_alt ?? ""}
+            media={meta.linkedin_image?.image ? [{ url: meta.linkedin_image.image, kind: "image", name: "linkedin-image.png" }] : []}
+          />
+        </div>
       )}
     </div>
   );

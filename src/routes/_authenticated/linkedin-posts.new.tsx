@@ -204,9 +204,12 @@ function NewLinkedinPostPage() {
 
           <div className="flex flex-wrap gap-4 text-sm">
             <Toggle label="Include hashtags" value={includeHashtags} onChange={setIncludeHashtags} />
-            <Toggle label="Image concept (Phase 2 render)" value={includeImage} onChange={setIncludeImage} />
-            <Toggle label="Carousel concept (Phase 2 render)" value={includeCarousel} onChange={setIncludeCarousel} />
+            <Toggle label="Plan a LinkedIn image" value={includeImage} onChange={setIncludeImage} />
+            <Toggle label="Plan a document carousel" value={includeCarousel} onChange={setIncludeCarousel} />
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            After you save this post, open it to generate the final LinkedIn image and document carousel in the built-in studios.
+          </p>
 
           <button
             onClick={generate}
@@ -300,16 +303,18 @@ function NewLinkedinPostPage() {
           </Section>
 
           {(includeImage || content.image_prompt) && (
-            <Section title="Image concept (Phase 2 rendering)">
+            <Section title="LinkedIn image brief">
               <p className="text-sm text-muted-foreground">{content.image_concept}</p>
               <p className="text-xs text-muted-foreground/80 mt-2"><span className="font-medium text-foreground">Prompt:</span> {content.image_prompt}</p>
               <p className="text-xs text-muted-foreground/80 mt-1"><span className="font-medium text-foreground">Alt:</span> {content.accessibility_alt}</p>
+              <p className="text-[11px] text-muted-foreground mt-3">Save the post, then open the <span className="text-foreground">Image</span> tab to render the final 1200×627 / 1080×1080 / 1080×1350 asset.</p>
             </Section>
           )}
 
           {(includeCarousel || content.carousel_concept) && (
-            <Section title="Document carousel concept (Phase 2 rendering)">
+            <Section title="Document carousel brief">
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">{content.carousel_concept}</p>
+              <p className="text-[11px] text-muted-foreground mt-3">Save the post, then open the <span className="text-foreground">Carousel</span> tab to generate, edit, and export the full slide deck (PDF/ZIP).</p>
             </Section>
           )}
         </div>
