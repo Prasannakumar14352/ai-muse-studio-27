@@ -25,9 +25,11 @@ async function readMetaBag(projectId: string): Promise<MetaBag> {
 }
 
 async function writeMetaBag(projectId: string, bag: MetaBag): Promise<void> {
+  // Cast through unknown: the JSONB column accepts any serializable object,
+  // but the generated Json type doesn't model our record shape.
   const { error } = await supabase
     .from("projects")
-    .update({ metadata: bag })
+    .update({ metadata: bag as unknown as never })
     .eq("id", projectId);
   if (error) throw error;
 }
