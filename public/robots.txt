@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+Disallow: /auth
+Disallow: /auth-callback
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /projects
+Disallow: /videos
+Disallow: /images
+Disallow: /carousels
+Disallow: /thumbnails
+Disallow: /captions
+Disallow: /linkedin-posts
+Disallow: /billing
+Disallow: /invoices
+Disallow: /settings
+Disallow: /connections
+Disallow: /admin
+
+Sitemap: https://ai-muse-studio-27.lovable.app/sitemap.xml

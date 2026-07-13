@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as HowItWorksRouteImport } from './routes/how-it-works'
 import { Route as FeaturesRouteImport } from './routes/features'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AuthCallbackRouteImport } from './routes/auth-callback'
@@ -46,6 +47,11 @@ import { Route as ApiPublicOauthPlatformCallbackRouteImport } from './routes/api
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HowItWorksRoute = HowItWorksRouteImport.update({
+  id: '/how-it-works',
+  path: '/how-it-works',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FeaturesRoute = FeaturesRouteImport.update({
@@ -225,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/auth-callback': typeof AuthCallbackRoute
   '/contact': typeof ContactRoute
   '/features': typeof FeaturesRoute
+  '/how-it-works': typeof HowItWorksRoute
   '/pricing': typeof PricingRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/billing': typeof AuthenticatedBillingRoute
@@ -259,6 +266,7 @@ export interface FileRoutesByTo {
   '/auth-callback': typeof AuthCallbackRoute
   '/contact': typeof ContactRoute
   '/features': typeof FeaturesRoute
+  '/how-it-works': typeof HowItWorksRoute
   '/pricing': typeof PricingRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/billing': typeof AuthenticatedBillingRoute
@@ -295,6 +303,7 @@ export interface FileRoutesById {
   '/auth-callback': typeof AuthCallbackRoute
   '/contact': typeof ContactRoute
   '/features': typeof FeaturesRoute
+  '/how-it-works': typeof HowItWorksRoute
   '/pricing': typeof PricingRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/billing': typeof AuthenticatedBillingRoute
@@ -331,6 +340,7 @@ export interface FileRouteTypes {
     | '/auth-callback'
     | '/contact'
     | '/features'
+    | '/how-it-works'
     | '/pricing'
     | '/admin'
     | '/billing'
@@ -365,6 +375,7 @@ export interface FileRouteTypes {
     | '/auth-callback'
     | '/contact'
     | '/features'
+    | '/how-it-works'
     | '/pricing'
     | '/admin'
     | '/billing'
@@ -400,6 +411,7 @@ export interface FileRouteTypes {
     | '/auth-callback'
     | '/contact'
     | '/features'
+    | '/how-it-works'
     | '/pricing'
     | '/_authenticated/admin'
     | '/_authenticated/billing'
@@ -436,6 +448,7 @@ export interface RootRouteChildren {
   AuthCallbackRoute: typeof AuthCallbackRoute
   ContactRoute: typeof ContactRoute
   FeaturesRoute: typeof FeaturesRoute
+  HowItWorksRoute: typeof HowItWorksRoute
   PricingRoute: typeof PricingRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   ApiGenerateVideoClipRoute: typeof ApiGenerateVideoClipRoute
@@ -452,6 +465,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/how-it-works': {
+      id: '/how-it-works'
+      path: '/how-it-works'
+      fullPath: '/how-it-works'
+      preLoaderRoute: typeof HowItWorksRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/features': {
@@ -772,6 +792,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthCallbackRoute: AuthCallbackRoute,
   ContactRoute: ContactRoute,
   FeaturesRoute: FeaturesRoute,
+  HowItWorksRoute: HowItWorksRoute,
   PricingRoute: PricingRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   ApiGenerateVideoClipRoute: ApiGenerateVideoClipRoute,
