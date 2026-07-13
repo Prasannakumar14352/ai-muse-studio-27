@@ -33,6 +33,7 @@ import { Route as AuthenticatedCarouselsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCaptionsRouteImport } from './routes/_authenticated/captions'
 import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticated/billing'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedLinkedinPostsIndexRouteImport } from './routes/_authenticated/linkedin-posts.index'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
 import { Route as AuthenticatedLinkedinPostsNewRouteImport } from './routes/_authenticated/linkedin-posts.new'
 import { Route as AuthenticatedLinkedinPostsIdRouteImport } from './routes/_authenticated/linkedin-posts.$id'
@@ -165,6 +166,12 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedLinkedinPostsIndexRoute =
+  AuthenticatedLinkedinPostsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedLinkedinPostsRoute,
+  } as any)
 const AuthenticatedProjectsIdRoute = AuthenticatedProjectsIdRouteImport.update({
   id: '/projects/$id',
   path: '/projects/$id',
@@ -255,6 +262,7 @@ export interface FileRoutesByFullPath {
   '/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
   '/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/linkedin-posts/': typeof AuthenticatedLinkedinPostsIndexRoute
   '/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
@@ -277,7 +285,6 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/images': typeof AuthenticatedImagesRoute
   '/invoices': typeof AuthenticatedInvoicesRoute
-  '/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/videos': typeof AuthenticatedVideosRoute
@@ -290,6 +297,7 @@ export interface FileRoutesByTo {
   '/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
   '/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/linkedin-posts': typeof AuthenticatedLinkedinPostsIndexRoute
   '/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
@@ -327,6 +335,7 @@ export interface FileRoutesById {
   '/_authenticated/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
   '/_authenticated/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/_authenticated/linkedin-posts/': typeof AuthenticatedLinkedinPostsIndexRoute
   '/_authenticated/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
@@ -364,6 +373,7 @@ export interface FileRouteTypes {
     | '/linkedin-posts/$id'
     | '/linkedin-posts/new'
     | '/projects/$id'
+    | '/linkedin-posts/'
     | '/linkedin-posts/$id/edit'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/webhooks/razorpay'
@@ -386,7 +396,6 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/images'
     | '/invoices'
-    | '/linkedin-posts'
     | '/settings'
     | '/thumbnails'
     | '/videos'
@@ -399,6 +408,7 @@ export interface FileRouteTypes {
     | '/linkedin-posts/$id'
     | '/linkedin-posts/new'
     | '/projects/$id'
+    | '/linkedin-posts'
     | '/linkedin-posts/$id/edit'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/webhooks/razorpay'
@@ -435,6 +445,7 @@ export interface FileRouteTypes {
     | '/_authenticated/linkedin-posts/$id'
     | '/_authenticated/linkedin-posts/new'
     | '/_authenticated/projects/$id'
+    | '/_authenticated/linkedin-posts/'
     | '/_authenticated/linkedin-posts/$id/edit'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/webhooks/razorpay'
@@ -628,6 +639,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/linkedin-posts/': {
+      id: '/_authenticated/linkedin-posts/'
+      path: '/'
+      fullPath: '/linkedin-posts/'
+      preLoaderRoute: typeof AuthenticatedLinkedinPostsIndexRouteImport
+      parentRoute: typeof AuthenticatedLinkedinPostsRoute
+    }
     '/_authenticated/projects/$id': {
       id: '/_authenticated/projects/$id'
       path: '/projects/$id'
@@ -732,6 +750,7 @@ const AuthenticatedLinkedinPostsIdRouteWithChildren =
 interface AuthenticatedLinkedinPostsRouteChildren {
   AuthenticatedLinkedinPostsIdRoute: typeof AuthenticatedLinkedinPostsIdRouteWithChildren
   AuthenticatedLinkedinPostsNewRoute: typeof AuthenticatedLinkedinPostsNewRoute
+  AuthenticatedLinkedinPostsIndexRoute: typeof AuthenticatedLinkedinPostsIndexRoute
 }
 
 const AuthenticatedLinkedinPostsRouteChildren: AuthenticatedLinkedinPostsRouteChildren =
@@ -739,6 +758,7 @@ const AuthenticatedLinkedinPostsRouteChildren: AuthenticatedLinkedinPostsRouteCh
     AuthenticatedLinkedinPostsIdRoute:
       AuthenticatedLinkedinPostsIdRouteWithChildren,
     AuthenticatedLinkedinPostsNewRoute: AuthenticatedLinkedinPostsNewRoute,
+    AuthenticatedLinkedinPostsIndexRoute: AuthenticatedLinkedinPostsIndexRoute,
   }
 
 const AuthenticatedLinkedinPostsRouteWithChildren =
