@@ -7,7 +7,9 @@ import { toast } from "sonner";
 import {
   AlertTriangle, Check, Clock, Copy, Plus, RotateCcw, Save, Scissors,
   Trash2, ArrowUp, ArrowDown, Wand2, Undo2, Film, Mic2, Sparkles, Info,
+  FileText,
 } from "lucide-react";
+import { VideoBriefParserPanel } from "@/components/video-brief-parser-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
