@@ -8,17 +8,42 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createRazorpayOrder, verifyRazorpayPayment, createRazorpayPlanOrder } from "@/lib/razorpay.functions";
 import { toast } from "sonner";
 import { Check, Sparkles, Crown, X, Image as ImageIcon, Layers, Film, Video, ChevronDown, Calculator, Minus, Plus, Zap, Loader2, Info, ArrowRight } from "lucide-react";
+import { PublicShell } from "@/components/public-shell";
 
-export const Route = createFileRoute("/pricing")({ component: PricingPage });
+export const Route = createFileRoute("/pricing")({
+  head: () => ({
+    meta: [
+      { title: "Pricing — CreatorVault AI" },
+      { name: "description", content: "Simple credit-based pricing for CreatorVault AI. Start free — 5 credits monthly. Upgrade for more videos, carousels, images and thumbnails." },
+      { property: "og:title", content: "Pricing — CreatorVault AI" },
+      { property: "og:description", content: "Simple credit-based pricing for CreatorVault AI. Start free." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:title", content: "Pricing — CreatorVault AI" },
+      { name: "twitter:description", content: "Simple credit-based pricing for CreatorVault AI." },
+    ],
+  }),
+  component: PricingPage,
+});
 
 
 function PricingPage() {
   const { data: access } = useAccess();
+  const navigate = useNavigate();
   const [modalPlan, setModalPlan] = useState<PlanDef | null>(null);
   const [estimatorPlan, setEstimatorPlan] = useState<PlanDef>(PLANS.find((p) => p.featured) ?? PLANS[0]);
 
+  const handleSelect = (p: PlanDef) => {
+    if (!access?.email) {
+      navigate({ to: "/auth", search: { next: "/pricing" } });
+      return;
+    }
+    setModalPlan(p);
+  };
+
   return (
-    <div className="space-y-14 max-w-7xl mx-auto pb-16 px-4 sm:px-6">
+    <PublicShell>
+      <div className="space-y-14 max-w-7xl mx-auto pb-16 px-4 sm:px-6 pt-10">
+
       {/* Header */}
       <div className="text-center max-w-3xl mx-auto pt-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass text-xs text-muted-foreground mb-4">
