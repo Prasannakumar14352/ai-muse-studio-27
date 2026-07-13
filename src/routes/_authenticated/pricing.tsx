@@ -7,7 +7,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { createRazorpayOrder, verifyRazorpayPayment, createRazorpayPlanOrder } from "@/lib/razorpay.functions";
 import { toast } from "sonner";
-import { Check, Sparkles, Crown, X, Image as ImageIcon, Layers, Film, Video, ChevronDown, Calculator, Minus, Plus, Zap, Loader2 } from "lucide-react";
+import { Check, Sparkles, Crown, X, Image as ImageIcon, Layers, Film, Video, ChevronDown, Calculator, Minus, Plus, Zap, Loader2, Info, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/pricing")({ component: PricingPage });
 
@@ -18,13 +18,18 @@ function PricingPage() {
   const [estimatorPlan, setEstimatorPlan] = useState<PlanDef>(PLANS.find((p) => p.featured) ?? PLANS[0]);
 
   return (
-    <div className="space-y-10 max-w-6xl mx-auto pb-12">
-      <div className="text-center">
+    <div className="space-y-14 max-w-7xl mx-auto pb-16 px-4 sm:px-6">
+      {/* Header */}
+      <div className="text-center max-w-3xl mx-auto pt-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass text-xs text-muted-foreground mb-4">
           <Sparkles className="w-3 h-3 text-[color:var(--neon-pink)]" /> Upgrade any time · Secure checkout
         </div>
-        <h1 className="text-3xl md:text-5xl font-bold">Choose your <span className="gradient-text">plan</span></h1>
-        <p className="text-muted-foreground mt-2">Cancel any time. Prices in USD.</p>
+        <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
+          Choose your <span className="gradient-text">plan</span>
+        </h1>
+        <p className="text-muted-foreground mt-3 text-base md:text-lg">
+          Simple credit-based pricing. Cancel any time. All prices in USD.
+        </p>
         {access?.isAdmin && (
           <div className="mt-4 inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 text-sm">
             <Crown className="w-4 h-4 text-amber-400" /> Admin — Unlimited access, no billing
@@ -32,83 +37,24 @@ function PricingPage() {
         )}
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-5">
-        {PLANS.map((p) => {
-          const isCurrent = access?.plan === p.id;
-          const totalCredits = p.monthlyCredits + (p.signupCredits ?? 0);
-          const estimate = p.contactSales ? null : getPlanGenerationEstimate(totalCredits);
-          return (
-            <div key={p.id}
-              className={`glass rounded-2xl p-6 relative flex flex-col ${p.featured ? "border-[color:var(--neon-purple)]/60 shadow-[var(--shadow-glow)]" : ""} ${p.contactSales ? "border-[color:var(--brand-orange)]/60" : ""}`}>
-              {p.featured && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 gradient-primary text-white text-xs px-3 py-1 rounded-full font-medium">
-                  Most popular
-                </div>
-              )}
-              {p.contactSales && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[color:var(--brand-orange)] text-black text-xs px-3 py-1 rounded-full font-medium">
-                  For teams
-                </div>
-              )}
-              <h3 className="text-xl font-semibold">{p.name}</h3>
-              <div className="mt-3 flex items-baseline gap-1">
-                <span className="text-3xl font-bold">{p.price}</span>
-                <span className="text-sm text-muted-foreground">{p.period}</span>
-              </div>
-
-
-              {estimate && (
-                <div className="mt-4 rounded-lg border border-border/60 bg-black/20 p-3 text-xs">
-
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Up to (single-type only)</div>
-                  <p className="text-[10px] text-muted-foreground mb-2">
-                    Each row is a separate "up to" — not a bundle. Mixed usage splits the same {totalCredits.toLocaleString()} credits.
-                  </p>
-                  <div className="space-y-1">
-                    <EstRow icon={<ImageIcon className="w-3.5 h-3.5 text-[color:var(--neon-pink)]" />} label="AI images" value={estimate.images} />
-                    <EstRow icon={<Layers className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />} label="Carousels" value={estimate.carousels} />
-                    <EstRow icon={<Film className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />} label="Short reels" value={estimate.shortReels} />
-                    <EstRow icon={<Video className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />} label="5-min long videos" value={estimate.longVideos} />
-                  </div>
-                </div>
-              )}
-              {p.contactSales && (
-                <div className="mt-4 rounded-lg border border-[color:var(--brand-orange)]/40 bg-[color:var(--brand-orange)]/5 p-3 text-xs text-muted-foreground">
-                  Pricing is tailored to your team size, credit needs and support tier. Reach out and we'll get back within 1 business day.
-                </div>
-              )}
-              <ul className="mt-5 space-y-2.5 flex-1">
-                {p.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm">
-                    <Check className="w-4 h-4 text-[color:var(--neon-purple)] mt-0.5 shrink-0" /> {f}
-                  </li>
-                ))}
-              </ul>
-              {p.contactSales ? (
-                <Link
-                  to="/contact"
-                  className="mt-6 w-full text-center rounded-lg py-2.5 text-sm font-medium bg-[color:var(--brand-orange)] text-black hover:opacity-90 transition">
-                  {p.cta}
-                </Link>
-              ) : (
-                <button
-                  disabled={isCurrent || p.id === "free"}
-                  onClick={() => setModalPlan(p)}
-                  className={`mt-6 w-full rounded-lg py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
-                    p.featured ? "gradient-primary text-white" : "glass hover:bg-white/5"
-                  }`}>
-                  {isCurrent ? "Current plan" : p.cta}
-                </button>
-              )}
-            </div>
-          );
-        })}
+      {/* Pricing cards: max 3 per row */}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mx-auto w-full">
+        {PLANS.map((p) => (
+          <PricingCard
+            key={p.id}
+            plan={p}
+            isCurrent={access?.plan === p.id}
+            onSelect={() => setModalPlan(p)}
+          />
+        ))}
       </div>
+
+      {/* Full comparison table */}
+      <ComparisonSection />
 
       <CreditPacksSection />
 
       <CreditsEstimator plan={estimatorPlan} onChangePlan={setEstimatorPlan} />
-
 
       <PricingFAQ />
 
@@ -121,6 +67,127 @@ function PricingPage() {
   );
 }
 
+/* ------------- Pricing card ------------- */
+
+function PricingCard({ plan: p, isCurrent, onSelect }: { plan: PlanDef; isCurrent: boolean; onSelect: () => void }) {
+  const totalCredits = p.monthlyCredits + (p.signupCredits ?? 0);
+  const estimate = p.contactSales ? null : getPlanGenerationEstimate(totalCredits);
+
+  const wrapper = [
+    "relative flex flex-col rounded-2xl p-6 md:p-7 min-h-[560px] transition-all duration-300",
+    "bg-[color:var(--card)]/40 backdrop-blur-md border border-border/60",
+    "hover:border-white/20 hover:-translate-y-0.5 hover:shadow-[0_10px_40px_-15px_rgba(0,0,0,0.6)]",
+    p.featured ? "border-transparent bg-gradient-to-b from-[color:var(--neon-purple)]/10 to-transparent ring-1 ring-[color:var(--neon-purple)]/40" : "",
+    p.contactSales ? "border-[color:var(--brand-orange)]/40" : "",
+  ].join(" ");
+
+  return (
+    <div className={wrapper}>
+      {p.featured && (
+        <div className="absolute -top-3 left-6 gradient-primary text-white text-[11px] uppercase tracking-wider px-2.5 py-1 rounded-full font-semibold shadow-md">
+          Most popular
+        </div>
+      )}
+      {p.contactSales && (
+        <div className="absolute -top-3 left-6 bg-[color:var(--brand-orange)] text-black text-[11px] uppercase tracking-wider px-2.5 py-1 rounded-full font-semibold shadow-md">
+          For teams
+        </div>
+      )}
+
+      {/* Header */}
+      <div>
+        <h3 className="text-lg font-semibold">{p.name}</h3>
+        <div className="mt-2 flex items-baseline gap-1.5">
+          <span className="text-4xl font-bold tracking-tight">{p.price}</span>
+          <span className="text-sm text-muted-foreground whitespace-nowrap">{p.period}</span>
+        </div>
+        <div className="mt-3 text-sm text-muted-foreground">
+          {p.contactSales
+            ? "Custom credit pool sized to your team."
+            : totalCredits > 0
+              ? <>Includes <strong className="text-foreground">{totalCredits.toLocaleString()}</strong> credits{p.signupCredits ? " (with signup bonus)" : " / month"}.</>
+              : "Free to start — no credit card required."}
+        </div>
+      </div>
+
+      {/* Estimated usage */}
+      {estimate && (
+        <div className="mt-5 pt-5 border-t border-border/40">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              Estimated monthly usage
+            </span>
+            <span
+              title={`Each row is an alternative "up to" — not a bundle. Mixed usage splits the same ${totalCredits.toLocaleString()} credits.`}
+              className="text-muted-foreground hover:text-foreground cursor-help">
+              <Info className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <UsageChip icon={<ImageIcon className="w-3.5 h-3.5" />} label="Images" value={estimate.images} accent="pink" />
+            <UsageChip icon={<Layers className="w-3.5 h-3.5" />} label="Carousels" value={estimate.carousels} accent="purple" />
+            <UsageChip icon={<Film className="w-3.5 h-3.5" />} label="Short reels" value={estimate.shortReels} accent="purple" />
+            <UsageChip icon={<Video className="w-3.5 h-3.5" />} label="5-min videos" value={estimate.longVideos} accent="purple" />
+          </div>
+          <p className="mt-2 text-[10.5px] text-muted-foreground/80 leading-relaxed">
+            Alternative maximums — all types share the same credit balance.
+          </p>
+        </div>
+      )}
+
+      {p.contactSales && (
+        <div className="mt-5 pt-5 border-t border-border/40 text-sm text-muted-foreground">
+          Pricing tailored to your team size, credit pool, and support tier. We reply within 1 business day.
+        </div>
+      )}
+
+      {/* Features */}
+      <ul className="mt-5 space-y-2.5 flex-1">
+        {p.features.slice(0, 6).map((f) => (
+          <li key={f} className="flex items-start gap-2 text-sm">
+            <Check className="w-4 h-4 text-[color:var(--neon-purple)] mt-0.5 shrink-0" />
+            <span className="text-foreground/90">{f}</span>
+          </li>
+        ))}
+      </ul>
+
+      {/* CTA pinned to bottom */}
+      <div className="mt-6 pt-2">
+        {p.contactSales ? (
+          <Link
+            to="/contact"
+            className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-medium bg-[color:var(--brand-orange)] text-black hover:opacity-90 transition">
+            {p.cta} <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        ) : (
+          <button
+            disabled={isCurrent || p.id === "free"}
+            onClick={onSelect}
+            className={`w-full rounded-lg py-2.5 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed ${
+              p.featured
+                ? "gradient-primary text-white hover:opacity-95"
+                : "border border-border/70 bg-white/5 hover:bg-white/10"
+            }`}>
+            {isCurrent ? "Current plan" : p.cta}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function UsageChip({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: number; accent: "pink" | "purple" }) {
+  const color = accent === "pink" ? "text-[color:var(--neon-pink)]" : "text-[color:var(--neon-purple)]";
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] border border-border/40 px-2.5 py-2">
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+        <span className={`shrink-0 ${color}`}>{icon}</span>
+        <span className="truncate">{label}</span>
+      </span>
+      <strong className="text-xs text-foreground whitespace-nowrap">~{value.toLocaleString()}</strong>
+    </div>
+  );
+}
 
 function EstRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
@@ -129,6 +196,116 @@ function EstRow({ icon, label, value }: { icon: React.ReactNode; label: string; 
       <strong className="text-foreground">up to ~{value.toLocaleString()}</strong>
     </div>
   );
+}
+
+/* ------------- Full comparison ------------- */
+
+function ComparisonSection() {
+  const plans = PLANS;
+  const numericRows: { label: string; get: (p: PlanDef) => string }[] = [
+    { label: "Price", get: (p) => `${p.price} ${p.period ?? ""}`.trim() },
+    { label: "Monthly credits", get: (p) => p.contactSales ? "Custom" : p.monthlyCredits.toLocaleString() },
+    { label: "Signup bonus credits", get: (p) => p.signupCredits ? `+${p.signupCredits.toLocaleString()}` : "—" },
+    { label: "Est. AI images / mo", get: (p) => estStr(p, "images") },
+    { label: "Est. carousels / mo", get: (p) => estStr(p, "carousels") },
+    { label: "Est. short reels / mo", get: (p) => estStr(p, "shortReels") },
+    { label: "Est. 5-min videos / mo", get: (p) => estStr(p, "longVideos") },
+  ];
+
+  return (
+    <section className="glass rounded-2xl p-6 md:p-8">
+      <div className="mb-6">
+        <h2 className="text-xl md:text-2xl font-semibold">Compare all plans</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Estimated outputs assume you produce only that asset type. Mixed usage draws from the same monthly credits.
+        </p>
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-sm border-separate border-spacing-0">
+          <thead>
+            <tr>
+              <th className="text-left py-3 px-3 text-xs uppercase tracking-wider text-muted-foreground font-medium border-b border-border/60"></th>
+              {plans.map((p) => (
+                <th key={p.id} className={`text-left py-3 px-3 border-b border-border/60 ${p.featured ? "text-[color:var(--neon-purple)]" : ""}`}>
+                  <div className="font-semibold text-foreground">{p.name}</div>
+                  {p.featured && <div className="text-[10px] uppercase tracking-wider text-[color:var(--neon-purple)]">Most popular</div>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {numericRows.map((row, i) => (
+              <tr key={row.label} className={i % 2 === 0 ? "bg-white/[0.02]" : ""}>
+                <td className="py-2.5 px-3 text-muted-foreground">{row.label}</td>
+                {plans.map((p) => (
+                  <td key={p.id} className="py-2.5 px-3 text-foreground">{row.get(p)}</td>
+                ))}
+              </tr>
+            ))}
+            <tr>
+              <td className="py-3 px-3 text-muted-foreground align-top border-t border-border/60">Included features</td>
+              {plans.map((p) => (
+                <td key={p.id} className="py-3 px-3 align-top border-t border-border/60">
+                  <ul className="space-y-1.5">
+                    {p.features.map((f) => (
+                      <li key={f} className="flex items-start gap-1.5 text-xs">
+                        <Check className="w-3 h-3 mt-0.5 shrink-0 text-[color:var(--neon-purple)]" />
+                        <span className="text-foreground/90">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile accordion */}
+      <div className="md:hidden space-y-3">
+        {plans.map((p) => (
+          <details key={p.id} className="rounded-xl border border-border/60 bg-black/20 group">
+            <summary className="cursor-pointer list-none p-4 flex items-center justify-between">
+              <div>
+                <div className="font-semibold">{p.name}</div>
+                <div className="text-xs text-muted-foreground">{p.price} {p.period}</div>
+              </div>
+              <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="px-4 pb-4 space-y-2 text-sm">
+              {numericRows.map((row) => (
+                <div key={row.label} className="flex justify-between gap-3 py-1 border-t border-border/40">
+                  <span className="text-muted-foreground">{row.label}</span>
+                  <span className="text-foreground text-right">{row.get(p)}</span>
+                </div>
+              ))}
+              <div className="pt-2 border-t border-border/40">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Features</div>
+                <ul className="space-y-1.5">
+                  {p.features.map((f) => (
+                    <li key={f} className="flex items-start gap-1.5 text-xs">
+                      <Check className="w-3 h-3 mt-0.5 shrink-0 text-[color:var(--neon-purple)]" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </details>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function estStr(p: PlanDef, key: "images" | "carousels" | "shortReels" | "longVideos"): string {
+  if (p.contactSales) return "Custom";
+  const total = p.monthlyCredits + (p.signupCredits ?? 0);
+  const est = getPlanGenerationEstimate(total);
+  if (!est) return "—";
+  return `up to ~${est[key].toLocaleString()}`;
 }
 
 /* ------------- Interactive Credits Estimator ------------- */
