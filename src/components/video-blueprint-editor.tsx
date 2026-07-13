@@ -7,7 +7,9 @@ import { toast } from "sonner";
 import {
   AlertTriangle, Check, Clock, Copy, Plus, RotateCcw, Save, Scissors,
   Trash2, ArrowUp, ArrowDown, Wand2, Undo2, Film, Mic2, Sparkles, Info,
+  FileText,
 } from "lucide-react";
+import { VideoBriefParserPanel } from "@/components/video-brief-parser-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,6 +62,7 @@ export function VideoBlueprintEditor({
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(initialMetadata.blueprintUpdatedAt);
   const [expandedScene, setExpandedScene] = useState<string | null>(bp.scenes[0]?.id ?? null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showParser, setShowParser] = useState(false);
 
   const issues = useMemo(() => validateBlueprint(bp), [bp]);
   const errors = issues.filter((i) => i.level === "error");
@@ -211,11 +214,29 @@ export function VideoBlueprintEditor({
           <Button size="sm" variant="outline" onClick={() => void commit(bp)} disabled={!dirty || saving}>
             Save now
           </Button>
+          <Button size="sm" variant="ghost" onClick={() => setShowParser((v) => !v)}>
+            <FileText className="h-3 w-3 mr-1" /> {showParser ? "Close brief import" : "Import from brief"}
+          </Button>
           <Button size="sm" variant="ghost" onClick={restoreOriginal}>
             <Undo2 className="h-3 w-3 mr-1" /> Restore AI original
           </Button>
         </div>
       </div>
+
+      {showParser && (
+        <VideoBriefParserPanel
+          projectId={projectId}
+          onCancel={() => setShowParser(false)}
+          onApplied={(m) => {
+            setMeta(m);
+            setBp(m.currentBlueprint);
+            setLastSavedAt(m.blueprintUpdatedAt);
+            setDirty(false);
+            onMetadataChange?.(m);
+            setShowParser(false);
+          }}
+        />
+      )}
 
       {/* Validation banner */}
       {(errors.length > 0 || warnings.length > 0) && (

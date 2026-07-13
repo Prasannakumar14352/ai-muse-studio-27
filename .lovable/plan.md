@@ -66,8 +66,10 @@ The following requires surgical edits to `src/lib/video-agents.ts` and `src/rout
    - `rerender_final` → skip shots + VO, jump to RenderAgent using cached blobs.
 4. **"Edits during render" notifier**: on render completion, if `hasEditsSinceSnapshot(meta)` is true, show toast "Your latest edits are queued for the next render."
 
-## Phase 3 (not started)
-- Free-text brief parser: paste a whole creative brief → extract global fields + scenes into a `VideoBlueprint`. Deliberately deferred.
+## Phase 3 — LANDED
+- `src/lib/video-brief-parser.ts` — flexible label parser (Title/Duration/Format/Audience/Style/CTA/Music/Voice/Character/Product + per-scene Visual/Text/VO/Camera/Transition/Motion/Negative/Product Placement); tolerates markdown, bullets, numbering; extracts scene timings from "(0-3 sec)" / "3s" / "0:03-0:06"; retains leftover text as `unmappedNotes`; runs `validateBlueprint` on the parsed result.
+- `src/components/video-brief-parser-panel.tsx` — paste area (with clipboard paste + example), Parse preview → Apply / Cancel / Undo / Edit Parsed Result. Apply routes through `saveBlueprintEdit` so version history is preserved and the original AI blueprint is never overwritten.
+- Wired into `video-blueprint-editor.tsx` via "Import from brief" toggle in header.
 
 ## Known limitations of the current slice
 - The editor persists to `projects.metadata` but the video pipeline still runs against its own AI-generated script — until step 1 above is done, edits do not yet change what gets rendered.
