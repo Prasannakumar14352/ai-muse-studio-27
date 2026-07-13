@@ -213,11 +213,29 @@ export function VideoBlueprintEditor({
           <Button size="sm" variant="outline" onClick={() => void commit(bp)} disabled={!dirty || saving}>
             Save now
           </Button>
+          <Button size="sm" variant="ghost" onClick={() => setShowParser((v) => !v)}>
+            <FileText className="h-3 w-3 mr-1" /> {showParser ? "Close brief import" : "Import from brief"}
+          </Button>
           <Button size="sm" variant="ghost" onClick={restoreOriginal}>
             <Undo2 className="h-3 w-3 mr-1" /> Restore AI original
           </Button>
         </div>
       </div>
+
+      {showParser && (
+        <VideoBriefParserPanel
+          projectId={projectId}
+          onCancel={() => setShowParser(false)}
+          onApplied={(m) => {
+            setMeta(m);
+            setBp(m.currentBlueprint);
+            setLastSavedAt(m.blueprintUpdatedAt);
+            setDirty(false);
+            onMetadataChange?.(m);
+            setShowParser(false);
+          }}
+        />
+      )}
 
       {/* Validation banner */}
       {(errors.length > 0 || warnings.length > 0) && (
