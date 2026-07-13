@@ -69,7 +69,7 @@ function PricingPage() {
             key={p.id}
             plan={p}
             isCurrent={access?.plan === p.id}
-            onSelect={() => setModalPlan(p)}
+            onSelect={() => handleSelect(p)}
           />
         ))}
       </div>
@@ -88,7 +88,8 @@ function PricingPage() {
       </div>
 
       {modalPlan && <CheckoutModal plan={modalPlan} onClose={() => setModalPlan(null)} />}
-    </div>
+      </div>
+    </PublicShell>
   );
 }
 
