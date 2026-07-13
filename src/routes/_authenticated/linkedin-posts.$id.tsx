@@ -155,14 +155,14 @@ function LinkedinPostViewPage() {
         </div>
       </div>
 
-      <div className="flex gap-1 border-b border-border/40">
-        {(["post", "image", "carousel"] as const).map((k) => (
+      <div className="flex gap-1 border-b border-border/40 overflow-x-auto">
+        {(["post", "image", "carousel", "preview"] as const).map((k) => (
           <button
             key={k}
             onClick={() => setTab(k)}
-            className={`px-4 py-2 text-xs uppercase tracking-wide border-b-2 -mb-px ${tab === k ? "border-[color:var(--brand-orange)] text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            className={`px-4 py-2 text-xs uppercase tracking-wide border-b-2 -mb-px whitespace-nowrap ${tab === k ? "border-[color:var(--brand-orange)] text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
           >
-            {k === "post" ? "Post" : k === "image" ? "LinkedIn image" : "Document carousel"}
+            {k === "post" ? "Post" : k === "image" ? "LinkedIn image" : k === "carousel" ? "Document carousel" : "Preview / Publish"}
           </button>
         ))}
       </div>
