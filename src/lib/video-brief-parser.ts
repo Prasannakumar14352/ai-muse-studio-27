@@ -49,7 +49,7 @@ function toAspect(text: string, fallback: AspectRatio): AspectRatio {
 
 function toVideoType(text: string, fallback: VideoType): VideoType {
   const t = text.toLowerCase();
-  if (/short|reel|tiktok|vertical/.test(t)) return "instagram_reel";
+  if (/short|reel|tiktok|vertical/.test(t)) return "reels";
   if (/long|youtube/.test(t)) return "youtube_long";
   return fallback;
 }
@@ -152,7 +152,7 @@ export function parseVideoBrief(input: string, opts: ParseOptions = {}): ParsedB
   const globalFieldsMatched: string[] = [];
   const warnings: string[] = [];
   const fallbackAspect = opts.fallbackAspect ?? "9:16";
-  const fallbackType = opts.fallbackVideoType ?? "instagram_reel";
+  const fallbackType = opts.fallbackVideoType ?? "reels";
   const fallbackStyle = opts.fallbackStyle ?? ("cinematic" as StyleId);
   const fallbackVoice = opts.fallbackVoice ?? "female";
   const fallbackDur = opts.fallbackSceneDuration ?? 4;
