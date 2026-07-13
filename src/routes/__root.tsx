@@ -61,8 +61,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "CreatorVault AI — Your AI Content Studio for Creators" },
       { name: "twitter:description", content: "CreatorVault AI turns a single idea into a full creator project — scripts, scenes, AI images, captions, hashtags and voiceover — in seconds." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/cc38326a-d7dd-4ab0-a429-1f573847fd8f/id-preview-17f86d3a--de9e0877-e40b-4031-b304-60c251b44708.lovable.app-1783473265454.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/cc38326a-d7dd-4ab0-a429-1f573847fd8f/id-preview-17f86d3a--de9e0877-e40b-4031-b304-60c251b44708.lovable.app-1783473265454.png" },
+      // NOTE: og:image intentionally NOT set at root — root head() concatenates
+      // into every match, which would override every leaf's own og:image.
+      // Leaf routes (marketing pages, project detail) set og:image themselves.
     ],
     links: [
       { rel: "stylesheet", href: appCss },
