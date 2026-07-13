@@ -62,6 +62,7 @@ export function VideoBlueprintEditor({
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(initialMetadata.blueprintUpdatedAt);
   const [expandedScene, setExpandedScene] = useState<string | null>(bp.scenes[0]?.id ?? null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showParser, setShowParser] = useState(false);
 
   const issues = useMemo(() => validateBlueprint(bp), [bp]);
   const errors = issues.filter((i) => i.level === "error");
