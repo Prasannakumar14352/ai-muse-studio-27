@@ -40,10 +40,10 @@ function Landing() {
             <BrandLogo alt="CreatorVault AI" className="h-9 md:h-10 w-auto object-contain" />
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
-            <a href="#features" className="hover:text-foreground">Features</a>
-            <a href="#pricing" className="hover:text-foreground">Pricing</a>
-            <a href="#faq" className="hover:text-foreground">FAQ</a>
-            <Link to="/contact" className="hover:text-foreground">Contact Us</Link>
+            <Link to="/features" className="hover:text-foreground">Features</Link>
+            <Link to="/how-it-works" className="hover:text-foreground">How it works</Link>
+            <Link to="/pricing" className="hover:text-foreground">Pricing</Link>
+            <Link to="/contact" className="hover:text-foreground">Contact</Link>
           </nav>
           <div className="flex items-center gap-3">
             <Link to="/auth" className="text-sm text-muted-foreground hover:text-foreground">Sign in</Link>
