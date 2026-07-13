@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useProjectDelete } from "@/hooks/use-project-delete";
 import { buildLinkedInPost } from "@/lib/downloads";
 
-export const Route = createFileRoute("/_authenticated/linkedin-posts")({
+export const Route = createFileRoute("/_authenticated/linkedin-posts/")({
   component: LinkedinPostsPage,
 });
 
