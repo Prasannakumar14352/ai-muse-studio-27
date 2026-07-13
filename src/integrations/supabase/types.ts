@@ -941,6 +941,16 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      refund_credits: {
+        Args: {
+          _amount: number
+          _description: string
+          _project_id: string
+          _source: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       reset_monthly_subscription_credits: { Args: never; Returns: undefined }
     }
     Enums: {
