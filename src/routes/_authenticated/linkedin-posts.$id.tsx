@@ -277,6 +277,45 @@ function LinkedinPostViewPage() {
           onChange={(c) => { void saveMetaPatch({ carousel: c }); }}
         />
       )}
+
+      {tab === "preview" && (
+        <div className="space-y-4">
+          <div className="glass rounded-2xl p-5">
+            <h2 className="font-semibold mb-3">Final LinkedIn preview</h2>
+            <div className="rounded-xl border border-border/60 bg-black/20 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Linkedin className="w-4 h-4 text-[#0A66C2]" />
+                <span>{meta.brand || data.title}</span>
+              </div>
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">{meta.body}</p>
+              {meta.linkedin_image?.image && (
+                <img src={meta.linkedin_image.image} alt={meta.accessibility_alt ?? ""} className="rounded-lg border border-border/40 max-h-96 w-auto" />
+              )}
+              {meta.carousel?.slides && meta.carousel.slides.length > 0 && (
+                <div className="text-xs text-muted-foreground">📎 Document carousel · {meta.carousel.slides.length} slides ready to export</div>
+              )}
+              {meta.hashtags && meta.hashtags.length > 0 && (
+                <div className="text-xs text-[#0A66C2]">{meta.hashtags.join(" ")}</div>
+              )}
+              {meta.first_comment && (
+                <div className="mt-3 pt-3 border-t border-border/40">
+                  <div className="text-[10px] uppercase text-muted-foreground mb-1">First comment</div>
+                  <p className="text-xs whitespace-pre-wrap">{meta.first_comment}</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <PublishActions
+            projectId={data.id}
+            title={data.title}
+            caption={meta.body ?? ""}
+            hashtags={(meta.hashtags ?? []).join(" ")}
+            cta={meta.cta ?? ""}
+            altText={meta.accessibility_alt ?? ""}
+            media={meta.linkedin_image?.image ? [{ url: meta.linkedin_image.image, kind: "image", name: "linkedin-image.png" }] : []}
+          />
+        </div>
+      )}
     </div>
   );
 }
