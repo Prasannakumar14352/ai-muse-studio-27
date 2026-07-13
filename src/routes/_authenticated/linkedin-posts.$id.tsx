@@ -8,6 +8,7 @@ import { buildLinkedInPost } from "@/lib/downloads";
 import { useProjectDelete } from "@/hooks/use-project-delete";
 import { LinkedinCarouselStudio } from "@/components/linkedin-carousel-studio";
 import { LinkedinImageStudio, type LinkedinImageState } from "@/components/linkedin-image-studio";
+import { PublishActions } from "@/components/publish-actions";
 import type { LinkedinCarouselContent } from "@/lib/linkedin-carousel-ai.functions";
 
 export const Route = createFileRoute("/_authenticated/linkedin-posts/$id")({
