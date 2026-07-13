@@ -98,3 +98,59 @@ export async function deductUsage(params: {
   if (error) return { ok: false, error: error.message };
   return data as { ok: boolean; source?: string; error?: string; remaining?: number };
 }
+
+/**
+ * Refund credits to the same bucket they were spent from. Call this when a
+ * generation fails AFTER a successful `deductUsage`. Safe to call for admin
+ * (server no-ops). Never throws — logs and swallows on failure so callers
+ * don't need extra try/catch just to refund.
+ */
+export async function refundUsage(params: {
+  amount: number;
+  projectId?: string | null;
+  description: string;
+  source: "subscription" | "balance" | "admin";
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    // Lazy-import so the browser bundle doesn't pull the server fn module eagerly.
+    const { refundCreditsFn } = await import("@/lib/credits.functions");
+    const result = await refundCreditsFn({ data: params });
+    return { ok: !!result?.ok };
+  } catch (e) {
+    console.warn("[refundUsage] failed", e);
+    return { ok: false, error: e instanceof Error ? e.message : "refund_failed" };
+  }
+}
+
+/**
+ * Convenience wrapper: run an async generation, deducting BEFORE the work and
+ * refunding automatically if the work throws. Returns the generation's result.
+ *
+ * Usage:
+ *   const project = await withCreditRefund(
+ *     { amount: 1, description: "AI image", projectId: null },
+ *     async () => generateImage(),
+ *   );
+ */
+export async function withCreditRefund<T>(
+  spend: { amount: number; projectId?: string | null; description: string },
+  work: () => Promise<T>,
+): Promise<T> {
+  const deducted = await deductUsage(spend);
+  if (!deducted.ok) {
+    throw new Error(deducted.error || "Could not deduct credits");
+  }
+  const source = (deducted.source ?? "balance") as "subscription" | "balance" | "admin";
+  try {
+    return await work();
+  } catch (err) {
+    // Best-effort refund — don't shadow the original error.
+    void refundUsage({
+      amount: spend.amount,
+      projectId: spend.projectId ?? null,
+      description: spend.description,
+      source,
+    });
+    throw err;
+  }
+}
