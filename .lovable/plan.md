@@ -1,132 +1,76 @@
+# Video Blueprint System — Rollout Plan
 
-# CreatorFlow AI — End-to-End Audit
+## Phase 1 + 2 (partial) — LANDED
 
-Read-only review. No files were modified. Scope: structure, UX, billing/credits, generation pipelines, publishing, LinkedIn, DB/security, responsive, fallbacks, production readiness.
+### Files added
+- `src/lib/video-blueprint.ts` — types, factory, mutations, validation, credit estimator, versioning + snapshot builders.
+- `src/lib/video-blueprint-store.ts` — read/write helpers against `projects.metadata` (no new tables).
+- `src/components/video-blueprint-editor.tsx` — full structured editor UI.
 
----
+### Metadata structure (inside `projects.metadata.videoBlueprint`)
+```
+{
+  originalAiBlueprint: VideoBlueprint,
+  currentBlueprint:    VideoBlueprint,
+  blueprintVersion:    number,          // monotonically increments
+  blueprintUpdatedAt:  ISO string,
+  blueprintSource:     "ai" | "user_edit" | "regenerate_scene" | "restore",
+  blueprintVersions:   BlueprintVersionEntry[],  // capped to latest 10
+  renderSnapshot:      RenderSnapshot | null,    // immutable copy used by last render
+  blueprintVersionUsed: number | null            // version that snapshot represents
+}
+```
 
-## 1. Snapshot
+### Editor behavior
+- Global fields: title, total duration, platform, aspect ratio, video style, audience, objective, brand, product, CTA, global visual style, global negative, music direction, voice (id + pace + emotion), default transition, motion intensity.
+- Per-scene: id, n, start/end/duration, role, visual, image prompt, video (motion) prompt, on-screen text, voiceover, transition in/out, camera movement, subject movement, product placement, character reference + lock, negative prompt.
+- Scene actions: add, delete, duplicate, move up/down (reorder), split, merge with next, regenerate one scene (via callback), restore AI original.
+- Autosave: debounced 900 ms → `saveBlueprintEdit` bumps `blueprintVersion` and prepends to `blueprintVersions` (cap 10).
+- Unsaved-changes indicator + `beforeunload` warning.
+- Manual `Save now` + `Restore AI original` (saved as a new version so it can be undone).
+- Pre-render validation runs on every render click: aspect ratio, per-scene duration, empty visuals, VO length vs duration, long on-screen text, total-duration drift > 15%, promotional CTA + product-scene requirements.
+- Credit estimate shown on every render button (`estimateCredits`).
+- Render callbacks: `render_full`, `regenerate_all`, `regenerate_visuals`, `regenerate_voiceover`, `rerender_final`, plus per-scene `onRegenerateScene(sceneId, blueprint)`.
 
-- **Routes**: 22 authenticated, 3 public (`/`, `/auth`, `/contact`) + API/OAuth routes.
-- **Generation engines**: Creative Director, Motion Director, Visual Director, Character Bible, Cinematic Engine, Short Video Engine, Layout Engine, Retention Engine, 47 lib modules total.
-- **Persistence**: Supabase (17 tables, RLS on all). Blob assets in IndexedDB (video shots), plus `renders` bucket for final MP4.
-- **Billing**: Razorpay live, idempotent webhooks, subscription + top-up wallet, admin bypass, `refund_credits` RPC (just landed).
-- **Auth**: Supabase native + Lovable Cloud Auth hybrid, Google/Apple providers.
-- **Publishing**: Meta/Google/LinkedIn OAuth config UI + connection page + scheduling table, no executor yet.
+### Render snapshot behavior
+- `saveRenderSnapshot(projectId, brief)` writes an immutable copy of `currentBlueprint` into `renderSnapshot` and records `blueprintVersionUsed`.
+- Pipeline callers should call `saveRenderSnapshot` before generation begins, then render from `snapshot.blueprint`.
+- `hasEditsSinceSnapshot(meta)` detects that the user kept editing during a render — the caller should preserve those edits (they remain in `currentBlueprint`) and surface a toast: "Your edits since the last render are preserved for the next one."
 
----
+## Test steps (data layer + editor)
+1. Create/open any project row; call `initBlueprintMetadata(projectId, buildBlueprintFromPlanning(brief, script))` from the console (or from the pipeline once wired).
+2. Mount `<VideoBlueprintEditor projectId=... initialMetadata=... />` in a sandbox route.
+3. Edit any global field → within ~1 s see "Saved HH:MM:SS"; refresh the page → edits persist.
+4. Add / duplicate / reorder / split / merge scenes → `n` and time ranges re-index.
+5. Restore AI original → global fields and scenes revert; a new version is appended (so the restore itself is undoable via history).
+6. Trigger a promotional case (fill `product`, leave `cta` empty) → red "missing CTA" error blocks rendering.
+7. Click any render button → confirm dialog shows estimated credits; on confirm, `onRender` fires.
 
-## 2. Strengths
+## Phase 2 REMAINING (next turn — pipeline wire-in)
+The following requires surgical edits to `src/lib/video-agents.ts` and `src/routes/_authenticated/videos.tsx` (1 850 + 1 809 lines) and is intentionally staged in a follow-up turn to avoid destabilizing the running pipeline:
 
-- **Architecture discipline** — TanStack Start file routing, server functions correctly split from client (`.functions.ts` vs `.server.ts`), no `useEffect+fetch` anti-patterns in loaders.
-- **Billing correctness** — server-side Razorpay verification, idempotent payment status guard, top-up + subscription buckets with correct consumption order, admin bypass in-DB, refund path just added.
-- **Security posture** — RLS enabled on every public table, `has_role` SECURITY DEFINER pattern for admin, OAuth tokens encrypted at rest (`OAUTH_TOKEN_ENCRYPTION_KEY`), service-role restricted to `.server.ts` files.
-- **Creative pipeline** — Character Bible + Locked Director enforce protagonist consistency; Layout Engine reserves negative space; Motion Director eliminates slideshow feel; Retention Engine drives structure.
-- **UX consistency** — unified two-view landing/input pattern across Images, Videos, Carousels, LinkedIn; unified `useProjectDelete` with undo + cascade; sidebar hierarchy with plan pill.
-- **Editor tooling** — layer-based slide editor, LinkedIn Studio (carousel + image), full ZIP/PDF exports, drag-drop reordering, real-time preview.
+1. **Split `runVideoJobPipeline`** into:
+   - `runPlanning(brief, opts) → { script, research, retentionEngine, storyboard, direction }`
+   - `runFromBlueprint(brief, blueprint, opts) → PipelineResult`
+     - Converts the edited blueprint back to `AiVideoScript` via `blueprintToScript(bp)`.
+     - Re-runs `expandScriptToBeats` (or a slimmer beat mapper) to align with the new scene set.
+     - Honors per-scene overrides for camera, transition, product placement, character lock, negative prompt.
+     - Preserves already-generated shot blobs whose scene wasn't edited (skip regen when scene marker still matches).
+2. **Add a "review" view** to `videos.tsx` between planning and shot generation that hosts `<VideoBlueprintEditor />`, wired to:
+   - `initBlueprintMetadata` immediately after planning finishes.
+   - `onRender` → `saveRenderSnapshot` → `runFromBlueprint`.
+   - `onRegenerateScene` → run only that beat through `generateOneShot` and update just that entry.
+3. **Selective render actions**:
+   - `regenerate_visuals` → keep VO + timeline, re-run shot pool.
+   - `regenerate_voiceover` → keep visuals, re-run VoiceoverAgent + SubtitleAgent.
+   - `rerender_final` → skip shots + VO, jump to RenderAgent using cached blobs.
+4. **"Edits during render" notifier**: on render completion, if `hasEditsSinceSnapshot(meta)` is true, show toast "Your latest edits are queued for the next render."
 
----
+## Phase 3 (not started)
+- Free-text brief parser: paste a whole creative brief → extract global fields + scenes into a `VideoBlueprint`. Deliberately deferred.
 
-## 3. Critical Findings
-
-**C1. Root `og:image` overrides every leaf**
-`src/routes/__root.tsx:64-65` hardcodes a preview-URL screenshot (`id-preview--de9e0877…lovable.app`) as `og:image` and `twitter:image`. Because root `head()` concatenates into every match, every page — Pricing, LinkedIn posts, projects — shares this image, and it points at an ephemeral preview host. Social shares look broken/branded-as-preview.
-
-**C2. No scheduled-post executor**
-`scheduled_posts` rows are created by `publishing.functions.ts` but nothing consumes them. Users see "Scheduled" toasts but nothing publishes. Feature is a UI-only stub.
-
-**C3. Public marketing surface = 1 page**
-Only `/`, `/auth`, `/contact` are unauthenticated. No `/pricing`, `/features`, `/how-it-works` public routes → paid signups depend on authenticated-only pricing. SEO surface is near zero.
-
----
-
-## 4. High Findings
-
-**H1. Refund helper not wired into any generation site**
-`withCreditRefund` exists but no route uses it. Deducts across `create.tsx`, `create_.carousel.tsx`, `images.tsx`, `thumbnails.tsx`, `videos.tsx` all happen *after* save (correct for full failures), but partial-scene renderers and per-image loops (`images.tsx:158`) charge per success without a rollback path if the batch aborts mid-way.
-
-**H2. Video assets device-locked**
-Final MP4 uploads to `renders` bucket (`projects.$id.tsx:705`) but per-shot images/audio live only in IndexedDB. Users switching browsers/devices lose scene thumbnails and can't re-render. No `projects.assets_synced_at` column.
-
-**H3. No admin console for user/credit ops**
-`admin.tsx`, `admin.integrations.tsx`, `admin.webhooks.tsx` exist. Missing: user list, role toggle, manual credit grant, subscription override, refund UI. All operator tasks currently require direct SQL.
-
-**H4. Hardcoded admin email**
-`handle_new_user` DB function hardcodes `prasannaskvd@gmail.com` as admin. Not portable; can't demote or add co-admins without a migration.
-
-**H5. Pricing page is auth-gated**
-`/pricing` lives under `_authenticated/`. Prospects can't view plans without signing up. Conversion blocker.
-
----
-
-## 5. Medium Findings
-
-**M1. Sidebar count vs page state drift risk** — module counts query independently of page-level queries; a delete on one page invalidates its own keys but sidebar counts rely on separate query keys not always in the invalidation list.
-
-**M2. `refund_credits` linter warnings** — 5 pre-existing SECURITY DEFINER warnings on `deduct_credits`, `has_role`, `is_admin`, `handle_new_user`, `reset_monthly_subscription_credits`. Intentional but undocumented; add a security memory note or the next audit re-flags them.
-
-**M3. Blob URL leaks** — `SafeVideoPreview` handles lifecycle, but slide/thumbnail exports (`html-to-image`) create object URLs without paired `revokeObjectURL` in error paths.
-
-**M4. No usage caps enforcement per plan on top-ups** — top-up credits never expire (correct per PRD) but there's no dashboard warning when balance exceeds e.g. 12 months of typical use → potential abuse for resellers.
-
-**M5. `content_type` sprawl** — `linkedin_post`, `carousel`, `image`, `short_video`, `long_video`, `thumbnail` are strings on `projects.content_type`. No enum, no DB constraint → typos silently create ghost modules invisible to the sidebar.
-
-**M6. Error boundaries partial** — `__root.tsx` has `notFoundComponent`, but leaf routes with loaders don't all set `errorComponent`+`notFoundComponent` (TanStack requirement).
-
-**M7. No `robots.txt` / sitemap** — production SEO blocker independent of C3.
-
----
-
-## 6. Nice-to-have
-
-- N1. Keyboard shortcuts (New project, search) via `cmdk`.
-- N2. Project search/filter on gallery pages (currently list-all).
-- N3. Bulk delete / bulk export on Images and Thumbnails.
-- N4. In-app changelog and empty-state onboarding tour.
-- N5. Public share link per project (view-only) using signed URLs.
-- N6. Dark/light toggle (currently dark-only).
-- N7. Cost estimator preview *before* clicking Generate on video (word/scene count → credit projection).
-
----
-
-## 7. Production Readiness Checklist
-
-| Area | Status |
-|---|---|
-| RLS on all tables | ✅ |
-| Server-side payment verify | ✅ |
-| Idempotent webhooks | ✅ |
-| Refund primitive | ✅ (just landed) |
-| Credit refund wired in flows | ❌ H1 |
-| Final render in cloud | ✅ |
-| Scene assets in cloud | ❌ H2 |
-| Scheduled publishing executor | ❌ C2 |
-| Public pricing/marketing | ❌ C3/H5 |
-| SEO metadata per leaf | ⚠ C1 |
-| Admin console | ❌ H3 |
-| Error/notFound on every route | ⚠ M6 |
-| Responsive (390–1920) | ✅ (pricing redesign verified) |
-
----
-
-## 8. Recommended Next 5 Steps
-
-1. **Fix C1 + C3 + H5 together (SEO/marketing unblock)** — remove root `og:image`, move `/pricing` out of `_authenticated`, add public `/features` + `/how-it-works` with per-route `head()`. Adds robots.txt + sitemap. **Low code, high conversion impact.**
-
-2. **Ship scheduled-post executor (C2)** — pg_cron every 5 min → `/api/public/cron/publish-due` route, verifies a shared secret header, pulls `scheduled_posts WHERE due AND status='pending'`, calls the platform-specific publisher, marks status. Unblocks the entire Publishing tab from being cosmetic.
-
-3. **Cloud-sync video scene assets (H2)** — add `renders/{userId}/{projectId}/scenes/{n}.jpg` uploads inside `video-shot-runner.ts` completion callback, plus `project_scenes.image_url` column populated on upload. Keeps IndexedDB as cache, treats cloud as source-of-truth. Users can then resume renders cross-device.
-
-4. **Wire `withCreditRefund` at generation sites (H1)** — wrap the batch loops in `images.tsx`, `thumbnails.tsx`, and per-shot deducts in the video runner so any partial-failure path reverses correctly. Also swap hardcoded admin email (H4) for a `user_roles` seed migration.
-
-5. **Admin console MVP (H3)** — new `_authenticated/admin.users.tsx` with paginated users list, columns (email, plan, monthly_used/limit, wallet, is_admin), row actions (grant credits, toggle role, view usage_history). Server functions gated by `has_role(auth.uid(),'admin')`. Removes all manual-SQL operator toil.
-
----
-
-## 9. Assumptions / Open Questions
-
-- Assumes Razorpay stays as the sole payment provider (no Stripe migration planned).
-- Assumes IndexedDB scene cache is acceptable to keep alongside cloud sync (not replace).
-- Not audited: analytics accuracy, email/notification pipeline (none found), rate limiting on server functions (none found — worth a follow-up audit if abuse becomes a concern).
-
-Approve to proceed with Step 1 of the Next 5, or reorder priorities.
+## Known limitations of the current slice
+- The editor persists to `projects.metadata` but the video pipeline still runs against its own AI-generated script — until step 1 above is done, edits do not yet change what gets rendered.
+- `estimateCredits` uses ballpark numbers; align with `src/lib/credit-costs.ts` in a follow-up.
+- Drag-and-drop reorder is button-based (▲▼); DnD can be added when we bring the same UX from `linkedin-carousel-studio`.
+- No inline preview of scene thumbnails yet — will hook into the shot blob store during the pipeline wire-in.
