@@ -23,6 +23,7 @@ import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-imag
 import { Route as AuthenticatedVideosRouteImport } from './routes/_authenticated/videos'
 import { Route as AuthenticatedThumbnailsRouteImport } from './routes/_authenticated/thumbnails'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedLinkedinPostsRouteImport } from './routes/_authenticated/linkedin-posts'
 import { Route as AuthenticatedInvoicesRouteImport } from './routes/_authenticated/invoices'
 import { Route as AuthenticatedImagesRouteImport } from './routes/_authenticated/images'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -113,6 +114,12 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedLinkedinPostsRoute =
+  AuthenticatedLinkedinPostsRouteImport.update({
+    id: '/linkedin-posts',
+    path: '/linkedin-posts',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedInvoicesRoute = AuthenticatedInvoicesRouteImport.update({
   id: '/invoices',
   path: '/invoices',
@@ -161,9 +168,9 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
 } as any)
 const AuthenticatedLinkedinPostsIndexRoute =
   AuthenticatedLinkedinPostsIndexRouteImport.update({
-    id: '/linkedin-posts/',
-    path: '/linkedin-posts/',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedLinkedinPostsRoute,
   } as any)
 const AuthenticatedProjectsIdRoute = AuthenticatedProjectsIdRouteImport.update({
   id: '/projects/$id',
@@ -172,15 +179,15 @@ const AuthenticatedProjectsIdRoute = AuthenticatedProjectsIdRouteImport.update({
 } as any)
 const AuthenticatedLinkedinPostsNewRoute =
   AuthenticatedLinkedinPostsNewRouteImport.update({
-    id: '/linkedin-posts/new',
-    path: '/linkedin-posts/new',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => AuthenticatedLinkedinPostsRoute,
   } as any)
 const AuthenticatedLinkedinPostsIdRoute =
   AuthenticatedLinkedinPostsIdRouteImport.update({
-    id: '/linkedin-posts/$id',
-    path: '/linkedin-posts/$id',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedLinkedinPostsRoute,
   } as any)
 const AuthenticatedCreateCarouselRoute =
   AuthenticatedCreateCarouselRouteImport.update({
@@ -242,6 +249,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/images': typeof AuthenticatedImagesRoute
   '/invoices': typeof AuthenticatedInvoicesRoute
+  '/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/videos': typeof AuthenticatedVideosRoute
@@ -314,6 +322,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/images': typeof AuthenticatedImagesRoute
   '/_authenticated/invoices': typeof AuthenticatedInvoicesRoute
+  '/_authenticated/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/_authenticated/videos': typeof AuthenticatedVideosRoute
@@ -351,6 +360,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/images'
     | '/invoices'
+    | '/linkedin-posts'
     | '/settings'
     | '/thumbnails'
     | '/videos'
@@ -422,6 +432,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/images'
     | '/_authenticated/invoices'
+    | '/_authenticated/linkedin-posts'
     | '/_authenticated/settings'
     | '/_authenticated/thumbnails'
     | '/_authenticated/videos'
@@ -558,6 +569,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/linkedin-posts': {
+      id: '/_authenticated/linkedin-posts'
+      path: '/linkedin-posts'
+      fullPath: '/linkedin-posts'
+      preLoaderRoute: typeof AuthenticatedLinkedinPostsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/invoices': {
       id: '/_authenticated/invoices'
       path: '/invoices'
@@ -623,10 +641,10 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/linkedin-posts/': {
       id: '/_authenticated/linkedin-posts/'
-      path: '/linkedin-posts'
+      path: '/'
       fullPath: '/linkedin-posts/'
       preLoaderRoute: typeof AuthenticatedLinkedinPostsIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedLinkedinPostsRoute
     }
     '/_authenticated/projects/$id': {
       id: '/_authenticated/projects/$id'
@@ -637,17 +655,17 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/linkedin-posts/new': {
       id: '/_authenticated/linkedin-posts/new'
-      path: '/linkedin-posts/new'
+      path: '/new'
       fullPath: '/linkedin-posts/new'
       preLoaderRoute: typeof AuthenticatedLinkedinPostsNewRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedLinkedinPostsRoute
     }
     '/_authenticated/linkedin-posts/$id': {
       id: '/_authenticated/linkedin-posts/$id'
-      path: '/linkedin-posts/$id'
+      path: '/$id'
       fullPath: '/linkedin-posts/$id'
       preLoaderRoute: typeof AuthenticatedLinkedinPostsIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedLinkedinPostsRoute
     }
     '/_authenticated/create_/carousel': {
       id: '/_authenticated/create_/carousel'
@@ -729,6 +747,25 @@ const AuthenticatedLinkedinPostsIdRouteWithChildren =
     AuthenticatedLinkedinPostsIdRouteChildren,
   )
 
+interface AuthenticatedLinkedinPostsRouteChildren {
+  AuthenticatedLinkedinPostsIdRoute: typeof AuthenticatedLinkedinPostsIdRouteWithChildren
+  AuthenticatedLinkedinPostsNewRoute: typeof AuthenticatedLinkedinPostsNewRoute
+  AuthenticatedLinkedinPostsIndexRoute: typeof AuthenticatedLinkedinPostsIndexRoute
+}
+
+const AuthenticatedLinkedinPostsRouteChildren: AuthenticatedLinkedinPostsRouteChildren =
+  {
+    AuthenticatedLinkedinPostsIdRoute:
+      AuthenticatedLinkedinPostsIdRouteWithChildren,
+    AuthenticatedLinkedinPostsNewRoute: AuthenticatedLinkedinPostsNewRoute,
+    AuthenticatedLinkedinPostsIndexRoute: AuthenticatedLinkedinPostsIndexRoute,
+  }
+
+const AuthenticatedLinkedinPostsRouteWithChildren =
+  AuthenticatedLinkedinPostsRoute._addFileChildren(
+    AuthenticatedLinkedinPostsRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedBillingRoute: typeof AuthenticatedBillingRoute
@@ -739,14 +776,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedImagesRoute: typeof AuthenticatedImagesRoute
   AuthenticatedInvoicesRoute: typeof AuthenticatedInvoicesRoute
+  AuthenticatedLinkedinPostsRoute: typeof AuthenticatedLinkedinPostsRouteWithChildren
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedThumbnailsRoute: typeof AuthenticatedThumbnailsRoute
   AuthenticatedVideosRoute: typeof AuthenticatedVideosRoute
   AuthenticatedCreateCarouselRoute: typeof AuthenticatedCreateCarouselRoute
-  AuthenticatedLinkedinPostsIdRoute: typeof AuthenticatedLinkedinPostsIdRouteWithChildren
-  AuthenticatedLinkedinPostsNewRoute: typeof AuthenticatedLinkedinPostsNewRoute
   AuthenticatedProjectsIdRoute: typeof AuthenticatedProjectsIdRoute
-  AuthenticatedLinkedinPostsIndexRoute: typeof AuthenticatedLinkedinPostsIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -759,15 +794,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedImagesRoute: AuthenticatedImagesRoute,
   AuthenticatedInvoicesRoute: AuthenticatedInvoicesRoute,
+  AuthenticatedLinkedinPostsRoute: AuthenticatedLinkedinPostsRouteWithChildren,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedThumbnailsRoute: AuthenticatedThumbnailsRoute,
   AuthenticatedVideosRoute: AuthenticatedVideosRoute,
   AuthenticatedCreateCarouselRoute: AuthenticatedCreateCarouselRoute,
-  AuthenticatedLinkedinPostsIdRoute:
-    AuthenticatedLinkedinPostsIdRouteWithChildren,
-  AuthenticatedLinkedinPostsNewRoute: AuthenticatedLinkedinPostsNewRoute,
   AuthenticatedProjectsIdRoute: AuthenticatedProjectsIdRoute,
-  AuthenticatedLinkedinPostsIndexRoute: AuthenticatedLinkedinPostsIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
