@@ -33,16 +33,13 @@ export const refundCreditsFn = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: result, error } = await (supabaseAdmin.rpc as (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>)(
-      "refund_credits",
-      {
-        _user_id: context.userId,
-        _amount: data.amount,
-        _project_id: data.projectId,
-        _description: data.description,
-        _source: data.source,
-      },
-    );
+    const { data: result, error } = await supabaseAdmin.rpc("refund_credits", {
+      _user_id: context.userId,
+      _amount: data.amount,
+      _project_id: data.projectId,
+      _description: data.description,
+      _source: data.source,
+    });
     if (error) {
       console.error("[refund_credits] rpc error", error);
       throw new Error(error.message);
