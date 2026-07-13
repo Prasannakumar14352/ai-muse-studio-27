@@ -34,7 +34,7 @@ function LinkedinPostViewPage() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
   const del = useProjectDelete();
-  const [tab, setTab] = useState<"post" | "image" | "carousel">("post");
+  const [tab, setTab] = useState<"post" | "image" | "carousel" | "preview">("post");
 
   const { data: project, isLoading, refetch } = useQuery({
     queryKey: ["linkedin-post", id],
