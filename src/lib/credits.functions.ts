@@ -36,7 +36,7 @@ export const refundCreditsFn = createServerFn({ method: "POST" })
     const { data: result, error } = await supabaseAdmin.rpc("refund_credits", {
       _user_id: context.userId,
       _amount: data.amount,
-      _project_id: data.projectId,
+      _project_id: (data.projectId ?? null) as unknown as string,
       _description: data.description,
       _source: data.source,
     });
