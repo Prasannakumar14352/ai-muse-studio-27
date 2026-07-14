@@ -75,3 +75,15 @@ export const runRazorpayDiagnostic = createServerFn({ method: "POST" })
     const { runDiagnostic } = await import("@/lib/razorpay-settings.server");
     return await runDiagnostic();
   });
+
+/**
+ * Admin: create a real ₹1 INR order (manual capture) so the admin can open
+ * Razorpay Checkout and visually inspect UPI QR rendering. Not auto-charged.
+ */
+export const createRazorpayCheckoutProbe = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { createCheckoutProbeOrder } = await import("@/lib/razorpay-settings.server");
+    return await createCheckoutProbeOrder();
+  });

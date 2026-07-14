@@ -5,8 +5,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccess } from "@/lib/access";
-import { runRazorpayDiagnostic } from "@/lib/razorpay-settings.functions";
-import { ArrowLeft, ShieldCheck, ShieldAlert, RefreshCw, ChevronDown, ChevronRight, Activity, AlertTriangle, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { runRazorpayDiagnostic, createRazorpayCheckoutProbe } from "@/lib/razorpay-settings.functions";
+import { ArrowLeft, ShieldCheck, ShieldAlert, RefreshCw, ChevronDown, ChevronRight, Activity, AlertTriangle, CheckCircle2, XCircle, Loader2, Info, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/webhooks")({ component: AdminWebhooksPage });
 
@@ -197,7 +197,9 @@ type Diag = Awaited<ReturnType<typeof runRazorpayDiagnostic>>;
 
 function DiagnosticPanel() {
   const runDiag = useServerFn(runRazorpayDiagnostic);
+  const runProbe = useServerFn(createRazorpayCheckoutProbe);
   const [busy, setBusy] = useState(false);
+  const [probing, setProbing] = useState(false);
   const [result, setResult] = useState<Diag | null>(null);
 
   async function handleRun() {
@@ -214,30 +216,71 @@ function DiagnosticPanel() {
     }
   }
 
+  async function handleCheckoutProbe() {
+    setProbing(true);
+    try {
+      const probe = await runProbe();
+      await ensureRazorpayScript();
+      const w = window as unknown as { Razorpay: new (opts: Record<string, unknown>) => { open: () => void } };
+      const rzp = new w.Razorpay({
+        key: probe.keyId,
+        order_id: probe.orderId,
+        amount: probe.amount,
+        currency: probe.currency,
+        name: probe.companyName ?? "Checkout probe",
+        description: "UPI QR rendering probe — do not pay",
+        image: probe.logoUrl ?? undefined,
+        theme: { color: probe.themeColor ?? "#0F172A" },
+        handler: () => {
+          toast.message("Checkout closed. Probe order is manual-capture and will not be charged.");
+        },
+        modal: {
+          ondismiss: () => toast.message("Checkout closed without payment."),
+        },
+      });
+      rzp.open();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Checkout probe failed");
+    } finally {
+      setProbing(false);
+    }
+  }
+
   return (
     <section className="glass rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Activity className="w-4 h-4 text-purple-300" /> Diagnostic — order + UPI/QR probe
+            <Activity className="w-4 h-4 text-purple-300" /> Diagnostic — Razorpay order + UPI/QR
           </h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Creates a ₹1 INR order (never charged, expires unpaid) and probes enabled payment methods for this merchant account.
+            Creates a ₹1 INR probe order (never charged, expires unpaid). Successful order creation is the authoritative proof that the saved Key ID + Secret are valid for this environment.
           </p>
         </div>
-        <button
-          onClick={handleRun}
-          disabled={busy}
-          className="inline-flex items-center gap-2 rounded-lg gradient-primary text-white px-4 py-2 text-sm disabled:opacity-60"
-        >
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
-          {busy ? "Running…" : "Run diagnostic"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCheckoutProbe}
+            disabled={probing}
+            className="inline-flex items-center gap-2 rounded-lg glass hover:bg-white/10 border border-border/40 px-4 py-2 text-sm disabled:opacity-60"
+            title="Open Razorpay Checkout with a ₹1 manual-capture order so you can visually confirm the UPI QR renders."
+          >
+            {probing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+            {probing ? "Opening…" : "Run checkout probe (₹1, not charged)"}
+          </button>
+          <button
+            onClick={handleRun}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-lg gradient-primary text-white px-4 py-2 text-sm disabled:opacity-60"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+            {busy ? "Running…" : "Run diagnostic"}
+          </button>
+        </div>
       </div>
 
       {!result && (
         <p className="text-sm text-muted-foreground py-6 text-center">
-          Run the diagnostic to verify credentials, order creation, and UPI QR availability.
+          Run the diagnostic to verify credentials, order creation, and payment configuration.
         </p>
       )}
 
@@ -255,7 +298,7 @@ function DiagnosticPanel() {
           {result.order && (
             <div className="rounded-lg border border-border/40 bg-black/20 p-3 text-xs">
               <div className="font-semibold text-sm mb-1 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Order created
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Probe order created
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <Field label="Order ID" value={result.order.id} />
@@ -266,28 +309,43 @@ function DiagnosticPanel() {
             </div>
           )}
 
-          {result.methods && (
-            <div className="rounded-lg border border-border/40 bg-black/20 p-3 text-xs">
-              <div className="font-semibold text-sm mb-2">Enabled payment methods</div>
-              <div className="flex flex-wrap gap-2">
-                <MethodPill on={result.methods.upi} label="UPI" />
-                <MethodPill on={result.methods.upiFlows?.qr} label="UPI QR" />
-                <MethodPill on={result.methods.upiFlows?.collect} label="UPI Collect" />
-                <MethodPill on={result.methods.upiFlows?.intent} label="UPI Intent" />
-                <MethodPill on={result.methods.card} label="Card" />
-                <MethodPill on={result.methods.netbanking} label="Netbanking" />
-                <MethodPill on={result.methods.wallet} label="Wallet" />
+          <div className="rounded-lg border border-border/40 bg-black/20 p-3 text-xs">
+            <div className="font-semibold text-sm mb-2">Validation checklist</div>
+            <ul className="space-y-1.5">
+              <CheckRow ok={result.checks.orderApi === "ok"} label="Order API" value="Connected" failValue="Failed" />
+              <CheckRow ok label="Environment" value={result.checks.environment.toUpperCase()} />
+              <CheckRow ok={result.checks.currency === "INR"} label="Currency" value={result.checks.currency} />
+              <CheckRow ok={result.checks.amountValidation === "ok"} label="Amount validation" value="Passed" failValue="Failed" />
+              <CheckRow ok={result.checks.credentialPair === "ok"} label="Credential pair" value="Valid" failValue="Invalid" />
+              <li className="flex items-start gap-2">
+                <Info className="w-3.5 h-3.5 mt-0.5 text-sky-300 shrink-0" />
+                <div>
+                  <span className="text-muted-foreground">UPI QR availability:</span>{" "}
+                  <span className="text-sky-200">Must be verified in Razorpay Dashboard / live checkout</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 text-sky-100 p-3 text-xs">
+            <div className="flex items-start gap-2">
+              <Info className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold">UPI QR is account-side — verify in the dashboard</p>
+                <p>
+                  Successful order creation above proves the saved Key ID + Secret are valid.
+                  Razorpay does not expose a reliable API to confirm UPI QR is turned on, so the QR
+                  can only be verified in the dashboard or a real checkout.
+                </p>
+                <ol className="list-decimal ml-4 mt-1 space-y-0.5">
+                  <li>Open Razorpay Dashboard → Account &amp; Settings → Payment Methods → UPI.</li>
+                  <li>Confirm UPI and the QR / Collect flow are enabled for Live Mode.</li>
+                  <li>Confirm account activation and website/app verification are complete.</li>
+                  <li>Click <em>Run checkout probe</em> above to visually inspect the QR — close without paying.</li>
+                </ol>
               </div>
-              {result.methods.rawJson && (
-                <details className="mt-2">
-                  <summary className="cursor-pointer text-muted-foreground">Raw /v1/methods response</summary>
-                  <pre className="mt-2 max-h-64 overflow-auto rounded bg-black/40 p-3 text-[11px]">
-                    {JSON.stringify(JSON.parse(result.methods.rawJson), null, 2)}
-                  </pre>
-                </details>
-              )}
             </div>
-          )}
+          </div>
 
           {result.warnings.map((w, i) => (
             <div key={`w${i}`} className="rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-100 p-3 text-xs flex gap-2">
@@ -305,6 +363,34 @@ function DiagnosticPanel() {
   );
 }
 
+function CheckRow({ ok, label, value, failValue }: { ok: boolean; label: string; value: string; failValue?: string }) {
+  return (
+    <li className="flex items-start gap-2">
+      {ok
+        ? <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 text-emerald-400 shrink-0" />
+        : <XCircle className="w-3.5 h-3.5 mt-0.5 text-rose-400 shrink-0" />}
+      <div>
+        <span className="text-muted-foreground">{label}:</span>{" "}
+        <span className={ok ? "text-emerald-200" : "text-rose-200"}>{ok ? value : (failValue ?? value)}</span>
+      </div>
+    </li>
+  );
+}
+
+async function ensureRazorpayScript(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const w = window as unknown as { Razorpay?: unknown };
+  if (w.Razorpay) return;
+  await new Promise<void>((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Failed to load Razorpay checkout script"));
+    document.head.appendChild(s);
+  });
+}
+
 function Stat({ label, value, tone, mono }: { label: string; value: string; tone?: "emerald" | "amber" | "rose"; mono?: boolean }) {
   const toneCls =
     tone === "emerald" ? "text-emerald-300" :
@@ -315,21 +401,5 @@ function Stat({ label, value, tone, mono }: { label: string; value: string; tone
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className={`font-semibold mt-0.5 ${toneCls} ${mono ? "font-mono text-xs" : ""}`}>{value}</div>
     </div>
-  );
-}
-
-function MethodPill({ on, label }: { on: boolean | undefined; label: string }) {
-  const enabled = on === true;
-  const unknown = on === undefined;
-  const cls = enabled
-    ? "bg-emerald-500/15 text-emerald-200 border-emerald-500/40"
-    : unknown
-      ? "bg-white/5 text-muted-foreground border-border/40"
-      : "bg-rose-500/15 text-rose-200 border-rose-500/40";
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-xs ${cls}`}>
-      {enabled ? <CheckCircle2 className="w-3 h-3" /> : unknown ? <ShieldAlert className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-      {label}{unknown ? " (?)" : ""}
-    </span>
   );
 }
