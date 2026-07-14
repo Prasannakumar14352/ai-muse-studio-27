@@ -169,6 +169,45 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_packs: {
+        Row: {
+          active: boolean
+          bonus: string | null
+          code: string
+          created_at: string
+          credits: number
+          id: string
+          label: string
+          price_usd: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          bonus?: string | null
+          code: string
+          created_at?: string
+          credits: number
+          id?: string
+          label: string
+          price_usd: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          bonus?: string | null
+          code?: string
+          created_at?: string
+          credits?: number
+          id?: string
+          label?: string
+          price_usd?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       generated_assets: {
         Row: {
           asset_type: string
@@ -403,6 +442,60 @@ export type Database = {
         }
         Relationships: []
       }
+      pricing_plans: {
+        Row: {
+          active: boolean
+          code: string
+          contact_sales: boolean
+          created_at: string
+          featured: boolean
+          features: Json
+          id: string
+          included_credits: number
+          monthly_credits: number
+          name: string
+          period_label: string | null
+          plan_type: string
+          price_usd: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          contact_sales?: boolean
+          created_at?: string
+          featured?: boolean
+          features?: Json
+          id?: string
+          included_credits?: number
+          monthly_credits?: number
+          name: string
+          period_label?: string | null
+          plan_type: string
+          price_usd?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          contact_sales?: boolean
+          created_at?: string
+          featured?: boolean
+          features?: Json
+          id?: string
+          included_credits?: number
+          monthly_credits?: number
+          name?: string
+          period_label?: string | null
+          plan_type?: string
+          price_usd?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           brand_name: string | null
@@ -414,6 +507,7 @@ export type Database = {
           full_name: string | null
           id: string
           is_admin: boolean
+          lifetime_credits: number
           plan: string
           role: string
           updated_at: string
@@ -429,6 +523,7 @@ export type Database = {
           full_name?: string | null
           id: string
           is_admin?: boolean
+          lifetime_credits?: number
           plan?: string
           role?: string
           updated_at?: string
@@ -444,6 +539,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_admin?: boolean
+          lifetime_credits?: number
           plan?: string
           role?: string
           updated_at?: string
@@ -825,9 +921,12 @@ export type Database = {
         Row: {
           expires_at: string | null
           id: string
+          included_credits: number
+          lifetime_access: boolean
           monthly_credit_limit: number
           monthly_credits_used: number
           plan_name: string
+          plan_type: string
           renews_at: string | null
           started_at: string
           status: string
@@ -837,9 +936,12 @@ export type Database = {
         Insert: {
           expires_at?: string | null
           id?: string
+          included_credits?: number
+          lifetime_access?: boolean
           monthly_credit_limit?: number
           monthly_credits_used?: number
           plan_name?: string
+          plan_type?: string
           renews_at?: string | null
           started_at?: string
           status?: string
@@ -849,9 +951,12 @@ export type Database = {
         Update: {
           expires_at?: string | null
           id?: string
+          included_credits?: number
+          lifetime_access?: boolean
           monthly_credit_limit?: number
           monthly_credits_used?: number
           plan_name?: string
+          plan_type?: string
           renews_at?: string | null
           started_at?: string
           status?: string
