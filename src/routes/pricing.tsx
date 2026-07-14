@@ -401,7 +401,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [paying, setPaying] = useState(false);
-  const [rate, setRate] = useState<number | null>(null);
+  const [rateInfo, setRateInfo] = useState<{ rate: number; source: string; status: string; updatedAt: string | null; warning: string | null } | null>(null);
   const credits = effective === "lifetime"
     ? (plan.includedCredits || plan.monthlyCredits)
     : effective === "yearly"
@@ -410,9 +410,12 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
 
   useEffect(() => {
     let alive = true;
-    getRate().then((r: { rate: number }) => { if (alive) setRate(r.rate); }).catch(() => {});
+    getRate()
+      .then((r) => { if (alive) setRateInfo({ rate: r.rate, source: r.source, status: r.status, updatedAt: r.updatedAt, warning: r.warning }); })
+      .catch(() => {});
     return () => { alive = false; };
   }, [getRate]);
+  const rate = rateInfo?.rate ?? null;
 
   const inrPreview = rate ? Math.round(price * rate) : null;
 
