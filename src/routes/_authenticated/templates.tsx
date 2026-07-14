@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Sparkles, Lock, Star, Search as SearchIcon, Wand2 } from "lucide-react";
 import { listTemplatesFn, planTier, canAccessTemplate, categoryToContentType, type TemplateRecord } from "@/lib/templates.functions";
 import { useAccess } from "@/lib/access";
+import { TemplatePreview } from "@/components/template-preview";
 
 export const Route = createFileRoute("/_authenticated/templates")({
   head: () => ({
