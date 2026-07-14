@@ -1235,13 +1235,29 @@ function JobDashboard({
           </div>
           <div className="flex items-center gap-2">
             {dash.phase !== "complete" && dash.phase !== "failed" && (
-              <button
-                onClick={onCancel}
-                className="rounded-lg glass border border-border px-3 py-1.5 text-xs flex items-center gap-1.5"
-                title="Pause — you can resume later from your videos list"
-              >
-                <X className="w-3.5 h-3.5" /> Cancel
-              </button>
+              <>
+                <button
+                  onClick={onEditBlueprint}
+                  className="rounded-lg glass border border-amber-500/40 text-amber-200 px-3 py-1.5 text-xs flex items-center gap-1.5"
+                  title={
+                    dash.phase === "generating_shots" || dash.phase === "voiceover" || dash.phase === "rendering"
+                      ? "Stop and edit — pauses generation without deleting cached assets"
+                      : "Open the blueprint editor"
+                  }
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  {dash.phase === "generating_shots" || dash.phase === "voiceover" || dash.phase === "rendering"
+                    ? "Stop & edit blueprint"
+                    : "Edit blueprint"}
+                </button>
+                <button
+                  onClick={onCancel}
+                  className="rounded-lg glass border border-border px-3 py-1.5 text-xs flex items-center gap-1.5"
+                  title="Pause — you can resume later from your videos list"
+                >
+                  <X className="w-3.5 h-3.5" /> Cancel
+                </button>
+              </>
             )}
             <button
               onClick={onBack}
