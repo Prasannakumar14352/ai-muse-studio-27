@@ -140,7 +140,7 @@ function TemplateEditor({ initial, onClose, onSaved }: {
       toast.error("slug, name and category are required");
       return;
     }
-    let brief: Record<string, unknown> = {};
+    let brief: any = {};
     try { brief = JSON.parse(briefJson || "{}"); }
     catch { toast.error("default_brief is not valid JSON"); return; }
     setSaving(true);
