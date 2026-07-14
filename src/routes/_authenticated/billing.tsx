@@ -235,7 +235,7 @@ function BillingPage() {
                         <td className="px-4 py-3">{p.pack_id.replace(/_/g, " ")}</td>
                         <td className="px-4 py-3 text-right">{p.credits.toLocaleString()}</td>
                         <td className="px-4 py-3 text-right font-medium">
-                          {p.currency === "INR" ? "₹" : "$"}{(p.amount_cents / 100).toLocaleString(undefined, { minimumFractionDigits: p.currency === "INR" ? 0 : 2, maximumFractionDigits: 2 })} {p.currency}
+                          ${(p.amount_cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                         </td>
                         <td className="px-6 py-3 text-center"><StatusPill status={p.status} /></td>
                       </tr>
