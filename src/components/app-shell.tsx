@@ -156,11 +156,32 @@ export function AppShell({ children }: { children: ReactNode }) {
     navigate({ to: "/auth", replace: true });
   }
 
+  // Longest-prefix wins: pick exactly one active nav item across ALL sections.
+  // This prevents sibling items from staying active (e.g. /admin AND /admin/templates).
+  const allNavRoutes = useMemo(
+    () => SECTIONS.flatMap((s) => s.items.map((i) => i.to)),
+    []
+  );
+  const activeRoute = useMemo(() => {
+    if (derivedNav) return derivedNav;
+    // Exact match beats everything.
+    const exact = allNavRoutes.find((r) => r === pathname);
+    if (exact) return exact;
+    // Otherwise pick the longest prefix match on a "/segment" boundary.
+    let best: string | null = null;
+    for (const r of allNavRoutes) {
+      if (r === "/") continue;
+      if (pathname === r || pathname.startsWith(r + "/")) {
+        if (!best || r.length > best.length) best = r;
+      }
+    }
+    return best;
+  }, [allNavRoutes, pathname, derivedNav]);
+
   function isActive(to: string): boolean {
-    if (derivedNav) return derivedNav === to;
-    if (to === "/dashboard") return pathname === "/dashboard";
-    return pathname === to || pathname.startsWith(to + "/");
+    return activeRoute === to;
   }
+
 
   function renderNavItem(n: NavItem, onClick?: () => void) {
     const active = isActive(n.to);
