@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { parseStructuredJsonResponse } from "@/lib/video-json";
 import {
   buildAssetPlanHeuristic,
   buildBriefFromIntent,
@@ -207,14 +208,8 @@ Return JSON EXACTLY:
     const raw = j.choices?.[0]?.message?.content ?? "";
     if (!raw) throw new Error("AI returned empty content");
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      const m = raw.match(/\{[\s\S]*\}/);
-      if (!m) throw new Error("AI response was not valid JSON");
-      parsed = JSON.parse(m[0]);
-    }
+    const { value: parsed } = parseStructuredJsonResponse(raw);
+
 
     const Schema = z.object({
       title: z.string(),
