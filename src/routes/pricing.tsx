@@ -127,8 +127,11 @@ function PricingPage() {
 /* ------------- Pricing card ------------- */
 
 function PricingCard({ plan: p, isCurrent, onSelect }: { plan: PlanDef; isCurrent: boolean; onSelect: () => void }) {
-  const totalCredits = p.monthlyCredits + (p.signupCredits ?? 0);
-  const estimate = p.contactSales ? null : getPlanGenerationEstimate(totalCredits);
+  const isLifetime = p.planType === "lifetime";
+  const totalCredits = isLifetime
+    ? (p.includedCredits ?? 0)
+    : p.monthlyCredits + (p.signupCredits ?? 0);
+  const estimate = p.contactSales || isLifetime ? null : getPlanGenerationEstimate(totalCredits);
 
   const wrapper = [
     "relative flex flex-col rounded-2xl p-6 md:p-7 min-h-[560px] transition-all duration-300",
@@ -136,6 +139,7 @@ function PricingCard({ plan: p, isCurrent, onSelect }: { plan: PlanDef; isCurren
     "hover:border-white/20 hover:-translate-y-0.5 hover:shadow-[0_10px_40px_-15px_rgba(0,0,0,0.6)]",
     p.featured ? "border-transparent bg-gradient-to-b from-[color:var(--neon-purple)]/10 to-transparent ring-1 ring-[color:var(--neon-purple)]/40" : "",
     p.contactSales ? "border-[color:var(--brand-orange)]/40" : "",
+    isLifetime ? "ring-1 ring-amber-400/30" : "",
   ].join(" ");
 
   return (
@@ -150,6 +154,11 @@ function PricingCard({ plan: p, isCurrent, onSelect }: { plan: PlanDef; isCurren
           For teams
         </div>
       )}
+      {isLifetime && !p.featured && (
+        <div className="absolute -top-3 left-6 bg-amber-400 text-black text-[11px] uppercase tracking-wider px-2.5 py-1 rounded-full font-semibold shadow-md">
+          Pay once
+        </div>
+      )}
 
       {/* Header */}
       <div>
@@ -161,11 +170,14 @@ function PricingCard({ plan: p, isCurrent, onSelect }: { plan: PlanDef; isCurren
         <div className="mt-3 text-sm text-muted-foreground">
           {p.contactSales
             ? "Custom credit pool sized to your team."
-            : totalCredits > 0
-              ? <>Includes <strong className="text-foreground">{totalCredits.toLocaleString()}</strong> credits{p.signupCredits ? " (with signup bonus)" : " / month"}.</>
-              : "Free to start — no credit card required."}
+            : isLifetime
+              ? <>Includes <strong className="text-foreground">{totalCredits.toLocaleString()}</strong> credits at purchase · top up any time.</>
+              : totalCredits > 0
+                ? <>Includes <strong className="text-foreground">{totalCredits.toLocaleString()}</strong> credits{p.signupCredits ? " (with signup bonus)" : " / month"}.</>
+                : "Free to start — no credit card required."}
         </div>
       </div>
+
 
       {/* Estimated usage */}
       {estimate && (
