@@ -3,11 +3,66 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_PACKS } from "@/lib/constants";
 
 /**
- * Currency is USD across the app. The `Currency` type + `currency` inputs
- * are kept so the payment layer stays configurable for future multi-currency
- * support without touching call sites.
+ * Currency handling:
+ *  - Public site advertises prices in USD.
+ *  - Razorpay orders are ALWAYS created in INR (paise) because Razorpay's
+ *    default merchant account only supports INR settlements.
+ *  - Conversion rate comes from `public.app_settings` key = `usd_to_inr_rate`
+ *    (admin-editable). If missing, we fall back to DEFAULT_USD_TO_INR.
+ *  - We persist USD price, conversion rate, INR paise, and Razorpay order/payment
+ *    IDs on every payments row for audit / invoices.
  */
-type Currency = "USD";
+const DEFAULT_USD_TO_INR = 88.5;
+
+type UsdInrSetting = { rate: number; updatedAt: string | null; source: "db" | "default" };
+
+async function readUsdToInrRate(): Promise<UsdInrSetting> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("app_settings")
+    .select("value, updated_at")
+    .eq("key", "usd_to_inr_rate")
+    .maybeSingle();
+  const raw = (data as { value?: { rate?: unknown }; updated_at?: string } | null) ?? null;
+  const rateNum = Number(raw?.value?.rate);
+  if (raw && Number.isFinite(rateNum) && rateNum > 0) {
+    return { rate: rateNum, updatedAt: raw.updated_at ?? null, source: "db" };
+  }
+  return { rate: DEFAULT_USD_TO_INR, updatedAt: null, source: "default" };
+}
+
+function usdToInrPaise(priceUsd: number, rate: number): { inrRupees: number; inrPaise: number } {
+  const rupees = Math.round(priceUsd * rate);
+  return { inrRupees: rupees, inrPaise: rupees * 100 };
+}
+
+/** Public: current USD→INR rate for the checkout confirmation UI. */
+export const getUsdInrRate = createServerFn({ method: "GET" }).handler(async () => {
+  const s = await readUsdToInrRate();
+  return { rate: s.rate, updatedAt: s.updatedAt, source: s.source };
+});
+
+/** Admin: update the USD→INR rate. */
+export const setUsdInrRate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { rate: number }) => {
+    const r = Number(input?.rate);
+    if (!Number.isFinite(r) || r <= 0 || r > 1000) throw new Error("Invalid rate");
+    return { rate: r };
+  })
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("app_settings")
+      .upsert({ key: "usd_to_inr_rate", value: { rate: data.rate }, updated_by: context.userId });
+    if (error) throw new Error(error.message);
+    return { ok: true, rate: data.rate };
+  });
 
 /** Public config for the browser Razorpay checkout (key_id only — safe to expose). */
 export const getRazorpayConfig = createServerFn({ method: "GET" }).handler(async () => {
@@ -16,12 +71,12 @@ export const getRazorpayConfig = createServerFn({ method: "GET" }).handler(async
   return { keyId };
 });
 
-/** Create a Razorpay order for a credit pack (USD) + record a pending payment row. */
+/** Create a Razorpay order for a credit pack. Always billed in INR. */
 export const createRazorpayOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { packId: string; currency?: Currency }) => {
+  .inputValidator((input: { packId: string; currency?: string }) => {
     if (!input || typeof input.packId !== "string") throw new Error("packId required");
-    return { packId: input.packId, currency: "USD" as Currency };
+    return { packId: input.packId };
   })
   .handler(async ({ data, context }) => {
     const pack = CREDIT_PACKS.find((p) => p.id === data.packId);
@@ -31,19 +86,28 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keyId || !keySecret) throw new Error("Razorpay not configured");
 
+    const { rate } = await readUsdToInrRate();
+    const priceUsdCents = Math.round(pack.priceUSD * 100);
+    const { inrRupees, inrPaise } = usdToInrPaise(pack.priceUSD, rate);
+
     const shortUid = context.userId.replace(/-/g, "").slice(0, 12);
     const receipt = `rcpt_${shortUid}_${Date.now().toString(36)}`.slice(0, 40);
 
     const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-    const amountCents = Math.round(pack.priceUSD * 100);
     const res = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
       body: JSON.stringify({
-        amount: amountCents,
-        currency: "USD",
+        amount: inrPaise,
+        currency: "INR",
         receipt,
-        notes: { user_id: context.userId, pack_id: pack.id, credits: pack.credits },
+        notes: {
+          user_id: context.userId,
+          pack_id: pack.id,
+          credits: pack.credits,
+          usd_price: pack.priceUSD,
+          usd_to_inr_rate: rate,
+        },
       }),
     });
     if (!res.ok) {
@@ -59,10 +123,13 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       razorpay_order_id: order.id,
       pack_id: pack.id,
       credits: pack.credits,
-      amount_cents: amountCents,
-      currency: "USD",
+      amount_cents: inrPaise,
+      currency: "INR",
       status: "pending",
       receipt_number: receipt,
+      price_usd_cents: priceUsdCents,
+      conversion_rate: rate,
+      amount_inr_paise: inrPaise,
     });
     if (error) {
       console.error("payments insert error:", error);
@@ -74,11 +141,14 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       amount: order.amount,
       currency: order.currency,
       keyId,
+      inrRupees,
+      inrPaise,
+      rate,
       pack: { id: pack.id, label: pack.label, credits: pack.credits, priceUSD: pack.priceUSD },
     };
   });
 
-/** Create a Razorpay order for a plan (USD, billing cycle aware). */
+/** Create a Razorpay order for a plan. Always billed in INR. */
 export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { planId: string; billingCycle: "monthly" | "yearly" | "lifetime" }) => {
@@ -94,7 +164,6 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keyId || !keySecret) throw new Error("Razorpay not configured");
 
-    // Look up the plan from the DB (admin-editable pricing)
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: planRow, error: planErr } = await supabaseAdmin
       .from("pricing_plans")
@@ -113,8 +182,6 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
           : Number(plan.price_lifetime_usd ?? 0);
     if (!priceUsd || priceUsd <= 0) throw new Error("Plan is not purchasable for this billing cycle");
 
-    // Credits granted at purchase.
-    // Subscription monthly -> monthly_credits; yearly -> monthly_credits * 12; lifetime -> included_credits.
     const monthlyCredits = Number(plan.monthly_credits ?? 0);
     const includedCredits = Number(plan.included_credits ?? 0);
     const credits =
@@ -124,17 +191,20 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
           ? monthlyCredits * 12
           : monthlyCredits;
 
+    const { rate } = await readUsdToInrRate();
+    const priceUsdCents = Math.round(priceUsd * 100);
+    const { inrRupees, inrPaise } = usdToInrPaise(priceUsd, rate);
+
     const shortUid = context.userId.replace(/-/g, "").slice(0, 12);
     const receipt = `rcpt_${shortUid}_${Date.now().toString(36)}`.slice(0, 40);
 
     const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-    const amountCents = Math.round(priceUsd * 100);
     const res = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
       body: JSON.stringify({
-        amount: amountCents,
-        currency: "USD",
+        amount: inrPaise,
+        currency: "INR",
         receipt,
         notes: {
           user_id: context.userId,
@@ -142,6 +212,8 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
           plan_code: String(plan.code),
           billing_cycle: data.billingCycle,
           credits,
+          usd_price: priceUsd,
+          usd_to_inr_rate: rate,
         },
       }),
     });
@@ -157,10 +229,13 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
       razorpay_order_id: order.id,
       pack_id: `plan_${String(plan.code)}_${data.billingCycle}`,
       credits,
-      amount_cents: amountCents,
-      currency: "USD",
+      amount_cents: inrPaise,
+      currency: "INR",
       status: "pending",
       receipt_number: receipt,
+      price_usd_cents: priceUsdCents,
+      conversion_rate: rate,
+      amount_inr_paise: inrPaise,
     });
     if (error) {
       console.error("payments insert error:", error);
@@ -172,6 +247,9 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
       amount: order.amount,
       currency: order.currency,
       keyId,
+      inrRupees,
+      inrPaise,
+      rate,
       plan: {
         id: String(plan.id),
         code: String(plan.code),
@@ -183,10 +261,7 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
     };
   });
 
-
-
-
-/** Verify Razorpay checkout signature + finalize the payment (add credits, mark success). */
+/** Verify Razorpay checkout signature + finalize the payment. */
 export const verifyRazorpayPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: {
@@ -226,7 +301,6 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       return { ok: true, alreadyCredited: true, credits: payment.credits };
     }
 
-    // Mark success (idempotent guard on status = 'pending')
     const { error: upErr } = await supabaseAdmin
       .from("payments")
       .update({ status: "success", razorpay_payment_id: data.razorpay_payment_id })
@@ -235,9 +309,6 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     if (upErr) throw new Error("Could not update payment");
 
     const packId = payment.pack_id ?? "";
-    // Two formats supported:
-    //   plan_<code>_<cycle>  → DB-backed plan
-    //   plan_<oldConstantId> → legacy (pre-refactor) constant plan
     let dbPlan: Record<string, unknown> | null = null;
     let cycle: "monthly" | "yearly" | "lifetime" | null = null;
     if (packId.startsWith("plan_")) {
@@ -302,7 +373,6 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       return { ok: true, credits: payment.credits, subscription: true, planId: String(dbPlan.code) };
     }
 
-
     // Otherwise: top-up credit pack → wallet balance.
     const { data: profile } = await supabaseAdmin
       .from("profiles").select("user_credits").eq("id", context.userId).maybeSingle();
@@ -322,7 +392,7 @@ export const listMyPayments = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("payments")
-      .select("id, razorpay_order_id, razorpay_payment_id, pack_id, credits, amount_cents, currency, status, receipt_number, created_at")
+      .select("id, razorpay_order_id, razorpay_payment_id, pack_id, credits, amount_cents, currency, status, receipt_number, created_at, price_usd_cents, conversion_rate, amount_inr_paise")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false })
       .limit(200);
@@ -351,7 +421,7 @@ export const getMySubscription = createServerFn({ method: "GET" })
 
     const { data: recent } = await context.supabase
       .from("payments")
-      .select("id, razorpay_order_id, pack_id, credits, amount_cents, currency, status, created_at")
+      .select("id, razorpay_order_id, pack_id, credits, amount_cents, currency, status, created_at, price_usd_cents, conversion_rate, amount_inr_paise")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false })
       .limit(10);
@@ -364,4 +434,3 @@ export const getMySubscription = createServerFn({ method: "GET" })
       recentPayments: recent ?? [],
     };
   });
-
