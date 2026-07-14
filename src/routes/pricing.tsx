@@ -410,7 +410,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
 
   useEffect(() => {
     let alive = true;
-    getRate().then((r) => { if (alive) setRate(r.rate); }).catch(() => {});
+    getRate().then((r: { rate: number }) => { if (alive) setRate(r.rate); }).catch(() => {});
     return () => { alive = false; };
   }, [getRate]);
 
