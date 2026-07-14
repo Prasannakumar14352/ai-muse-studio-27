@@ -370,9 +370,12 @@ function VideosPage() {
   }
 
   /** Called from the Blueprint Editor when the user clicks "Approve & Generate Assets".
-   *  Runs shots + narration + subtitles + timeline, then PAUSES at the asset review gate. */
+   *  Stamps explicit approval, then runs shots + narration + subtitles + timeline,
+   *  then PAUSES at the asset review gate. */
   async function approveAndGenerate(jobId: string) {
     if (!gen) return;
+    // Stamp approval on the current blueprint version. Any later edit clears it.
+    await approveBlueprint(localBlueprintId(jobId));
     const meta = await getBlueprintMetadata(localBlueprintId(jobId));
     const edited = meta ? blueprintToScript(meta.currentBlueprint) : undefined;
     setError(null);
