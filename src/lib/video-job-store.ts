@@ -11,6 +11,7 @@ export type JobPhase =
   | "review"
   | "generating_shots"
   | "voiceover"
+  | "asset_review"
   | "rendering"
   | "complete"
   | "failed"
