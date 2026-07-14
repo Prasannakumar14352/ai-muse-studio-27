@@ -13,7 +13,7 @@ import {
   GuaranteeSection, TrustBadgesSection,
 } from "@/components/landing-sections";
 import { EXTRA_FAQ } from "@/lib/landing-content";
-const demoVideo = { url: "/creatorvault-demo.mp4", poster: "/brand/hero-poster.jpg" };
+
 
 
 export const Route = createFileRoute("/")({ component: Landing });
@@ -118,6 +118,13 @@ function Landing() {
         </div>
       </section>
 
+      {/* Video Testimonials */}
+      <VideoTestimonialsSection />
+
+      {/* Written Testimonials Carousel */}
+      <WrittenTestimonialsSection />
+
+
       {/* Pricing */}
       <section id="pricing" className="py-24 px-6">
         <div className="max-w-7xl mx-auto">
@@ -168,8 +175,15 @@ function Landing() {
         </div>
       </section>
 
+      {/* Guarantee */}
+      <GuaranteeSection />
+
+      {/* Trust Badges */}
+      <TrustBadgesSection />
+
       {/* FAQ */}
       <section id="faq" className="py-24 px-6">
+
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-4xl md:text-5xl font-bold">Questions, <span className="gradient-text">answered</span></h2>
