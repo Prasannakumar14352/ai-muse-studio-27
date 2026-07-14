@@ -209,7 +209,21 @@ function TemplateEditor({ initial, onClose, onSaved }: {
             <Field label="Platform"><input value={f.platform ?? ""} onChange={(e) => set("platform", e.target.value)} placeholder="instagram" className={input} /></Field>
           </div>
           <Field label="Style"><input value={f.style ?? ""} onChange={(e) => set("style", e.target.value)} placeholder="cinematic" className={input} /></Field>
-          <Field label="Preview image URL"><input value={f.preview_image_url ?? ""} onChange={(e) => set("preview_image_url", e.target.value)} className={input} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Preview type">
+              <select value={f.preview_type ?? "image"} onChange={(e) => set("preview_type", e.target.value as "image" | "video")} className={input}>
+                <option value="image">image</option>
+                <option value="video">video</option>
+              </select>
+            </Field>
+            <Field label="Alt text (accessibility)"><input value={f.alt_text ?? ""} onChange={(e) => set("alt_text", e.target.value)} className={input} /></Field>
+          </div>
+          <Field label="Preview image URL"><input value={f.preview_image_url ?? ""} onChange={(e) => set("preview_image_url", e.target.value)} placeholder="https://..." className={input} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Preview video URL (mp4)"><input value={f.preview_video_url ?? ""} onChange={(e) => set("preview_video_url", e.target.value)} placeholder="https://... .mp4" className={input} /></Field>
+            <Field label="Poster URL (video thumb)"><input value={f.poster_url ?? ""} onChange={(e) => set("poster_url", e.target.value)} placeholder="https://..." className={input} /></Field>
+          </div>
+          <p className="text-[11px] text-muted-foreground -mt-1">Leave preview fields empty to use the branded category placeholder.</p>
           <Field label="Default prompt (topic)">
             <textarea value={f.default_prompt ?? ""} onChange={(e) => set("default_prompt", e.target.value)} rows={2} className={input} />
           </Field>
