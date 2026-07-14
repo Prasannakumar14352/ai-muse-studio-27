@@ -5,8 +5,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccess } from "@/lib/access";
-import { runRazorpayDiagnostic } from "@/lib/razorpay-settings.functions";
-import { ArrowLeft, ShieldCheck, ShieldAlert, RefreshCw, ChevronDown, ChevronRight, Activity, AlertTriangle, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { runRazorpayDiagnostic, createRazorpayCheckoutProbe } from "@/lib/razorpay-settings.functions";
+import { ArrowLeft, ShieldCheck, ShieldAlert, RefreshCw, ChevronDown, ChevronRight, Activity, AlertTriangle, CheckCircle2, XCircle, Loader2, Info, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/webhooks")({ component: AdminWebhooksPage });
 
