@@ -338,7 +338,7 @@ const FAQ = [
   { q: "Can I switch between Monthly, Yearly and Lifetime?", a: "Yes. Any credits already in your wallet stay put, and we deduct in the order: monthly → top-ups → lifetime, so nothing is wasted." },
   { q: "Can I buy additional credit packs?", a: "Yes. Any user can top up anytime — packs are added instantly and never expire." },
   { q: "Do failed generations cost credits?", a: "No. Credits are only deducted when a generation succeeds; failed runs are refunded automatically." },
-  { q: "How is payment processed?", a: "Payments are processed securely by Razorpay in INR ($). We never store your card details." },
+  { q: "How is payment processed?", a: "Payments are processed securely by Razorpay in USD ($). We never store your card details." },
 ];
 function PricingFAQ() {
   const [open, setOpen] = useState<number | null>(0);
