@@ -276,10 +276,16 @@ function CreatePage() {
     );
   }
 
-  // Step 2: full brief form, preseeded with the chosen content type.
+  // Step 2: full brief form, preseeded with the chosen content type + optional template.
+  const templateBrief = (template?.default_brief ?? null) as Partial<ProjectBrief> | null;
   const initialBrief: Partial<ProjectBrief> = {
     content_type: selectedMeta.id,
     ...(selectedMeta.aspect ? { aspect_ratio: selectedMeta.aspect } : {}),
+    ...(template?.default_prompt ? { topic: template.default_prompt } : {}),
+    ...(template?.style ? { style: template.style } : {}),
+    ...(template?.platform ? { platform: template.platform } : {}),
+    ...(template?.aspect_ratio ? { aspect_ratio: template.aspect_ratio as ProjectBrief["aspect_ratio"] } : {}),
+    ...(templateBrief ?? {}),
   };
 
   return (
@@ -294,6 +300,19 @@ function CreatePage() {
         <p className="text-muted-foreground mt-1">{selectedMeta.description}</p>
       </div>
 
+      {template && (
+        <div className="glass rounded-2xl p-4 border border-[color:var(--brand-orange)]/40 bg-[color:var(--brand-orange)]/5 text-sm flex items-start gap-3">
+          <Sparkles className="w-4 h-4 text-[color:var(--brand-orange)] mt-0.5" />
+          <div>
+            <div className="font-semibold">Template: {template.name}</div>
+            {template.description && <p className="text-muted-foreground mt-0.5">{template.description}</p>}
+            <Link to="/templates" className="text-xs text-[color:var(--brand-orange)] hover:underline mt-1 inline-block">
+              Change template →
+            </Link>
+          </div>
+        </div>
+      )}
+
       <div className="glass rounded-2xl p-4 border border-[color:var(--neon-purple)]/40 bg-[color:var(--neon-purple)]/5 text-sm">
         <span className="font-semibold">One flow for create + edit.</span>{" "}
         <span className="text-muted-foreground">
@@ -302,6 +321,7 @@ function CreatePage() {
       </div>
 
       <ProjectBriefForm
+        key={template?.slug ?? "no-template"}
         initial={initialBrief}
         loading={loading}
         onSubmit={handleGenerate}
@@ -310,4 +330,5 @@ function CreatePage() {
     </div>
   );
 }
+
 
