@@ -43,8 +43,8 @@ function CurrencyAdmin() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (data?.manualFallback && !draft) setDraft(String(data.manualFallback));
-  }, [data?.manualFallback, draft]);
+    if (data?.manualFallback?.rate && !draft) setDraft(String(data.manualFallback.rate));
+  }, [data?.manualFallback?.rate, draft]);
 
   if (isLoading) return <div className="glass rounded-2xl h-64 animate-pulse" />;
   if (!access?.isAdmin) return <Navigate to="/dashboard" />;
@@ -192,7 +192,7 @@ function CurrencyAdmin() {
             </button>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Current fallback: ₹{data?.manualFallback?.toFixed(2) ?? "—"} · cache TTL: {data?.cacheTtlHours ?? "—"}h
+            Current fallback: ₹{data?.manualFallback?.rate?.toFixed(2) ?? "—"} · cache TTL: {data?.cacheTtlHours ?? "—"}h
           </p>
         </div>
 
