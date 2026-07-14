@@ -33,6 +33,7 @@ import { Route as AuthenticatedConnectionsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedCarouselsRouteImport } from './routes/_authenticated/carousels'
 import { Route as AuthenticatedCaptionsRouteImport } from './routes/_authenticated/captions'
 import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticated/billing'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedLinkedinPostsIndexRouteImport } from './routes/_authenticated/linkedin-posts.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
@@ -168,6 +169,11 @@ const AuthenticatedBillingRoute = AuthenticatedBillingRouteImport.update({
   path: '/billing',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedLinkedinPostsIndexRoute =
   AuthenticatedLinkedinPostsIndexRouteImport.update({
     id: '/',
@@ -175,9 +181,9 @@ const AuthenticatedLinkedinPostsIndexRoute =
     getParentRoute: () => AuthenticatedLinkedinPostsRoute,
   } as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
-  id: '/admin/',
-  path: '/admin/',
-  getParentRoute: () => AuthenticatedRouteRoute,
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
 const AuthenticatedProjectsIdRoute = AuthenticatedProjectsIdRouteImport.update({
   id: '/projects/$id',
@@ -204,21 +210,21 @@ const AuthenticatedCreateCarouselRoute =
   } as any)
 const AuthenticatedAdminWebhooksRoute =
   AuthenticatedAdminWebhooksRouteImport.update({
-    id: '/admin/webhooks',
-    path: '/admin/webhooks',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/webhooks',
+    path: '/webhooks',
+    getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminTemplatesRoute =
   AuthenticatedAdminTemplatesRouteImport.update({
-    id: '/admin/templates',
-    path: '/admin/templates',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/templates',
+    path: '/templates',
+    getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminIntegrationsRoute =
   AuthenticatedAdminIntegrationsRouteImport.update({
-    id: '/admin/integrations',
-    path: '/admin/integrations',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/integrations',
+    path: '/integrations',
+    getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const ApiPublicWebhooksRazorpayRoute =
   ApiPublicWebhooksRazorpayRouteImport.update({
@@ -253,6 +259,7 @@ export interface FileRoutesByFullPath {
   '/features': typeof FeaturesRoute
   '/how-it-works': typeof HowItWorksRoute
   '/pricing': typeof PricingRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/billing': typeof AuthenticatedBillingRoute
   '/captions': typeof AuthenticatedCaptionsRoute
   '/carousels': typeof AuthenticatedCarouselsRoute
@@ -330,6 +337,7 @@ export interface FileRoutesById {
   '/features': typeof FeaturesRoute
   '/how-it-works': typeof HowItWorksRoute
   '/pricing': typeof PricingRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/billing': typeof AuthenticatedBillingRoute
   '/_authenticated/captions': typeof AuthenticatedCaptionsRoute
   '/_authenticated/carousels': typeof AuthenticatedCarouselsRoute
@@ -370,6 +378,7 @@ export interface FileRouteTypes {
     | '/features'
     | '/how-it-works'
     | '/pricing'
+    | '/admin'
     | '/billing'
     | '/captions'
     | '/carousels'
@@ -446,6 +455,7 @@ export interface FileRouteTypes {
     | '/features'
     | '/how-it-works'
     | '/pricing'
+    | '/_authenticated/admin'
     | '/_authenticated/billing'
     | '/_authenticated/captions'
     | '/_authenticated/carousels'
@@ -664,6 +674,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBillingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/linkedin-posts/': {
       id: '/_authenticated/linkedin-posts/'
       path: '/'
@@ -673,10 +690,10 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
-      path: '/admin'
+      path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/projects/$id': {
       id: '/_authenticated/projects/$id'
@@ -708,24 +725,24 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/admin/webhooks': {
       id: '/_authenticated/admin/webhooks'
-      path: '/admin/webhooks'
+      path: '/webhooks'
       fullPath: '/admin/webhooks'
       preLoaderRoute: typeof AuthenticatedAdminWebhooksRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/templates': {
       id: '/_authenticated/admin/templates'
-      path: '/admin/templates'
+      path: '/templates'
       fullPath: '/admin/templates'
       preLoaderRoute: typeof AuthenticatedAdminTemplatesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/integrations': {
       id: '/_authenticated/admin/integrations'
-      path: '/admin/integrations'
+      path: '/integrations'
       fullPath: '/admin/integrations'
       preLoaderRoute: typeof AuthenticatedAdminIntegrationsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedAdminRoute
     }
     '/api/public/webhooks/razorpay': {
       id: '/api/public/webhooks/razorpay'
@@ -757,6 +774,23 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminIntegrationsRoute: typeof AuthenticatedAdminIntegrationsRoute
+  AuthenticatedAdminTemplatesRoute: typeof AuthenticatedAdminTemplatesRoute
+  AuthenticatedAdminWebhooksRoute: typeof AuthenticatedAdminWebhooksRoute
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+}
+
+const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminIntegrationsRoute: AuthenticatedAdminIntegrationsRoute,
+  AuthenticatedAdminTemplatesRoute: AuthenticatedAdminTemplatesRoute,
+  AuthenticatedAdminWebhooksRoute: AuthenticatedAdminWebhooksRoute,
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+}
+
+const AuthenticatedAdminRouteWithChildren =
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
 interface AuthenticatedLinkedinPostsIdRouteChildren {
   AuthenticatedLinkedinPostsIdEditRoute: typeof AuthenticatedLinkedinPostsIdEditRoute
@@ -793,6 +827,7 @@ const AuthenticatedLinkedinPostsRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedBillingRoute: typeof AuthenticatedBillingRoute
   AuthenticatedCaptionsRoute: typeof AuthenticatedCaptionsRoute
   AuthenticatedCarouselsRoute: typeof AuthenticatedCarouselsRoute
@@ -806,15 +841,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
   AuthenticatedThumbnailsRoute: typeof AuthenticatedThumbnailsRoute
   AuthenticatedVideosRoute: typeof AuthenticatedVideosRoute
-  AuthenticatedAdminIntegrationsRoute: typeof AuthenticatedAdminIntegrationsRoute
-  AuthenticatedAdminTemplatesRoute: typeof AuthenticatedAdminTemplatesRoute
-  AuthenticatedAdminWebhooksRoute: typeof AuthenticatedAdminWebhooksRoute
   AuthenticatedCreateCarouselRoute: typeof AuthenticatedCreateCarouselRoute
   AuthenticatedProjectsIdRoute: typeof AuthenticatedProjectsIdRoute
-  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedBillingRoute: AuthenticatedBillingRoute,
   AuthenticatedCaptionsRoute: AuthenticatedCaptionsRoute,
   AuthenticatedCarouselsRoute: AuthenticatedCarouselsRoute,
@@ -828,12 +860,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
   AuthenticatedThumbnailsRoute: AuthenticatedThumbnailsRoute,
   AuthenticatedVideosRoute: AuthenticatedVideosRoute,
-  AuthenticatedAdminIntegrationsRoute: AuthenticatedAdminIntegrationsRoute,
-  AuthenticatedAdminTemplatesRoute: AuthenticatedAdminTemplatesRoute,
-  AuthenticatedAdminWebhooksRoute: AuthenticatedAdminWebhooksRoute,
   AuthenticatedCreateCarouselRoute: AuthenticatedCreateCarouselRoute,
   AuthenticatedProjectsIdRoute: AuthenticatedProjectsIdRoute,
-  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
