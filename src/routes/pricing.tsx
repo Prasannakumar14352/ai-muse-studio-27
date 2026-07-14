@@ -422,6 +422,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
 
   async function handlePay() {
     setPaying(true);
+    setLastError(null);
     try {
       const ok = await loadRazorpayScript();
       if (!ok || !window.Razorpay) throw new Error("Could not load Razorpay checkout");
@@ -448,16 +449,37 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
               resolve();
             } catch (e) {
               const msg = e instanceof Error ? e.message : "Verification failed";
+              setLastError({ description: msg, source: "verification" });
               toast.error(msg);
               reject(e);
             }
           },
-          modal: { ondismiss: () => resolve() },
-        });
+          modal: {
+            ondismiss: () => {
+              setPaying(false);
+              resolve();
+            },
+          },
+        }) as { open: () => void; on?: (event: string, cb: (payload: unknown) => void) => void };
+        // Capture Razorpay payment.failed for a useful error + retry.
+        if (typeof rzp.on === "function") {
+          rzp.on("payment.failed", (payload: unknown) => {
+            const err = (payload as { error?: { code?: string; description?: string; source?: string; reason?: string } })?.error;
+            const info = {
+              code: err?.code,
+              description: err?.description ?? "Payment failed",
+              source: err?.source,
+              reason: err?.reason,
+            };
+            setLastError(info);
+            toast.error(`${info.code ?? "Payment failed"}: ${info.description}`);
+          });
+        }
         rzp.open();
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not start checkout";
+      setLastError({ description: msg, source: "client" });
       toast.error(msg);
     } finally {
       setPaying(false);
