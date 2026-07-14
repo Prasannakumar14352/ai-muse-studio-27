@@ -456,7 +456,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
           <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center text-white font-bold text-sm">$</div>
           <div>
             <div className="font-semibold">Checkout</div>
-            <div className="text-xs text-muted-foreground">Secure payment · Razorpay · INR</div>
+            <div className="text-xs text-muted-foreground">Secure payment · Razorpay · USD</div>
           </div>
         </div>
         <div className="glass rounded-xl p-4 mb-3 space-y-2 text-sm">
