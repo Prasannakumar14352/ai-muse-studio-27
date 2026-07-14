@@ -643,10 +643,19 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
         </div>
         <div className="glass rounded-xl p-4 mb-3">
           <div className="flex justify-between text-sm mb-2"><span>Plan</span><span className="font-medium">{plan.name}</span></div>
-          <div className="flex justify-between text-sm mb-2"><span>Monthly credits</span><span className="font-medium">{plan.monthlyCredits.toLocaleString()}</span></div>
-          {plan.signupCredits ? (
-            <div className="flex justify-between text-sm mb-2"><span>Signup bonus</span><span className="font-medium">+{plan.signupCredits.toLocaleString()}</span></div>
-          ) : null}
+          {isLifetime ? (
+            <>
+              <div className="flex justify-between text-sm mb-2"><span>Included credits</span><span className="font-medium">{(plan.includedCredits ?? 0).toLocaleString()} (one-time)</span></div>
+              <div className="flex justify-between text-sm mb-2"><span>Billing</span><span className="font-medium">One-time · no recurring charges</span></div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between text-sm mb-2"><span>Monthly credits</span><span className="font-medium">{plan.monthlyCredits.toLocaleString()}</span></div>
+              {plan.signupCredits ? (
+                <div className="flex justify-between text-sm mb-2"><span>Signup bonus</span><span className="font-medium">+{plan.signupCredits.toLocaleString()}</span></div>
+              ) : null}
+            </>
+          )}
           <div className="flex justify-between text-base pt-2 border-t border-border/40">
             <span className="font-semibold">Total</span><span className="font-bold gradient-text">{displayAmount}</span>
           </div>
