@@ -4,7 +4,8 @@
 // create and edit share both the form component AND the destination.
 
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { generateProject, generateCarousel, generateCaptions, generateHashtags } from "@/lib/generators";
@@ -17,18 +18,20 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ProjectBriefForm, type ProjectBrief } from "@/components/project-brief-form";
 import { ContentTypePicker } from "@/components/content-type-picker";
 import { CONTENT_TYPES_BY_ID, type ContentTypeId } from "@/lib/content-types";
-import { ArrowLeft } from "lucide-react";
+import { getTemplateBySlugFn } from "@/lib/templates.functions";
+import { ArrowLeft, Sparkles } from "lucide-react";
 
 const VALID_TYPES = new Set<ContentTypeId>([
   "long_video", "short_reel", "talking_object", "documentary", "product_promo",
-  "carousel", "ai_image", "thumbnail", "caption_only", "seo_pack",
+  "carousel", "ai_image", "thumbnail", "caption_only", "seo_pack", "linkedin_post",
 ]);
 
 export const Route = createFileRoute("/_authenticated/create")({
-  validateSearch: (s: Record<string, unknown>): { type?: ContentTypeId } => {
+  validateSearch: (s: Record<string, unknown>): { type?: ContentTypeId; template?: string } => {
     const t = typeof s.type === "string" && VALID_TYPES.has(s.type as ContentTypeId)
       ? (s.type as ContentTypeId) : undefined;
-    return t ? { type: t } : {};
+    const template = typeof s.template === "string" ? s.template : undefined;
+    return { ...(t ? { type: t } : {}), ...(template ? { template } : {}) };
   },
   component: CreatePage,
 });
@@ -41,6 +44,18 @@ function CreatePage() {
   const [loading, setLoading] = useState(false);
   const selectedType = search.type as ContentTypeId | undefined;
   const selectedMeta = selectedType ? CONTENT_TYPES_BY_ID[selectedType] ?? null : null;
+
+  // Optional template pre-fill from ?template=slug
+  const { data: template } = useQuery({
+    queryKey: ["template", search.template],
+    enabled: !!search.template,
+    queryFn: () => getTemplateBySlugFn({ data: { slug: search.template! } }),
+  });
+
+  useEffect(() => {
+    if (template) toast.success(`Template loaded: ${template.name}`, { duration: 2500 });
+  }, [template]);
+
 
 
   async function handleGenerate(form: ProjectBrief) {
