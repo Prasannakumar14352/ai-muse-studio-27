@@ -488,22 +488,39 @@ function VideosPage() {
   async function resumeJob(job: JobRecord) {
     const brief = JSON.parse(job.briefJson) as VideoBrief;
     setGen({ brief, niche: job.niche, topic: job.topic });
-    // Planning done but blueprint never approved → back to blueprint review.
-    if (job.phase === "review" || job.phase === "planning") {
+    setAssetsBundle(null);
+    setResult(null);
+    setError(null);
+    // Backward-compatible approval gate. Every unfinished job — including legacy
+    // ones created before the review-gate change — must pass through the
+    // blueprint editor and be explicitly approved before any further generation
+    // or rendering. Existing shot images stay cached in IndexedDB and will be
+    // reused during the next asset generation pass.
+    const meta = await getBlueprintMetadata(localBlueprintId(job.id));
+    const approved = isBlueprintApproved(meta);
+    if (!approved) {
       setDash({ ...initialDash, jobId: job.id, phase: "review" });
       setView("review");
+      if (job.phase !== "planning" && job.phase !== "review") {
+        toast.info("Blueprint approval required before resuming. Review and re-approve.");
+      }
       return;
     }
-    // Asset review paused → asset bundle is in-memory and was lost. Re-run
-    // asset generation from the edited blueprint (fast because shot images
-    // are cached in IndexedDB and won't regenerate).
-    if (job.phase === "asset_review") {
-      await approveAndGenerate(job.id);
-      return;
-    }
-    // Anything else (generating_shots, voiceover, paused during those, rendering)
-    // → re-run asset generation, which will land back at asset_review.
+    // Job was approved earlier — safe to continue asset generation. If shots
+    // were already produced, IndexedDB caching short-circuits regen and we
+    // land right back on the asset review gate.
     await approveAndGenerate(job.id);
+  }
+
+  /** Abort any active phase and jump back into the blueprint editor without
+   *  deleting cached shot images. Approval is auto-invalidated on next edit. */
+  async function stopAndEdit() {
+    if (!dash.jobId) return;
+    abortRef.current?.abort();
+    setDash((prev) => ({ ...prev, phase: "review" }));
+    setView("review");
+    await refreshInProgress();
+    toast.info("Paused. Edit the blueprint, then re-approve to continue.");
   }
 
   async function discardJob(id: string) {
