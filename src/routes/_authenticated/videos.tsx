@@ -856,15 +856,18 @@ function ChipRow<T extends string | number>({
 
 const PHASE_LABELS: Record<JobPhaseId, string> = {
   planning: "Planning",
-  review: "Review & edit",
+  review: "Review & edit blueprint",
   generating_shots: "Generating shots",
   voiceover: "Narrating & subtitling",
+  asset_review: "Review assets",
   rendering: "Rendering final video",
   complete: "Complete",
   failed: "Failed",
 };
 
-const PHASE_ORDER: JobPhaseId[] = ["planning", "review", "generating_shots", "voiceover", "rendering", "complete"];
+const PHASE_ORDER: JobPhaseId[] = [
+  "planning", "review", "generating_shots", "voiceover", "asset_review", "rendering", "complete",
+];
 
 // ---------------- Review Gate (mandatory blueprint edit checkpoint) ----------------
 
