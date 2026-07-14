@@ -368,34 +368,65 @@ function VideosPage() {
     }
   }
 
-  /** Called from the Blueprint Editor when the user clicks "Approve & Generate Shots". */
+  /** Called from the Blueprint Editor when the user clicks "Approve & Generate Assets".
+   *  Runs shots + narration + subtitles + timeline, then PAUSES at the asset review gate. */
   async function approveAndGenerate(jobId: string) {
     if (!gen) return;
     const meta = await getBlueprintMetadata(localBlueprintId(jobId));
     const edited = meta ? blueprintToScript(meta.currentBlueprint) : undefined;
     setError(null);
     setResult(null);
+    setAssetsBundle(null);
     setDash({ ...initialDash, jobId, phase: "generating_shots" });
     setView("processing");
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const { job, result: r } = await runGenerationPhase(jobId, gen.brief, {
+      const { job, bundle } = await runAssetGenerationPhase(jobId, gen.brief, {
         niche: gen.niche,
         topic: gen.topic,
         onEvent: handleJobEvent,
         signal: controller.signal,
       }, edited);
-      setDash((prev) => ({ ...prev, jobId: job.id }));
+      setDash((prev) => ({ ...prev, jobId: job.id, phase: "asset_review" }));
+      setAssetsBundle(bundle);
+      setView("asset_review");
+      await refreshInProgress();
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        toast.info("Generation paused. You can resume from your videos list.");
+        setView("landing");
+        await refreshInProgress();
+        return;
+      }
+      const msg = e instanceof Error ? e.message : "Pipeline failed";
+      setError(msg);
+      toast.error(msg);
+    }
+  }
+
+  /** Called from the Asset Review screen — kicks off the final MP4 render. */
+  async function renderFinal() {
+    if (!gen || !assetsBundle || !dash.jobId) return;
+    setError(null);
+    setDash((prev) => ({ ...prev, phase: "rendering", renderProgress: 0 }));
+    setView("processing");
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      const { result: r } = await runRenderPhase(dash.jobId, assetsBundle, {
+        onEvent: handleJobEvent,
+        signal: controller.signal,
+      });
       setResult(r);
+      setAssetsBundle(null);
       setView("result");
       await refreshInProgress();
 
       try {
         const videoBlob = r.render.blob;
         if (!videoBlob || videoBlob.size === 0) throw new Error("Rendered video blob is empty");
-        const niche = gen.niche;
-        const nicheLabel = NICHES.find((n) => n.id === niche)?.label ?? niche;
+        const nicheLabel = NICHES.find((n) => n.id === gen.niche)?.label ?? gen.niche;
         const styleLabel = STYLE_CARDS.find((s) => s.id === gen.brief.style)?.label ?? gen.brief.style;
         await saveGeneratedVideo({
           title: gen.brief.title,
@@ -425,14 +456,24 @@ function VideosPage() {
       }
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
-        toast.info("Generation paused. You can resume from your videos list.");
-        setView("landing");
-        await refreshInProgress();
+        toast.info("Render paused.");
+        setView("asset_review");
         return;
       }
-      const msg = e instanceof Error ? e.message : "Pipeline failed";
+      const msg = e instanceof Error ? e.message : "Render failed";
       setError(msg);
       toast.error(msg);
+    }
+  }
+
+  /** Regenerate one shot from the asset review screen. */
+  async function regenOneShot(shotId: string) {
+    if (!gen || !dash.jobId) return;
+    try {
+      await regenerateShot(dash.jobId, shotId, gen.brief, handleJobEvent);
+      toast.success("Shot regenerated");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Regenerate failed");
     }
   }
 
@@ -443,13 +484,21 @@ function VideosPage() {
   async function resumeJob(job: JobRecord) {
     const brief = JSON.parse(job.briefJson) as VideoBrief;
     setGen({ brief, niche: job.niche, topic: job.topic });
-    // If planning finished but user never approved the blueprint, jump back
-    // to the Review gate. Otherwise resume generation.
+    // Planning done but blueprint never approved → back to blueprint review.
     if (job.phase === "review" || job.phase === "planning") {
       setDash({ ...initialDash, jobId: job.id, phase: "review" });
       setView("review");
       return;
     }
+    // Asset review paused → asset bundle is in-memory and was lost. Re-run
+    // asset generation from the edited blueprint (fast because shot images
+    // are cached in IndexedDB and won't regenerate).
+    if (job.phase === "asset_review") {
+      await approveAndGenerate(job.id);
+      return;
+    }
+    // Anything else (generating_shots, voiceover, paused during those, rendering)
+    // → re-run asset generation, which will land back at asset_review.
     await approveAndGenerate(job.id);
   }
 
