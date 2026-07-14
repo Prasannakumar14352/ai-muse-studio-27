@@ -1,10 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   Play, Star, Check, X, ShieldCheck, Sparkles, Briefcase, Download,
   Infinity as InfinityIcon, Calendar, Coins, Key, Cloud, HeadphonesIcon,
   Video as VideoIcon, Image as ImageIcon, Layers, Linkedin, Type as TypeIcon,
-  Wand2, Send,
+  Wand2, Send, AlertCircle,
 } from "lucide-react";
 import {
   VIDEO_TESTIMONIALS, WRITTEN_TESTIMONIALS,
@@ -12,7 +12,7 @@ import {
   type Testimonial,
 } from "@/lib/landing-content";
 
-const DEMO_VIDEO_URL = "/creatorvault-demo.mp4";
+const DEMO_VIDEO_URL = "/creatorflow-demo.mp4";
 const DEMO_POSTER = "/brand/hero-poster.jpg";
 
 const HERO_FEATURES = [
@@ -29,13 +29,26 @@ const HERO_FEATURES = [
 
 export function DemoVideoSection() {
   const [playing, setPlaying] = useState(false);
+  const [error, setError] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const handlePlay = () => {
+    setError(false);
     setPlaying(true);
-    // wait a tick for the <video> to mount before playing
-    setTimeout(() => videoRef.current?.play().catch(() => {}), 30);
   };
+
+  // Once mounted, kick off playback within the same user-gesture window.
+  useEffect(() => {
+    if (!playing) return;
+    const v = videoRef.current;
+    if (!v) return;
+    const p = v.play();
+    if (p && typeof p.catch === "function") {
+      // If the browser blocks programmatic play we still show controls so
+      // the user can hit the native play button.
+      p.catch(() => {});
+    }
+  }, [playing]);
 
   return (
     <section className="py-24 px-6">
@@ -49,25 +62,30 @@ export function DemoVideoSection() {
           reels, carousels, LinkedIn posts, thumbnails, captions and images in minutes.
         </p>
 
-
         <div className="mt-10 glass rounded-3xl p-2 shadow-[var(--shadow-glow)]">
           <div className="relative aspect-video rounded-2xl overflow-hidden bg-black group">
-            {playing ? (
+            {playing && !error ? (
               <video
                 ref={videoRef}
-                src={DEMO_VIDEO_URL}
                 poster={DEMO_POSTER}
                 controls
+                controlsList="nodownload"
                 playsInline
                 preload="metadata"
-                className="w-full h-full object-cover"
-              />
+                onError={() => setError(true)}
+                className="w-full h-full object-contain bg-black"
+                aria-label="CreatorFlow AI product demo"
+              >
+                <source src={DEMO_VIDEO_URL} type="video/mp4" />
+                Sorry, your browser can't play this video. You can{" "}
+                <a href={DEMO_VIDEO_URL} download>download it here</a>.
+              </video>
             ) : (
               <button
                 type="button"
                 onClick={handlePlay}
                 className="absolute inset-0 w-full h-full flex items-center justify-center"
-                aria-label="Play demo video"
+                aria-label="Play CreatorFlow AI demo video"
               >
                 <img
                   src={DEMO_POSTER}
@@ -81,6 +99,12 @@ export function DemoVideoSection() {
                 <span className="absolute bottom-6 left-6 glass px-3 py-1.5 rounded-full text-xs font-medium uppercase tracking-wide text-white/90">
                   Blueprint · Review &amp; Edit · Render
                 </span>
+                {error && (
+                  <span className="absolute top-4 right-4 flex items-center gap-1.5 glass px-3 py-1.5 rounded-full text-xs text-rose-300">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    Video failed to load. Please try again.
+                  </span>
+                )}
               </button>
             )}
           </div>
@@ -119,28 +143,109 @@ function StarRow({ n }: { n: number }) {
   );
 }
 
-function VideoTestimonialCard({ t }: { t: Testimonial }) {
-  const [playing, setPlaying] = useState(false);
+type PlayingVideo = {
+  name: string;
+  url: string;
+  type: "mp4" | "youtube" | "vimeo";
+};
+
+function TestimonialVideoModal({ video, onClose }: { video: PlayingVideo; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+      // Pause on close so audio stops even if the element hasn't unmounted yet.
+      try { videoRef.current?.pause(); } catch { /* noop */ }
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Testimonial from ${video.name}`}
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close video"
+        className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full glass flex items-center justify-center text-white hover:scale-105 transition"
+      >
+        <X className="w-5 h-5" />
+      </button>
+      <div
+        className="relative w-full max-w-5xl aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {video.type === "mp4" ? (
+          <video
+            ref={videoRef}
+            key={video.url}
+            src={video.url}
+            controls
+            autoPlay
+            playsInline
+            preload="metadata"
+            className="w-full h-full object-contain bg-black"
+          >
+            Your browser can't play this video.
+          </video>
+        ) : (
+          <iframe
+            key={video.url}
+            src={video.url}
+            title={`Testimonial from ${video.name}`}
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowFullScreen
+            className="w-full h-full"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VideoTestimonialCard({
+  t, onPlay,
+}: { t: Testimonial; onPlay: (v: PlayingVideo) => void }) {
+  const hasVideo = Boolean(t.videoUrl && t.videoType);
   return (
     <div className="glass rounded-2xl p-4 flex flex-col">
       <div className="relative aspect-[4/5] rounded-xl overflow-hidden bg-black">
-        {playing && t.videoUrl ? (
-          <video src={t.videoUrl} controls autoPlay playsInline className="w-full h-full object-cover" />
-        ) : (
+        <img
+          src={t.photo}
+          alt={t.name}
+          loading="lazy"
+          className="w-full h-full object-cover opacity-80"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        {hasVideo ? (
           <button
             type="button"
-            onClick={() => setPlaying(true)}
-            className="absolute inset-0 w-full h-full group"
+            onClick={() =>
+              onPlay({ name: t.name, url: t.videoUrl!, type: t.videoType! })
+            }
+            className="absolute inset-0 w-full h-full group flex items-center justify-center"
             aria-label={`Play testimonial from ${t.name}`}
           >
-            <img src={t.photo} alt={t.name} loading="lazy" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-14 h-14 rounded-full gradient-primary flex items-center justify-center shadow-[var(--shadow-glow)] group-hover:scale-110 transition">
-                <Play className="w-6 h-6 text-white fill-white ml-0.5" />
-              </div>
+            <div className="w-14 h-14 rounded-full gradient-primary flex items-center justify-center shadow-[var(--shadow-glow)] group-hover:scale-110 transition">
+              <Play className="w-6 h-6 text-white fill-white ml-0.5" />
             </div>
           </button>
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-end pb-4 pointer-events-none">
+            <span className="glass px-3 py-1.5 rounded-full text-[11px] font-medium uppercase tracking-wide text-white/90">
+              Sample testimonial
+            </span>
+          </div>
         )}
       </div>
       <div className="mt-4 flex items-center gap-3">
@@ -157,6 +262,7 @@ function VideoTestimonialCard({ t }: { t: Testimonial }) {
 }
 
 export function VideoTestimonialsSection() {
+  const [playing, setPlaying] = useState<PlayingVideo | null>(null);
   return (
     <section className="py-24 px-6">
       <div className="max-w-7xl mx-auto">
@@ -167,9 +273,14 @@ export function VideoTestimonialsSection() {
           </p>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {VIDEO_TESTIMONIALS.map((t) => <VideoTestimonialCard key={t.id} t={t} />)}
+          {VIDEO_TESTIMONIALS.map((t) => (
+            <VideoTestimonialCard key={t.id} t={t} onPlay={setPlaying} />
+          ))}
         </div>
       </div>
+      {playing && (
+        <TestimonialVideoModal video={playing} onClose={() => setPlaying(null)} />
+      )}
     </section>
   );
 }
