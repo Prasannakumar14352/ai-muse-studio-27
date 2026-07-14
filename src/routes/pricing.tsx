@@ -42,8 +42,8 @@ export const Route = createFileRoute("/pricing")({
 });
 
 /* ---------- helpers ---------- */
-function inr(n: number) {
-  return `₹${n.toLocaleString("en-IN")}`;
+function usd(n: number) {
+  return `$${n.toLocaleString("en-US")}`;
 }
 function priceForCycle(p: PricingPlan, cycle: BillingCycle): number {
   return cycle === "monthly" ? p.priceMonthlyUsd : cycle === "yearly" ? p.priceYearlyUsd : p.priceLifetimeUsd;
