@@ -16,11 +16,22 @@ export type Testimonial = {
   photo: string; // URL
   rating: 1 | 2 | 3 | 4 | 5;
   review: string;
-  videoUrl?: string; // if present, becomes a video testimonial
+  /**
+   * Real, browser-playable video source (MP4 file, Supabase Storage URL,
+   * or YouTube/Vimeo EMBED url — never a watch-page URL).
+   * Omit when no real testimonial video exists yet: the card renders as a
+   * clearly labelled "Sample testimonial" with a disabled play button.
+   */
+  videoUrl?: string;
+  videoType?: "mp4" | "youtube" | "vimeo";
 };
 
 export type TrustBadge = { title: string; desc: string; icon: string };
 
+// NOTE: All entries below are currently poster-only "Sample testimonial"
+// cards. To enable playback, add `videoUrl` + `videoType` with a real
+// asset (MP4 in /public, Supabase Storage URL, or a YouTube/Vimeo EMBED
+// url like https://www.youtube.com/embed/VIDEO_ID).
 export const VIDEO_TESTIMONIALS: Testimonial[] = [
   {
     id: "v1",
@@ -31,7 +42,6 @@ export const VIDEO_TESTIMONIALS: Testimonial[] = [
     rating: 5,
     review:
       "I went from posting twice a week to daily reels. CreatorFlow AI plans my hooks, scripts and thumbnails in minutes.",
-    videoUrl: "/creatorvault-demo.mp4",
   },
   {
     id: "v2",
@@ -42,7 +52,6 @@ export const VIDEO_TESTIMONIALS: Testimonial[] = [
     rating: 5,
     review:
       "The blueprint editor is a game changer. I approve the script, tweak scenes, then render — no more slideshow feel.",
-    videoUrl: "/creatorvault-demo.mp4",
   },
   {
     id: "v3",
@@ -53,7 +62,6 @@ export const VIDEO_TESTIMONIALS: Testimonial[] = [
     rating: 5,
     review:
       "My students get carousels, captions and thumbnails for every lesson. It replaced three tools in my stack.",
-    videoUrl: "/creatorvault-demo.mp4",
   },
 ];
 
