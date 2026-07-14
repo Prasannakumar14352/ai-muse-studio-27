@@ -5,30 +5,18 @@ import { CREDIT_PACKS } from "@/lib/constants";
 /**
  * Currency handling:
  *  - Public site advertises prices in USD.
- *  - Razorpay orders are ALWAYS created in INR (paise) because Razorpay's
- *    default merchant account only supports INR settlements.
- *  - Conversion rate comes from `public.app_settings` key = `usd_to_inr_rate`
- *    (admin-editable). If missing, we fall back to DEFAULT_USD_TO_INR.
- *  - We persist USD price, conversion rate, INR paise, and Razorpay order/payment
- *    IDs on every payments row for audit / invoices.
+ *  - Razorpay orders are ALWAYS created in INR (paise); merchant account is INR-only.
+ *  - Conversion rate is resolved server-side by `resolveUsdInrRate()` in
+ *    `src/lib/fx-rate.server.ts` which prefers live → cache → stale-cache → manual
+ *    fallback. We NEVER accept a browser-provided rate — the amount is always
+ *    recomputed on the server before creating the Razorpay order.
+ *  - Full audit persisted on every payments row (listed USD, rate, source, INR paise).
  */
-const DEFAULT_USD_TO_INR = 88.5;
 
-type UsdInrSetting = { rate: number; updatedAt: string | null; source: "db" | "default" };
-
-async function readUsdToInrRate(): Promise<UsdInrSetting> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin
-    .from("app_settings")
-    .select("value, updated_at")
-    .eq("key", "usd_to_inr_rate")
-    .maybeSingle();
-  const raw = (data as { value?: { rate?: unknown }; updated_at?: string } | null) ?? null;
-  const rateNum = Number(raw?.value?.rate);
-  if (raw && Number.isFinite(rateNum) && rateNum > 0) {
-    return { rate: rateNum, updatedAt: raw.updated_at ?? null, source: "db" };
-  }
-  return { rate: DEFAULT_USD_TO_INR, updatedAt: null, source: "default" };
+type ResolvedRate = Awaited<ReturnType<typeof import("@/lib/fx-rate.server").resolveUsdInrRate>>;
+async function resolveRate(): Promise<ResolvedRate> {
+  const { resolveUsdInrRate } = await import("@/lib/fx-rate.server");
+  return await resolveUsdInrRate();
 }
 
 function usdToInrPaise(priceUsd: number, rate: number): { inrRupees: number; inrPaise: number } {
@@ -36,13 +24,21 @@ function usdToInrPaise(priceUsd: number, rate: number): { inrRupees: number; inr
   return { inrRupees: rupees, inrPaise: rupees * 100 };
 }
 
-/** Public: current USD→INR rate for the checkout confirmation UI. */
+/** Back-compat shim used by the pricing modal + legacy admin page. */
 export const getUsdInrRate = createServerFn({ method: "GET" }).handler(async () => {
-  const s = await readUsdToInrRate();
-  return { rate: s.rate, updatedAt: s.updatedAt, source: s.source };
+  const r = await resolveRate();
+  return {
+    rate: r.rate,
+    updatedAt: r.fetchedAt,
+    source: r.source,
+    status: r.status,
+    provider: r.provider,
+    warning: r.warning,
+    nextRefreshAt: r.nextRefreshAt,
+  };
 });
 
-/** Admin: update the USD→INR rate. */
+/** Admin: legacy setter — updates the manual fallback rate. */
 export const setUsdInrRate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { rate: number }) => {
@@ -51,15 +47,13 @@ export const setUsdInrRate = createServerFn({ method: "POST" })
     return { rate: r };
   })
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
+    const sb = context.supabase as unknown as { rpc: (fn: "has_role", a: { _user_id: string; _role: "admin" }) => Promise<{ data: unknown }> };
+    const { data: isAdmin } = await sb.rpc("has_role", { _user_id: context.userId, _role: "admin" });
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("app_settings")
-      .upsert({ key: "usd_to_inr_rate", value: { rate: data.rate }, updated_by: context.userId });
+      .upsert({ key: "usd_to_inr_manual_fallback", value: { rate: data.rate }, updated_by: context.userId });
     if (error) throw new Error(error.message);
     return { ok: true, rate: data.rate };
   });
@@ -86,7 +80,8 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keyId || !keySecret) throw new Error("Razorpay not configured");
 
-    const { rate } = await readUsdToInrRate();
+    const resolved = await resolveRate();
+    const rate = resolved.rate;
     const priceUsdCents = Math.round(pack.priceUSD * 100);
     const { inrRupees, inrPaise } = usdToInrPaise(pack.priceUSD, rate);
 
@@ -129,6 +124,8 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       receipt_number: receipt,
       price_usd_cents: priceUsdCents,
       conversion_rate: rate,
+      exchange_rate_source: resolved.source,
+      exchange_rate_fetched_at: resolved.fetchedAt,
       amount_inr_paise: inrPaise,
     });
     if (error) {
@@ -191,7 +188,8 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
           ? monthlyCredits * 12
           : monthlyCredits;
 
-    const { rate } = await readUsdToInrRate();
+    const resolved = await resolveRate();
+    const rate = resolved.rate;
     const priceUsdCents = Math.round(priceUsd * 100);
     const { inrRupees, inrPaise } = usdToInrPaise(priceUsd, rate);
 
@@ -235,6 +233,8 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
       receipt_number: receipt,
       price_usd_cents: priceUsdCents,
       conversion_rate: rate,
+      exchange_rate_source: resolved.source,
+      exchange_rate_fetched_at: resolved.fetchedAt,
       amount_inr_paise: inrPaise,
     });
     if (error) {
