@@ -8,6 +8,7 @@ import { putBlob, deleteBlob, deleteBlobsByPrefix, getObjectURL, makeBlobKey } f
 
 export type JobPhase =
   | "planning"
+  | "review"
   | "generating_shots"
   | "voiceover"
   | "rendering"
