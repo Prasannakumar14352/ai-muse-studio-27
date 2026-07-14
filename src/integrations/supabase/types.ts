@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          created_at: string
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          created_at?: string
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       brand_kits: {
         Row: {
           body_font: string | null
@@ -334,12 +358,15 @@ export type Database = {
       payments: {
         Row: {
           amount_cents: number
+          amount_inr_paise: number | null
+          conversion_rate: number | null
           created_at: string
           credits: number
           currency: string
           id: string
           metadata: Json | null
           pack_id: string
+          price_usd_cents: number | null
           razorpay_order_id: string
           razorpay_payment_id: string | null
           receipt_number: string | null
@@ -349,12 +376,15 @@ export type Database = {
         }
         Insert: {
           amount_cents: number
+          amount_inr_paise?: number | null
+          conversion_rate?: number | null
           created_at?: string
           credits: number
           currency?: string
           id?: string
           metadata?: Json | null
           pack_id: string
+          price_usd_cents?: number | null
           razorpay_order_id: string
           razorpay_payment_id?: string | null
           receipt_number?: string | null
@@ -364,12 +394,15 @@ export type Database = {
         }
         Update: {
           amount_cents?: number
+          amount_inr_paise?: number | null
+          conversion_rate?: number | null
           created_at?: string
           credits?: number
           currency?: string
           id?: string
           metadata?: Json | null
           pack_id?: string
+          price_usd_cents?: number | null
           razorpay_order_id?: string
           razorpay_payment_id?: string | null
           receipt_number?: string | null

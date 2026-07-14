@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useSuspenseQuery, useQueryClient, queryOptions } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -7,7 +7,7 @@ import {
   type PricingPlan,
   type BillingCycle,
 } from "@/lib/pricing.functions";
-import { createRazorpayOrder, verifyRazorpayPayment, createRazorpayPlanOrder } from "@/lib/razorpay.functions";
+import { createRazorpayOrder, verifyRazorpayPayment, createRazorpayPlanOrder, getUsdInrRate } from "@/lib/razorpay.functions";
 import { CREDIT_PACKS, type CreditPack } from "@/lib/constants";
 import { useAccess } from "@/lib/access";
 import { toast } from "sonner";
@@ -387,20 +387,34 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
+function inr(n: number) {
+  return `₹${Math.round(n).toLocaleString("en-IN")}`;
+}
+
 function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: BillingCycle; onClose: () => void }) {
   const effective: BillingCycle = plan.planType === "lifetime" ? "lifetime" : cycle;
   const price = priceForCycle(plan, effective);
   const { data: access } = useAccess();
   const createOrder = useServerFn(createRazorpayPlanOrder);
   const verifyPayment = useServerFn(verifyRazorpayPayment);
+  const getRate = useServerFn(getUsdInrRate);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [paying, setPaying] = useState(false);
+  const [rate, setRate] = useState<number | null>(null);
   const credits = effective === "lifetime"
     ? (plan.includedCredits || plan.monthlyCredits)
     : effective === "yearly"
       ? plan.monthlyCredits * 12
       : plan.monthlyCredits;
+
+  useEffect(() => {
+    let alive = true;
+    getRate().then((r: { rate: number }) => { if (alive) setRate(r.rate); }).catch(() => {});
+    return () => { alive = false; };
+  }, [getRate]);
+
+  const inrPreview = rate ? Math.round(price * rate) : null;
 
   async function handlePay() {
     setPaying(true);
@@ -453,31 +467,33 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
           <X className="w-4 h-4" />
         </button>
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center text-white font-bold text-sm">$</div>
+          <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center text-white font-bold text-sm">₹</div>
           <div>
             <div className="font-semibold">Checkout</div>
-            <div className="text-xs text-muted-foreground">Secure payment · Razorpay · USD</div>
+            <div className="text-xs text-muted-foreground">Secure payment · Razorpay · Charged in INR</div>
           </div>
         </div>
         <div className="glass rounded-xl p-4 mb-3 space-y-2 text-sm">
           <div className="flex justify-between"><span>Plan</span><span className="font-medium">{plan.name}</span></div>
           <div className="flex justify-between"><span>Billing</span><span className="font-medium capitalize">{effective}</span></div>
           <div className="flex justify-between"><span>Credits</span><span className="font-medium">{credits.toLocaleString()}{effective === "lifetime" ? " (one-time + monthly refill)" : ""}</span></div>
+          <div className="flex justify-between"><span>Listed price</span><span className="font-medium">{usd(price)}<span className="text-xs text-muted-foreground ml-1">{suffixForCycle(effective)}</span></span></div>
+          <div className="flex justify-between"><span>Exchange rate</span><span className="font-medium">{rate ? `1 USD = ₹${rate.toFixed(2)}` : "…"}</span></div>
           <div className="flex justify-between text-base pt-2 border-t border-border/40">
-            <span className="font-semibold">Total</span>
-            <span className="font-bold gradient-text">{usd(price)}<span className="text-xs text-muted-foreground font-normal ml-1">{suffixForCycle(effective)}</span></span>
+            <span className="font-semibold">Payable today</span>
+            <span className="font-bold gradient-text">{inrPreview !== null ? inr(inrPreview) : "…"}</span>
           </div>
         </div>
         <button
           onClick={handlePay}
-          disabled={paying}
+          disabled={paying || !rate}
           className="w-full rounded-lg gradient-primary text-white py-3 font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {paying && <Loader2 className="w-4 h-4 animate-spin" />}
-          {paying ? "Opening checkout…" : `Pay ${usd(price)}`}
+          {paying ? "Opening checkout…" : inrPreview !== null ? `Pay ${inr(inrPreview)}` : "Loading…"}
         </button>
         <p className="mt-2 text-[11px] text-center text-muted-foreground">
-          Credits are only granted after a successful payment.
+          Final payment is processed in INR through Razorpay. Credits are only granted after a successful payment.
         </p>
       </div>
     </div>

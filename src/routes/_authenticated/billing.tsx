@@ -55,6 +55,9 @@ type Pay = {
   currency: string;
   status: string;
   created_at: string;
+  price_usd_cents?: number | null;
+  conversion_rate?: number | null;
+  amount_inr_paise?: number | null;
 };
 
 function BillingPage() {
@@ -235,7 +238,15 @@ function BillingPage() {
                         <td className="px-4 py-3">{p.pack_id.replace(/_/g, " ")}</td>
                         <td className="px-4 py-3 text-right">{p.credits.toLocaleString()}</td>
                         <td className="px-4 py-3 text-right font-medium">
-                          ${(p.amount_cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                          {p.currency === "INR" && p.amount_inr_paise != null
+                            ? `₹${Math.round(p.amount_inr_paise / 100).toLocaleString("en-IN")}`
+                            : `$${(p.amount_cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${p.currency}`}
+                          {p.price_usd_cents != null && (
+                            <div className="text-[10px] text-muted-foreground font-normal">
+                              Listed ${(p.price_usd_cents / 100).toFixed(2)}
+                              {p.conversion_rate ? ` @ ₹${Number(p.conversion_rate).toFixed(2)}` : ""}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-3 text-center"><StatusPill status={p.status} /></td>
                       </tr>

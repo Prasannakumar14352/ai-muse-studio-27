@@ -29,7 +29,21 @@ type Payment = {
   status: string;
   receipt_number: string | null;
   created_at: string;
+  price_usd_cents: number | null;
+  conversion_rate: number | null;
+  amount_inr_paise: number | null;
 };
+
+function fmtAmount(p: Payment): string {
+  if (p.currency === "INR" && p.amount_inr_paise != null) {
+    return `₹${Math.round(p.amount_inr_paise / 100).toLocaleString("en-IN")}`;
+  }
+  return `${p.currency === "USD" ? "$" : ""}${(p.amount_cents / 100).toFixed(2)} ${p.currency}`;
+}
+function fmtUsdListed(p: Payment): string | null {
+  if (p.price_usd_cents == null) return null;
+  return `$${(p.price_usd_cents / 100).toFixed(2)}`;
+}
 
 function InvoicesPage() {
   const list = useServerFn(listMyPayments);
@@ -95,7 +109,12 @@ function InvoicesPage() {
                     <td className="px-4 py-3">{p.pack_id.replace(/_/g, " ")}</td>
                     <td className="px-4 py-3 text-right">{p.credits.toLocaleString()}</td>
                     <td className="px-4 py-3 text-right font-medium">
-                      ${(p.amount_cents / 100).toFixed(2)} {p.currency}
+                      <div>{fmtAmount(p)}</div>
+                      {fmtUsdListed(p) && (
+                        <div className="text-[10px] text-muted-foreground">
+                          Listed {fmtUsdListed(p)}{p.conversion_rate ? ` @ ₹${Number(p.conversion_rate).toFixed(2)}` : ""}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center"><StatusBadge status={p.status} /></td>
                     <td className="px-4 py-3 text-right">
@@ -181,13 +200,21 @@ function downloadReceiptPDF(p: Payment) {
   doc.setFont("helvetica", "normal"); doc.setTextColor(0); doc.setFontSize(11);
   doc.text(`${p.pack_id.replace(/_/g, " ")} — ${BRAND} credit pack`, 50, y);
   doc.text(p.credits.toLocaleString(), W - 220, y);
-  doc.text(`$${(p.amount_cents / 100).toFixed(2)} ${p.currency}`, W - 50, y, { align: "right" });
+  doc.text(fmtAmount(p), W - 50, y, { align: "right" });
+
+  if (p.price_usd_cents != null) {
+    y += 16;
+    doc.setFontSize(9); doc.setTextColor(120);
+    const rateTxt = p.conversion_rate ? ` (1 USD = INR ${Number(p.conversion_rate).toFixed(2)})` : "";
+    doc.text(`Listed price: $${(p.price_usd_cents / 100).toFixed(2)} USD${rateTxt}`, 50, y);
+    doc.setTextColor(0);
+  }
 
   y += 30; doc.setDrawColor(220); doc.line(40, y, W - 40, y);
   y += 25;
   doc.setFont("helvetica", "bold"); doc.setFontSize(13);
-  doc.text("Total", W - 220, y);
-  doc.text(`$${(p.amount_cents / 100).toFixed(2)} ${p.currency}`, W - 50, y, { align: "right" });
+  doc.text("Total charged", W - 220, y);
+  doc.text(fmtAmount(p), W - 50, y, { align: "right" });
 
   // Footer
   y = doc.internal.pageSize.getHeight() - 80;
