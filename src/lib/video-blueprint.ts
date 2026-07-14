@@ -440,6 +440,10 @@ export function pushVersion(
     blueprintUpdatedAt: entry.savedAt,
     blueprintSource: source,
     blueprintVersions: versions,
+    // Any new version invalidates a prior approval — the user must re-approve
+    // before generation/rendering can consume the edited plan.
+    blueprintApprovedAt: null,
+    approvedBlueprintVersion: null,
   };
 }
 
