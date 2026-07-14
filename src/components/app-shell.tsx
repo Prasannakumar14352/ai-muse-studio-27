@@ -158,7 +158,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // Longest-prefix wins: pick exactly one active nav item across ALL sections.
   // This prevents sibling items from staying active (e.g. /admin AND /admin/templates).
-  const allNavRoutes = useMemo(
+  const allNavRoutes = useMemo<string[]>(
     () => SECTIONS.flatMap((s) => s.items.map((i) => i.to)),
     []
   );
