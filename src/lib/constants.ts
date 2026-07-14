@@ -70,7 +70,7 @@ export const NICHES = [
   { id: "finance", label: "Personal Finance", emoji: "💰", topics: [
     "5 money moves in your 20s that pay off forever",
     "The 50/30/20 budget everyone gets wrong",
-    "How I saved my first ₹1 lakh in 6 months",
+    "How I saved my first $10k in 6 months",
   ]},
   { id: "tech", label: "Tech & AI", emoji: "🤖", topics: [
     "3 AI tools that replaced my whole workflow",
