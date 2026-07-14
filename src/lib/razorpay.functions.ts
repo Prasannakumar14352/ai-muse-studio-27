@@ -80,7 +80,8 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keyId || !keySecret) throw new Error("Razorpay not configured");
 
-    const { rate } = await readUsdToInrRate();
+    const resolved = await resolveRate();
+    const rate = resolved.rate;
     const priceUsdCents = Math.round(pack.priceUSD * 100);
     const { inrRupees, inrPaise } = usdToInrPaise(pack.priceUSD, rate);
 
