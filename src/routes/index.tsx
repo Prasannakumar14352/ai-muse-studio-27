@@ -28,7 +28,7 @@ const FEATURES = [
 ];
 
 const FAQ = [
-  { q: "What is CreatorVault AI?", a: "A premium AI content platform that generates full creator-ready projects — scripts, scenes, images, captions, hashtags — in one flow." },
+  { q: "What is CreatorFlow AI?", a: "A premium AI content platform that generates full creator-ready projects — scripts, scenes, images, captions, hashtags — in one flow." },
   { q: "Do I need any editing experience?", a: "No. You describe the topic and pick a style. We generate the entire project blueprint." },
   { q: "Which platforms are supported?", a: "YouTube, Instagram, TikTok, Facebook and LinkedIn — with platform-specific tone and formatting." },
   { q: "Can I use my own brand style?", a: "Yes. Save brand presets in Settings, and every generation adapts to your defaults." },
@@ -42,8 +42,8 @@ function Landing() {
       {/* Nav */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/60 border-b border-border/40">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2" aria-label="CreatorVault AI home">
-            <BrandLogo alt="CreatorVault AI" className="h-9 md:h-10 w-auto object-contain" />
+          <Link to="/" className="flex items-center gap-2" aria-label="CreatorFlow AI home">
+            <BrandLogo alt="CreatorFlow AI" className="h-9 md:h-10 w-auto object-contain" />
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <Link to="/features" className="hover:text-foreground">Features</Link>
@@ -72,7 +72,7 @@ function Landing() {
             faster than you can scroll.
           </h1>
           <p className="mt-6 max-w-2xl mx-auto text-lg text-muted-foreground">
-            CreatorVault AI turns a single idea into a complete creator project — script, scenes, AI images,
+            CreatorFlow AI turns a single idea into a complete creator project — script, scenes, AI images,
             captions, hashtags and voiceover — in seconds.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-3">
@@ -217,12 +217,12 @@ function Landing() {
       <footer className="border-t border-border/40 py-10 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-3">
-            <BrandLogo alt="CreatorVault AI" className="h-7 w-auto object-contain" />
-            <span>© 2026 CreatorVault AI · Digital Products Marketplace</span>
+            <BrandLogo alt="CreatorFlow AI" className="h-7 w-auto object-contain" />
+            <span>© 2026 CreatorFlow AI · Digital Products Marketplace</span>
           </div>
           <div className="flex items-center gap-5">
-            <a href="mailto:support@creatorvault.ai" className="hover:text-foreground inline-flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5" /> support@creatorvault.ai
+            <a href="mailto:support@creatorflow.ai" className="hover:text-foreground inline-flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5" /> support@creatorflow.ai
             </a>
             <Link to="/contact" className="hover:text-foreground">Contact Us</Link>
           </div>

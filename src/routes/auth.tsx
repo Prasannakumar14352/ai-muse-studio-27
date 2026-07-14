@@ -172,7 +172,7 @@ function AuthPage() {
           <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold text-xl">CreatorVault<span className="gradient-text">AI</span></span>
+          <span className="font-bold text-xl">CreatorFlow<span className="gradient-text">AI</span></span>
         </Link>
 
         <div className="glass rounded-2xl p-8 shadow-[var(--shadow-glow)]">

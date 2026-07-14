@@ -53,14 +53,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "CreatorVault AI — Your AI Content Studio for Creators" },
-      { name: "description", content: "CreatorVault AI turns a single idea into a full creator project — scripts, scenes, AI images, captions, hashtags and voiceover — in seconds." },
-      { property: "og:title", content: "CreatorVault AI — Your AI Content Studio for Creators" },
-      { property: "og:description", content: "CreatorVault AI turns a single idea into a full creator project — scripts, scenes, AI images, captions, hashtags and voiceover — in seconds." },
+      { title: "CreatorFlow AI — Your AI Content Studio for Creators" },
+      { name: "description", content: "CreatorFlow AI turns a single idea into a full creator project — scripts, scenes, AI images, captions, hashtags and voiceover — in seconds." },
+      { property: "og:title", content: "CreatorFlow AI — Your AI Content Studio for Creators" },
+      { property: "og:description", content: "CreatorFlow AI turns a single idea into a full creator project — scripts, scenes, AI images, captions, hashtags and voiceover — in seconds." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "CreatorVault AI — Your AI Content Studio for Creators" },
-      { name: "twitter:description", content: "CreatorVault AI turns a single idea into a full creator project — scripts, scenes, AI images, captions, hashtags and voiceover — in seconds." },
+      { name: "twitter:title", content: "CreatorFlow AI — Your AI Content Studio for Creators" },
+      { name: "twitter:description", content: "CreatorFlow AI turns a single idea into a full creator project — scripts, scenes, AI images, captions, hashtags and voiceover — in seconds." },
       // NOTE: og:image intentionally NOT set at root — root head() concatenates
       // into every match, which would override every leaf's own og:image.
       // Leaf routes (marketing pages, project detail) set og:image themselves.

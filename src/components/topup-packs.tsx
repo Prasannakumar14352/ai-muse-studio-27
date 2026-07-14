@@ -57,7 +57,7 @@ export function TopUpPacks({ compact = false }: { compact?: boolean }) {
           amount: order.amount,
           currency: order.currency,
           order_id: order.orderId,
-          name: "CreatorVault AI",
+          name: "CreatorFlow AI",
           description: `${pack.label} — ${pack.credits.toLocaleString()} credits`,
           prefill: access?.email ? { email: access.email } : {},
           theme: { color: "#ff6b35" },
