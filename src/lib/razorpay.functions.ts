@@ -2,68 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_PACKS } from "@/lib/constants";
 
-/** Approximate USD → INR conversion used when charging in INR via Razorpay.
- *  Kept as a constant so it's easy to update. Actual FX may vary slightly. */
-export const INR_PER_USD = 84;
-
-type Currency = "USD" | "INR";
-
-/** Look at Razorpay's error body and decide whether it's an international-payments block. */
-function isInternationalBlockedError(status: number, body: string): boolean {
-  if (status !== 400 && status !== 401 && status !== 403) return false;
-  const b = body.toLowerCase();
-  return b.includes("international") || b.includes("currency is not supported") || b.includes("payment_currency_not_supported");
-}
-
-/** Create a Razorpay order (with optional currency + international-fallback to INR). */
-async function createOrderWithFallback(opts: {
-  keyId: string;
-  keySecret: string;
-  priceUSD: number;
-  currency: Currency;
-  receipt: string;
-  notes: Record<string, string | number>;
-}): Promise<{ order: { id: string; amount: number; currency: string }; currencyUsed: Currency; amountCharged: number; fellBack: boolean }> {
-  const auth = Buffer.from(`${opts.keyId}:${opts.keySecret}`).toString("base64");
-
-  async function post(currency: Currency) {
-    const amount = currency === "INR"
-      ? Math.round(opts.priceUSD * INR_PER_USD * 100)
-      : Math.round(opts.priceUSD * 100);
-    const res = await fetch("https://api.razorpay.com/v1/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
-      body: JSON.stringify({ amount, currency, receipt: opts.receipt, notes: opts.notes }),
-    });
-    return { res, amount, currency };
-  }
-
-  // First attempt with requested currency
-  let attempt = await post(opts.currency);
-  if (attempt.res.ok) {
-    const order = await attempt.res.json() as { id: string; amount: number; currency: string };
-    return { order, currencyUsed: attempt.currency, amountCharged: attempt.amount, fellBack: false };
-  }
-
-  const errText = await attempt.res.text();
-  console.error("Razorpay order error:", attempt.res.status, errText);
-
-  // Auto-fallback: user asked USD but international is not enabled → retry INR
-  if (opts.currency === "USD" && isInternationalBlockedError(attempt.res.status, errText)) {
-    attempt = await post("INR");
-    if (attempt.res.ok) {
-      const order = await attempt.res.json() as { id: string; amount: number; currency: string };
-      return { order, currencyUsed: "INR", amountCharged: attempt.amount, fellBack: true };
-    }
-    const errText2 = await attempt.res.text();
-    console.error("Razorpay INR fallback error:", attempt.res.status, errText2);
-    throw new Error(`Failed to create order (${attempt.res.status})`);
-  }
-
-  throw new Error(`Failed to create order (${attempt.res.status})`);
-}
-
-
+/**
+ * Currency is USD across the app. The `Currency` type + `currency` inputs
+ * are kept so the payment layer stays configurable for future multi-currency
+ * support without touching call sites.
+ */
+type Currency = "USD";
 
 /** Public config for the browser Razorpay checkout (key_id only — safe to expose). */
 export const getRazorpayConfig = createServerFn({ method: "GET" }).handler(async () => {
@@ -72,13 +16,12 @@ export const getRazorpayConfig = createServerFn({ method: "GET" }).handler(async
   return { keyId };
 });
 
-/** Create a Razorpay order for a credit pack + record a pending payment row. */
+/** Create a Razorpay order for a credit pack (USD) + record a pending payment row. */
 export const createRazorpayOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { packId: string; currency?: Currency }) => {
     if (!input || typeof input.packId !== "string") throw new Error("packId required");
-    const currency: Currency = input.currency === "INR" ? "INR" : "USD";
-    return { packId: input.packId, currency };
+    return { packId: input.packId, currency: "USD" as Currency };
   })
   .handler(async ({ data, context }) => {
     const pack = CREDIT_PACKS.find((p) => p.id === data.packId);
@@ -91,13 +34,24 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     const shortUid = context.userId.replace(/-/g, "").slice(0, 12);
     const receipt = `rcpt_${shortUid}_${Date.now().toString(36)}`.slice(0, 40);
 
-    const { order, currencyUsed, amountCharged, fellBack } = await createOrderWithFallback({
-      keyId, keySecret,
-      priceUSD: pack.priceUSD,
-      currency: data.currency,
-      receipt,
-      notes: { user_id: context.userId, pack_id: pack.id, credits: pack.credits },
+    const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+    const amountCents = Math.round(pack.priceUSD * 100);
+    const res = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
+      body: JSON.stringify({
+        amount: amountCents,
+        currency: "USD",
+        receipt,
+        notes: { user_id: context.userId, pack_id: pack.id, credits: pack.credits },
+      }),
     });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("Razorpay pack order error:", res.status, err);
+      throw new Error(`Failed to create order (${res.status})`);
+    }
+    const order = (await res.json()) as { id: string; amount: number; currency: string };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("payments").insert({
@@ -105,8 +59,8 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       razorpay_order_id: order.id,
       pack_id: pack.id,
       credits: pack.credits,
-      amount_cents: amountCharged,
-      currency: currencyUsed,
+      amount_cents: amountCents,
+      currency: "USD",
       status: "pending",
       receipt_number: receipt,
     });
@@ -120,12 +74,11 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       amount: order.amount,
       currency: order.currency,
       keyId,
-      fellBackToINR: fellBack,
       pack: { id: pack.id, label: pack.label, credits: pack.credits, priceUSD: pack.priceUSD },
     };
   });
 
-/** Create a Razorpay order for a plan (INR only, billing cycle aware). */
+/** Create a Razorpay order for a plan (USD, billing cycle aware). */
 export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { planId: string; billingCycle: "monthly" | "yearly" | "lifetime" }) => {
@@ -152,13 +105,13 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
     const plan = planRow as unknown as Record<string, unknown>;
     if (plan.contact_sales) throw new Error("Contact sales for this plan");
 
-    const priceInr =
+    const priceUsd =
       data.billingCycle === "monthly"
-        ? Number(plan.price_monthly_inr ?? 0)
+        ? Number(plan.price_monthly_usd ?? 0)
         : data.billingCycle === "yearly"
-          ? Number(plan.price_yearly_inr ?? 0)
-          : Number(plan.price_lifetime_inr ?? 0);
-    if (!priceInr || priceInr <= 0) throw new Error("Plan is not purchasable for this billing cycle");
+          ? Number(plan.price_yearly_usd ?? 0)
+          : Number(plan.price_lifetime_usd ?? 0);
+    if (!priceUsd || priceUsd <= 0) throw new Error("Plan is not purchasable for this billing cycle");
 
     // Credits granted at purchase.
     // Subscription monthly -> monthly_credits; yearly -> monthly_credits * 12; lifetime -> included_credits.
@@ -175,13 +128,13 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
     const receipt = `rcpt_${shortUid}_${Date.now().toString(36)}`.slice(0, 40);
 
     const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-    const amount = Math.round(priceInr * 100);
+    const amountCents = Math.round(priceUsd * 100);
     const res = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
       body: JSON.stringify({
-        amount,
-        currency: "INR",
+        amount: amountCents,
+        currency: "USD",
         receipt,
         notes: {
           user_id: context.userId,
@@ -204,8 +157,8 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
       razorpay_order_id: order.id,
       pack_id: `plan_${String(plan.code)}_${data.billingCycle}`,
       credits,
-      amount_cents: amount,
-      currency: "INR",
+      amount_cents: amountCents,
+      currency: "USD",
       status: "pending",
       receipt_number: receipt,
     });
@@ -224,7 +177,7 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
         code: String(plan.code),
         name: String(plan.name),
         credits,
-        priceInr,
+        priceUsd,
         billingCycle: data.billingCycle,
       },
     };

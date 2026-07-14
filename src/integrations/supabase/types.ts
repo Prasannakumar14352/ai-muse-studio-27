@@ -458,10 +458,10 @@ export type Database = {
           name: string
           period_label: string | null
           plan_type: string
-          price_lifetime_inr: number
-          price_monthly_inr: number
+          price_lifetime_usd: number
+          price_monthly_usd: number
           price_usd: number
-          price_yearly_inr: number
+          price_yearly_usd: number
           sort_order: number
           tier: string | null
           updated_at: string
@@ -481,10 +481,10 @@ export type Database = {
           name: string
           period_label?: string | null
           plan_type: string
-          price_lifetime_inr?: number
-          price_monthly_inr?: number
+          price_lifetime_usd?: number
+          price_monthly_usd?: number
           price_usd?: number
-          price_yearly_inr?: number
+          price_yearly_usd?: number
           sort_order?: number
           tier?: string | null
           updated_at?: string
@@ -504,10 +504,10 @@ export type Database = {
           name?: string
           period_label?: string | null
           plan_type?: string
-          price_lifetime_inr?: number
-          price_monthly_inr?: number
+          price_lifetime_usd?: number
+          price_monthly_usd?: number
           price_usd?: number
-          price_yearly_inr?: number
+          price_yearly_usd?: number
           sort_order?: number
           tier?: string | null
           updated_at?: string

@@ -27,7 +27,7 @@ export const Route = createFileRoute("/pricing")({
   head: () => ({
     meta: [
       { title: "Pricing — CreatorFlow AI" },
-      { name: "description", content: "Simple, affordable pricing for CreatorFlow AI in INR. Monthly, yearly (save ~17%) or pay once for lifetime access." },
+      { name: "description", content: "Simple, affordable pricing for CreatorFlow AI in USD. Monthly, yearly (save ~17%) or pay once for lifetime access." },
       { property: "og:title", content: "Pricing — CreatorFlow AI" },
       { property: "og:description", content: "Monthly, yearly or lifetime access — pick what fits your workflow." },
       { property: "og:type", content: "website" },
@@ -42,11 +42,11 @@ export const Route = createFileRoute("/pricing")({
 });
 
 /* ---------- helpers ---------- */
-function inr(n: number) {
-  return `₹${n.toLocaleString("en-IN")}`;
+function usd(n: number) {
+  return `$${n.toLocaleString("en-US")}`;
 }
 function priceForCycle(p: PricingPlan, cycle: BillingCycle): number {
-  return cycle === "monthly" ? p.priceMonthlyInr : cycle === "yearly" ? p.priceYearlyInr : p.priceLifetimeInr;
+  return cycle === "monthly" ? p.priceMonthlyUsd : cycle === "yearly" ? p.priceYearlyUsd : p.priceLifetimeUsd;
 }
 function suffixForCycle(cycle: BillingCycle): string {
   return cycle === "monthly" ? "/month" : cycle === "yearly" ? "/year" : "one-time";
@@ -63,7 +63,7 @@ function PricingPage() {
 
   const visible = useMemo(() => {
     if (cycle === "lifetime") {
-      return plans.filter((p) => p.priceLifetimeInr > 0 || p.planType === "lifetime");
+      return plans.filter((p) => p.priceLifetimeUsd > 0 || p.planType === "lifetime");
     }
     // monthly & yearly: everything except lifetime-only rows
     return plans.filter((p) => p.planType !== "lifetime");
@@ -71,7 +71,7 @@ function PricingPage() {
 
   const handleSelect = (p: PricingPlan) => {
     if (p.contactSales) return;
-    if (p.priceMonthlyInr === 0 && p.priceYearlyInr === 0 && p.priceLifetimeInr === 0) return; // free
+    if (p.priceMonthlyUsd === 0 && p.priceYearlyUsd === 0 && p.priceLifetimeUsd === 0) return; // free
     if (!access?.email) {
       navigate({ to: "/auth", search: { next: "/pricing" } });
       return;
@@ -174,14 +174,14 @@ function PricingCard({
   const isFree = price === 0 && plan.planType === "free";
   const recommended = plan.featured;
   const showBadge = plan.badge || (recommended ? "🚀 Recommended" : null);
-  const monthlyEquivYearly = cycle === "yearly" && plan.priceYearlyInr > 0
-    ? Math.round(plan.priceYearlyInr / 12)
+  const monthlyEquivYearly = cycle === "yearly" && plan.priceYearlyUsd > 0
+    ? Math.round(plan.priceYearlyUsd / 12)
     : null;
   const priceLabel = plan.contactSales
     ? "Custom"
     : isFree
-      ? "₹0"
-      : inr(price);
+      ? "$0"
+      : usd(price);
   const suffix = plan.contactSales ? "" : isFree ? "" : suffixForCycle(effectiveCycle);
 
   return (
@@ -218,15 +218,15 @@ function PricingCard({
         </div>
         {monthlyEquivYearly && !isFree && !plan.contactSales && (
           <div className="mt-1 text-xs text-muted-foreground">
-            ≈ {inr(monthlyEquivYearly)}/mo · billed yearly
+            ≈ {usd(monthlyEquivYearly)}/mo · billed yearly
             {plan.discountPct > 0 && (
               <span className="ml-2 text-[color:var(--brand-orange)] font-semibold">Save {plan.discountPct}%</span>
             )}
           </div>
         )}
-        {cycle === "monthly" && plan.priceYearlyInr > 0 && !isFree && !plan.contactSales && plan.planType !== "lifetime" && (
+        {cycle === "monthly" && plan.priceYearlyUsd > 0 && !isFree && !plan.contactSales && plan.planType !== "lifetime" && (
           <div className="mt-1 text-xs text-muted-foreground">
-            or {inr(plan.priceYearlyInr)}/yr {plan.discountPct > 0 ? `· save ${plan.discountPct}%` : ""}
+            or {usd(plan.priceYearlyUsd)}/yr {plan.discountPct > 0 ? `· save ${plan.discountPct}%` : ""}
           </div>
         )}
 
@@ -338,7 +338,7 @@ const FAQ = [
   { q: "Can I switch between Monthly, Yearly and Lifetime?", a: "Yes. Any credits already in your wallet stay put, and we deduct in the order: monthly → top-ups → lifetime, so nothing is wasted." },
   { q: "Can I buy additional credit packs?", a: "Yes. Any user can top up anytime — packs are added instantly and never expire." },
   { q: "Do failed generations cost credits?", a: "No. Credits are only deducted when a generation succeeds; failed runs are refunded automatically." },
-  { q: "How is payment processed?", a: "Payments are processed securely by Razorpay in INR (₹). We never store your card details." },
+  { q: "How is payment processed?", a: "Payments are processed securely by Razorpay in USD ($). We never store your card details." },
 ];
 function PricingFAQ() {
   const [open, setOpen] = useState<number | null>(0);
@@ -453,10 +453,10 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
           <X className="w-4 h-4" />
         </button>
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center text-white font-bold text-sm">₹</div>
+          <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center text-white font-bold text-sm">$</div>
           <div>
             <div className="font-semibold">Checkout</div>
-            <div className="text-xs text-muted-foreground">Secure payment · Razorpay · INR</div>
+            <div className="text-xs text-muted-foreground">Secure payment · Razorpay · USD</div>
           </div>
         </div>
         <div className="glass rounded-xl p-4 mb-3 space-y-2 text-sm">
@@ -465,7 +465,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
           <div className="flex justify-between"><span>Credits</span><span className="font-medium">{credits.toLocaleString()}{effective === "lifetime" ? " (one-time + monthly refill)" : ""}</span></div>
           <div className="flex justify-between text-base pt-2 border-t border-border/40">
             <span className="font-semibold">Total</span>
-            <span className="font-bold gradient-text">{inr(price)}<span className="text-xs text-muted-foreground font-normal ml-1">{suffixForCycle(effective)}</span></span>
+            <span className="font-bold gradient-text">{usd(price)}<span className="text-xs text-muted-foreground font-normal ml-1">{suffixForCycle(effective)}</span></span>
           </div>
         </div>
         <button
@@ -474,7 +474,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
           className="w-full rounded-lg gradient-primary text-white py-3 font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {paying && <Loader2 className="w-4 h-4 animate-spin" />}
-          {paying ? "Opening checkout…" : `Pay ${inr(price)}`}
+          {paying ? "Opening checkout…" : `Pay ${usd(price)}`}
         </button>
         <p className="mt-2 text-[11px] text-center text-muted-foreground">
           Credits are only granted after a successful payment.
@@ -502,7 +502,7 @@ function CreditPacksSection() {
     try {
       const ok = await loadRazorpayScript();
       if (!ok || !window.Razorpay) throw new Error("Could not load Razorpay checkout");
-      const order = await createOrder({ data: { packId: pack.id, currency: "INR" } });
+      const order = await createOrder({ data: { packId: pack.id, currency: "USD" } });
       await new Promise<void>((resolve, reject) => {
         const rzp = new window.Razorpay!({
           key: order.keyId,
@@ -558,7 +558,7 @@ function CreditPacksSection() {
             </div>
             <div className="mt-3 text-3xl font-extrabold">{pack.credits.toLocaleString()}</div>
             <div className="text-xs text-muted-foreground">credits</div>
-            <div className="mt-3 text-lg font-bold gradient-text">₹{Math.round(pack.priceUSD * 84).toLocaleString("en-IN")}</div>
+            <div className="mt-3 text-lg font-bold gradient-text">${pack.priceUSD.toFixed(2)}</div>
             <button
               onClick={() => handleBuy(pack)}
               disabled={buyingId === pack.id}
