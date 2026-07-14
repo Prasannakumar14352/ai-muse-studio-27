@@ -292,7 +292,7 @@ function ComparisonSection({ plans, mode = "monthly" }: { plans?: PlanDef[]; mod
           <thead>
             <tr>
               <th className="text-left py-3 px-3 text-xs uppercase tracking-wider text-muted-foreground font-medium border-b border-border/60"></th>
-              {plans.map((p) => (
+              {list.map((p) => (
                 <th key={p.id} className={`text-left py-3 px-3 border-b border-border/60 ${p.featured ? "text-[color:var(--neon-purple)]" : ""}`}>
                   <div className="font-semibold text-foreground">{p.name}</div>
                   {p.featured && <div className="text-[10px] uppercase tracking-wider text-[color:var(--neon-purple)]">Most popular</div>}
@@ -304,14 +304,14 @@ function ComparisonSection({ plans, mode = "monthly" }: { plans?: PlanDef[]; mod
             {numericRows.map((row, i) => (
               <tr key={row.label} className={i % 2 === 0 ? "bg-white/[0.02]" : ""}>
                 <td className="py-2.5 px-3 text-muted-foreground">{row.label}</td>
-                {plans.map((p) => (
+                {list.map((p) => (
                   <td key={p.id} className="py-2.5 px-3 text-foreground">{row.get(p)}</td>
                 ))}
               </tr>
             ))}
             <tr>
               <td className="py-3 px-3 text-muted-foreground align-top border-t border-border/60">Included features</td>
-              {plans.map((p) => (
+              {list.map((p) => (
                 <td key={p.id} className="py-3 px-3 align-top border-t border-border/60">
                   <ul className="space-y-1.5">
                     {p.features.map((f) => (
@@ -330,7 +330,7 @@ function ComparisonSection({ plans, mode = "monthly" }: { plans?: PlanDef[]; mod
 
       {/* Mobile accordion */}
       <div className="md:hidden space-y-3">
-        {plans.map((p) => (
+        {list.map((p) => (
           <details key={p.id} className="rounded-xl border border-border/60 bg-black/20 group">
             <summary className="cursor-pointer list-none p-4 flex items-center justify-between">
               <div>
