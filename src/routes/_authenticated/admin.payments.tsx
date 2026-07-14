@@ -144,7 +144,7 @@ function PaymentSettings() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Environment">
             <select
-              className="input"
+              className="w-full rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm placeholder:text-white/30 disabled:opacity-50"
               value={form.environment}
               onChange={(e) => patch({ environment: e.target.value as "test" | "live" })}
             >
@@ -154,12 +154,12 @@ function PaymentSettings() {
           </Field>
 
           <Field label="Currency">
-            <input className="input" value={form.currency} disabled />
+            <input className="w-full rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm placeholder:text-white/30 disabled:opacity-50" value={form.currency} disabled />
           </Field>
 
           <Field label="Razorpay Key ID" hint="Public identifier — safe to expose to browser">
             <input
-              className="input font-mono"
+              className="w-full rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm font-mono placeholder:text-white/30 disabled:opacity-50"
               placeholder="rzp_test_xxx / rzp_live_xxx"
               value={form.keyId}
               onChange={(e) => patch({ keyId: e.target.value })}
@@ -171,7 +171,7 @@ function PaymentSettings() {
             hint={data.hasKeySecret ? "Saved. Leave blank to keep. Enter a new value to replace." : "Never saved yet"}
           >
             <input
-              className="input font-mono"
+              className="w-full rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm font-mono placeholder:text-white/30 disabled:opacity-50"
               type="password"
               placeholder={data.hasKeySecret ? "•••••••••••••• (unchanged)" : "Enter secret"}
               value={form.keySecret}
@@ -184,7 +184,7 @@ function PaymentSettings() {
             hint={data.hasWebhookSecret ? "Saved. Leave blank to keep." : "Optional — used by /api/public/webhooks/razorpay"}
           >
             <input
-              className="input font-mono"
+              className="w-full rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm font-mono placeholder:text-white/30 disabled:opacity-50"
               type="password"
               placeholder={data.hasWebhookSecret ? "•••••••••••••• (unchanged)" : "Enter webhook secret"}
               value={form.webhookSecret}
@@ -194,7 +194,7 @@ function PaymentSettings() {
 
           <Field label="Company Name">
             <input
-              className="input"
+              className="w-full rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm placeholder:text-white/30 disabled:opacity-50"
               placeholder="CreatorFlow AI"
               value={form.companyName}
               onChange={(e) => patch({ companyName: e.target.value })}
@@ -203,7 +203,7 @@ function PaymentSettings() {
 
           <Field label="Logo URL">
             <input
-              className="input"
+              className="w-full rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm placeholder:text-white/30 disabled:opacity-50"
               placeholder="https://…/logo.png"
               value={form.logoUrl}
               onChange={(e) => patch({ logoUrl: e.target.value })}
@@ -219,7 +219,7 @@ function PaymentSettings() {
                 onChange={(e) => patch({ themeColor: e.target.value })}
               />
               <input
-                className="input flex-1 font-mono"
+                className="flex-1 rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm font-mono placeholder:text-white/30"
                 value={form.themeColor}
                 onChange={(e) => patch({ themeColor: e.target.value })}
               />
