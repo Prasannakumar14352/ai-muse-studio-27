@@ -380,7 +380,7 @@ function CreditGuide() {
         .foot { margin-top: 24px; font-size: 11px; color: #888; }
       </style></head><body>
       <h1>Credits &amp; Pricing Guide</h1>
-      <div class="sub">CreatorVault · generated ${escapeHtml(stamp)}</div>
+      <div class="sub">CreatorFlow · generated ${escapeHtml(stamp)}</div>
       <ul>${intro}</ul>
       <table>
         <thead><tr><th>Category</th><th>Action</th><th>Credits</th><th>Unit</th><th>Notes</th></tr></thead>

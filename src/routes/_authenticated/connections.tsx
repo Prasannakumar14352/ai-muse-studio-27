@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_authenticated/connections")({
   }),
   head: () => ({
     meta: [
-      { title: "Connected Accounts — CreatorVaultAI" },
+      { title: "Connected Accounts — CreatorFlow AI" },
       { name: "description", content: "Connect Instagram, Facebook, YouTube, and LinkedIn to publish directly, or download and post manually." },
     ],
   }),

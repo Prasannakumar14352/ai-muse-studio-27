@@ -19,7 +19,7 @@ import { ProjectsSection } from "@/components/projects-section";
 export const Route = createFileRoute("/_authenticated/thumbnails")({
   head: () => ({
     meta: [
-      { title: "AI Thumbnail Studio — CreatorVaultAI" },
+      { title: "AI Thumbnail Studio — CreatorFlow AI" },
       { name: "description", content: "Generate professional layered YouTube thumbnails with high-CTR composition, cinematic backgrounds, and editable text." },
     ],
   }),

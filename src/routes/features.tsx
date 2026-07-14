@@ -107,7 +107,7 @@ function FeaturesPage() {
           Ten AI engines. <span className="gradient-text">One creator studio.</span>
         </h1>
         <p className="mt-5 max-w-2xl mx-auto text-lg text-muted-foreground">
-          CreatorVault composes cinematic videos, layered carousels, thumbnails and LinkedIn posts with the same
+          CreatorFlow composes cinematic videos, layered carousels, thumbnails and LinkedIn posts with the same
           character, brand and voice — end to end.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
