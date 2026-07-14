@@ -58,11 +58,12 @@ export const setUsdInrRate = createServerFn({ method: "POST" })
     return { ok: true, rate: data.rate };
   });
 
-/** Public config for the browser Razorpay checkout (key_id only — safe to expose). */
+/** Public config for the browser Razorpay checkout (key_id + branding only — safe to expose). */
 export const getRazorpayConfig = createServerFn({ method: "GET" }).handler(async () => {
-  const keyId = process.env.RAZORPAY_KEY_ID;
-  if (!keyId) throw new Error("Razorpay not configured");
-  return { keyId };
+  const { resolveRazorpayBranding } = await import("@/lib/razorpay-settings.server");
+  const branding = await resolveRazorpayBranding();
+  if (!branding?.keyId || !branding.enabled) throw new Error("Razorpay not configured");
+  return branding;
 });
 
 /** Create a Razorpay order for a credit pack. Always billed in INR. */
@@ -76,9 +77,10 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     const pack = CREDIT_PACKS.find((p) => p.id === data.packId);
     if (!pack) throw new Error("Unknown pack");
 
-    const keyId = process.env.RAZORPAY_KEY_ID;
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (!keyId || !keySecret) throw new Error("Razorpay not configured");
+    const { resolveRazorpayCredentials } = await import("@/lib/razorpay-settings.server");
+    const creds = await resolveRazorpayCredentials();
+    const keyId = creds.keyId;
+    const keySecret = creds.keySecret;
 
     const resolved = await resolveRate();
     const rate = resolved.rate;
@@ -157,9 +159,10 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
     return { planId: input.planId, billingCycle: cycle };
   })
   .handler(async ({ data, context }) => {
-    const keyId = process.env.RAZORPAY_KEY_ID;
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (!keyId || !keySecret) throw new Error("Razorpay not configured");
+    const { resolveRazorpayCredentials } = await import("@/lib/razorpay-settings.server");
+    const creds = await resolveRazorpayCredentials();
+    const keyId = creds.keyId;
+    const keySecret = creds.keySecret;
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: planRow, error: planErr } = await supabaseAdmin
@@ -275,8 +278,9 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (!keySecret) throw new Error("Razorpay not configured");
+    const { resolveRazorpayCredentials } = await import("@/lib/razorpay-settings.server");
+    const creds = await resolveRazorpayCredentials();
+    const keySecret = creds.keySecret;
 
     const { createHmac, timingSafeEqual } = await import("crypto");
     const expected = createHmac("sha256", keySecret)

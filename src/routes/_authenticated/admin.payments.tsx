@@ -1,0 +1,296 @@
+import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { useAccess } from "@/lib/access";
+import {
+  getRazorpaySettings,
+  saveRazorpaySettings,
+  testRazorpayConnection,
+} from "@/lib/razorpay-settings.functions";
+import { ArrowLeft, CheckCircle2, Loader2, ShieldCheck, XCircle } from "lucide-react";
+
+export const Route = createFileRoute("/_authenticated/admin/payments")({
+  component: PaymentSettings,
+});
+
+type Form = {
+  environment: "test" | "live";
+  enabled: boolean;
+  keyId: string;
+  keySecret: string;
+  webhookSecret: string;
+  companyName: string;
+  logoUrl: string;
+  themeColor: string;
+  currency: string;
+};
+
+function PaymentSettings() {
+  const { data: access, isLoading } = useAccess();
+  const getFn = useServerFn(getRazorpaySettings);
+  const saveFn = useServerFn(saveRazorpaySettings);
+  const testFn = useServerFn(testRazorpayConnection);
+  const qc = useQueryClient();
+
+  const { data, isFetching } = useQuery({
+    queryKey: ["razorpay-admin-settings"],
+    queryFn: () => getFn(),
+    enabled: !!access?.isAdmin,
+  });
+
+  const [form, setForm] = useState<Form | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    if (data && !form) {
+      setForm({
+        environment: data.environment,
+        enabled: data.enabled,
+        keyId: data.keyId,
+        keySecret: "",
+        webhookSecret: "",
+        companyName: data.companyName,
+        logoUrl: data.logoUrl,
+        themeColor: data.themeColor,
+        currency: data.currency,
+      });
+    }
+  }, [data, form]);
+
+  if (isLoading) return <div className="glass rounded-2xl h-64 animate-pulse" />;
+  if (!access?.isAdmin) return <Navigate to="/dashboard" />;
+  if (!form || !data) return <div className="glass rounded-2xl h-64 animate-pulse" />;
+
+  const patch = (p: Partial<Form>) => setForm((f) => (f ? { ...f, ...p } : f));
+
+  async function handleSave() {
+    if (!form) return;
+    if (!form.keyId.trim()) { toast.error("Key ID is required"); return; }
+    setSaving(true);
+    try {
+      await saveFn({
+        data: {
+          environment: form.environment,
+          enabled: form.enabled,
+          keyId: form.keyId.trim(),
+          keySecret: form.keySecret || undefined,
+          webhookSecret: form.webhookSecret || undefined,
+          companyName: form.companyName,
+          logoUrl: form.logoUrl,
+          themeColor: form.themeColor,
+          currency: form.currency || "INR",
+        },
+      });
+      toast.success("Payment settings saved");
+      setForm({ ...form, keySecret: "", webhookSecret: "" });
+      await qc.invalidateQueries({ queryKey: ["razorpay-admin-settings"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleTest() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const r = await testFn();
+      setTestResult(r);
+      if (r.ok) toast.success("Razorpay connection OK"); else toast.error(r.message);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Test failed";
+      setTestResult({ ok: false, message: msg });
+      toast.error(msg);
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  const envBadge = form.environment === "live"
+    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+    : "bg-amber-500/20 text-amber-300 border-amber-500/30";
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <Link to="/admin" className="inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white">
+            <ArrowLeft className="w-4 h-4" /> Back to Admin
+          </Link>
+          <h1 className="text-2xl font-semibold mt-2 flex items-center gap-2">
+            <ShieldCheck className="w-6 h-6 text-purple-300" />
+            Payment Settings — Razorpay
+          </h1>
+          <p className="text-white/60 text-sm mt-1">
+            Super admin only. Credentials are encrypted at rest and never exposed to the browser.
+          </p>
+        </div>
+        <span className={`text-xs px-2.5 py-1 rounded-full border ${envBadge}`}>
+          {form.environment.toUpperCase()}
+        </span>
+      </div>
+
+      <div className="glass rounded-2xl p-6 space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Environment">
+            <select
+              className="input"
+              value={form.environment}
+              onChange={(e) => patch({ environment: e.target.value as "test" | "live" })}
+            >
+              <option value="test">Test</option>
+              <option value="live">Live</option>
+            </select>
+          </Field>
+
+          <Field label="Currency">
+            <input className="input" value={form.currency} disabled />
+          </Field>
+
+          <Field label="Razorpay Key ID" hint="Public identifier — safe to expose to browser">
+            <input
+              className="input font-mono"
+              placeholder="rzp_test_xxx / rzp_live_xxx"
+              value={form.keyId}
+              onChange={(e) => patch({ keyId: e.target.value })}
+            />
+          </Field>
+
+          <Field
+            label="Razorpay Key Secret"
+            hint={data.hasKeySecret ? "Saved. Leave blank to keep. Enter a new value to replace." : "Never saved yet"}
+          >
+            <input
+              className="input font-mono"
+              type="password"
+              placeholder={data.hasKeySecret ? "•••••••••••••• (unchanged)" : "Enter secret"}
+              value={form.keySecret}
+              onChange={(e) => patch({ keySecret: e.target.value })}
+            />
+          </Field>
+
+          <Field
+            label="Webhook Secret"
+            hint={data.hasWebhookSecret ? "Saved. Leave blank to keep." : "Optional — used by /api/public/webhooks/razorpay"}
+          >
+            <input
+              className="input font-mono"
+              type="password"
+              placeholder={data.hasWebhookSecret ? "•••••••••••••• (unchanged)" : "Enter webhook secret"}
+              value={form.webhookSecret}
+              onChange={(e) => patch({ webhookSecret: e.target.value })}
+            />
+          </Field>
+
+          <Field label="Company Name">
+            <input
+              className="input"
+              placeholder="CreatorFlow AI"
+              value={form.companyName}
+              onChange={(e) => patch({ companyName: e.target.value })}
+            />
+          </Field>
+
+          <Field label="Logo URL">
+            <input
+              className="input"
+              placeholder="https://…/logo.png"
+              value={form.logoUrl}
+              onChange={(e) => patch({ logoUrl: e.target.value })}
+            />
+          </Field>
+
+          <Field label="Theme Color">
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                className="h-10 w-14 rounded border border-white/10 bg-transparent"
+                value={form.themeColor || "#0F172A"}
+                onChange={(e) => patch({ themeColor: e.target.value })}
+              />
+              <input
+                className="input flex-1 font-mono"
+                value={form.themeColor}
+                onChange={(e) => patch({ themeColor: e.target.value })}
+              />
+            </div>
+          </Field>
+        </div>
+
+        <label className="flex items-center gap-3 pt-2 border-t border-white/10">
+          <input
+            type="checkbox"
+            className="w-4 h-4"
+            checked={form.enabled}
+            onChange={(e) => patch({ enabled: e.target.checked })}
+          />
+          <span className="text-sm">
+            Enable Razorpay checkout — when off, order creation is blocked platform-wide.
+          </span>
+        </label>
+
+        <div className="flex flex-wrap items-center gap-3 pt-2">
+          <button
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={saving || isFetching}
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            Save Changes
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={handleTest}
+            disabled={testing}
+          >
+            {testing && <Loader2 className="w-4 h-4 animate-spin" />}
+            Test Connection
+          </button>
+          {data.updatedAt && (
+            <span className="text-xs text-white/50">
+              Last updated: {new Date(data.updatedAt).toLocaleString()}
+            </span>
+          )}
+        </div>
+
+        {testResult && (
+          <div
+            className={`rounded-lg px-4 py-3 text-sm flex items-start gap-2 border ${
+              testResult.ok
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-200"
+                : "bg-rose-500/10 border-rose-500/30 text-rose-200"
+            }`}
+          >
+            {testResult.ok ? <CheckCircle2 className="w-4 h-4 mt-0.5" /> : <XCircle className="w-4 h-4 mt-0.5" />}
+            <div className="font-mono text-xs">{testResult.message}</div>
+          </div>
+        )}
+      </div>
+
+      <div className="glass rounded-2xl p-5 text-sm text-white/70 space-y-2">
+        <div className="font-semibold text-white">Security</div>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>Key secret and webhook secret are encrypted with AES-256-GCM before being stored.</li>
+          <li>The browser only ever receives the Key ID and branding fields — never the secret.</li>
+          <li>Row-level security blocks direct database reads; only server functions with admin role can access this table.</li>
+          <li>Changes take effect immediately for every checkout — no code deploy required.</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="block space-y-1.5">
+      <div className="text-xs uppercase tracking-wide text-white/60">{label}</div>
+      {children}
+      {hint && <div className="text-xs text-white/40">{hint}</div>}
+    </label>
+  );
+}

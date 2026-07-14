@@ -42,6 +42,7 @@ import { Route as AuthenticatedLinkedinPostsIdRouteImport } from './routes/_auth
 import { Route as AuthenticatedCreateCarouselRouteImport } from './routes/_authenticated/create_.carousel'
 import { Route as AuthenticatedAdminWebhooksRouteImport } from './routes/_authenticated/admin.webhooks'
 import { Route as AuthenticatedAdminTemplatesRouteImport } from './routes/_authenticated/admin.templates'
+import { Route as AuthenticatedAdminPaymentsRouteImport } from './routes/_authenticated/admin.payments'
 import { Route as AuthenticatedAdminIntegrationsRouteImport } from './routes/_authenticated/admin.integrations'
 import { Route as AuthenticatedAdminCurrencyRouteImport } from './routes/_authenticated/admin.currency'
 import { Route as ApiPublicWebhooksRazorpayRouteImport } from './routes/api/public/webhooks/razorpay'
@@ -221,6 +222,12 @@ const AuthenticatedAdminTemplatesRoute =
     path: '/templates',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminPaymentsRoute =
+  AuthenticatedAdminPaymentsRouteImport.update({
+    id: '/payments',
+    path: '/payments',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminIntegrationsRoute =
   AuthenticatedAdminIntegrationsRouteImport.update({
     id: '/integrations',
@@ -285,6 +292,7 @@ export interface FileRoutesByFullPath {
   '/api/tts': typeof ApiTtsRoute
   '/admin/currency': typeof AuthenticatedAdminCurrencyRoute
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
+  '/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/admin/templates': typeof AuthenticatedAdminTemplatesRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
@@ -323,6 +331,7 @@ export interface FileRoutesByTo {
   '/api/tts': typeof ApiTtsRoute
   '/admin/currency': typeof AuthenticatedAdminCurrencyRoute
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
+  '/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/admin/templates': typeof AuthenticatedAdminTemplatesRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
@@ -365,6 +374,7 @@ export interface FileRoutesById {
   '/api/tts': typeof ApiTtsRoute
   '/_authenticated/admin/currency': typeof AuthenticatedAdminCurrencyRoute
   '/_authenticated/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
+  '/_authenticated/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/_authenticated/admin/templates': typeof AuthenticatedAdminTemplatesRoute
   '/_authenticated/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/_authenticated/create_/carousel': typeof AuthenticatedCreateCarouselRoute
@@ -407,6 +417,7 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/admin/currency'
     | '/admin/integrations'
+    | '/admin/payments'
     | '/admin/templates'
     | '/admin/webhooks'
     | '/create/carousel'
@@ -445,6 +456,7 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/admin/currency'
     | '/admin/integrations'
+    | '/admin/payments'
     | '/admin/templates'
     | '/admin/webhooks'
     | '/create/carousel'
@@ -486,6 +498,7 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/_authenticated/admin/currency'
     | '/_authenticated/admin/integrations'
+    | '/_authenticated/admin/payments'
     | '/_authenticated/admin/templates'
     | '/_authenticated/admin/webhooks'
     | '/_authenticated/create_/carousel'
@@ -750,6 +763,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminTemplatesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/payments': {
+      id: '/_authenticated/admin/payments'
+      path: '/payments'
+      fullPath: '/admin/payments'
+      preLoaderRoute: typeof AuthenticatedAdminPaymentsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/integrations': {
       id: '/_authenticated/admin/integrations'
       path: '/integrations'
@@ -798,6 +818,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminCurrencyRoute: typeof AuthenticatedAdminCurrencyRoute
   AuthenticatedAdminIntegrationsRoute: typeof AuthenticatedAdminIntegrationsRoute
+  AuthenticatedAdminPaymentsRoute: typeof AuthenticatedAdminPaymentsRoute
   AuthenticatedAdminTemplatesRoute: typeof AuthenticatedAdminTemplatesRoute
   AuthenticatedAdminWebhooksRoute: typeof AuthenticatedAdminWebhooksRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -806,6 +827,7 @@ interface AuthenticatedAdminRouteChildren {
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminCurrencyRoute: AuthenticatedAdminCurrencyRoute,
   AuthenticatedAdminIntegrationsRoute: AuthenticatedAdminIntegrationsRoute,
+  AuthenticatedAdminPaymentsRoute: AuthenticatedAdminPaymentsRoute,
   AuthenticatedAdminTemplatesRoute: AuthenticatedAdminTemplatesRoute,
   AuthenticatedAdminWebhooksRoute: AuthenticatedAdminWebhooksRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
