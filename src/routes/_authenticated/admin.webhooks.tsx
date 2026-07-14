@@ -192,3 +192,144 @@ function Field({ label, value }: { label: string; value: string | null }) {
     </div>
   );
 }
+
+type Diag = Awaited<ReturnType<typeof runRazorpayDiagnostic>>;
+
+function DiagnosticPanel() {
+  const runDiag = useServerFn(runRazorpayDiagnostic);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<Diag | null>(null);
+
+  async function handleRun() {
+    setBusy(true);
+    try {
+      const r = await runDiag();
+      setResult(r);
+      if (r.ok) toast.success(`Diagnostic passed (${r.environment.toUpperCase()})`);
+      else toast.error("Diagnostic failed — see details below");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Diagnostic error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="glass rounded-2xl p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Activity className="w-4 h-4 text-purple-300" /> Diagnostic — order + UPI/QR probe
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Creates a ₹1 INR order (never charged, expires unpaid) and probes enabled payment methods for this merchant account.
+          </p>
+        </div>
+        <button
+          onClick={handleRun}
+          disabled={busy}
+          className="inline-flex items-center gap-2 rounded-lg gradient-primary text-white px-4 py-2 text-sm disabled:opacity-60"
+        >
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+          {busy ? "Running…" : "Run diagnostic"}
+        </button>
+      </div>
+
+      {!result && (
+        <p className="text-sm text-muted-foreground py-6 text-center">
+          Run the diagnostic to verify credentials, order creation, and UPI QR availability.
+        </p>
+      )}
+
+      {result && (
+        <div className="space-y-3 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Stat label="Environment" value={result.environment.toUpperCase()}
+                  tone={result.environment === "live" ? "emerald" : "amber"} />
+            <Stat label="Credentials source" value={result.source} />
+            <Stat label="Key mode" value={result.keyMode}
+                  tone={result.keyMode === result.environment ? "emerald" : "rose"} />
+            <Stat label="Key ID" value={result.keyIdMasked} mono />
+          </div>
+
+          {result.order && (
+            <div className="rounded-lg border border-border/40 bg-black/20 p-3 text-xs">
+              <div className="font-semibold text-sm mb-1 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Order created
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <Field label="Order ID" value={result.order.id} />
+                <Field label="Currency" value={result.order.currency} />
+                <Field label="Amount (paise)" value={String(result.order.amount)} />
+                <Field label="Status" value={result.order.status} />
+              </div>
+            </div>
+          )}
+
+          {result.methods && (
+            <div className="rounded-lg border border-border/40 bg-black/20 p-3 text-xs">
+              <div className="font-semibold text-sm mb-2">Enabled payment methods</div>
+              <div className="flex flex-wrap gap-2">
+                <MethodPill on={result.methods.upi} label="UPI" />
+                <MethodPill on={result.methods.upiFlows?.qr} label="UPI QR" />
+                <MethodPill on={result.methods.upiFlows?.collect} label="UPI Collect" />
+                <MethodPill on={result.methods.upiFlows?.intent} label="UPI Intent" />
+                <MethodPill on={result.methods.card} label="Card" />
+                <MethodPill on={result.methods.netbanking} label="Netbanking" />
+                <MethodPill on={result.methods.wallet} label="Wallet" />
+              </div>
+              {result.methods.rawJson && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-muted-foreground">Raw /v1/methods response</summary>
+                  <pre className="mt-2 max-h-64 overflow-auto rounded bg-black/40 p-3 text-[11px]">
+                    {JSON.stringify(JSON.parse(result.methods.rawJson), null, 2)}
+                  </pre>
+                </details>
+              )}
+            </div>
+          )}
+
+          {result.warnings.map((w, i) => (
+            <div key={`w${i}`} className="rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-100 p-3 text-xs flex gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{w}</span>
+            </div>
+          ))}
+          {result.errors.map((er, i) => (
+            <div key={`e${i}`} className="rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-100 p-3 text-xs flex gap-2">
+              <XCircle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{er}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Stat({ label, value, tone, mono }: { label: string; value: string; tone?: "emerald" | "amber" | "rose"; mono?: boolean }) {
+  const toneCls =
+    tone === "emerald" ? "text-emerald-300" :
+    tone === "amber" ? "text-amber-300" :
+    tone === "rose" ? "text-rose-300" : "text-white";
+  return (
+    <div className="rounded-lg border border-border/40 bg-black/20 p-3">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={`font-semibold mt-0.5 ${toneCls} ${mono ? "font-mono text-xs" : ""}`}>{value}</div>
+    </div>
+  );
+}
+
+function MethodPill({ on, label }: { on: boolean | undefined; label: string }) {
+  const enabled = on === true;
+  const unknown = on === undefined;
+  const cls = enabled
+    ? "bg-emerald-500/15 text-emerald-200 border-emerald-500/40"
+    : unknown
+      ? "bg-white/5 text-muted-foreground border-border/40"
+      : "bg-rose-500/15 text-rose-200 border-rose-500/40";
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-xs ${cls}`}>
+      {enabled ? <CheckCircle2 className="w-3 h-3" /> : unknown ? <ShieldAlert className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+      {label}{unknown ? " (?)" : ""}
+    </span>
+  );
+}
