@@ -107,6 +107,10 @@ export type VideoBlueprintMetadata = {
   blueprintVersions: BlueprintVersionEntry[]; // capped to 10 most recent
   renderSnapshot: RenderSnapshot | null;
   blueprintVersionUsed: number | null;        // last version that a render used
+  /** ISO timestamp when the user explicitly approved the current blueprint. */
+  blueprintApprovedAt?: string | null;
+  /** Blueprint version that was approved. Any later edit invalidates approval. */
+  approvedBlueprintVersion?: number | null;
 };
 
 export const MAX_BLUEPRINT_VERSIONS = 10;
