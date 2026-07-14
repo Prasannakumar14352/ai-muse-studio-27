@@ -9,9 +9,9 @@ export const Route = createFileRoute("/features")({
   head: () => ({
     meta: [
       { title: "Features — CreatorFlow AI" },
-      { name: "description", content: "Every AI engine inside CreatorVault: cinematic videos, layered carousels, LinkedIn studio, character consistency, motion director, thumbnail studio and more." },
+      { name: "description", content: "Every AI engine inside CreatorFlow AI: cinematic videos, layered carousels, LinkedIn studio, character consistency, motion director, thumbnail studio and more." },
       { property: "og:title", content: "Features — CreatorFlow AI" },
-      { property: "og:description", content: "Every AI engine inside CreatorVault: videos, carousels, LinkedIn, thumbnails and more." },
+      { property: "og:description", content: "Every AI engine inside CreatorFlow AI: videos, carousels, LinkedIn, thumbnails and more." },
       { property: "og:type", content: "website" },
       { name: "twitter:title", content: "Features — CreatorFlow AI" },
       { name: "twitter:description", content: "Every AI engine inside CreatorFlow AI." },
