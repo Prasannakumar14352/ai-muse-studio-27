@@ -279,6 +279,7 @@ function VideosPage() {
   const [thumbLibrary, setThumbLibrary] = useState<LocalThumbnail[]>([]);
   const [inProgress, setInProgress] = useState<JobRecord[]>([]);
   const [projectCount, setProjectCount] = useState<number | null>(null);
+  const [assetsBundle, setAssetsBundle] = useState<AssetGenerationBundle | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const dashRef = useRef<DashState>(initialDash);
   dashRef.current = dash;
