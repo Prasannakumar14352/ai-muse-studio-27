@@ -102,11 +102,11 @@ function AdminPanel() {
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Admin Panel</div>
           <h1 className="text-2xl font-bold">Manage users & subscriptions</h1>
         </div>
-        <a
-          href="/admin/webhooks"
+        <Link
+          to="/admin/webhooks"
           className="inline-flex items-center gap-2 rounded-lg gradient-primary text-white px-3 py-2 text-sm hover:opacity-90 transition">
           <Zap className="w-4 h-4" /> Razorpay Debugger
-        </a>
+        </Link>
       </div>
 
 
