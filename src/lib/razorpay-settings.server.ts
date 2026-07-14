@@ -199,15 +199,24 @@ export async function saveAdminSettings(input: SaveInput, userId: string) {
 }
 
 /** Ping Razorpay with current credentials — verifies key id + secret work. */
-export async function testConnection(): Promise<{ ok: boolean; message: string }> {
-  const r = await resolveRazorpayCredentials();
+export async function testConnection(): Promise<{ ok: boolean; kind: "ok" | "invalid" | "network"; message: string }> {
+  let r: ResolvedRazorpay;
+  try {
+    r = await resolveRazorpayCredentials();
+  } catch (e) {
+    return { ok: false, kind: "invalid", message: e instanceof Error ? e.message : "Invalid configuration" };
+  }
   const auth = Buffer.from(`${r.keyId}:${r.keySecret}`).toString("base64");
-  const res = await fetch("https://api.razorpay.com/v1/payments?count=1", {
-    headers: { Authorization: `Basic ${auth}` },
-  });
-  if (res.ok) return { ok: true, message: `Connected (${r.environment}, source: ${r.source})` };
-  const text = await res.text();
-  return { ok: false, message: `HTTP ${res.status}: ${text.slice(0, 200)}` };
+  try {
+    const res = await fetch("https://api.razorpay.com/v1/payments?count=1", {
+      headers: { Authorization: `Basic ${auth}` },
+    });
+    if (res.ok) return { ok: true, kind: "ok", message: `Connected (${r.environment}, source: ${r.source})` };
+    const text = await res.text();
+    return { ok: false, kind: "invalid", message: `HTTP ${res.status}: ${text.slice(0, 200)}` };
+  } catch (e) {
+    return { ok: false, kind: "network", message: e instanceof Error ? e.message : "Network error reaching Razorpay" };
+  }
 }
 
 /**
