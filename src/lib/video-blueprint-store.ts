@@ -126,6 +126,30 @@ export function hasEditsSinceSnapshot(meta: VideoBlueprintMetadata): boolean {
   return meta.blueprintVersion > meta.renderSnapshot.version;
 }
 
+/** Stamp explicit user approval on the current blueprint version. */
+export async function approveBlueprint(
+  projectId: string,
+): Promise<VideoBlueprintMetadata | null> {
+  const bag = await readMetaBag(projectId);
+  const existing = bag[KEY];
+  if (!existing) return null;
+  const updated: VideoBlueprintMetadata = {
+    ...existing,
+    blueprintApprovedAt: new Date().toISOString(),
+    approvedBlueprintVersion: existing.blueprintVersion,
+  };
+  bag[KEY] = updated;
+  await writeMetaBag(projectId, bag);
+  return updated;
+}
+
+/** True only when the current blueprint version matches the approved version. */
+export function isBlueprintApproved(meta: VideoBlueprintMetadata | null): boolean {
+  if (!meta) return false;
+  if (!meta.blueprintApprovedAt) return false;
+  return meta.approvedBlueprintVersion === meta.blueprintVersion;
+}
+
 /** Delete a local blueprint (matches deleteJob lifecycle). */
 export function deleteLocalBlueprint(jobId: string): void {
   try { localStorage.removeItem(`cv:videojob-blueprint:${jobId}`); } catch { /* noop */ }

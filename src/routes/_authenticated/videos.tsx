@@ -31,6 +31,7 @@ import {
 } from "@/lib/thumbnailLocalStore";
 import {
   initBlueprintMetadata, getBlueprintMetadata, localBlueprintId,
+  approveBlueprint, isBlueprintApproved,
 } from "@/lib/video-blueprint-store";
 import { buildBlueprintFromPlanning, blueprintToScript } from "@/lib/video-blueprint";
 import { VideoBlueprintEditor } from "@/components/video-blueprint-editor";
@@ -369,9 +370,12 @@ function VideosPage() {
   }
 
   /** Called from the Blueprint Editor when the user clicks "Approve & Generate Assets".
-   *  Runs shots + narration + subtitles + timeline, then PAUSES at the asset review gate. */
+   *  Stamps explicit approval, then runs shots + narration + subtitles + timeline,
+   *  then PAUSES at the asset review gate. */
   async function approveAndGenerate(jobId: string) {
     if (!gen) return;
+    // Stamp approval on the current blueprint version. Any later edit clears it.
+    await approveBlueprint(localBlueprintId(jobId));
     const meta = await getBlueprintMetadata(localBlueprintId(jobId));
     const edited = meta ? blueprintToScript(meta.currentBlueprint) : undefined;
     setError(null);
@@ -484,22 +488,39 @@ function VideosPage() {
   async function resumeJob(job: JobRecord) {
     const brief = JSON.parse(job.briefJson) as VideoBrief;
     setGen({ brief, niche: job.niche, topic: job.topic });
-    // Planning done but blueprint never approved → back to blueprint review.
-    if (job.phase === "review" || job.phase === "planning") {
+    setAssetsBundle(null);
+    setResult(null);
+    setError(null);
+    // Backward-compatible approval gate. Every unfinished job — including legacy
+    // ones created before the review-gate change — must pass through the
+    // blueprint editor and be explicitly approved before any further generation
+    // or rendering. Existing shot images stay cached in IndexedDB and will be
+    // reused during the next asset generation pass.
+    const meta = await getBlueprintMetadata(localBlueprintId(job.id));
+    const approved = isBlueprintApproved(meta);
+    if (!approved) {
       setDash({ ...initialDash, jobId: job.id, phase: "review" });
       setView("review");
+      if (job.phase !== "planning" && job.phase !== "review") {
+        toast.info("Blueprint approval required before resuming. Review and re-approve.");
+      }
       return;
     }
-    // Asset review paused → asset bundle is in-memory and was lost. Re-run
-    // asset generation from the edited blueprint (fast because shot images
-    // are cached in IndexedDB and won't regenerate).
-    if (job.phase === "asset_review") {
-      await approveAndGenerate(job.id);
-      return;
-    }
-    // Anything else (generating_shots, voiceover, paused during those, rendering)
-    // → re-run asset generation, which will land back at asset_review.
+    // Job was approved earlier — safe to continue asset generation. If shots
+    // were already produced, IndexedDB caching short-circuits regen and we
+    // land right back on the asset review gate.
     await approveAndGenerate(job.id);
+  }
+
+  /** Abort any active phase and jump back into the blueprint editor without
+   *  deleting cached shot images. Approval is auto-invalidated on next edit. */
+  async function stopAndEdit() {
+    if (!dash.jobId) return;
+    abortRef.current?.abort();
+    setDash((prev) => ({ ...prev, phase: "review" }));
+    setView("review");
+    await refreshInProgress();
+    toast.info("Paused. Edit the blueprint, then re-approve to continue.");
   }
 
   async function discardJob(id: string) {
@@ -652,6 +673,7 @@ function VideosPage() {
           onCancel={cancel}
           onRetryFailed={retryFailed}
           onBack={() => setView("landing")}
+          onEditBlueprint={stopAndEdit}
         />
       )}
       {view === "review" && dash.jobId && (
@@ -1167,13 +1189,14 @@ function AssetReviewGate({
 
 
 function JobDashboard({
-  dash, error, onCancel, onRetryFailed, onBack,
+  dash, error, onCancel, onRetryFailed, onBack, onEditBlueprint,
 }: {
   dash: DashState;
   error: string | null;
   onCancel: () => void;
   onRetryFailed: () => void;
   onBack: () => void;
+  onEditBlueprint: () => void;
 }) {
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const shotPct = dash.shotsTotal > 0 ? Math.round((dash.shotsDone / dash.shotsTotal) * 100) : 0;
@@ -1212,13 +1235,29 @@ function JobDashboard({
           </div>
           <div className="flex items-center gap-2">
             {dash.phase !== "complete" && dash.phase !== "failed" && (
-              <button
-                onClick={onCancel}
-                className="rounded-lg glass border border-border px-3 py-1.5 text-xs flex items-center gap-1.5"
-                title="Pause — you can resume later from your videos list"
-              >
-                <X className="w-3.5 h-3.5" /> Cancel
-              </button>
+              <>
+                <button
+                  onClick={onEditBlueprint}
+                  className="rounded-lg glass border border-amber-500/40 text-amber-200 px-3 py-1.5 text-xs flex items-center gap-1.5"
+                  title={
+                    dash.phase === "generating_shots" || dash.phase === "voiceover" || dash.phase === "rendering"
+                      ? "Stop and edit — pauses generation without deleting cached assets"
+                      : "Open the blueprint editor"
+                  }
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  {dash.phase === "generating_shots" || dash.phase === "voiceover" || dash.phase === "rendering"
+                    ? "Stop & edit blueprint"
+                    : "Edit blueprint"}
+                </button>
+                <button
+                  onClick={onCancel}
+                  className="rounded-lg glass border border-border px-3 py-1.5 text-xs flex items-center gap-1.5"
+                  title="Pause — you can resume later from your videos list"
+                >
+                  <X className="w-3.5 h-3.5" /> Cancel
+                </button>
+              </>
             )}
             <button
               onClick={onBack}
