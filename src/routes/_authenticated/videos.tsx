@@ -236,7 +236,7 @@ const STYLE_CARDS: StyleCard[] = [
   { id: "futuristic", label: "Futuristic", image: style3d },
 ];
 
-type View = "landing" | "input" | "processing" | "review" | "result" | "library";
+type View = "landing" | "input" | "processing" | "review" | "asset_review" | "result" | "library";
 type GenerateArgs = { brief: VideoBrief; niche: string; topic: string };
 type LibraryOpen = {
   meta: LocalVideo;
