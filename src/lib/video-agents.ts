@@ -1840,17 +1840,36 @@ export async function runPlanningPhase(
 }
 
 /**
- * Continue an existing "review" job through shot generation → voiceover →
- * render. If `editedScript` is provided (typically converted from the user's
- * edited blueprint), the job's shot list is rebuilt from it so downstream
- * assets follow the edits.
+ * Bundle of everything produced by asset generation. Held in memory by the
+ * UI between the two review gates (blueprint review → asset review → render).
+ * Not persisted because `voiceover[].buffer` is a live AudioBuffer.
  */
-export async function runGenerationPhase(
+export type AssetGenerationBundle = {
+  brief: VideoBrief;
+  research: Awaited<ReturnType<typeof ResearchAgent.run>>;
+  retentionEngine: Awaited<ReturnType<typeof RetentionEngineAgent.run>>;
+  script: AiVideoScript;
+  storyboard: Awaited<ReturnType<typeof StoryboardAgent.run>>;
+  direction: Awaited<ReturnType<typeof DirectorAgent.run>>;
+  voiceover: Awaited<ReturnType<typeof VoiceoverAgent.run>>;
+  subtitles: Awaited<ReturnType<typeof SubtitleAgent.run>>;
+  timeline: Awaited<ReturnType<typeof VideoEditingAgent.run>>;
+  music: Awaited<ReturnType<typeof MusicAgent.run>>;
+  sfx: Awaited<ReturnType<typeof SoundEffectsAgent.run>>;
+};
+
+/**
+ * Runs shot generation + voiceover/subtitles/timeline/music/sfx, then STOPS at
+ * the "asset_review" phase. Rendering happens later in runRenderPhase, so the
+ * user can preview shots, edit or regenerate individual scenes, and only
+ * trigger the expensive final encode when they explicitly approve.
+ */
+export async function runAssetGenerationPhase(
   jobId: string,
   brief: VideoBrief,
   opts: JobRunOptions,
   editedScript?: AiVideoScript,
-): Promise<{ job: JobRecord; result: PipelineResult }> {
+): Promise<{ job: JobRecord; bundle: AssetGenerationBundle }> {
   const { onEvent, signal } = opts;
   const job = await getJob(jobId);
   if (!job) throw new Error("Job not found");
@@ -1864,8 +1883,8 @@ export async function runGenerationPhase(
   const direction = await DirectorAgent.run(brief, storyboard);
 
   // If the user edited the blueprint, rebuild shots from the edited script so
-  // every generated asset reflects the edits. Only rebuild when there is no
-  // in-flight progress on the current shots (i.e. we haven't started yet).
+  // every generated asset reflects the edits. Only rebuild when no in-flight
+  // progress on the current shots.
   const anyProgress = job.shots.some((s) => s.status !== "pending");
   if (editedScript && !anyProgress) {
     job.shots = planShots(editedScript, brief.style, brief.title, creativeBrief);
@@ -1958,7 +1977,39 @@ export async function runGenerationPhase(
   const music = await MusicAgent.run(brief, timeline.total_sec);
   const sfx = await SoundEffectsAgent.run(direction);
 
-  // -------- Phase 4: render --------
+  // -------- Stop at asset review gate --------
+  job.phase = "asset_review";
+  await saveJob(job);
+  onEvent({ type: "phase", phase: "asset_review",
+    note: "Preview shots & narration before rendering." });
+
+  return {
+    job,
+    bundle: {
+      brief, research, retentionEngine, script, storyboard, direction,
+      voiceover, subtitles, timeline, music, sfx,
+    },
+  };
+}
+
+/**
+ * Final render. Consumes an AssetGenerationBundle produced by
+ * runAssetGenerationPhase and produces the final MP4 + thumbnail + SEO.
+ * Only runs after explicit user approval on the asset-review screen.
+ */
+export async function runRenderPhase(
+  jobId: string,
+  bundle: AssetGenerationBundle,
+  opts: Pick<JobRunOptions, "onEvent" | "signal">,
+): Promise<{ job: JobRecord; result: PipelineResult }> {
+  const { onEvent } = opts;
+  const job = await getJob(jobId);
+  if (!job) throw new Error("Job not found");
+  const {
+    brief, research, retentionEngine, script, storyboard, direction,
+    voiceover, subtitles, timeline, music, sfx,
+  } = bundle;
+
   job.phase = "rendering";
   await saveJob(job);
   onEvent({ type: "phase", phase: "rendering" });
@@ -2008,6 +2059,86 @@ export async function runGenerationPhase(
     render, thumbnail, seo,
   };
   return { job, result };
+}
+
+/**
+ * Back-compat: runs both asset generation and render in a single call.
+ * The new UI calls runAssetGenerationPhase + runRenderPhase separately so
+ * users can review assets between the two.
+ */
+export async function runGenerationPhase(
+  jobId: string,
+  brief: VideoBrief,
+  opts: JobRunOptions,
+  editedScript?: AiVideoScript,
+): Promise<{ job: JobRecord; result: PipelineResult }> {
+  const { bundle } = await runAssetGenerationPhase(jobId, brief, opts, editedScript);
+  return await runRenderPhase(jobId, bundle, opts);
+}
+
+/**
+ * Regenerate a single shot in place. Used by the asset-review screen so users
+ * can iterate on one scene without rebuilding the whole video.
+ */
+export async function regenerateShot(
+  jobId: string,
+  shotId: string,
+  brief: VideoBrief,
+  onEvent: (ev: JobEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const job = await getJob(jobId);
+  if (!job) return;
+  const shot = job.shots.find((s) => s.id === shotId);
+  if (!shot) return;
+
+  shot.status = "running";
+  shot.error = null;
+  shot.attempts += 1;
+  await saveJob(job);
+  onEvent({
+    type: "shot",
+    done: job.shotsDone,
+    failed: job.shotsFailed,
+    total: job.shots.length,
+    shot: { id: shot.id, index: shot.index, status: "pending",
+      kind: shot.kind, previewUrl: null, error: null, attempts: shot.attempts },
+  });
+
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  signal?.addEventListener("abort", onAbort);
+  try {
+    const out = await generateOneShot(shot, brief, job.id, controller.signal);
+    shot.status = "done";
+    shot.kind = out.kind;
+    shot.blobKey = out.blobKey;
+    shot.mime = out.mime;
+    shot.error = null;
+    await saveJob(job);
+    onEvent({
+      type: "shot",
+      done: job.shotsDone,
+      failed: job.shotsFailed,
+      total: job.shots.length,
+      shot: { id: shot.id, index: shot.index, status: "done",
+        kind: shot.kind, previewUrl: out.previewUrl, error: null, attempts: shot.attempts },
+    });
+  } catch (e) {
+    shot.status = "failed";
+    shot.error = e instanceof Error ? e.message : String(e);
+    await saveJob(job);
+    onEvent({
+      type: "shot",
+      done: job.shotsDone,
+      failed: job.shotsFailed,
+      total: job.shots.length,
+      shot: { id: shot.id, index: shot.index, status: "failed",
+        kind: null, previewUrl: null, error: shot.error, attempts: shot.attempts },
+    });
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
+  }
 }
 
 /** Requeue only the failed shots on an existing job. Emits the same events. */
