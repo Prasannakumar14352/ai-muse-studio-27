@@ -482,6 +482,25 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
           <div className="flex justify-between"><span>Credits</span><span className="font-medium">{credits.toLocaleString()}{effective === "lifetime" ? " (one-time + monthly refill)" : ""}</span></div>
           <div className="flex justify-between"><span>Listed price</span><span className="font-medium">{usd(price)}<span className="text-xs text-muted-foreground ml-1">{suffixForCycle(effective)}</span></span></div>
           <div className="flex justify-between"><span>Exchange rate</span><span className="font-medium">{rate ? `1 USD = ₹${rate.toFixed(2)}` : "…"}</span></div>
+          {rateInfo && (
+            <div className="flex justify-between text-[11px] text-muted-foreground">
+              <span>Rate source</span>
+              <span>
+                <span className={
+                  rateInfo.status === "live" ? "text-emerald-300"
+                    : rateInfo.status === "cached" ? "text-sky-300"
+                    : rateInfo.status === "manual" ? "text-purple-300"
+                    : "text-amber-300"
+                }>
+                  {rateInfo.status === "live" ? "Live" : rateInfo.status === "cached" ? "Cached" : rateInfo.status === "manual" ? "Manual" : "Stale"}
+                </span>
+                {rateInfo.updatedAt ? ` · ${new Date(rateInfo.updatedAt).toLocaleString()}` : ""}
+              </span>
+            </div>
+          )}
+          {rateInfo?.warning && (
+            <div className="text-[11px] text-amber-300">{rateInfo.warning}</div>
+          )}
           <div className="flex justify-between text-base pt-2 border-t border-border/40">
             <span className="font-semibold">Payable today</span>
             <span className="font-bold gradient-text">{inrPreview !== null ? inr(inrPreview) : "…"}</span>
