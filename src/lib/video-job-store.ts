@@ -163,13 +163,14 @@ export async function deleteJob(id: string): Promise<void> {
   if (!uid) return;
   const rec = readJson<JobRecord | null>(jobKey(uid, id), null);
   if (rec) {
-    // Blow away every shot blob for this job.
     await deleteBlobsByPrefix(`shot:${uid}:${id}:`).catch(() => {});
     for (const s of rec.shots) {
       if (s.blobKey) await deleteBlob(s.blobKey).catch(() => {});
     }
   }
   localStorage.removeItem(jobKey(uid, id));
+  // Drop any locally-saved blueprint tied to this job.
+  try { localStorage.removeItem(`cv:videojob-blueprint:${id}`); } catch { /* noop */ }
   const idx = readJson<string[]>(indexKey(uid), []);
   writeJson(indexKey(uid), idx.filter((x) => x !== id));
 }
