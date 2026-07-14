@@ -35,6 +35,7 @@ import { Route as AuthenticatedCaptionsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticated/billing'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedLinkedinPostsIndexRouteImport } from './routes/_authenticated/linkedin-posts.index'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
 import { Route as AuthenticatedLinkedinPostsNewRouteImport } from './routes/_authenticated/linkedin-posts.new'
 import { Route as AuthenticatedLinkedinPostsIdRouteImport } from './routes/_authenticated/linkedin-posts.$id'
@@ -179,6 +180,11 @@ const AuthenticatedLinkedinPostsIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedLinkedinPostsRoute,
   } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const AuthenticatedProjectsIdRoute = AuthenticatedProjectsIdRouteImport.update({
   id: '/projects/$id',
   path: '/projects/$id',
@@ -277,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
   '/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
   '/linkedin-posts/': typeof AuthenticatedLinkedinPostsIndexRoute
   '/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
@@ -291,7 +298,6 @@ export interface FileRoutesByTo {
   '/features': typeof FeaturesRoute
   '/how-it-works': typeof HowItWorksRoute
   '/pricing': typeof PricingRoute
-  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/billing': typeof AuthenticatedBillingRoute
   '/captions': typeof AuthenticatedCaptionsRoute
   '/carousels': typeof AuthenticatedCarouselsRoute
@@ -314,6 +320,7 @@ export interface FileRoutesByTo {
   '/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
   '/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
   '/linkedin-posts': typeof AuthenticatedLinkedinPostsIndexRoute
   '/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
@@ -354,6 +361,7 @@ export interface FileRoutesById {
   '/_authenticated/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
   '/_authenticated/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/linkedin-posts/': typeof AuthenticatedLinkedinPostsIndexRoute
   '/_authenticated/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
@@ -394,6 +402,7 @@ export interface FileRouteTypes {
     | '/linkedin-posts/$id'
     | '/linkedin-posts/new'
     | '/projects/$id'
+    | '/admin/'
     | '/linkedin-posts/'
     | '/linkedin-posts/$id/edit'
     | '/api/public/hooks/publish-scheduled'
@@ -408,7 +417,6 @@ export interface FileRouteTypes {
     | '/features'
     | '/how-it-works'
     | '/pricing'
-    | '/admin'
     | '/billing'
     | '/captions'
     | '/carousels'
@@ -431,6 +439,7 @@ export interface FileRouteTypes {
     | '/linkedin-posts/$id'
     | '/linkedin-posts/new'
     | '/projects/$id'
+    | '/admin'
     | '/linkedin-posts'
     | '/linkedin-posts/$id/edit'
     | '/api/public/hooks/publish-scheduled'
@@ -470,6 +479,7 @@ export interface FileRouteTypes {
     | '/_authenticated/linkedin-posts/$id'
     | '/_authenticated/linkedin-posts/new'
     | '/_authenticated/projects/$id'
+    | '/_authenticated/admin/'
     | '/_authenticated/linkedin-posts/'
     | '/_authenticated/linkedin-posts/$id/edit'
     | '/api/public/hooks/publish-scheduled'
@@ -678,6 +688,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLinkedinPostsIndexRouteImport
       parentRoute: typeof AuthenticatedLinkedinPostsRoute
     }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/projects/$id': {
       id: '/_authenticated/projects/$id'
       path: '/projects/$id'
@@ -762,12 +779,14 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminIntegrationsRoute: typeof AuthenticatedAdminIntegrationsRoute
   AuthenticatedAdminTemplatesRoute: typeof AuthenticatedAdminTemplatesRoute
   AuthenticatedAdminWebhooksRoute: typeof AuthenticatedAdminWebhooksRoute
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminIntegrationsRoute: AuthenticatedAdminIntegrationsRoute,
   AuthenticatedAdminTemplatesRoute: AuthenticatedAdminTemplatesRoute,
   AuthenticatedAdminWebhooksRoute: AuthenticatedAdminWebhooksRoute,
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
 
 const AuthenticatedAdminRouteWithChildren =

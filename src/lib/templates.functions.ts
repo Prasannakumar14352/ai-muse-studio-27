@@ -7,6 +7,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type TemplateAccessTier = "free" | "starter" | "creator" | "pro";
 
+export type TemplatePreviewType = "image" | "video";
+
 export type TemplateRecord = {
   id: string;
   slug: string;
@@ -14,6 +16,10 @@ export type TemplateRecord = {
   category: string;
   description: string | null;
   preview_image_url: string | null;
+  preview_video_url: string | null;
+  poster_url: string | null;
+  preview_type: TemplatePreviewType;
+  alt_text: string | null;
   aspect_ratio: string | null;
   platform: string | null;
   style: string | null;
@@ -98,6 +104,10 @@ export const upsertTemplateFn = createServerFn({ method: "POST" })
       category: data.category,
       description: data.description ?? null,
       preview_image_url: data.preview_image_url ?? null,
+      preview_video_url: data.preview_video_url ?? null,
+      poster_url: data.poster_url ?? null,
+      preview_type: (data.preview_type ?? "image") as TemplatePreviewType,
+      alt_text: data.alt_text ?? null,
       aspect_ratio: data.aspect_ratio ?? null,
       platform: data.platform ?? null,
       style: data.style ?? null,

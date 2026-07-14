@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Sparkles, Lock, Star, Search as SearchIcon, Wand2 } from "lucide-react";
 import { listTemplatesFn, planTier, canAccessTemplate, categoryToContentType, type TemplateRecord } from "@/lib/templates.functions";
 import { useAccess } from "@/lib/access";
+import { TemplatePreview } from "@/components/template-preview";
 
 export const Route = createFileRoute("/_authenticated/templates")({
   head: () => ({
@@ -132,12 +133,16 @@ function TemplateCard({ t, userTier }: { t: TemplateRecord; userTier: ReturnType
 
   return (
     <div className={`glass rounded-2xl overflow-hidden flex flex-col group ${t.featured ? "border-[color:var(--brand-orange)]/40" : ""}`}>
-      <div className="relative aspect-video bg-gradient-to-br from-[color:var(--neon-purple)]/20 to-[color:var(--brand-orange)]/20 flex items-center justify-center">
-        {t.preview_image_url ? (
-          <img src={t.preview_image_url} alt={t.name} loading="lazy" className="w-full h-full object-cover" />
-        ) : (
-          <Sparkles className="w-10 h-10 text-white/60" />
-        )}
+      <div className="relative aspect-video overflow-hidden">
+        <TemplatePreview
+          previewType={t.preview_type}
+          imageUrl={t.preview_image_url}
+          videoUrl={t.preview_video_url}
+          posterUrl={t.poster_url}
+          alt={t.alt_text}
+          name={t.name}
+          category={t.category}
+        />
         {t.featured && (
           <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/60 backdrop-blur px-2 py-0.5 text-[10px] font-semibold text-[color:var(--brand-orange)]">
             <Star className="w-2.5 h-2.5 fill-current" /> Featured
