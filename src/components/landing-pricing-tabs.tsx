@@ -23,7 +23,7 @@ export function LandingPricingTabs() {
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
 
   const list = cycle === "lifetime"
-    ? plans.filter((p) => p.planType === "lifetime" || p.priceLifetimeInr > 0)
+    ? plans.filter((p) => p.planType === "lifetime" || p.priceLifetimeUsd > 0)
     : plans.filter((p) => p.planType !== "lifetime");
 
   const tabs: { id: BillingCycle; label: string; hint?: string }[] = [
@@ -85,7 +85,7 @@ export function LandingPricingTabs() {
 function LandingCard({ p, cycle }: { p: PricingPlan; cycle: BillingCycle }) {
   const isLifetime = p.planType === "lifetime" || cycle === "lifetime";
   const effective: BillingCycle = p.planType === "lifetime" ? "lifetime" : cycle;
-  const price = effective === "monthly" ? p.priceMonthlyInr : effective === "yearly" ? p.priceYearlyInr : p.priceLifetimeInr;
+  const price = effective === "monthly" ? p.priceMonthlyUsd : effective === "yearly" ? p.priceYearlyUsd : p.priceLifetimeUsd;
   const isFree = p.planType === "free" && price === 0;
   const suffix = p.contactSales ? "" : isFree ? "" : effective === "lifetime" ? "one-time" : effective === "yearly" ? "/year" : "/month";
   const priceLabel = p.contactSales ? "Custom" : isFree ? "₹0" : inr(price);
@@ -110,9 +110,9 @@ function LandingCard({ p, cycle }: { p: PricingPlan; cycle: BillingCycle }) {
         <span className="text-3xl font-bold">{priceLabel}</span>
         {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
       </div>
-      {cycle === "yearly" && p.priceYearlyInr > 0 && !isFree && !p.contactSales && p.planType !== "lifetime" && (
+      {cycle === "yearly" && p.priceYearlyUsd > 0 && !isFree && !p.contactSales && p.planType !== "lifetime" && (
         <div className="mt-1 text-xs text-muted-foreground">
-          ≈ {inr(Math.round(p.priceYearlyInr / 12))}/mo
+          ≈ {inr(Math.round(p.priceYearlyUsd / 12))}/mo
           {p.discountPct > 0 && <span className="ml-2 text-[color:var(--brand-orange)] font-semibold">Save {p.discountPct}%</span>}
         </div>
       )}

@@ -46,7 +46,7 @@ function inr(n: number) {
   return `₹${n.toLocaleString("en-IN")}`;
 }
 function priceForCycle(p: PricingPlan, cycle: BillingCycle): number {
-  return cycle === "monthly" ? p.priceMonthlyInr : cycle === "yearly" ? p.priceYearlyInr : p.priceLifetimeInr;
+  return cycle === "monthly" ? p.priceMonthlyUsd : cycle === "yearly" ? p.priceYearlyUsd : p.priceLifetimeUsd;
 }
 function suffixForCycle(cycle: BillingCycle): string {
   return cycle === "monthly" ? "/month" : cycle === "yearly" ? "/year" : "one-time";
@@ -63,7 +63,7 @@ function PricingPage() {
 
   const visible = useMemo(() => {
     if (cycle === "lifetime") {
-      return plans.filter((p) => p.priceLifetimeInr > 0 || p.planType === "lifetime");
+      return plans.filter((p) => p.priceLifetimeUsd > 0 || p.planType === "lifetime");
     }
     // monthly & yearly: everything except lifetime-only rows
     return plans.filter((p) => p.planType !== "lifetime");
@@ -71,7 +71,7 @@ function PricingPage() {
 
   const handleSelect = (p: PricingPlan) => {
     if (p.contactSales) return;
-    if (p.priceMonthlyInr === 0 && p.priceYearlyInr === 0 && p.priceLifetimeInr === 0) return; // free
+    if (p.priceMonthlyUsd === 0 && p.priceYearlyUsd === 0 && p.priceLifetimeUsd === 0) return; // free
     if (!access?.email) {
       navigate({ to: "/auth", search: { next: "/pricing" } });
       return;
@@ -174,8 +174,8 @@ function PricingCard({
   const isFree = price === 0 && plan.planType === "free";
   const recommended = plan.featured;
   const showBadge = plan.badge || (recommended ? "🚀 Recommended" : null);
-  const monthlyEquivYearly = cycle === "yearly" && plan.priceYearlyInr > 0
-    ? Math.round(plan.priceYearlyInr / 12)
+  const monthlyEquivYearly = cycle === "yearly" && plan.priceYearlyUsd > 0
+    ? Math.round(plan.priceYearlyUsd / 12)
     : null;
   const priceLabel = plan.contactSales
     ? "Custom"
@@ -224,9 +224,9 @@ function PricingCard({
             )}
           </div>
         )}
-        {cycle === "monthly" && plan.priceYearlyInr > 0 && !isFree && !plan.contactSales && plan.planType !== "lifetime" && (
+        {cycle === "monthly" && plan.priceYearlyUsd > 0 && !isFree && !plan.contactSales && plan.planType !== "lifetime" && (
           <div className="mt-1 text-xs text-muted-foreground">
-            or {inr(plan.priceYearlyInr)}/yr {plan.discountPct > 0 ? `· save ${plan.discountPct}%` : ""}
+            or {inr(plan.priceYearlyUsd)}/yr {plan.discountPct > 0 ? `· save ${plan.discountPct}%` : ""}
           </div>
         )}
 
