@@ -136,48 +136,58 @@ export const SUPPORT_EMAIL = "support@creatorvault.ai";
 
 export type CreditPack = { id: string; label: string; credits: number; priceUSD: number; bonus?: string };
 
+// One-time top-up packs. Available to both subscription and lifetime users.
+// Credits from top-ups never expire and are spent AFTER monthly subscription credits.
 export const CREDIT_PACKS: CreditPack[] = [
-  { id: "pack_100",  label: "Starter Pack",  credits: 100,  priceUSD: 4.99 },
-  { id: "pack_500",  label: "Creator Pack",  credits: 500,  priceUSD: 19.99, bonus: "+10%" },
-  { id: "pack_1500", label: "Pro Pack",      credits: 1500, priceUSD: 49.99, bonus: "+20%" },
-  { id: "pack_5000", label: "Studio Pack",   credits: 5000, priceUSD: 149.99, bonus: "+30%" },
+  { id: "pack_250",  label: "Starter Pack", credits: 250,  priceUSD: 7 },
+  { id: "pack_500",  label: "Creator Pack", credits: 500,  priceUSD: 12 },
+  { id: "pack_1000", label: "Pro Pack",     credits: 1000, priceUSD: 20 },
+  { id: "pack_2500", label: "Studio Pack",  credits: 2500, priceUSD: 45, bonus: "+10%" },
+  { id: "pack_5000", label: "Mega Pack",    credits: 5000, priceUSD: 79, bonus: "+20%" },
 ];
 
 
+export type PlanType = "free" | "monthly" | "yearly" | "lifetime" | "enterprise";
+
 export type PlanDef = {
   id: string; name: string; price: string; period: string;
-  monthlyCredits: number; signupCredits?: number; features: string[]; cta: string; featured?: boolean;
+  planType: PlanType;
+  monthlyCredits: number;
+  includedCredits?: number; // one-time bucket granted at purchase (lifetime / free signup bonus)
+  signupCredits?: number;   // legacy alias for includedCredits on the free plan
+  features: string[]; cta: string; featured?: boolean;
   contactSales?: boolean;
 };
 
 export const PLANS: PlanDef[] = [
   {
-    id: "free", name: "Free", price: "$0", period: "forever",
+    id: "free", name: "Free", price: "$0", period: "forever", planType: "free",
     monthlyCredits: 0,
     signupCredits: 50,
+    includedCredits: 50,
     features: ["50 signup credits", "Basic captions & images", "Community styles", "Uses credit balance only"],
     cta: "Current plan",
   },
   {
-    id: "starter", name: "Starter", price: "$3.99", period: "/ month",
+    id: "starter", name: "Starter", price: "$9", period: "/ month", planType: "monthly",
     monthlyCredits: 300,
     features: ["300 credits / month", "All content types", "Standard visual styles", "Priority queue"],
     cta: "Upgrade to Starter",
   },
   {
-    id: "creator", name: "Creator", price: "$7.99", period: "/ month", featured: true,
+    id: "creator", name: "Creator", price: "$19", period: "/ month", planType: "monthly", featured: true,
     monthlyCredits: 1000,
     features: ["1,000 credits / month", "Premium styles", "Voice selection", "Priority support"],
     cta: "Upgrade to Creator",
   },
   {
-    id: "pro", name: "Pro", price: "$17.99", period: "/ month",
+    id: "pro", name: "Pro", price: "$39", period: "/ month", planType: "monthly",
     monthlyCredits: 3000,
     features: ["3,000 credits / month", "Advanced styles + presets", "Brand kits", "Priority rendering"],
     cta: "Go Pro",
   },
   {
-    id: "team", name: "Team", price: "Custom", period: "contact sales",
+    id: "team", name: "Team", price: "Custom", period: "contact sales", planType: "enterprise",
     monthlyCredits: 0,
     contactSales: true,
     features: [
@@ -190,4 +200,47 @@ export const PLANS: PlanDef[] = [
     ],
     cta: "Contact sales",
   },
+  // Lifetime plans — one-time payment, no recurring billing.
+  {
+    id: "starter_life", name: "Starter Lifetime", price: "$35", period: "one-time", planType: "lifetime",
+    monthlyCredits: 0, includedCredits: 500,
+    features: [
+      "Lifetime account · no recurring payments",
+      "All core modules: Videos, Shorts, Carousels, Images, Thumbnails, Captions, LinkedIn",
+      "500 included credits (one-time)",
+      "Commercial usage",
+      "Basic templates & standard AI generation",
+      "Manual publishing",
+      "Download unlimited outputs",
+      "Buy additional credit packs any time",
+    ],
+    cta: "Get Starter Lifetime",
+  },
+  {
+    id: "creator_life", name: "Creator Lifetime", price: "$79", period: "one-time", planType: "lifetime", featured: true,
+    monthlyCredits: 0, includedCredits: 1500,
+    features: [
+      "Everything in Starter Lifetime",
+      "1,500 included credits (one-time)",
+      "More templates",
+      "Higher usage limits",
+      "Larger storage",
+    ],
+    cta: "Get Creator Lifetime",
+  },
+  {
+    id: "pro_life", name: "Pro Lifetime", price: "$149", period: "one-time", planType: "lifetime",
+    monthlyCredits: 0, includedCredits: 5000,
+    features: [
+      "Everything in Creator Lifetime",
+      "5,000 included credits (one-time)",
+      "Priority rendering",
+      "Premium templates",
+      "Priority support",
+    ],
+    cta: "Get Pro Lifetime",
+  },
 ];
+
+export const MONTHLY_PLANS = PLANS.filter((p) => p.planType === "free" || p.planType === "monthly" || p.planType === "enterprise");
+export const LIFETIME_PLANS = PLANS.filter((p) => p.planType === "lifetime");

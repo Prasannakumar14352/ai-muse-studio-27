@@ -34,6 +34,9 @@ export const Route = createFileRoute("/_authenticated/billing")({
 type Sub = {
   id: string;
   plan_name: string;
+  plan_type?: string | null;
+  lifetime_access?: boolean | null;
+  included_credits?: number | null;
   status: string;
   started_at: string;
   expires_at: string | null;
@@ -109,6 +112,10 @@ function BillingPage() {
                   {unlimited ? (
                     <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[color:var(--brand-orange)]/20 text-[color:var(--brand-orange)]">
                       <Crown className="w-3 h-3" /> Unlimited
+                    </span>
+                  ) : sub?.lifetime_access ? (
+                    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300">
+                      <Crown className="w-3 h-3" /> Lifetime
                     </span>
                   ) : (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">

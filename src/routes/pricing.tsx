@@ -30,7 +30,11 @@ function PricingPage() {
   const { data: access } = useAccess();
   const navigate = useNavigate();
   const [modalPlan, setModalPlan] = useState<PlanDef | null>(null);
-  const [estimatorPlan, setEstimatorPlan] = useState<PlanDef>(PLANS.find((p) => p.featured) ?? PLANS[0]);
+  const [billingMode, setBillingMode] = useState<"monthly" | "lifetime">("monthly");
+  const monthlyPlans = useMemo(() => PLANS.filter((p) => p.planType === "free" || p.planType === "monthly" || p.planType === "enterprise"), []);
+  const lifetimePlans = useMemo(() => PLANS.filter((p) => p.planType === "lifetime"), []);
+  const visiblePlans = billingMode === "lifetime" ? lifetimePlans : monthlyPlans;
+  const [estimatorPlan, setEstimatorPlan] = useState<PlanDef>(PLANS.find((p) => p.featured && p.planType === "monthly") ?? PLANS[0]);
 
   const handleSelect = (p: PlanDef) => {
     if (!access?.email) {
@@ -47,24 +51,51 @@ function PricingPage() {
       {/* Header */}
       <div className="text-center max-w-3xl mx-auto pt-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass text-xs text-muted-foreground mb-4">
-          <Sparkles className="w-3 h-3 text-[color:var(--neon-pink)]" /> Upgrade any time · Secure checkout
+          <Sparkles className="w-3 h-3 text-[color:var(--neon-pink)]" /> Monthly or Lifetime · Secure checkout
         </div>
         <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
           Choose your <span className="gradient-text">plan</span>
         </h1>
         <p className="text-muted-foreground mt-3 text-base md:text-lg">
-          Simple credit-based pricing. Cancel any time. All prices in USD.
+          Pay monthly for the latest AI features — or pay once and own it for life. All prices in USD.
         </p>
         {access?.isAdmin && (
           <div className="mt-4 inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 text-sm">
             <Crown className="w-4 h-4 text-amber-400" /> Admin — Unlimited access, no billing
           </div>
         )}
+
+        {/* Monthly / Lifetime tabs */}
+        <div className="mt-6 inline-flex items-center gap-1 rounded-full glass p-1 border border-border/60">
+          {([
+            { id: "monthly", label: "Monthly" },
+            { id: "lifetime", label: "Lifetime · Pay once" },
+          ] as const).map((t) => {
+            const active = billingMode === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setBillingMode(t.id)}
+                aria-pressed={active}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                  active ? "gradient-primary text-white shadow-lg" : "text-muted-foreground hover:text-foreground"
+                }`}>
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+        {billingMode === "lifetime" && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            One payment. No recurring charges. Credits are added once at purchase — top up any time.
+          </p>
+        )}
       </div>
 
-      {/* Pricing cards: max 3 per row */}
+      {/* Pricing cards */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mx-auto w-full">
-        {PLANS.map((p) => (
+        {visiblePlans.map((p) => (
           <PricingCard
             key={p.id}
             plan={p}
@@ -75,7 +106,7 @@ function PricingPage() {
       </div>
 
       {/* Full comparison table */}
-      <ComparisonSection />
+      <ComparisonSection plans={visiblePlans} mode={billingMode} />
 
       <CreditPacksSection />
 
@@ -96,8 +127,11 @@ function PricingPage() {
 /* ------------- Pricing card ------------- */
 
 function PricingCard({ plan: p, isCurrent, onSelect }: { plan: PlanDef; isCurrent: boolean; onSelect: () => void }) {
-  const totalCredits = p.monthlyCredits + (p.signupCredits ?? 0);
-  const estimate = p.contactSales ? null : getPlanGenerationEstimate(totalCredits);
+  const isLifetime = p.planType === "lifetime";
+  const totalCredits = isLifetime
+    ? (p.includedCredits ?? 0)
+    : p.monthlyCredits + (p.signupCredits ?? 0);
+  const estimate = p.contactSales || isLifetime ? null : getPlanGenerationEstimate(totalCredits);
 
   const wrapper = [
     "relative flex flex-col rounded-2xl p-6 md:p-7 min-h-[560px] transition-all duration-300",
@@ -105,6 +139,7 @@ function PricingCard({ plan: p, isCurrent, onSelect }: { plan: PlanDef; isCurren
     "hover:border-white/20 hover:-translate-y-0.5 hover:shadow-[0_10px_40px_-15px_rgba(0,0,0,0.6)]",
     p.featured ? "border-transparent bg-gradient-to-b from-[color:var(--neon-purple)]/10 to-transparent ring-1 ring-[color:var(--neon-purple)]/40" : "",
     p.contactSales ? "border-[color:var(--brand-orange)]/40" : "",
+    isLifetime ? "ring-1 ring-amber-400/30" : "",
   ].join(" ");
 
   return (
@@ -119,6 +154,11 @@ function PricingCard({ plan: p, isCurrent, onSelect }: { plan: PlanDef; isCurren
           For teams
         </div>
       )}
+      {isLifetime && !p.featured && (
+        <div className="absolute -top-3 left-6 bg-amber-400 text-black text-[11px] uppercase tracking-wider px-2.5 py-1 rounded-full font-semibold shadow-md">
+          Pay once
+        </div>
+      )}
 
       {/* Header */}
       <div>
@@ -130,11 +170,14 @@ function PricingCard({ plan: p, isCurrent, onSelect }: { plan: PlanDef; isCurren
         <div className="mt-3 text-sm text-muted-foreground">
           {p.contactSales
             ? "Custom credit pool sized to your team."
-            : totalCredits > 0
-              ? <>Includes <strong className="text-foreground">{totalCredits.toLocaleString()}</strong> credits{p.signupCredits ? " (with signup bonus)" : " / month"}.</>
-              : "Free to start — no credit card required."}
+            : isLifetime
+              ? <>Includes <strong className="text-foreground">{totalCredits.toLocaleString()}</strong> credits at purchase · top up any time.</>
+              : totalCredits > 0
+                ? <>Includes <strong className="text-foreground">{totalCredits.toLocaleString()}</strong> credits{p.signupCredits ? " (with signup bonus)" : " / month"}.</>
+                : "Free to start — no credit card required."}
         </div>
       </div>
+
 
       {/* Estimated usage */}
       {estimate && (
@@ -226,17 +269,25 @@ function EstRow({ icon, label, value }: { icon: React.ReactNode; label: string; 
 
 /* ------------- Full comparison ------------- */
 
-function ComparisonSection() {
-  const plans = PLANS;
-  const numericRows: { label: string; get: (p: PlanDef) => string }[] = [
-    { label: "Price", get: (p) => `${p.price} ${p.period ?? ""}`.trim() },
-    { label: "Monthly credits", get: (p) => p.contactSales ? "Custom" : p.monthlyCredits.toLocaleString() },
-    { label: "Signup bonus credits", get: (p) => p.signupCredits ? `+${p.signupCredits.toLocaleString()}` : "—" },
-    { label: "Est. AI images / mo", get: (p) => estStr(p, "images") },
-    { label: "Est. carousels / mo", get: (p) => estStr(p, "carousels") },
-    { label: "Est. short reels / mo", get: (p) => estStr(p, "shortReels") },
-    { label: "Est. 5-min videos / mo", get: (p) => estStr(p, "longVideos") },
-  ];
+function ComparisonSection({ plans, mode = "monthly" }: { plans?: PlanDef[]; mode?: "monthly" | "lifetime" }) {
+  const list = plans ?? PLANS;
+  const isLifetime = mode === "lifetime";
+  const numericRows: { label: string; get: (p: PlanDef) => string }[] = isLifetime
+    ? [
+        { label: "Price", get: (p) => `${p.price} ${p.period ?? ""}`.trim() },
+        { label: "Included credits (one-time)", get: (p) => (p.includedCredits ?? 0).toLocaleString() },
+        { label: "Recurring charges", get: () => "None" },
+        { label: "Additional credit packs", get: () => "Yes" },
+      ]
+    : [
+        { label: "Price", get: (p) => `${p.price} ${p.period ?? ""}`.trim() },
+        { label: "Monthly credits", get: (p) => p.contactSales ? "Custom" : p.monthlyCredits.toLocaleString() },
+        { label: "Signup bonus credits", get: (p) => p.signupCredits ? `+${p.signupCredits.toLocaleString()}` : "—" },
+        { label: "Est. AI images / mo", get: (p) => estStr(p, "images") },
+        { label: "Est. carousels / mo", get: (p) => estStr(p, "carousels") },
+        { label: "Est. short reels / mo", get: (p) => estStr(p, "shortReels") },
+        { label: "Est. 5-min videos / mo", get: (p) => estStr(p, "longVideos") },
+      ];
 
   return (
     <section className="glass rounded-2xl p-6 md:p-8">
@@ -253,7 +304,7 @@ function ComparisonSection() {
           <thead>
             <tr>
               <th className="text-left py-3 px-3 text-xs uppercase tracking-wider text-muted-foreground font-medium border-b border-border/60"></th>
-              {plans.map((p) => (
+              {list.map((p) => (
                 <th key={p.id} className={`text-left py-3 px-3 border-b border-border/60 ${p.featured ? "text-[color:var(--neon-purple)]" : ""}`}>
                   <div className="font-semibold text-foreground">{p.name}</div>
                   {p.featured && <div className="text-[10px] uppercase tracking-wider text-[color:var(--neon-purple)]">Most popular</div>}
@@ -265,14 +316,14 @@ function ComparisonSection() {
             {numericRows.map((row, i) => (
               <tr key={row.label} className={i % 2 === 0 ? "bg-white/[0.02]" : ""}>
                 <td className="py-2.5 px-3 text-muted-foreground">{row.label}</td>
-                {plans.map((p) => (
+                {list.map((p) => (
                   <td key={p.id} className="py-2.5 px-3 text-foreground">{row.get(p)}</td>
                 ))}
               </tr>
             ))}
             <tr>
               <td className="py-3 px-3 text-muted-foreground align-top border-t border-border/60">Included features</td>
-              {plans.map((p) => (
+              {list.map((p) => (
                 <td key={p.id} className="py-3 px-3 align-top border-t border-border/60">
                   <ul className="space-y-1.5">
                     {p.features.map((f) => (
@@ -291,7 +342,7 @@ function ComparisonSection() {
 
       {/* Mobile accordion */}
       <div className="md:hidden space-y-3">
-        {plans.map((p) => (
+        {list.map((p) => (
           <details key={p.id} className="rounded-xl border border-border/60 bg-black/20 group">
             <summary className="cursor-pointer list-none p-4 flex items-center justify-between">
               <div>
@@ -520,9 +571,12 @@ function PricingFAQ() {
 
 /* Checkout — real Razorpay payment. Credits granted after signature verification. */
 function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }) {
-  const totalCredits = plan.monthlyCredits + (plan.signupCredits ?? 0);
+  const isLifetime = plan.planType === "lifetime";
+  const totalCredits = isLifetime
+    ? (plan.includedCredits ?? 0)
+    : plan.monthlyCredits + (plan.signupCredits ?? 0);
   const estimate = getPlanGenerationEstimate(totalCredits);
-  const isFree = plan.monthlyCredits === 0 || /free/i.test(plan.price);
+  const isFree = plan.planType === "free" || /^\$0/.test(plan.price);
   const { data: access } = useAccess();
   const createOrder = useServerFn(createRazorpayPlanOrder);
   const verifyPayment = useServerFn(verifyRazorpayPayment);
@@ -601,10 +655,19 @@ function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }
         </div>
         <div className="glass rounded-xl p-4 mb-3">
           <div className="flex justify-between text-sm mb-2"><span>Plan</span><span className="font-medium">{plan.name}</span></div>
-          <div className="flex justify-between text-sm mb-2"><span>Monthly credits</span><span className="font-medium">{plan.monthlyCredits.toLocaleString()}</span></div>
-          {plan.signupCredits ? (
-            <div className="flex justify-between text-sm mb-2"><span>Signup bonus</span><span className="font-medium">+{plan.signupCredits.toLocaleString()}</span></div>
-          ) : null}
+          {isLifetime ? (
+            <>
+              <div className="flex justify-between text-sm mb-2"><span>Included credits</span><span className="font-medium">{(plan.includedCredits ?? 0).toLocaleString()} (one-time)</span></div>
+              <div className="flex justify-between text-sm mb-2"><span>Billing</span><span className="font-medium">One-time · no recurring charges</span></div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between text-sm mb-2"><span>Monthly credits</span><span className="font-medium">{plan.monthlyCredits.toLocaleString()}</span></div>
+              {plan.signupCredits ? (
+                <div className="flex justify-between text-sm mb-2"><span>Signup bonus</span><span className="font-medium">+{plan.signupCredits.toLocaleString()}</span></div>
+              ) : null}
+            </>
+          )}
           <div className="flex justify-between text-base pt-2 border-t border-border/40">
             <span className="font-semibold">Total</span><span className="font-bold gradient-text">{displayAmount}</span>
           </div>
