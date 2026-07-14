@@ -7,7 +7,7 @@ import {
   type PricingPlan,
   type BillingCycle,
 } from "@/lib/pricing.functions";
-import { createRazorpayOrder, verifyRazorpayPayment, createRazorpayPlanOrder } from "@/lib/razorpay.functions";
+import { createRazorpayOrder, verifyRazorpayPayment, createRazorpayPlanOrder, getUsdInrRate } from "@/lib/razorpay.functions";
 import { CREDIT_PACKS, type CreditPack } from "@/lib/constants";
 import { useAccess } from "@/lib/access";
 import { toast } from "sonner";
