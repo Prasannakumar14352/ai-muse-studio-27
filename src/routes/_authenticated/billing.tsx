@@ -34,6 +34,9 @@ export const Route = createFileRoute("/_authenticated/billing")({
 type Sub = {
   id: string;
   plan_name: string;
+  plan_type?: string | null;
+  lifetime_access?: boolean | null;
+  included_credits?: number | null;
   status: string;
   started_at: string;
   expires_at: string | null;
