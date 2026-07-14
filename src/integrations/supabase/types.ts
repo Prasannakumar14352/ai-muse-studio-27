@@ -1013,6 +1013,7 @@ export type Database = {
         Row: {
           access_tier: string
           active: boolean
+          alt_text: string | null
           aspect_ratio: string | null
           category: string
           created_at: string
@@ -1024,7 +1025,10 @@ export type Database = {
           id: string
           name: string
           platform: string | null
+          poster_url: string | null
           preview_image_url: string | null
+          preview_type: string
+          preview_video_url: string | null
           slug: string
           sort_order: number
           style: string | null
@@ -1034,6 +1038,7 @@ export type Database = {
         Insert: {
           access_tier?: string
           active?: boolean
+          alt_text?: string | null
           aspect_ratio?: string | null
           category: string
           created_at?: string
@@ -1045,7 +1050,10 @@ export type Database = {
           id?: string
           name: string
           platform?: string | null
+          poster_url?: string | null
           preview_image_url?: string | null
+          preview_type?: string
+          preview_video_url?: string | null
           slug: string
           sort_order?: number
           style?: string | null
@@ -1055,6 +1063,7 @@ export type Database = {
         Update: {
           access_tier?: string
           active?: boolean
+          alt_text?: string | null
           aspect_ratio?: string | null
           category?: string
           created_at?: string
@@ -1066,7 +1075,10 @@ export type Database = {
           id?: string
           name?: string
           platform?: string | null
+          poster_url?: string | null
           preview_image_url?: string | null
+          preview_type?: string
+          preview_video_url?: string | null
           slug?: string
           sort_order?: number
           style?: string | null
