@@ -47,7 +47,7 @@ export const setUsdInrRate = createServerFn({ method: "POST" })
     return { rate: r };
   })
   .handler(async ({ data, context }) => {
-    const sb = context.supabase as { rpc: (fn: "has_role", a: { _user_id: string; _role: "admin" }) => Promise<{ data: unknown }> };
+    const sb = context.supabase as unknown as { rpc: (fn: "has_role", a: { _user_id: string; _role: "admin" }) => Promise<{ data: unknown }> };
     const { data: isAdmin } = await sb.rpc("has_role", { _user_id: context.userId, _role: "admin" });
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
