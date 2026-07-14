@@ -224,7 +224,7 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       return { ok: true, alreadyCredited: true, credits: payment.credits };
     }
 
-    // Mark success + add credits atomically-ish (best-effort)
+    // Mark success (idempotent guard on status = 'pending')
     const { error: upErr } = await supabaseAdmin
       .from("payments")
       .update({ status: "success", razorpay_payment_id: data.razorpay_payment_id })
@@ -232,7 +232,74 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       .eq("status", "pending");
     if (upErr) throw new Error("Could not update payment");
 
-    // Add credits to profile
+    const packId = payment.pack_id ?? "";
+    const planIdMatch = packId.startsWith("plan_") ? packId.slice(5) : null;
+    const plan = planIdMatch ? PLANS.find((p) => p.id === planIdMatch) : null;
+
+    if (plan && plan.planType === "lifetime") {
+      // Lifetime purchase — credit lifetime bucket + upsert lifetime subscription row.
+      const included = plan.includedCredits ?? payment.credits;
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("lifetime_credits")
+        .eq("id", context.userId)
+        .maybeSingle();
+      const currentLife = (profile as { lifetime_credits?: number } | null)?.lifetime_credits ?? 0;
+      const { error: credErr } = await supabaseAdmin
+        .from("profiles")
+        .update({ lifetime_credits: currentLife + included })
+        .eq("id", context.userId);
+      if (credErr) throw new Error("Could not credit lifetime account");
+
+      // Deactivate previous subs, insert new lifetime sub row.
+      await supabaseAdmin
+        .from("subscriptions")
+        .update({ status: "canceled" })
+        .eq("user_id", context.userId)
+        .eq("status", "active");
+      await supabaseAdmin.from("subscriptions").insert({
+        user_id: context.userId,
+        plan_name: plan.id,
+        plan_type: "lifetime",
+        lifetime_access: true,
+        included_credits: included,
+        monthly_credit_limit: 0,
+        monthly_credits_used: 0,
+        unlimited_usage: false,
+        status: "active",
+        started_at: new Date().toISOString(),
+        expires_at: null,
+        renews_at: null,
+      });
+      return { ok: true, credits: included, lifetime: true, planId: plan.id };
+    }
+
+    if (plan && (plan.planType === "monthly" || plan.planType === "yearly")) {
+      // Subscription purchase — set monthly bucket, reset used counter.
+      const nextRenew = new Date();
+      nextRenew.setMonth(nextRenew.getMonth() + 1);
+      await supabaseAdmin
+        .from("subscriptions")
+        .update({ status: "canceled" })
+        .eq("user_id", context.userId)
+        .eq("status", "active");
+      await supabaseAdmin.from("subscriptions").insert({
+        user_id: context.userId,
+        plan_name: plan.id,
+        plan_type: plan.planType,
+        lifetime_access: false,
+        included_credits: 0,
+        monthly_credit_limit: plan.monthlyCredits,
+        monthly_credits_used: 0,
+        unlimited_usage: false,
+        status: "active",
+        started_at: new Date().toISOString(),
+        renews_at: nextRenew.toISOString(),
+      });
+      return { ok: true, credits: plan.monthlyCredits, subscription: true, planId: plan.id };
+    }
+
+    // Otherwise: top-up credit pack → wallet balance.
     const { data: profile } = await supabaseAdmin
       .from("profiles").select("user_credits").eq("id", context.userId).maybeSingle();
     const current = profile?.user_credits ?? 0;
@@ -265,7 +332,7 @@ export const getMySubscription = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data: sub } = await context.supabase
       .from("subscriptions")
-      .select("id, plan_name, status, started_at, expires_at, renews_at, monthly_credit_limit, monthly_credits_used, unlimited_usage")
+      .select("id, plan_name, plan_type, lifetime_access, included_credits, status, started_at, expires_at, renews_at, monthly_credit_limit, monthly_credits_used, unlimited_usage")
       .eq("user_id", context.userId)
       .eq("status", "active")
       .order("started_at", { ascending: false })
@@ -274,7 +341,7 @@ export const getMySubscription = createServerFn({ method: "GET" })
 
     const { data: profile } = await context.supabase
       .from("profiles")
-      .select("user_credits, is_admin")
+      .select("user_credits, lifetime_credits, is_admin")
       .eq("id", context.userId)
       .maybeSingle();
 
@@ -288,7 +355,9 @@ export const getMySubscription = createServerFn({ method: "GET" })
     return {
       subscription: sub ?? null,
       balance: profile?.user_credits ?? 0,
+      lifetimeCredits: (profile as { lifetime_credits?: number } | null)?.lifetime_credits ?? 0,
       isAdmin: !!profile?.is_admin,
       recentPayments: recent ?? [],
     };
   });
+
