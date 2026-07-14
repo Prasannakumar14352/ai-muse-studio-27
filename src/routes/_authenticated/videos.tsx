@@ -7,11 +7,13 @@ import {
   X, RotateCw, Maximize2, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import {
-  runPlanningPhase, runGenerationPhase, retryFailedShots,
+  runPlanningPhase, runAssetGenerationPhase, runRenderPhase,
+  retryFailedShots, regenerateShot,
   PIPELINE_STEPS,
   VIDEO_TYPES, DURATIONS, VOICES, ASPECT_RATIOS,
   type VideoBrief, type VideoType, type DurationSec, type StyleId, type VoiceId, type AspectRatio,
   type StepStatus, type PipelineResult, type JobEvent, type JobPhaseId, type ShotProgress,
+  type AssetGenerationBundle,
 } from "@/lib/video-agents";
 import {
   listJobs, deleteJob as deleteJobRec, loadShotObjectURL, getJob,
