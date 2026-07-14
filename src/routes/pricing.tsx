@@ -401,6 +401,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [paying, setPaying] = useState(false);
+  const [lastError, setLastError] = useState<{ code?: string; description?: string; source?: string; reason?: string } | null>(null);
   const [rateInfo, setRateInfo] = useState<{ rate: number; source: string; status: string; updatedAt: string | null; warning: string | null } | null>(null);
   const credits = effective === "lifetime"
     ? (plan.includedCredits || plan.monthlyCredits)
