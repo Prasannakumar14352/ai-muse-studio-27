@@ -241,21 +241,54 @@ function PaymentSettings() {
 
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <button
-            className="btn btn-primary"
+            type="button"
             onClick={handleSave}
             disabled={saving || isFetching}
+            aria-busy={saving}
+            className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 transition
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background
+              disabled:opacity-60 disabled:cursor-not-allowed
+              ${saveState === "saved"
+                ? "bg-emerald-500 hover:bg-emerald-500"
+                : saveState === "error"
+                  ? "bg-rose-500 hover:bg-rose-500"
+                  : "gradient-primary hover:brightness-110 active:brightness-95"}`}
           >
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            Save Changes
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Saving…
+              </>
+            ) : saveState === "saved" ? (
+              <>
+                <CheckCircle2 className="w-4 h-4" /> Saved
+              </>
+            ) : saveState === "error" ? (
+              <>
+                <XCircle className="w-4 h-4" /> Retry save
+              </>
+            ) : (
+              "Save Changes"
+            )}
           </button>
+
           <button
-            className="btn btn-secondary"
+            type="button"
             onClick={handleTest}
             disabled={testing}
+            aria-busy={testing}
+            className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white/90 bg-white/5 border border-white/15 hover:bg-white/10 hover:border-white/25 transition
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background
+              disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {testing && <Loader2 className="w-4 h-4 animate-spin" />}
-            Test Connection
+            {testing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Testing…
+              </>
+            ) : (
+              "Test Connection"
+            )}
           </button>
+
           {data.updatedAt && (
             <span className="text-xs text-white/50">
               Last updated: {new Date(data.updatedAt).toLocaleString()}
@@ -265,14 +298,33 @@ function PaymentSettings() {
 
         {testResult && (
           <div
+            role="status"
+            aria-live="polite"
             className={`rounded-lg px-4 py-3 text-sm flex items-start gap-2 border ${
-              testResult.ok
+              testResult.kind === "ok"
                 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-200"
-                : "bg-rose-500/10 border-rose-500/30 text-rose-200"
+                : testResult.kind === "network"
+                  ? "bg-amber-500/10 border-amber-500/30 text-amber-200"
+                  : "bg-rose-500/10 border-rose-500/30 text-rose-200"
             }`}
           >
-            {testResult.ok ? <CheckCircle2 className="w-4 h-4 mt-0.5" /> : <XCircle className="w-4 h-4 mt-0.5" />}
-            <div className="font-mono text-xs">{testResult.message}</div>
+            {testResult.kind === "ok" ? (
+              <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+            ) : testResult.kind === "network" ? (
+              <Loader2 className="w-4 h-4 mt-0.5 shrink-0" />
+            ) : (
+              <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            )}
+            <div>
+              <div className="font-semibold">
+                {testResult.kind === "ok"
+                  ? "Connected successfully"
+                  : testResult.kind === "network"
+                    ? "Network error"
+                    : "Invalid credentials"}
+              </div>
+              <div className="font-mono text-xs opacity-90 break-all">{testResult.message}</div>
+            </div>
           </div>
         )}
       </div>
