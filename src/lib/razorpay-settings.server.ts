@@ -209,3 +209,139 @@ export async function testConnection(): Promise<{ ok: boolean; message: string }
   const text = await res.text();
   return { ok: false, message: `HTTP ${res.status}: ${text.slice(0, 200)}` };
 }
+
+/**
+ * Diagnostic: creates a tiny INR order (never charged) and probes the merchant's
+ * enabled payment methods to surface UPI/QR availability. Use from the admin
+ * Razorpay debugger — safe to run repeatedly. No refund/void needed: an order
+ * that is never paid simply expires.
+ */
+export type RazorpayDiagnostic = {
+  ok: boolean;
+  environment: "test" | "live";
+  source: "database" | "environment";
+  keyMode: "live" | "test" | "unknown";
+  keyIdMasked: string;
+  order?: { id: string; amount: number; currency: string; status: string; receipt: string };
+  methods?: {
+    upi?: boolean;
+    upiFlows?: Record<string, boolean> | null;
+    card?: boolean;
+    netbanking?: boolean;
+    wallet?: boolean;
+    raw?: unknown;
+  };
+  warnings: string[];
+  errors: string[];
+};
+
+export async function runDiagnostic(): Promise<RazorpayDiagnostic> {
+  const warnings: string[] = [];
+  const errors: string[] = [];
+  let creds: ResolvedRazorpay;
+  try {
+    creds = await resolveRazorpayCredentials();
+  } catch (e) {
+    return {
+      ok: false,
+      environment: "test",
+      source: "environment",
+      keyMode: "unknown",
+      keyIdMasked: "—",
+      warnings,
+      errors: [e instanceof Error ? e.message : String(e)],
+    };
+  }
+
+  const keyMode: "live" | "test" | "unknown" = creds.keyId.startsWith("rzp_live_")
+    ? "live"
+    : creds.keyId.startsWith("rzp_test_")
+      ? "test"
+      : "unknown";
+  const keyIdMasked = `${creds.keyId.slice(0, 12)}…${creds.keyId.slice(-4)}`;
+  const auth = Buffer.from(`${creds.keyId}:${creds.keySecret}`).toString("base64");
+
+  // 1) Create a probe order (100 paise = ₹1). Never charged — expires unpaid.
+  const receipt = `probe_${Date.now().toString(36)}`.slice(0, 40);
+  let order: RazorpayDiagnostic["order"];
+  try {
+    const res = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
+      body: JSON.stringify({
+        amount: 100,
+        currency: "INR",
+        receipt,
+        notes: { diagnostic: true },
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      errors.push(`Order create failed: HTTP ${res.status} — ${text.slice(0, 240)}`);
+    } else {
+      const j = (await res.json()) as { id: string; amount: number; currency: string; status: string; receipt: string };
+      order = { id: j.id, amount: j.amount, currency: j.currency, status: j.status, receipt: j.receipt };
+      if (j.currency !== "INR") errors.push(`Order currency is ${j.currency}, expected INR.`);
+      if (j.amount !== 100) errors.push(`Order amount mismatch: got ${j.amount}, expected 100 paise.`);
+    }
+  } catch (e) {
+    errors.push(`Order create exception: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  // 2) Enabled payment methods (surfaces UPI QR availability).
+  let methods: RazorpayDiagnostic["methods"];
+  try {
+    const res = await fetch("https://api.razorpay.com/v1/methods", {
+      headers: { Authorization: `Basic ${auth}` },
+    });
+    if (res.ok) {
+      const j = (await res.json()) as Record<string, unknown>;
+      const upi = !!j.upi;
+      const upiFlows =
+        j.upi && typeof j.upi === "object"
+          ? ((j.upi as Record<string, unknown>).flows as Record<string, boolean> | undefined) ?? null
+          : null;
+      methods = {
+        upi,
+        upiFlows: upiFlows ?? null,
+        card: !!j.card,
+        netbanking: !!j.netbanking,
+        wallet: !!j.wallet,
+        raw: j,
+      };
+      if (!upi) {
+        warnings.push(
+          "UPI is NOT enabled on this merchant account. Enable UPI in the Razorpay Dashboard → Account & Settings → Payment Methods.",
+        );
+      } else if (upiFlows && upiFlows.qr === false) {
+        warnings.push(
+          "UPI is enabled but UPI QR flow is disabled. Enable 'UPI QR / Collect' in Razorpay Dashboard → Payment Methods → UPI.",
+        );
+      } else if (upiFlows && !("qr" in upiFlows)) {
+        warnings.push(
+          "UPI QR flow status could not be confirmed from /v1/methods. Verify UPI QR is activated in Razorpay Dashboard → Payment Methods → UPI.",
+        );
+      }
+      if (keyMode === "live" && !methods.card && !methods.netbanking && !methods.upi) {
+        warnings.push("Live account appears to have no active payment methods — activation may be incomplete.");
+      }
+    } else {
+      const text = await res.text();
+      warnings.push(`Could not fetch /v1/methods (HTTP ${res.status}) — cannot confirm UPI QR availability. ${text.slice(0, 200)}`);
+    }
+  } catch (e) {
+    warnings.push(`/v1/methods exception: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  return {
+    ok: errors.length === 0,
+    environment: creds.environment,
+    source: creds.source,
+    keyMode,
+    keyIdMasked,
+    order,
+    methods,
+    warnings,
+    errors,
+  };
+}
