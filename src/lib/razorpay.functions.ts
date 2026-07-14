@@ -278,8 +278,9 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (!keySecret) throw new Error("Razorpay not configured");
+    const { resolveRazorpayCredentials } = await import("@/lib/razorpay-settings.server");
+    const creds = await resolveRazorpayCredentials();
+    const keySecret = creds.keySecret;
 
     const { createHmac, timingSafeEqual } = await import("crypto");
     const expected = createHmac("sha256", keySecret)
