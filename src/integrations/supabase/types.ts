@@ -232,6 +232,45 @@ export type Database = {
         }
         Relationships: []
       }
+      fx_rates: {
+        Row: {
+          base_currency: string
+          created_at: string
+          expires_at: string
+          fetched_at: string
+          id: string
+          provider: string
+          quote_currency: string
+          rate: number
+          raw: Json | null
+          status: string
+        }
+        Insert: {
+          base_currency?: string
+          created_at?: string
+          expires_at: string
+          fetched_at?: string
+          id?: string
+          provider: string
+          quote_currency?: string
+          rate: number
+          raw?: Json | null
+          status?: string
+        }
+        Update: {
+          base_currency?: string
+          created_at?: string
+          expires_at?: string
+          fetched_at?: string
+          id?: string
+          provider?: string
+          quote_currency?: string
+          rate?: number
+          raw?: Json | null
+          status?: string
+        }
+        Relationships: []
+      }
       generated_assets: {
         Row: {
           asset_type: string
@@ -363,6 +402,8 @@ export type Database = {
           created_at: string
           credits: number
           currency: string
+          exchange_rate_fetched_at: string | null
+          exchange_rate_source: string | null
           id: string
           metadata: Json | null
           pack_id: string
@@ -381,6 +422,8 @@ export type Database = {
           created_at?: string
           credits: number
           currency?: string
+          exchange_rate_fetched_at?: string | null
+          exchange_rate_source?: string | null
           id?: string
           metadata?: Json | null
           pack_id: string
@@ -399,6 +442,8 @@ export type Database = {
           created_at?: string
           credits?: number
           currency?: string
+          exchange_rate_fetched_at?: string | null
+          exchange_rate_source?: string | null
           id?: string
           metadata?: Json | null
           pack_id?: string
