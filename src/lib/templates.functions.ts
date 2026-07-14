@@ -18,7 +18,7 @@ export type TemplateRecord = {
   platform: string | null;
   style: string | null;
   default_prompt: string | null;
-  default_brief: Record<string, unknown> | null;
+  default_brief: any;
   tags: string[] | null;
   access_tier: TemplateAccessTier;
   featured: boolean;
