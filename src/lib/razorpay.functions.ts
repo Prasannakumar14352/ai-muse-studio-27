@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { CREDIT_PACKS, PLANS } from "@/lib/constants";
+import { CREDIT_PACKS } from "@/lib/constants";
 
 /** Approximate USD → INR conversion used when charging in INR via Razorpay.
  *  Kept as a constant so it's easy to update. Actual FX may vary slightly. */
