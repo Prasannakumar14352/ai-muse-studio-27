@@ -14,7 +14,13 @@ export const Route = createFileRoute("/api/public/webhooks/razorpay")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+        let secret: string | null = null;
+        try {
+          const { resolveRazorpayCredentials } = await import("@/lib/razorpay-settings.server");
+          secret = (await resolveRazorpayCredentials()).webhookSecret;
+        } catch {
+          secret = process.env.RAZORPAY_WEBHOOK_SECRET ?? null;
+        }
         const signature = request.headers.get("x-razorpay-signature") ?? "";
         const body = await request.text();
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
