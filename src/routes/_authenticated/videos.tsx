@@ -673,6 +673,7 @@ function VideosPage() {
           onCancel={cancel}
           onRetryFailed={retryFailed}
           onBack={() => setView("landing")}
+          onEditBlueprint={stopAndEdit}
         />
       )}
       {view === "review" && dash.jobId && (
