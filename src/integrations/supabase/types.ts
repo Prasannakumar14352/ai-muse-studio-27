@@ -394,6 +394,60 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_provider_settings: {
+        Row: {
+          company_name: string | null
+          created_at: string
+          currency: string
+          enabled: boolean
+          environment: string
+          key_id: string | null
+          key_secret_cipher: string | null
+          key_secret_iv: string | null
+          logo_url: string | null
+          provider: string
+          theme_color: string | null
+          updated_at: string
+          updated_by: string | null
+          webhook_secret_cipher: string | null
+          webhook_secret_iv: string | null
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string
+          currency?: string
+          enabled?: boolean
+          environment?: string
+          key_id?: string | null
+          key_secret_cipher?: string | null
+          key_secret_iv?: string | null
+          logo_url?: string | null
+          provider: string
+          theme_color?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_secret_cipher?: string | null
+          webhook_secret_iv?: string | null
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string
+          currency?: string
+          enabled?: boolean
+          environment?: string
+          key_id?: string | null
+          key_secret_cipher?: string | null
+          key_secret_iv?: string | null
+          logo_url?: string | null
+          provider?: string
+          theme_color?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_secret_cipher?: string | null
+          webhook_secret_iv?: string | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount_cents: number
