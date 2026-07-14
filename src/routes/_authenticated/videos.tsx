@@ -31,6 +31,7 @@ import {
 } from "@/lib/thumbnailLocalStore";
 import {
   initBlueprintMetadata, getBlueprintMetadata, localBlueprintId,
+  approveBlueprint, isBlueprintApproved,
 } from "@/lib/video-blueprint-store";
 import { buildBlueprintFromPlanning, blueprintToScript } from "@/lib/video-blueprint";
 import { VideoBlueprintEditor } from "@/components/video-blueprint-editor";
