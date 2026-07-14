@@ -159,9 +159,10 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
     return { planId: input.planId, billingCycle: cycle };
   })
   .handler(async ({ data, context }) => {
-    const keyId = process.env.RAZORPAY_KEY_ID;
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (!keyId || !keySecret) throw new Error("Razorpay not configured");
+    const { resolveRazorpayCredentials } = await import("@/lib/razorpay-settings.server");
+    const creds = await resolveRazorpayCredentials();
+    const keyId = creds.keyId;
+    const keySecret = creds.keySecret;
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: planRow, error: planErr } = await supabaseAdmin
