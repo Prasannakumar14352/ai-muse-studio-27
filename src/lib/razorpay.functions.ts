@@ -105,13 +105,13 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
     const plan = planRow as unknown as Record<string, unknown>;
     if (plan.contact_sales) throw new Error("Contact sales for this plan");
 
-    const priceInr =
+    const priceUsd =
       data.billingCycle === "monthly"
-        ? Number(plan.price_monthly_inr ?? 0)
+        ? Number(plan.price_monthly_usd ?? 0)
         : data.billingCycle === "yearly"
-          ? Number(plan.price_yearly_inr ?? 0)
-          : Number(plan.price_lifetime_inr ?? 0);
-    if (!priceInr || priceInr <= 0) throw new Error("Plan is not purchasable for this billing cycle");
+          ? Number(plan.price_yearly_usd ?? 0)
+          : Number(plan.price_lifetime_usd ?? 0);
+    if (!priceUsd || priceUsd <= 0) throw new Error("Plan is not purchasable for this billing cycle");
 
     // Credits granted at purchase.
     // Subscription monthly -> monthly_credits; yearly -> monthly_credits * 12; lifetime -> included_credits.
@@ -128,13 +128,13 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
     const receipt = `rcpt_${shortUid}_${Date.now().toString(36)}`.slice(0, 40);
 
     const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-    const amount = Math.round(priceInr * 100);
+    const amountCents = Math.round(priceUsd * 100);
     const res = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
       body: JSON.stringify({
-        amount,
-        currency: "INR",
+        amount: amountCents,
+        currency: "USD",
         receipt,
         notes: {
           user_id: context.userId,
@@ -157,8 +157,8 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
       razorpay_order_id: order.id,
       pack_id: `plan_${String(plan.code)}_${data.billingCycle}`,
       credits,
-      amount_cents: amount,
-      currency: "INR",
+      amount_cents: amountCents,
+      currency: "USD",
       status: "pending",
       receipt_number: receipt,
     });
@@ -177,7 +177,7 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
         code: String(plan.code),
         name: String(plan.name),
         credits,
-        priceInr,
+        priceUsd,
         billingCycle: data.billingCycle,
       },
     };
