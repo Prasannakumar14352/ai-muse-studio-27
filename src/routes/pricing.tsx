@@ -559,9 +559,12 @@ function PricingFAQ() {
 
 /* Checkout — real Razorpay payment. Credits granted after signature verification. */
 function CheckoutModal({ plan, onClose }: { plan: PlanDef; onClose: () => void }) {
-  const totalCredits = plan.monthlyCredits + (plan.signupCredits ?? 0);
+  const isLifetime = plan.planType === "lifetime";
+  const totalCredits = isLifetime
+    ? (plan.includedCredits ?? 0)
+    : plan.monthlyCredits + (plan.signupCredits ?? 0);
   const estimate = getPlanGenerationEstimate(totalCredits);
-  const isFree = plan.monthlyCredits === 0 || /free/i.test(plan.price);
+  const isFree = plan.planType === "free" || /^\$0/.test(plan.price);
   const { data: access } = useAccess();
   const createOrder = useServerFn(createRazorpayPlanOrder);
   const verifyPayment = useServerFn(verifyRazorpayPayment);
