@@ -558,7 +558,7 @@ function CreditPacksSection() {
             </div>
             <div className="mt-3 text-3xl font-extrabold">{pack.credits.toLocaleString()}</div>
             <div className="text-xs text-muted-foreground">credits</div>
-            <div className="mt-3 text-lg font-bold gradient-text">${Math.round(pack.priceUSD * 84).toLocaleString("en-IN")}</div>
+            <div className="mt-3 text-lg font-bold gradient-text">${pack.priceUSD.toFixed(2)}</div>
             <button
               onClick={() => handleBuy(pack)}
               disabled={buyingId === pack.id}
