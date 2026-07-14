@@ -46,11 +46,6 @@ export function TopUpPacks({ compact = false }: { compact?: boolean }) {
       const ok = await loadRazorpayScript();
       if (!ok || !window.Razorpay) throw new Error("Could not load Razorpay checkout");
       const order = await createOrder({ data: { packId: pack.id } });
-      if (order.fellBackToINR) {
-        toast.message("Switched to INR", {
-          description: "Your account doesn't allow international payments — charging in INR.",
-        });
-      }
       await new Promise<void>((resolve, reject) => {
         const rzp = new window.Razorpay!({
           key: order.keyId,
