@@ -59,7 +59,7 @@ export const testRazorpayConnection = createServerFn({ method: "POST" })
     try {
       return await testConnection();
     } catch (e) {
-      return { ok: false, message: e instanceof Error ? e.message : String(e) };
+      return { ok: false, kind: "network" as const, message: e instanceof Error ? e.message : String(e) };
     }
   });
 
