@@ -13,8 +13,8 @@ const plansQuery = queryOptions({
   staleTime: 60_000,
 });
 
-function inr(n: number) {
-  return `₹${n.toLocaleString("en-IN")}`;
+function usd(n: number) {
+  return `$${n.toLocaleString("en-IN")}`;
 }
 
 export function LandingPricingTabs() {
@@ -88,7 +88,7 @@ function LandingCard({ p, cycle }: { p: PricingPlan; cycle: BillingCycle }) {
   const price = effective === "monthly" ? p.priceMonthlyUsd : effective === "yearly" ? p.priceYearlyUsd : p.priceLifetimeUsd;
   const isFree = p.planType === "free" && price === 0;
   const suffix = p.contactSales ? "" : isFree ? "" : effective === "lifetime" ? "one-time" : effective === "yearly" ? "/year" : "/month";
-  const priceLabel = p.contactSales ? "Custom" : isFree ? "₹0" : inr(price);
+  const priceLabel = p.contactSales ? "Custom" : isFree ? "$0" : usd(price);
   const showBadge = p.badge || (p.featured ? "🚀 Recommended" : null);
 
   return (
@@ -112,7 +112,7 @@ function LandingCard({ p, cycle }: { p: PricingPlan; cycle: BillingCycle }) {
       </div>
       {cycle === "yearly" && p.priceYearlyUsd > 0 && !isFree && !p.contactSales && p.planType !== "lifetime" && (
         <div className="mt-1 text-xs text-muted-foreground">
-          ≈ {inr(Math.round(p.priceYearlyUsd / 12))}/mo
+          ≈ {usd(Math.round(p.priceYearlyUsd / 12))}/mo
           {p.discountPct > 0 && <span className="ml-2 text-[color:var(--brand-orange)] font-semibold">Save {p.discountPct}%</span>}
         </div>
       )}

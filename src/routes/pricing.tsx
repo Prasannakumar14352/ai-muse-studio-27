@@ -180,8 +180,8 @@ function PricingCard({
   const priceLabel = plan.contactSales
     ? "Custom"
     : isFree
-      ? "₹0"
-      : inr(price);
+      ? "$0"
+      : usd(price);
   const suffix = plan.contactSales ? "" : isFree ? "" : suffixForCycle(effectiveCycle);
 
   return (
@@ -218,7 +218,7 @@ function PricingCard({
         </div>
         {monthlyEquivYearly && !isFree && !plan.contactSales && (
           <div className="mt-1 text-xs text-muted-foreground">
-            ≈ {inr(monthlyEquivYearly)}/mo · billed yearly
+            ≈ {usd(monthlyEquivYearly)}/mo · billed yearly
             {plan.discountPct > 0 && (
               <span className="ml-2 text-[color:var(--brand-orange)] font-semibold">Save {plan.discountPct}%</span>
             )}
@@ -226,7 +226,7 @@ function PricingCard({
         )}
         {cycle === "monthly" && plan.priceYearlyUsd > 0 && !isFree && !plan.contactSales && plan.planType !== "lifetime" && (
           <div className="mt-1 text-xs text-muted-foreground">
-            or {inr(plan.priceYearlyUsd)}/yr {plan.discountPct > 0 ? `· save ${plan.discountPct}%` : ""}
+            or {usd(plan.priceYearlyUsd)}/yr {plan.discountPct > 0 ? `· save ${plan.discountPct}%` : ""}
           </div>
         )}
 
@@ -338,7 +338,7 @@ const FAQ = [
   { q: "Can I switch between Monthly, Yearly and Lifetime?", a: "Yes. Any credits already in your wallet stay put, and we deduct in the order: monthly → top-ups → lifetime, so nothing is wasted." },
   { q: "Can I buy additional credit packs?", a: "Yes. Any user can top up anytime — packs are added instantly and never expire." },
   { q: "Do failed generations cost credits?", a: "No. Credits are only deducted when a generation succeeds; failed runs are refunded automatically." },
-  { q: "How is payment processed?", a: "Payments are processed securely by Razorpay in INR (₹). We never store your card details." },
+  { q: "How is payment processed?", a: "Payments are processed securely by Razorpay in INR ($). We never store your card details." },
 ];
 function PricingFAQ() {
   const [open, setOpen] = useState<number | null>(0);
@@ -453,7 +453,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
           <X className="w-4 h-4" />
         </button>
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center text-white font-bold text-sm">₹</div>
+          <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center text-white font-bold text-sm">$</div>
           <div>
             <div className="font-semibold">Checkout</div>
             <div className="text-xs text-muted-foreground">Secure payment · Razorpay · INR</div>
@@ -465,7 +465,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
           <div className="flex justify-between"><span>Credits</span><span className="font-medium">{credits.toLocaleString()}{effective === "lifetime" ? " (one-time + monthly refill)" : ""}</span></div>
           <div className="flex justify-between text-base pt-2 border-t border-border/40">
             <span className="font-semibold">Total</span>
-            <span className="font-bold gradient-text">{inr(price)}<span className="text-xs text-muted-foreground font-normal ml-1">{suffixForCycle(effective)}</span></span>
+            <span className="font-bold gradient-text">{usd(price)}<span className="text-xs text-muted-foreground font-normal ml-1">{suffixForCycle(effective)}</span></span>
           </div>
         </div>
         <button
@@ -474,7 +474,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
           className="w-full rounded-lg gradient-primary text-white py-3 font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {paying && <Loader2 className="w-4 h-4 animate-spin" />}
-          {paying ? "Opening checkout…" : `Pay ${inr(price)}`}
+          {paying ? "Opening checkout…" : `Pay ${usd(price)}`}
         </button>
         <p className="mt-2 text-[11px] text-center text-muted-foreground">
           Credits are only granted after a successful payment.
@@ -558,7 +558,7 @@ function CreditPacksSection() {
             </div>
             <div className="mt-3 text-3xl font-extrabold">{pack.credits.toLocaleString()}</div>
             <div className="text-xs text-muted-foreground">credits</div>
-            <div className="mt-3 text-lg font-bold gradient-text">₹{Math.round(pack.priceUSD * 84).toLocaleString("en-IN")}</div>
+            <div className="mt-3 text-lg font-bold gradient-text">${Math.round(pack.priceUSD * 84).toLocaleString("en-IN")}</div>
             <button
               onClick={() => handleBuy(pack)}
               disabled={buyingId === pack.id}
