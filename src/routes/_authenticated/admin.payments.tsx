@@ -72,6 +72,7 @@ function PaymentSettings() {
     if (!form) return;
     if (!form.keyId.trim()) { toast.error("Key ID is required"); return; }
     setSaving(true);
+    setSaveState("idle");
     try {
       await saveFn({
         data: {
@@ -87,9 +88,12 @@ function PaymentSettings() {
         },
       });
       toast.success("Payment settings saved");
+      setSaveState("saved");
       setForm({ ...form, keySecret: "", webhookSecret: "" });
       await qc.invalidateQueries({ queryKey: ["razorpay-admin-settings"] });
+      setTimeout(() => setSaveState("idle"), 2500);
     } catch (e) {
+      setSaveState("error");
       toast.error(e instanceof Error ? e.message : "Save failed");
     } finally {
       setSaving(false);
