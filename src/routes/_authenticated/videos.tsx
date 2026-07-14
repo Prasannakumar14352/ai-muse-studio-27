@@ -1018,6 +1018,152 @@ function ReviewGate({
   );
 }
 
+// ---------------- Asset Review Gate (mandatory pre-render checkpoint) ----------------
+
+function AssetReviewGate({
+  shots, bundle, onRender, onRegenerate, onBackToBlueprint, onCancel,
+}: {
+  shots: ShotProgress[];
+  bundle: AssetGenerationBundle;
+  onRender: () => void;
+  onRegenerate: (shotId: string) => Promise<void>;
+  onBackToBlueprint: () => void;
+  onCancel: () => void;
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const viewable = useMemo(() => shots.filter((s) => s.previewUrl), [shots]);
+  const failedCount = shots.filter((s) => s.status === "failed").length;
+  const voMinutes = bundle.voiceover.reduce(
+    (a, v) => a + (v.buffer?.duration ?? v.duration_sec ?? 0), 0,
+  );
+
+  async function handleRegen(id: string) {
+    setBusyId(id);
+    try { await onRegenerate(id); } finally { setBusyId(null); }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="glass rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-lg">Review your generated assets</h2>
+          <p className="text-sm text-muted-foreground">
+            All shots, narration and subtitles are ready. Preview each scene, regenerate anything
+            you don't like, then render the final MP4.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={onCancel} className="rounded-lg glass border border-border px-3 py-1.5 text-xs">
+            Save & exit
+          </button>
+          <button
+            onClick={onBackToBlueprint}
+            className="rounded-lg glass border border-border px-3 py-1.5 text-xs"
+          >
+            Back to blueprint
+          </button>
+          <button
+            onClick={onRender}
+            disabled={failedCount > 0}
+            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
+          >
+            <Check className="w-4 h-4" /> Render final video
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 text-sm">
+        <div className="glass rounded-2xl p-4">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">Shots ready</div>
+          <div className="text-2xl font-bold mt-1">{shots.filter((s) => s.status === "done").length} / {shots.length}</div>
+          {failedCount > 0 && <div className="text-xs text-rose-400 mt-1">{failedCount} failed — regenerate before rendering</div>}
+        </div>
+        <div className="glass rounded-2xl p-4">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">Narration</div>
+          <div className="text-2xl font-bold mt-1">{Math.round(voMinutes)}s</div>
+          <div className="text-xs text-muted-foreground mt-1">{bundle.voiceover.length} scenes voiced</div>
+        </div>
+        <div className="glass rounded-2xl p-4">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">Timeline</div>
+          <div className="text-2xl font-bold mt-1">{Math.round(bundle.timeline.total_sec)}s</div>
+          <div className="text-xs text-muted-foreground mt-1">Music + SFX layered</div>
+        </div>
+      </div>
+
+      <div className="glass rounded-2xl p-5">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+          Scene-by-scene preview
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {shots.map((s, i) => {
+            const vo = bundle.voiceover[i];
+            const scene = bundle.script.scenes[i];
+            return (
+              <div key={s.id} className="rounded-lg border border-border overflow-hidden glass">
+                <button
+                  onClick={() => {
+                    const idx = viewable.findIndex((v) => v.id === s.id);
+                    if (idx >= 0) setOpenIdx(idx);
+                  }}
+                  className="block w-full aspect-video bg-black/40 relative"
+                >
+                  {s.previewUrl ? (
+                    <img src={s.previewUrl} alt={`Scene ${i + 1}`} className="w-full h-full object-cover" />
+                  ) : s.status === "failed" ? (
+                    <div className="w-full h-full flex items-center justify-center text-rose-400 text-xs">Failed</div>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    </div>
+                  )}
+                  <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-[10px] font-medium">
+                    Scene {i + 1}
+                  </div>
+                </button>
+                <div className="p-2.5 space-y-1.5">
+                  {scene?.voiceover && (
+                    <div className="text-[11px] text-muted-foreground line-clamp-2">
+                      🎙 {scene.voiceover}
+                    </div>
+                  )}
+                  {scene?.on_screen_text && (
+                    <div className="text-[11px] line-clamp-1">📝 {scene.on_screen_text}</div>
+                  )}
+                  <button
+                    onClick={() => handleRegen(s.id)}
+                    disabled={busyId === s.id}
+                    className="w-full mt-1 rounded-md glass border border-border px-2 py-1 text-[11px] flex items-center justify-center gap-1 hover:border-white/20 disabled:opacity-50"
+                  >
+                    {busyId === s.id
+                      ? <><Loader2 className="w-3 h-3 animate-spin" /> Regenerating…</>
+                      : <><RotateCw className="w-3 h-3" /> Regenerate this shot</>}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">
+          Need to change scripts, timings or prompts? Use “Back to blueprint” — assets will regenerate from your edits.
+        </p>
+      </div>
+
+      {openIdx != null && viewable.length > 0 && (
+        <SceneLightbox
+          shot={viewable[openIdx]}
+          current={openIdx + 1}
+          total={viewable.length}
+          hasNext={viewable.length > 1}
+          hasPrev={viewable.length > 1}
+          onClose={() => setOpenIdx(null)}
+          onNext={() => setOpenIdx((p) => (p == null ? null : (p + 1) % viewable.length))}
+          onPrev={() => setOpenIdx((p) => (p == null ? null : (p - 1 + viewable.length) % viewable.length))}
+        />
+      )}
+    </div>
+  );
+}
 
 
 function JobDashboard({
