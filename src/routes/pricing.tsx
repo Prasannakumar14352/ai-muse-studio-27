@@ -257,17 +257,25 @@ function EstRow({ icon, label, value }: { icon: React.ReactNode; label: string; 
 
 /* ------------- Full comparison ------------- */
 
-function ComparisonSection() {
-  const plans = PLANS;
-  const numericRows: { label: string; get: (p: PlanDef) => string }[] = [
-    { label: "Price", get: (p) => `${p.price} ${p.period ?? ""}`.trim() },
-    { label: "Monthly credits", get: (p) => p.contactSales ? "Custom" : p.monthlyCredits.toLocaleString() },
-    { label: "Signup bonus credits", get: (p) => p.signupCredits ? `+${p.signupCredits.toLocaleString()}` : "—" },
-    { label: "Est. AI images / mo", get: (p) => estStr(p, "images") },
-    { label: "Est. carousels / mo", get: (p) => estStr(p, "carousels") },
-    { label: "Est. short reels / mo", get: (p) => estStr(p, "shortReels") },
-    { label: "Est. 5-min videos / mo", get: (p) => estStr(p, "longVideos") },
-  ];
+function ComparisonSection({ plans, mode = "monthly" }: { plans?: PlanDef[]; mode?: "monthly" | "lifetime" }) {
+  const list = plans ?? PLANS;
+  const isLifetime = mode === "lifetime";
+  const numericRows: { label: string; get: (p: PlanDef) => string }[] = isLifetime
+    ? [
+        { label: "Price", get: (p) => `${p.price} ${p.period ?? ""}`.trim() },
+        { label: "Included credits (one-time)", get: (p) => (p.includedCredits ?? 0).toLocaleString() },
+        { label: "Recurring charges", get: () => "None" },
+        { label: "Additional credit packs", get: () => "Yes" },
+      ]
+    : [
+        { label: "Price", get: (p) => `${p.price} ${p.period ?? ""}`.trim() },
+        { label: "Monthly credits", get: (p) => p.contactSales ? "Custom" : p.monthlyCredits.toLocaleString() },
+        { label: "Signup bonus credits", get: (p) => p.signupCredits ? `+${p.signupCredits.toLocaleString()}` : "—" },
+        { label: "Est. AI images / mo", get: (p) => estStr(p, "images") },
+        { label: "Est. carousels / mo", get: (p) => estStr(p, "carousels") },
+        { label: "Est. short reels / mo", get: (p) => estStr(p, "shortReels") },
+        { label: "Est. 5-min videos / mo", get: (p) => estStr(p, "longVideos") },
+      ];
 
   return (
     <section className="glass rounded-2xl p-6 md:p-8">
