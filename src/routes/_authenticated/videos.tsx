@@ -602,6 +602,13 @@ function VideosPage() {
           onBack={() => setView("landing")}
         />
       )}
+      {view === "review" && dash.jobId && (
+        <ReviewGate
+          jobId={dash.jobId}
+          onApprove={() => approveAndGenerate(dash.jobId!)}
+          onBack={() => setView("landing")}
+        />
+      )}
       {view === "result" && result && (
         <ResultScreen result={result} onAnother={() => gen && start(gen)} onNew={reset} onSaveThumbnail={saveThumb} />
       )}
