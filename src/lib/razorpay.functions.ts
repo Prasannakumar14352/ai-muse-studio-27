@@ -233,6 +233,8 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
       receipt_number: receipt,
       price_usd_cents: priceUsdCents,
       conversion_rate: rate,
+      exchange_rate_source: resolved.source,
+      exchange_rate_fetched_at: resolved.fetchedAt,
       amount_inr_paise: inrPaise,
     });
     if (error) {
