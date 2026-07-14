@@ -401,6 +401,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [paying, setPaying] = useState(false);
+  const [lastError, setLastError] = useState<{ code?: string; description?: string; source?: string; reason?: string } | null>(null);
   const [rateInfo, setRateInfo] = useState<{ rate: number; source: string; status: string; updatedAt: string | null; warning: string | null } | null>(null);
   const credits = effective === "lifetime"
     ? (plan.includedCredits || plan.monthlyCredits)
@@ -421,6 +422,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
 
   async function handlePay() {
     setPaying(true);
+    setLastError(null);
     try {
       const ok = await loadRazorpayScript();
       if (!ok || !window.Razorpay) throw new Error("Could not load Razorpay checkout");
@@ -447,16 +449,37 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
               resolve();
             } catch (e) {
               const msg = e instanceof Error ? e.message : "Verification failed";
+              setLastError({ description: msg, source: "verification" });
               toast.error(msg);
               reject(e);
             }
           },
-          modal: { ondismiss: () => resolve() },
-        });
+          modal: {
+            ondismiss: () => {
+              setPaying(false);
+              resolve();
+            },
+          },
+        }) as { open: () => void; on?: (event: string, cb: (payload: unknown) => void) => void };
+        // Capture Razorpay payment.failed for a useful error + retry.
+        if (typeof rzp.on === "function") {
+          rzp.on("payment.failed", (payload: unknown) => {
+            const err = (payload as { error?: { code?: string; description?: string; source?: string; reason?: string } })?.error;
+            const info = {
+              code: err?.code,
+              description: err?.description ?? "Payment failed",
+              source: err?.source,
+              reason: err?.reason,
+            };
+            setLastError(info);
+            toast.error(`${info.code ?? "Payment failed"}: ${info.description}`);
+          });
+        }
         rzp.open();
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not start checkout";
+      setLastError({ description: msg, source: "client" });
       toast.error(msg);
     } finally {
       setPaying(false);
@@ -512,8 +535,19 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
           className="w-full rounded-lg gradient-primary text-white py-3 font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {paying && <Loader2 className="w-4 h-4 animate-spin" />}
-          {paying ? "Opening checkout…" : inrPreview !== null ? `Pay ${inr(inrPreview)}` : "Loading…"}
+          {paying ? "Opening checkout…" : lastError ? "Retry payment" : inrPreview !== null ? `Pay ${inr(inrPreview)}` : "Loading…"}
         </button>
+        {lastError && (
+          <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-100 p-3 text-xs">
+            <div className="font-semibold mb-1">Payment did not complete</div>
+            <div>{lastError.description}</div>
+            {(lastError.code || lastError.source || lastError.reason) && (
+              <div className="mt-1 text-[10px] opacity-75 font-mono">
+                {[lastError.code, lastError.source, lastError.reason].filter(Boolean).join(" · ")}
+              </div>
+            )}
+          </div>
+        )}
         <p className="mt-2 text-[11px] text-center text-muted-foreground">
           Final payment is processed in INR through Razorpay. Credits are only granted after a successful payment.
         </p>
