@@ -55,6 +55,9 @@ type Pay = {
   currency: string;
   status: string;
   created_at: string;
+  price_usd_cents?: number | null;
+  conversion_rate?: number | null;
+  amount_inr_paise?: number | null;
 };
 
 function BillingPage() {
