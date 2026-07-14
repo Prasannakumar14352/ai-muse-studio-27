@@ -1,6 +1,6 @@
 // Public + admin pricing plan APIs. Pricing lives in the pricing_plans
 // table so admins can edit price, credits, features, badge, and highlight
-// without a code change.
+// without a code change. All amounts are stored & charged in USD.
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -14,9 +14,9 @@ export type PricingPlan = {
   name: string;
   tier: string | null;
   planType: string;
-  priceMonthlyInr: number;
-  priceYearlyInr: number;
-  priceLifetimeInr: number;
+  priceMonthlyUsd: number;
+  priceYearlyUsd: number;
+  priceLifetimeUsd: number;
   discountPct: number;
   monthlyCredits: number;
   includedCredits: number;
@@ -35,9 +35,9 @@ function mapRow(r: Record<string, unknown>): PricingPlan {
     name: String(r.name),
     tier: (r.tier as string | null) ?? null,
     planType: String(r.plan_type),
-    priceMonthlyInr: Number(r.price_monthly_inr ?? 0),
-    priceYearlyInr: Number(r.price_yearly_inr ?? 0),
-    priceLifetimeInr: Number(r.price_lifetime_inr ?? 0),
+    priceMonthlyUsd: Number(r.price_monthly_usd ?? 0),
+    priceYearlyUsd: Number(r.price_yearly_usd ?? 0),
+    priceLifetimeUsd: Number(r.price_lifetime_usd ?? 0),
     discountPct: Number(r.discount_pct ?? 0),
     monthlyCredits: Number(r.monthly_credits ?? 0),
     includedCredits: Number(r.included_credits ?? 0),
@@ -98,9 +98,9 @@ export type UpsertPlanInput = {
   name: string;
   tier?: string | null;
   planType: string;
-  priceMonthlyInr: number;
-  priceYearlyInr: number;
-  priceLifetimeInr: number;
+  priceMonthlyUsd: number;
+  priceYearlyUsd: number;
+  priceLifetimeUsd: number;
   discountPct: number;
   monthlyCredits: number;
   includedCredits: number;
@@ -131,9 +131,9 @@ export const adminUpsertPricingPlan = createServerFn({ method: "POST" })
       name: data.name,
       tier: data.tier ?? null,
       plan_type: data.planType,
-      price_monthly_inr: Math.max(0, Math.floor(data.priceMonthlyInr)),
-      price_yearly_inr: Math.max(0, Math.floor(data.priceYearlyInr)),
-      price_lifetime_inr: Math.max(0, Math.floor(data.priceLifetimeInr)),
+      price_monthly_usd: Math.max(0, Math.floor(data.priceMonthlyUsd)),
+      price_yearly_usd: Math.max(0, Math.floor(data.priceYearlyUsd)),
+      price_lifetime_usd: Math.max(0, Math.floor(data.priceLifetimeUsd)),
       discount_pct: Math.max(0, Math.min(100, Math.floor(data.discountPct))),
       monthly_credits: Math.max(0, Math.floor(data.monthlyCredits)),
       included_credits: Math.max(0, Math.floor(data.includedCredits)),
@@ -182,9 +182,9 @@ export const adminDeletePricingPlan = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/** Helper used by checkout to compute the amount in paise for a plan+cycle. */
-export function amountInrForCycle(plan: PricingPlan, cycle: BillingCycle): number {
-  if (cycle === "monthly") return plan.priceMonthlyInr;
-  if (cycle === "yearly") return plan.priceYearlyInr;
-  return plan.priceLifetimeInr;
+/** Helper used by checkout to compute the USD price for a plan+cycle. */
+export function amountUsdForCycle(plan: PricingPlan, cycle: BillingCycle): number {
+  if (cycle === "monthly") return plan.priceMonthlyUsd;
+  if (cycle === "yearly") return plan.priceYearlyUsd;
+  return plan.priceLifetimeUsd;
 }
