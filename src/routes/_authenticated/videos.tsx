@@ -7,14 +7,14 @@ import {
   X, RotateCw, Maximize2, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import {
-  runVideoJobPipeline, retryFailedShots,
+  runPlanningPhase, runGenerationPhase, retryFailedShots,
   PIPELINE_STEPS,
   VIDEO_TYPES, DURATIONS, VOICES, ASPECT_RATIOS,
   type VideoBrief, type VideoType, type DurationSec, type StyleId, type VoiceId, type AspectRatio,
   type StepStatus, type PipelineResult, type JobEvent, type JobPhaseId, type ShotProgress,
 } from "@/lib/video-agents";
 import {
-  listJobs, deleteJob as deleteJobRec, loadShotObjectURL,
+  listJobs, deleteJob as deleteJobRec, loadShotObjectURL, getJob,
   type JobRecord,
 } from "@/lib/video-job-store";
 import {
@@ -27,6 +27,11 @@ import {
   loadThumbnailImageURL,
   type LocalThumbnail,
 } from "@/lib/thumbnailLocalStore";
+import {
+  initBlueprintMetadata, getBlueprintMetadata, localBlueprintId,
+} from "@/lib/video-blueprint-store";
+import { buildBlueprintFromPlanning, blueprintToScript } from "@/lib/video-blueprint";
+import { VideoBlueprintEditor } from "@/components/video-blueprint-editor";
 import { validateRenderedVideo, type VideoValidation } from "@/lib/video-validate";
 import { ProjectsSection } from "@/components/projects-section";
 import { AlertTriangle } from "lucide-react";
