@@ -42,11 +42,38 @@ async function loadRow(): Promise<RazorpaySettingsRow | null> {
   return (data as RazorpaySettingsRow | null) ?? null;
 }
 
+/**
+ * Reject test/live cross-wired credentials. A mismatched key id + secret is the
+ * single most common cause of "checkout opens but UPI QR is blank" — the QR
+ * request goes to Razorpay's live endpoint with a test secret and silently
+ * returns no QR. Fail fast at order-creation time instead.
+ */
+function assertKeyModeConsistent(keyId: string, environment: "test" | "live") {
+  const isLiveKey = keyId.startsWith("rzp_live_");
+  const isTestKey = keyId.startsWith("rzp_test_");
+  if (!isLiveKey && !isTestKey) {
+    throw new Error(`Invalid Razorpay Key ID format (expected rzp_live_* or rzp_test_*)`);
+  }
+  if (environment === "live" && !isLiveKey) {
+    throw new Error(
+      `Razorpay environment is LIVE but Key ID starts with '${keyId.slice(0, 8)}'. ` +
+        `Live mode requires an rzp_live_* Key ID and its matching live Key Secret.`,
+    );
+  }
+  if (environment === "test" && !isTestKey) {
+    throw new Error(
+      `Razorpay environment is TEST but Key ID starts with '${keyId.slice(0, 8)}'. ` +
+        `Test mode requires an rzp_test_* Key ID and its matching test Key Secret.`,
+    );
+  }
+}
+
 /** Full resolved credentials for order creation / webhook verification. */
 export async function resolveRazorpayCredentials(): Promise<ResolvedRazorpay> {
   const row = await loadRow();
 
   if (row && row.enabled && row.key_id && row.key_secret_cipher && row.key_secret_iv) {
+    assertKeyModeConsistent(row.key_id, row.environment);
     const keySecret = await decryptSecret(row.key_secret_cipher, row.key_secret_iv);
     const webhookSecret =
       row.webhook_secret_cipher && row.webhook_secret_iv
@@ -70,11 +97,15 @@ export async function resolveRazorpayCredentials(): Promise<ResolvedRazorpay> {
   const keyId = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
   if (!keyId || !keySecret) throw new Error("Razorpay not configured");
+  const environment: "test" | "live" =
+    (process.env.RAZORPAY_ENV as "test" | "live") ??
+    (keyId.startsWith("rzp_live_") ? "live" : "test");
+  assertKeyModeConsistent(keyId, environment);
   return {
     keyId,
     keySecret,
     webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? null,
-    environment: (process.env.RAZORPAY_ENV as "test" | "live") ?? "test",
+    environment,
     enabled: true,
     companyName: null,
     logoUrl: null,
