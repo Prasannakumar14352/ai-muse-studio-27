@@ -1,78 +1,72 @@
-# Video Blueprint System — Rollout Plan
+## Scope
 
-## Phase 1 + 2 (partial) — LANDED
+Four workstreams for the existing CreatorFlow AI (currently branded "CreatorVault AI") project. No unrelated redesigns.
 
-### Files added
-- `src/lib/video-blueprint.ts` — types, factory, mutations, validation, credit estimator, versioning + snapshot builders.
-- `src/lib/video-blueprint-store.ts` — read/write helpers against `projects.metadata` (no new tables).
-- `src/components/video-blueprint-editor.tsx` — full structured editor UI.
+---
 
-### Metadata structure (inside `projects.metadata.videoBlueprint`)
-```
-{
-  originalAiBlueprint: VideoBlueprint,
-  currentBlueprint:    VideoBlueprint,
-  blueprintVersion:    number,          // monotonically increments
-  blueprintUpdatedAt:  ISO string,
-  blueprintSource:     "ai" | "user_edit" | "regenerate_scene" | "restore",
-  blueprintVersions:   BlueprintVersionEntry[],  // capped to latest 10
-  renderSnapshot:      RenderSnapshot | null,    // immutable copy used by last render
-  blueprintVersionUsed: number | null            // version that snapshot represents
-}
-```
+### 1. Branding: CreatorVault AI → CreatorFlow AI
 
-### Editor behavior
-- Global fields: title, total duration, platform, aspect ratio, video style, audience, objective, brand, product, CTA, global visual style, global negative, music direction, voice (id + pace + emotion), default transition, motion intensity.
-- Per-scene: id, n, start/end/duration, role, visual, image prompt, video (motion) prompt, on-screen text, voiceover, transition in/out, camera movement, subject movement, product placement, character reference + lock, negative prompt.
-- Scene actions: add, delete, duplicate, move up/down (reorder), split, merge with next, regenerate one scene (via callback), restore AI original.
-- Autosave: debounced 900 ms → `saveBlueprintEdit` bumps `blueprintVersion` and prepends to `blueprintVersions` (cap 10).
-- Unsaved-changes indicator + `beforeunload` warning.
-- Manual `Save now` + `Restore AI original` (saved as a new version so it can be undone).
-- Pre-render validation runs on every render click: aspect ratio, per-scene duration, empty visuals, VO length vs duration, long on-screen text, total-duration drift > 15%, promotional CTA + product-scene requirements.
-- Credit estimate shown on every render button (`estimateCredits`).
-- Render callbacks: `render_full`, `regenerate_all`, `regenerate_visuals`, `regenerate_voiceover`, `rerender_final`, plus per-scene `onRegenerateScene(sceneId, blueprint)`.
+**Finding:** ~27 source files contain `CreatorVault` / `creatorvault.ai`. `ProdXStore` already exists as parent company (see `src/assets/prodxstore-*` assets). Nothing renames ProdXStore.
 
-### Render snapshot behavior
-- `saveRenderSnapshot(projectId, brief)` writes an immutable copy of `currentBlueprint` into `renderSnapshot` and records `blueprintVersionUsed`.
-- Pipeline callers should call `saveRenderSnapshot` before generation begins, then render from `snapshot.blueprint`.
-- `hasEditsSinceSnapshot(meta)` detects that the user kept editing during a render — the caller should preserve those edits (they remain in `currentBlueprint`) and surface a toast: "Your edits since the last render are preserved for the next one."
+**Changes:**
+- Text replace across every user-facing file listed by grep (routes, components, `constants.ts` `BRAND`, `SUPPORT_EMAIL`, `landing-content.ts`, `public-shell`, `app-shell`, `auth.tsx`, `__root.tsx` head/OG/JSON-LD, `styles.css` comments, `pricing.tsx`, `billing.tsx`, `settings.tsx`, `VERCEL_DEPLOYMENT.md`, etc.).
+- Update `SUPPORT_EMAIL` to `support@creatorflow.ai` (matches new brand).
+- Add "by ProdXStore" tagline under the wordmark in `PublicShell` header, landing footer, auth page, and sidebar workspace header.
+- Update Razorpay `description`/`notes` strings in `src/lib/razorpay.functions.ts` (checkout modal + order name) to "CreatorFlow AI".
+- Rename demo asset reference logically: keep filename `creatorvault-demo.mp4` (bundled binary can't be re-uploaded from here), but add `src/assets/creatorflow-demo.mp4.asset.json` alias pointer and update all imports/labels/captions/poster alt-text to "CreatorFlow AI demo". Report the filename as an intentionally retained internal identifier.
+- Retained internal identifiers to report: the bundled `creatorvault-demo.mp4` binary and its R2 key (cannot re-render from repo agent), plus DB column names / migration filenames (never user-visible).
 
-## Test steps (data layer + editor)
-1. Create/open any project row; call `initBlueprintMetadata(projectId, buildBlueprintFromPlanning(brief, script))` from the console (or from the pipeline once wired).
-2. Mount `<VideoBlueprintEditor projectId=... initialMetadata=... />` in a sandbox route.
-3. Edit any global field → within ~1 s see "Saved HH:MM:SS"; refresh the page → edits persist.
-4. Add / duplicate / reorder / split / merge scenes → `n` and time ranges re-index.
-5. Restore AI original → global fields and scenes revert; a new version is appended (so the restore itself is undoable via history).
-6. Trigger a promotional case (fill `product`, leave `cta` empty) → red "missing CTA" error blocks rendering.
-7. Click any render button → confirm dialog shows estimated credits; on confirm, `onRender` fires.
+### 2. Real Premium Templates module
 
-## Phase 2 REMAINING (next turn — pipeline wire-in)
-The following requires surgical edits to `src/lib/video-agents.ts` and `src/routes/_authenticated/videos.tsx` (1 850 + 1 809 lines) and is intentionally staged in a follow-up turn to avoid destabilizing the running pipeline:
+**Finding:** No template system exists — "Premium Templates" is only a pricing bullet today.
 
-1. **Split `runVideoJobPipeline`** into:
-   - `runPlanning(brief, opts) → { script, research, retentionEngine, storyboard, direction }`
-   - `runFromBlueprint(brief, blueprint, opts) → PipelineResult`
-     - Converts the edited blueprint back to `AiVideoScript` via `blueprintToScript(bp)`.
-     - Re-runs `expandScriptToBeats` (or a slimmer beat mapper) to align with the new scene set.
-     - Honors per-scene overrides for camera, transition, product placement, character lock, negative prompt.
-     - Preserves already-generated shot blobs whose scene wasn't edited (skip regen when scene marker still matches).
-2. **Add a "review" view** to `videos.tsx` between planning and shot generation that hosts `<VideoBlueprintEditor />`, wired to:
-   - `initBlueprintMetadata` immediately after planning finishes.
-   - `onRender` → `saveRenderSnapshot` → `runFromBlueprint`.
-   - `onRegenerateScene` → run only that beat through `generateOneShot` and update just that entry.
-3. **Selective render actions**:
-   - `regenerate_visuals` → keep VO + timeline, re-run shot pool.
-   - `regenerate_voiceover` → keep visuals, re-run VoiceoverAgent + SubtitleAgent.
-   - `rerender_final` → skip shots + VO, jump to RenderAgent using cached blobs.
-4. **"Edits during render" notifier**: on render completion, if `hasEditsSinceSnapshot(meta)` is true, show toast "Your latest edits are queued for the next render."
+**Database migration** (single new table + seed):
+- `public.templates` — name, slug, category (enum-like text: `short_video|long_video|product_promo|documentary|carousel|linkedin_post|image|thumbnail|seo_pack`), description, preview_image_url, aspect_ratio, platform, style, default_prompt (text), default_brief (jsonb — scene/slide structure + prefill for existing brief form), tags (text[]), access_tier (`free|starter|creator|pro`), featured (bool), active (bool), sort_order (int), created_by (uuid nullable — null = system seed), timestamps.
+- `public.template_favorites` — (user_id, template_id) composite PK.
+- GRANTs + RLS: authenticated can SELECT active templates; only admin (`has_role`) can INSERT/UPDATE/DELETE. Favorites: user owns their rows.
+- Seed 3+ templates per category (9 categories × 3 = 27 rows) with realistic prompts/briefs.
 
-## Phase 3 — LANDED
-- `src/lib/video-brief-parser.ts` — flexible label parser (Title/Duration/Format/Audience/Style/CTA/Music/Voice/Character/Product + per-scene Visual/Text/VO/Camera/Transition/Motion/Negative/Product Placement); tolerates markdown, bullets, numbering; extracts scene timings from "(0-3 sec)" / "3s" / "0:03-0:06"; retains leftover text as `unmappedNotes`; runs `validateBlueprint` on the parsed result.
-- `src/components/video-brief-parser-panel.tsx` — paste area (with clipboard paste + example), Parse preview → Apply / Cancel / Undo / Edit Parsed Result. Apply routes through `saveBlueprintEdit` so version history is preserved and the original AI blueprint is never overwritten.
-- Wired into `video-blueprint-editor.tsx` via "Import from brief" toggle in header.
+**Client:**
+- `src/lib/templates.functions.ts` — list, get, favorite, admin CRUD server fns.
+- `src/lib/template-access.ts` — access rule: free→free, starter/starter_life→free+starter, creator/creator_life→+creator, pro/pro_life→all, admin→all.
+- `src/routes/_authenticated/templates.tsx` — grid with category tabs, search, Free/Premium filter, favorites. Locked cards show badge + "Upgrade" CTA linking to `/pricing`. "Use Template" navigates to the matching creation flow (`/create` for videos/images/etc., `/create/carousel` for carousels, `/linkedin-posts/new` for LinkedIn) with `?template=<slug>` query. Read `template` param in `project-brief-form.tsx` and prefill via `templates.functions.ts` `getTemplate`.
+- `src/routes/_authenticated/admin.templates.tsx` — admin CRUD, mark free/premium/pro, featured toggle, sort_order reorder, activate/deactivate, thumbnail upload (uses existing `renders` storage bucket at new prefix `templates/`).
+- Sidebar entry "Templates" in `app-shell.tsx`.
 
-## Known limitations of the current slice
-- The editor persists to `projects.metadata` but the video pipeline still runs against its own AI-generated script — until step 1 above is done, edits do not yet change what gets rendered.
-- `estimateCredits` uses ballpark numbers; align with `src/lib/credit-costs.ts` in a follow-up.
-- Drag-and-drop reorder is button-based (▲▼); DnD can be added when we bring the same UX from `linkedin-carousel-studio`.
-- No inline preview of scene thumbnails yet — will hook into the shot blob store during the pipeline wire-in.
+### 3. Landing pricing tabs
+
+- Replace flat grid in `src/routes/index.tsx` "Pricing" section with a `LandingPricingSection` component that mounts tabs (Subscription / Lifetime), reusing `MONTHLY_PLANS` / `LIFETIME_PLANS` from `constants.ts` — same source as `/pricing`.
+- Include the concise bullet transformer + comparison block + Credit-packs section (reusing `<TopupPacks />`; for public users the checkout button routes to `/auth?next=/pricing`).
+- Ensure `pricing.tsx` and landing both read `MONTHLY_PLANS` / `LIFETIME_PLANS` from `constants.ts` (already the case for `pricing.tsx`).
+
+### 4. Demo video refresh
+
+- The bundled MP4 binary can't be re-rendered by this agent, so:
+  - Rewrite `DemoVideoSection` in `landing-sections.tsx` with new title "See CreatorFlow AI in action", new 10-step storyboard captions, updated poster, no autoplay, `preload="metadata"`, `loading="lazy"` iframe pattern, `<track>` placeholder for captions.
+  - Generate a new poster PNG via imagegen matching CreatorFlow AI dark/orange-pink theme with sidebar mockup.
+  - Update `remotion-demo/src/MainVideo.tsx` + `Root.tsx` to reflect current UI (dashboard → content type → Review & Edit blueprint → generate → templates → pricing tabs → CTA), driven by the current theme tokens. Provide the exact render command in the final report: `cd remotion-demo && bun install && bun run render`.
+  - Do NOT claim a new MP4 was rendered. Existing MP4 remains served until the user runs the render step and replaces `/mnt/user-uploads/creatorvault-demo.mp4` (or the CDN asset).
+
+### 5. Acceptance / verification
+
+- `rg -i "creatorvault|creator vault"` returns only the retained internal identifiers list.
+- Typecheck passes.
+- Manual smoke: landing tabs render both sets; `/pricing` unchanged in behavior; template card → creation flow prefills; admin templates CRUD works; Razorpay modal shows "CreatorFlow AI".
+
+## Technical details
+
+- Migration order per project rules: CREATE TABLE → GRANT → ALTER ENABLE RLS → CREATE POLICY. `templates` gets SELECT to `authenticated` (filtered by `active=true` policy) + ALL to `service_role`; INSERT/UPDATE/DELETE gated by `has_role(auth.uid(),'admin')`. `template_favorites` scoped to `auth.uid()`.
+- Template `default_brief` jsonb shape matches `project-brief-form.tsx` inputs (topic, tone, platform, style, aspect_ratio, scenes[]) so prefill is a shallow merge.
+- `project-brief-form.tsx` reads `useSearch({ from: '__root__' })` `template` param on mount; if present, calls `getTemplate({ slug })` and merges into form state before first render (guarded by hydration flag to avoid mismatch).
+- Access enforcement: `template-access.ts` returns `canUse(template, access)`; server fn `useTemplate` re-checks server-side before returning prefill payload — locked users get 403.
+- Landing pricing "Contact Sales" and "Get Started" CTAs point to `/contact` and `/auth` respectively; authenticated users see "Open app" per existing `PublicShell` pattern.
+- Sidebar highlighting: add `/templates` to sidebar items list; existing `useRouterState` match handles active state.
+
+## Out of scope
+
+- No changes to billing math, credit consumption order, Razorpay integration internals, existing generation pipelines, or auth flow.
+- No re-render of the bundled demo MP4 binary from this agent — the Remotion source will be updated and ready to render.
+
+## Deliverables report (after implementation)
+
+Will include: pre-existing template state (none), file list, migration summary, branding replacements count, template access matrix, landing pricing diff, demo work vs remaining render step, test steps, known limitations.
