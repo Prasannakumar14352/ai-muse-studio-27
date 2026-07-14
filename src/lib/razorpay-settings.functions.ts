@@ -62,3 +62,16 @@ export const testRazorpayConnection = createServerFn({ method: "POST" })
       return { ok: false, message: e instanceof Error ? e.message : String(e) };
     }
   });
+
+/**
+ * Admin diagnostic: creates a tiny INR order (never charged) and reports
+ * UPI/QR availability + key mode. Used by the Razorpay debugger to isolate
+ * "blank QR" issues to code vs. credentials vs. merchant activation.
+ */
+export const runRazorpayDiagnostic = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { runDiagnostic } = await import("@/lib/razorpay-settings.server");
+    return await runDiagnostic();
+  });
