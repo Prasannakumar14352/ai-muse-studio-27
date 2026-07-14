@@ -1,15 +1,36 @@
-// Landing-page pricing section with Monthly/Lifetime tabs. Reuses the plan
-// definitions from constants; keeps CTA linking to /auth or /pricing.
+// Landing pricing section with Monthly / Yearly / Lifetime tabs.
+// Reads pricing from the DB via listPricingPlans so admins can edit
+// prices without a code change.
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { Check, Star, Infinity as InfinityIcon } from "lucide-react";
-import { PLANS, type PlanDef } from "@/lib/constants";
+import { listPricingPlans, type PricingPlan, type BillingCycle } from "@/lib/pricing.functions";
+
+const plansQuery = queryOptions({
+  queryKey: ["pricing-plans"],
+  queryFn: () => listPricingPlans(),
+  staleTime: 60_000,
+});
+
+function inr(n: number) {
+  return `₹${n.toLocaleString("en-IN")}`;
+}
 
 export function LandingPricingTabs() {
-  const [tab, setTab] = useState<"subscription" | "lifetime">("subscription");
-  const monthly = PLANS.filter((p) => p.planType === "free" || p.planType === "monthly" || p.planType === "enterprise");
-  const lifetime = PLANS.filter((p) => p.planType === "lifetime");
-  const list = tab === "lifetime" ? lifetime : monthly;
+  const { data } = useSuspenseQuery(plansQuery);
+  const plans = data.plans;
+  const [cycle, setCycle] = useState<BillingCycle>("monthly");
+
+  const list = cycle === "lifetime"
+    ? plans.filter((p) => p.planType === "lifetime" || p.priceLifetimeInr > 0)
+    : plans.filter((p) => p.planType !== "lifetime");
+
+  const tabs: { id: BillingCycle; label: string; hint?: string }[] = [
+    { id: "monthly", label: "Monthly" },
+    { id: "yearly", label: "Yearly", hint: "Save 17%" },
+    { id: "lifetime", label: "Lifetime", hint: "Best Value" },
+  ];
 
   return (
     <section id="pricing" className="py-24 px-6">
@@ -22,21 +43,25 @@ export function LandingPricingTabs() {
             Subscribe for fresh monthly credits — or pay once and own it for life.
           </p>
           <div className="mt-8 inline-flex items-center gap-1 rounded-full glass p-1 border border-border/60">
-            {([
-              { id: "subscription", label: "Subscription" },
-              { id: "lifetime", label: "Lifetime" },
-            ] as const).map((t) => {
-              const active = tab === t.id;
+            {tabs.map((t) => {
+              const active = cycle === t.id;
               return (
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => setTab(t.id)}
-                  className={`px-5 py-2 rounded-full text-sm font-semibold transition ${
+                  onClick={() => setCycle(t.id)}
+                  className={`px-5 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2 ${
                     active ? "gradient-primary text-white shadow-lg" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {t.label}
+                  {t.hint && (
+                    <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold ${
+                      active ? "bg-white/20 text-white" : "bg-[color:var(--brand-orange)]/20 text-[color:var(--brand-orange)]"
+                    }`}>
+                      {t.hint}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -44,7 +69,7 @@ export function LandingPricingTabs() {
         </div>
 
         <div className={`grid gap-5 ${list.length >= 4 ? "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" : "md:grid-cols-2 lg:grid-cols-3"}`}>
-          {list.map((p) => <LandingCard key={p.id} p={p} />)}
+          {list.map((p) => <LandingCard key={p.id} p={p} cycle={cycle} />)}
         </div>
 
         <div className="mt-8 text-center">
@@ -57,25 +82,40 @@ export function LandingPricingTabs() {
   );
 }
 
-function LandingCard({ p }: { p: PlanDef }) {
-  const isLifetime = p.planType === "lifetime";
+function LandingCard({ p, cycle }: { p: PricingPlan; cycle: BillingCycle }) {
+  const isLifetime = p.planType === "lifetime" || cycle === "lifetime";
+  const effective: BillingCycle = p.planType === "lifetime" ? "lifetime" : cycle;
+  const price = effective === "monthly" ? p.priceMonthlyInr : effective === "yearly" ? p.priceYearlyInr : p.priceLifetimeInr;
+  const isFree = p.planType === "free" && price === 0;
+  const suffix = p.contactSales ? "" : isFree ? "" : effective === "lifetime" ? "one-time" : effective === "yearly" ? "/year" : "/month";
+  const priceLabel = p.contactSales ? "Custom" : isFree ? "₹0" : inr(price);
+  const showBadge = p.badge || (p.featured ? "🚀 Recommended" : null);
+
   return (
-    <div className={`glass rounded-2xl p-6 relative flex flex-col ${p.featured ? "border-[color:var(--brand-orange)]/60 shadow-[var(--shadow-glow)]" : ""} ${p.contactSales ? "border-[color:var(--brand-orange)]/60" : ""}`}>
-      {p.featured && (
+    <div className={`glass rounded-2xl p-6 relative flex flex-col transition hover:-translate-y-0.5 ${
+      p.featured ? "border-[color:var(--brand-orange)]/60 shadow-[var(--shadow-glow)]" : ""
+    } ${p.contactSales ? "border-[color:var(--brand-orange)]/60" : ""}`}>
+      {showBadge && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 gradient-primary text-white text-xs px-3 py-1 rounded-full font-medium flex items-center gap-1">
-          <Star className="w-3 h-3 fill-white" /> Recommended
+          <Star className="w-3 h-3 fill-white" /> {showBadge}
         </div>
       )}
-      {isLifetime && (
+      {isLifetime && p.planType === "lifetime" && (
         <span className="absolute top-4 right-4 inline-flex items-center gap-1 rounded-full bg-amber-400/20 text-amber-300 text-[10px] px-2 py-0.5 font-semibold uppercase">
           <InfinityIcon className="w-2.5 h-2.5" /> Lifetime
         </span>
       )}
       <h3 className="text-xl font-semibold">{p.name}</h3>
       <div className="mt-4 flex items-baseline gap-1">
-        <span className="text-3xl font-bold">{p.price}</span>
-        <span className="text-sm text-muted-foreground">{isLifetime ? "one-time" : p.period}</span>
+        <span className="text-3xl font-bold">{priceLabel}</span>
+        {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
       </div>
+      {cycle === "yearly" && p.priceYearlyInr > 0 && !isFree && !p.contactSales && p.planType !== "lifetime" && (
+        <div className="mt-1 text-xs text-muted-foreground">
+          ≈ {inr(Math.round(p.priceYearlyInr / 12))}/mo
+          {p.discountPct > 0 && <span className="ml-2 text-[color:var(--brand-orange)] font-semibold">Save {p.discountPct}%</span>}
+        </div>
+      )}
       <ul className="mt-6 space-y-2.5 flex-1">
         {p.features.slice(0, 6).map((f) => (
           <li key={f} className="flex items-start gap-2 text-sm">
@@ -85,7 +125,7 @@ function LandingCard({ p }: { p: PlanDef }) {
         ))}
       </ul>
       <Link
-        to={p.contactSales ? "/contact" : "/auth"}
+        to={p.contactSales ? "/contact" : "/pricing"}
         className={`mt-8 block text-center rounded-lg py-3 text-sm font-medium ${
           p.contactSales
             ? "bg-[color:var(--brand-orange)] text-black hover:opacity-90"
@@ -94,7 +134,7 @@ function LandingCard({ p }: { p: PlanDef }) {
               : "glass hover:bg-white/5"
         }`}
       >
-        {p.cta}
+        {p.contactSales ? "Contact Sales" : isFree ? "Start free" : "View plan"}
       </Link>
     </div>
   );
