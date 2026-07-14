@@ -8,7 +8,7 @@ import { confirmDialog } from "@/components/confirm-dialog";
 import { CREDIT_COSTS, CREDIT_GUIDE_INTRO, ASSET_CREDIT_COST } from "@/lib/credit-costs";
 import { Crown, Users, Layers, Zap, Plus, Shield, ShieldOff, Ban, Loader2, ChevronDown, ChevronRight, Coins, FileText, FileDown, Printer, Image as ImageIcon, Film, Video } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/admin")({ component: AdminPanel });
+export const Route = createFileRoute("/_authenticated/admin/")({ component: AdminPanel });
 
 function AdminPanel() {
   const { data: access, isLoading } = useAccess();
