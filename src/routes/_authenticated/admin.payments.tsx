@@ -105,7 +105,7 @@ function PaymentSettings() {
       if (r.ok) toast.success("Razorpay connection OK"); else toast.error(r.message);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Test failed";
-      setTestResult({ ok: false, message: msg });
+      setTestResult({ ok: false, kind: "network", message: msg });
       toast.error(msg);
     } finally {
       setTesting(false);
