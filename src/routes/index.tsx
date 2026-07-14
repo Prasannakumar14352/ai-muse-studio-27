@@ -8,6 +8,11 @@ import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
 import { BrandLogo } from "@/components/brand-logo";
+import {
+  DemoVideoSection, VideoTestimonialsSection, WrittenTestimonialsSection,
+  GuaranteeSection, TrustBadgesSection,
+} from "@/components/landing-sections";
+import { EXTRA_FAQ } from "@/lib/landing-content";
 const demoVideo = { url: "/creatorvault-demo.mp4", poster: "/brand/hero-poster.jpg" };
 
 
@@ -28,6 +33,7 @@ const FAQ = [
   { q: "Which platforms are supported?", a: "YouTube, Instagram, TikTok, Facebook and LinkedIn — with platform-specific tone and formatting." },
   { q: "Can I use my own brand style?", a: "Yes. Save brand presets in Settings, and every generation adapts to your defaults." },
   { q: "Is there a free plan?", a: "Yes — 5 generations per month, forever free. Upgrade any time." },
+  ...EXTRA_FAQ,
 ];
 
 function Landing() {
