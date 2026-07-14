@@ -53,6 +53,7 @@ const SECTIONS: readonly NavSection[] = [
       { to: "/images", label: "Images", icon: ImageIcon, moduleId: "images" },
       { to: "/thumbnails", label: "Thumbnails", icon: Sparkles, moduleId: "thumbnails" },
       { to: "/captions", label: "Captions", icon: Type, moduleId: "captions" },
+      { to: "/templates", label: "Templates", icon: Sparkles },
     ],
   },
   {
@@ -76,6 +77,7 @@ const SECTIONS: readonly NavSection[] = [
     adminOnly: true,
     items: [
       { to: "/admin", label: "Admin", icon: Crown },
+      { to: "/admin/templates", label: "Templates CMS", icon: Sparkles },
       { to: "/admin/integrations", label: "Social Publishing", icon: Plug },
     ],
   },
