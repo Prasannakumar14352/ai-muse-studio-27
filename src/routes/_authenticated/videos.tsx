@@ -1189,13 +1189,14 @@ function AssetReviewGate({
 
 
 function JobDashboard({
-  dash, error, onCancel, onRetryFailed, onBack,
+  dash, error, onCancel, onRetryFailed, onBack, onEditBlueprint,
 }: {
   dash: DashState;
   error: string | null;
   onCancel: () => void;
   onRetryFailed: () => void;
   onBack: () => void;
+  onEditBlueprint: () => void;
 }) {
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const shotPct = dash.shotsTotal > 0 ? Math.round((dash.shotsDone / dash.shotsTotal) * 100) : 0;
