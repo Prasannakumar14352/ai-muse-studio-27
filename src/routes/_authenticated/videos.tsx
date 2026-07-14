@@ -7,14 +7,14 @@ import {
   X, RotateCw, Maximize2, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import {
-  runVideoJobPipeline, retryFailedShots,
+  runPlanningPhase, runGenerationPhase, retryFailedShots,
   PIPELINE_STEPS,
   VIDEO_TYPES, DURATIONS, VOICES, ASPECT_RATIOS,
   type VideoBrief, type VideoType, type DurationSec, type StyleId, type VoiceId, type AspectRatio,
   type StepStatus, type PipelineResult, type JobEvent, type JobPhaseId, type ShotProgress,
 } from "@/lib/video-agents";
 import {
-  listJobs, deleteJob as deleteJobRec, loadShotObjectURL,
+  listJobs, deleteJob as deleteJobRec, loadShotObjectURL, getJob,
   type JobRecord,
 } from "@/lib/video-job-store";
 import {
@@ -27,6 +27,11 @@ import {
   loadThumbnailImageURL,
   type LocalThumbnail,
 } from "@/lib/thumbnailLocalStore";
+import {
+  initBlueprintMetadata, getBlueprintMetadata, localBlueprintId,
+} from "@/lib/video-blueprint-store";
+import { buildBlueprintFromPlanning, blueprintToScript } from "@/lib/video-blueprint";
+import { VideoBlueprintEditor } from "@/components/video-blueprint-editor";
 import { validateRenderedVideo, type VideoValidation } from "@/lib/video-validate";
 import { ProjectsSection } from "@/components/projects-section";
 import { AlertTriangle } from "lucide-react";
@@ -229,7 +234,7 @@ const STYLE_CARDS: StyleCard[] = [
   { id: "futuristic", label: "Futuristic", image: style3d },
 ];
 
-type View = "landing" | "input" | "processing" | "result" | "library";
+type View = "landing" | "input" | "processing" | "review" | "result" | "library";
 type GenerateArgs = { brief: VideoBrief; niche: string; topic: string };
 type LibraryOpen = {
   meta: LocalVideo;
@@ -320,46 +325,83 @@ function VideosPage() {
     });
   }, []);
 
-  async function start(args: GenerateArgs, resumeJobId?: string) {
+  async function start(args: GenerateArgs) {
     setGen(args);
     setError(null);
     setResult(null);
     setLibraryOpen(null);
-    setDash({ ...initialDash, jobId: resumeJobId ?? null });
+    setDash({ ...initialDash, jobId: null });
     setView("processing");
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const { job, result: r } = await runVideoJobPipeline(args.brief, {
-        jobId: resumeJobId,
+      // Phase 1 only — planning. After this we pause at the Review gate.
+      const { job, script } = await runPlanningPhase(args.brief, {
         niche: args.niche,
         topic: args.topic,
         onEvent: handleJobEvent,
         signal: controller.signal,
       });
+      setDash((prev) => ({ ...prev, jobId: job.id, phase: "review" }));
+
+      // Seed the local blueprint (never overwrites if already set).
+      const existingMeta = await getBlueprintMetadata(localBlueprintId(job.id));
+      if (!existingMeta) {
+        const bp = buildBlueprintFromPlanning(args.brief, script);
+        await initBlueprintMetadata(localBlueprintId(job.id), bp);
+      }
+      await refreshInProgress();
+      setView("review");
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        toast.info("Planning paused.");
+        setView("landing");
+        await refreshInProgress();
+        return;
+      }
+      const msg = e instanceof Error ? e.message : "Planning failed";
+      setError(msg);
+      toast.error(msg);
+    }
+  }
+
+  /** Called from the Blueprint Editor when the user clicks "Approve & Generate Shots". */
+  async function approveAndGenerate(jobId: string) {
+    if (!gen) return;
+    const meta = await getBlueprintMetadata(localBlueprintId(jobId));
+    const edited = meta ? blueprintToScript(meta.currentBlueprint) : undefined;
+    setError(null);
+    setResult(null);
+    setDash({ ...initialDash, jobId, phase: "generating_shots" });
+    setView("processing");
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      const { job, result: r } = await runGenerationPhase(jobId, gen.brief, {
+        niche: gen.niche,
+        topic: gen.topic,
+        onEvent: handleJobEvent,
+        signal: controller.signal,
+      }, edited);
       setDash((prev) => ({ ...prev, jobId: job.id }));
       setResult(r);
       setView("result");
       await refreshInProgress();
 
-      // Persist to browser-local library — no backend, no upload.
-      // We store the raw Blob (never the blob: URL) so it survives reloads.
       try {
         const videoBlob = r.render.blob;
-        if (!videoBlob || videoBlob.size === 0) {
-          throw new Error("Rendered video blob is empty");
-        }
-        const niche = args.niche;
+        if (!videoBlob || videoBlob.size === 0) throw new Error("Rendered video blob is empty");
+        const niche = gen.niche;
         const nicheLabel = NICHES.find((n) => n.id === niche)?.label ?? niche;
-        const styleLabel = STYLE_CARDS.find((s) => s.id === args.brief.style)?.label ?? args.brief.style;
+        const styleLabel = STYLE_CARDS.find((s) => s.id === gen.brief.style)?.label ?? gen.brief.style;
         await saveGeneratedVideo({
-          title: args.brief.title,
+          title: gen.brief.title,
           niche: nicheLabel,
-          topic: args.topic || args.brief.title,
-          styleId: args.brief.style,
+          topic: gen.topic || gen.brief.title,
+          styleId: gen.brief.style,
           styleLabel,
-          videoType: args.brief.videoType,
-          aspectRatio: args.brief.aspectRatio,
+          videoType: gen.brief.videoType,
+          aspectRatio: gen.brief.aspectRatio,
           duration_sec: r.render.duration_sec,
           extension: r.render.extension,
           mime: r.render.mime,
@@ -397,7 +439,15 @@ function VideosPage() {
 
   async function resumeJob(job: JobRecord) {
     const brief = JSON.parse(job.briefJson) as VideoBrief;
-    await start({ brief, niche: job.niche, topic: job.topic }, job.id);
+    setGen({ brief, niche: job.niche, topic: job.topic });
+    // If planning finished but user never approved the blueprint, jump back
+    // to the Review gate. Otherwise resume generation.
+    if (job.phase === "review" || job.phase === "planning") {
+      setDash({ ...initialDash, jobId: job.id, phase: "review" });
+      setView("review");
+      return;
+    }
+    await approveAndGenerate(job.id);
   }
 
   async function discardJob(id: string) {
@@ -549,6 +599,13 @@ function VideosPage() {
           error={error}
           onCancel={cancel}
           onRetryFailed={retryFailed}
+          onBack={() => setView("landing")}
+        />
+      )}
+      {view === "review" && dash.jobId && (
+        <ReviewGate
+          jobId={dash.jobId}
+          onApprove={() => approveAndGenerate(dash.jobId!)}
           onBack={() => setView("landing")}
         />
       )}
@@ -799,6 +856,7 @@ function ChipRow<T extends string | number>({
 
 const PHASE_LABELS: Record<JobPhaseId, string> = {
   planning: "Planning",
+  review: "Review & edit",
   generating_shots: "Generating shots",
   voiceover: "Narrating & subtitling",
   rendering: "Rendering final video",
@@ -806,7 +864,97 @@ const PHASE_LABELS: Record<JobPhaseId, string> = {
   failed: "Failed",
 };
 
-const PHASE_ORDER: JobPhaseId[] = ["planning", "generating_shots", "voiceover", "rendering", "complete"];
+const PHASE_ORDER: JobPhaseId[] = ["planning", "review", "generating_shots", "voiceover", "rendering", "complete"];
+
+// ---------------- Review Gate (mandatory blueprint edit checkpoint) ----------------
+
+function ReviewGate({
+  jobId, onApprove, onBack,
+}: {
+  jobId: string;
+  onApprove: () => void;
+  onBack: () => void;
+}) {
+  const localId = localBlueprintId(jobId);
+  const [meta, setMeta] = useState<import("@/lib/video-blueprint").VideoBlueprintMetadata | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let m = await getBlueprintMetadata(localId);
+      if (!m) {
+        // Job exists but no blueprint was seeded — build one from the brief.
+        const job = await getJob(jobId);
+        if (job) {
+          try {
+            const brief = JSON.parse(job.briefJson) as VideoBrief;
+            const scenes = job.shots.map((s, i) => ({
+              n: i + 1,
+              time_range: `${i * 3}-${(i + 1) * 3} sec`,
+              role: "Beat",
+              voiceover: s.text,
+              on_screen_text: "",
+              visual: s.prompt.slice(0, 120),
+              image_prompt: s.prompt,
+              duration: "3s",
+            }));
+            const stubScript = {
+              title: brief.title, reel_title: brief.title,
+              length_sec: brief.duration, style_note: "",
+              scenes, caption: "", hashtags: [] as string[],
+            };
+            const bp = buildBlueprintFromPlanning(brief, stubScript);
+            m = await initBlueprintMetadata(localId, bp);
+          } catch (e) { console.warn(e); }
+        }
+      }
+      if (!cancelled) { setMeta(m); setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [jobId, localId]);
+
+  return (
+    <div className="space-y-4">
+      <div className="glass rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-lg">Review & edit your blueprint</h2>
+          <p className="text-sm text-muted-foreground">
+            Nothing has been generated yet. Edit the script, prompts, timings and voiceover, then approve to start rendering.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={onBack} className="rounded-lg glass border border-border px-3 py-1.5 text-xs">
+            Back
+          </button>
+          <button
+            onClick={onApprove}
+            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-semibold flex items-center gap-2"
+          >
+            <Check className="w-4 h-4" /> Approve & generate shots
+          </button>
+        </div>
+      </div>
+      {loading ? (
+        <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading blueprint…
+        </div>
+      ) : meta ? (
+        <VideoBlueprintEditor
+          projectId={localId}
+          initialMetadata={meta}
+          onRender={async () => { onApprove(); }}
+        />
+      ) : (
+        <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">
+          Couldn't load the blueprint. Try starting a new video.
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 
 function JobDashboard({
   dash, error, onCancel, onRetryFailed, onBack,

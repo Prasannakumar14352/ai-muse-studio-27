@@ -1470,6 +1470,7 @@ export const ASPECT_RATIOS: AspectRatio[] = ["16:9", "9:16", "1:1"];
 
 export type JobPhaseId =
   | "planning"
+  | "review"
   | "generating_shots"
   | "voiceover"
   | "rendering"
@@ -1767,6 +1768,219 @@ export async function runVideoJobPipeline(
   // Title / Hook are also computed here so the result carries them; the
   // hook is not re-applied to the script in the async pipeline because the
   // script has already been rendered.
+  const [titles, hook] = await Promise.all([
+    TitleOptimizerAgent.run(brief, research),
+    HookAgent.run(brief, research),
+  ]);
+  const intro = await IntroAgent.run(brief, script);
+  const curiosity = await CuriosityLoopAgent.run(script);
+  const retention = await RetentionAgent.run(brief, script, curiosity);
+  const chapters = await ChapterAgent.run(script);
+
+  validatePipelineDuration({
+    requestedSec: brief.duration,
+    voiceoverSec: voiceover.reduce((a, v) => a + (v.buffer?.duration ?? v.duration_sec ?? 0), 0),
+    timelineSec: timeline.total_sec,
+    renderedSec: render.duration_sec,
+  });
+
+  job.phase = "complete";
+  await saveJob(job);
+  onEvent({ type: "phase", phase: "complete" });
+
+  const result: PipelineResult = {
+    brief, research, retentionEngine, titles, hook, intro, curiosity, script, retention, chapters,
+    storyboard, direction, visuals, voiceover, subtitles, music, sfx, timeline,
+    render, thumbnail, seo,
+  };
+  return { job, result };
+}
+
+// ----------------------------------------------------------------------------
+// Split pipeline: planning → REVIEW gate → generation
+// ----------------------------------------------------------------------------
+//
+// The Videos UI uses these two entrypoints instead of runVideoJobPipeline so
+// that users can edit the AI blueprint (script, prompts, timings, voiceover,
+// on-screen text) before any images/shots/narration/rendering is generated.
+//
+//   1. runPlanningPhase()   → creates the job in phase "review" and returns
+//                             the AI script (used to seed the blueprint
+//                             editor). Nothing else has been generated.
+//   2. runGenerationPhase() → resumes an existing "review" job, optionally
+//                             with an edited script from the blueprint, and
+//                             runs shots → voiceover → render.
+
+export async function runPlanningPhase(
+  brief: VideoBrief,
+  opts: JobRunOptions,
+): Promise<{ job: JobRecord; script: AiVideoScript }> {
+  const { onEvent } = opts;
+  onEvent({ type: "phase", phase: "planning" });
+
+  const cdIntent = detectIntentHeuristic(brief.title);
+  const creativeBrief = buildBriefFromIntent(brief.title, cdIntent.intent, cdIntent.confidence);
+  const research = await ResearchAgent.run(brief);
+  const retentionEngine = await RetentionEngineAgent.run(brief, research);
+  const script = await ScriptAgent.run(brief, research, undefined, retentionEngine);
+  const shots = planShots(script, brief.style, brief.title, creativeBrief);
+
+  const job = await createJob({
+    title: brief.title,
+    niche: opts.niche,
+    topic: opts.topic,
+    briefJson: JSON.stringify(brief),
+    shots,
+  });
+  job.phase = "review";
+  await saveJob(job);
+  onEvent({ type: "phase", phase: "review", note: "Review & edit blueprint before rendering." });
+  return { job, script };
+}
+
+/**
+ * Continue an existing "review" job through shot generation → voiceover →
+ * render. If `editedScript` is provided (typically converted from the user's
+ * edited blueprint), the job's shot list is rebuilt from it so downstream
+ * assets follow the edits.
+ */
+export async function runGenerationPhase(
+  jobId: string,
+  brief: VideoBrief,
+  opts: JobRunOptions,
+  editedScript?: AiVideoScript,
+): Promise<{ job: JobRecord; result: PipelineResult }> {
+  const { onEvent, signal } = opts;
+  const job = await getJob(jobId);
+  if (!job) throw new Error("Job not found");
+
+  const cdIntent = detectIntentHeuristic(brief.title);
+  const creativeBrief = buildBriefFromIntent(brief.title, cdIntent.intent, cdIntent.confidence);
+  const research = await ResearchAgent.run(brief);
+  const retentionEngine = await RetentionEngineAgent.run(brief, research);
+  const script = editedScript ?? await ScriptAgent.run(brief, research, undefined, retentionEngine);
+  const storyboard = await StoryboardAgent.run(script);
+  const direction = await DirectorAgent.run(brief, storyboard);
+
+  // If the user edited the blueprint, rebuild shots from the edited script so
+  // every generated asset reflects the edits. Only rebuild when there is no
+  // in-flight progress on the current shots (i.e. we haven't started yet).
+  const anyProgress = job.shots.some((s) => s.status !== "pending");
+  if (editedScript && !anyProgress) {
+    job.shots = planShots(editedScript, brief.style, brief.title, creativeBrief);
+    job.shotsTotal = job.shots.length;
+    job.shotsDone = 0;
+    job.shotsFailed = 0;
+    await saveJob(job);
+  }
+
+  // -------- Phase 2: parallel shot generation --------
+  job.phase = "generating_shots";
+  await saveJob(job);
+  onEvent({ type: "phase", phase: "generating_shots" });
+
+  const initial: ShotProgress[] = await Promise.all(job.shots.map(async (s) => {
+    let previewUrl: string | null = null;
+    if (s.status === "done" && s.blobKey) previewUrl = await loadShotObjectURL(s.blobKey);
+    return {
+      id: s.id, index: s.index,
+      status: s.status === "running" ? "pending" : s.status,
+      kind: s.kind, previewUrl, error: s.error, attempts: s.attempts,
+    };
+  }));
+  onEvent({ type: "shots-init", total: job.shots.length, shots: initial });
+
+  let done = job.shots.filter((s) => s.status === "done").length;
+  let failed = 0;
+  job.shotsDone = done; job.shotsFailed = 0;
+
+  const pending = job.shots.filter((s) => s.status !== "done");
+  const poolJobs = pending.map((shot) => ({
+    id: shot.id,
+    run: async (sig: AbortSignal) => {
+      shot.status = "running";
+      shot.attempts += 1;
+      return await generateOneShot(shot, brief, job.id, sig);
+    },
+  }));
+
+  await runShotPool(poolJobs, {
+    concurrency: 6,
+    maxAttempts: 2,
+    signal,
+    onShotSettled: (outcome) => {
+      const shot = job.shots.find((s) => s.id === outcome.id);
+      if (!shot) return;
+      if (outcome.ok) {
+        shot.status = "done";
+        shot.kind = outcome.value.kind;
+        shot.blobKey = outcome.value.blobKey;
+        shot.mime = outcome.value.mime;
+        shot.error = null;
+        done += 1;
+        onEvent({
+          type: "shot", done, failed, total: job.shots.length,
+          shot: { id: shot.id, index: shot.index, status: "done",
+            kind: shot.kind, previewUrl: outcome.value.previewUrl,
+            error: null, attempts: shot.attempts },
+        });
+      } else {
+        shot.status = "failed";
+        shot.error = outcome.error;
+        failed += 1;
+        onEvent({
+          type: "shot", done, failed, total: job.shots.length,
+          shot: { id: shot.id, index: shot.index, status: "failed",
+            kind: null, previewUrl: null, error: outcome.error, attempts: shot.attempts },
+        });
+      }
+      job.shotsDone = done; job.shotsFailed = failed;
+      void saveJob(job);
+    },
+  });
+
+  if (signal?.aborted) {
+    job.phase = "paused";
+    await saveJob(job);
+    throw new DOMException("Aborted", "AbortError");
+  }
+
+  // -------- Phase 3: voiceover / subtitles / timeline --------
+  job.phase = "voiceover";
+  await saveJob(job);
+  onEvent({ type: "phase", phase: "voiceover" });
+  const voiceover = await VoiceoverAgent.run(brief, script, (d, t) =>
+    onEvent({ type: "voiceover", done: d, total: t }),
+  );
+  const subtitles = await SubtitleAgent.run(script, voiceover);
+  const timeline = await VideoEditingAgent.run(script, voiceover);
+  const music = await MusicAgent.run(brief, timeline.total_sec);
+  const sfx = await SoundEffectsAgent.run(direction);
+
+  // -------- Phase 4: render --------
+  job.phase = "rendering";
+  await saveJob(job);
+  onEvent({ type: "phase", phase: "rendering" });
+
+  const visuals: VisualAsset[] = await Promise.all(job.shots.map(async (s, i) => {
+    let url: string | null = null;
+    if (s.blobKey) url = await loadShotObjectURL(s.blobKey);
+    if (!url) url = placeholderImage(brief.aspectRatio, `Shot ${i + 1}`);
+    return {
+      n: i + 1, kind: (s.kind ?? "image"), url,
+      duration_sec: TARGET_BEAT_SEC, generated: s.status === "done",
+    };
+  }));
+
+  const beats = beatsFromShots(job, brief.style);
+  const render = await RenderAgent.run(brief, script, beats, visuals, voiceover, (p) =>
+    onEvent({ type: "render", progress: p }),
+  );
+  job.renderProgress = 1;
+
+  const thumbnail = await ThumbnailAgent.run(brief);
+  const seo = await SeoAgent.run(brief, script, timeline);
+
   const [titles, hook] = await Promise.all([
     TitleOptimizerAgent.run(brief, research),
     HookAgent.run(brief, research),
