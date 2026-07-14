@@ -8,7 +8,12 @@ import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
 import { BrandLogo } from "@/components/brand-logo";
-const demoVideo = { url: "/creatorvault-demo.mp4", poster: "/brand/hero-poster.jpg" };
+import {
+  DemoVideoSection, VideoTestimonialsSection, WrittenTestimonialsSection,
+  GuaranteeSection, TrustBadgesSection,
+} from "@/components/landing-sections";
+import { EXTRA_FAQ } from "@/lib/landing-content";
+
 
 
 export const Route = createFileRoute("/")({ component: Landing });
@@ -28,6 +33,7 @@ const FAQ = [
   { q: "Which platforms are supported?", a: "YouTube, Instagram, TikTok, Facebook and LinkedIn — with platform-specific tone and formatting." },
   { q: "Can I use my own brand style?", a: "Yes. Save brand presets in Settings, and every generation adapts to your defaults." },
   { q: "Is there a free plan?", a: "Yes — 5 generations per month, forever free. Upgrade any time." },
+  ...EXTRA_FAQ,
 ];
 
 function Landing() {
@@ -81,38 +87,13 @@ function Landing() {
             {[...Array(5)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-[color:var(--neon-pink)] text-[color:var(--neon-pink)]" />)}
             <span className="ml-2">Loved by 10,000+ creators</span>
           </div>
-
-          {/* Live demo video — how the platform works */}
-          <div className="mt-16 max-w-5xl mx-auto">
-            <div className="glass rounded-2xl p-2 shadow-[var(--shadow-glow)]">
-              <div className="rounded-xl overflow-hidden bg-black aspect-video relative group">
-                <video
-                  src={demoVideo.url}
-                  poster={demoVideo.poster}
-                  controls
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  preload="auto"
-                  className="w-full h-full object-cover"
-                  aria-label="How CreatorVault AI works — 20 second walkthrough">
-                  Your browser does not support the video tag.
-                </video>
-
-                <div className="pointer-events-none absolute top-4 left-4 flex gap-2">
-                  <span className="glass px-2.5 py-1 rounded text-[11px] font-medium tracking-wide uppercase text-white/90">Demo</span>
-                  <span className="glass px-2.5 py-1 rounded text-[11px] font-medium tracking-wide uppercase text-white/90">20 sec</span>
-                </div>
-              </div>
-            </div>
-            <p className="mt-4 text-xs text-muted-foreground text-center">
-              Watch how a single idea becomes a full creator project — no sign-in needed.
-            </p>
-          </div>
-
         </div>
       </section>
+
+      {/* Demo Video */}
+      <DemoVideoSection />
+
+
 
       {/* Features */}
       <section id="features" className="py-24 px-6">
@@ -136,6 +117,13 @@ function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Video Testimonials */}
+      <VideoTestimonialsSection />
+
+      {/* Written Testimonials Carousel */}
+      <WrittenTestimonialsSection />
+
 
       {/* Pricing */}
       <section id="pricing" className="py-24 px-6">
@@ -187,8 +175,15 @@ function Landing() {
         </div>
       </section>
 
+      {/* Guarantee */}
+      <GuaranteeSection />
+
+      {/* Trust Badges */}
+      <TrustBadgesSection />
+
       {/* FAQ */}
       <section id="faq" className="py-24 px-6">
+
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-4xl md:text-5xl font-bold">Questions, <span className="gradient-text">answered</span></h2>
