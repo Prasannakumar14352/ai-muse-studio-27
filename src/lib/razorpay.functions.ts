@@ -186,7 +186,8 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
           ? monthlyCredits * 12
           : monthlyCredits;
 
-    const { rate } = await readUsdToInrRate();
+    const resolved = await resolveRate();
+    const rate = resolved.rate;
     const priceUsdCents = Math.round(priceUsd * 100);
     const { inrRupees, inrPaise } = usdToInrPaise(priceUsd, rate);
 
