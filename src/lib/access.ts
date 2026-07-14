@@ -16,10 +16,13 @@ export type AccessInfo = {
   email: string | null;
   isAdmin: boolean;
   plan: string;
+  planType: "free" | "monthly" | "yearly" | "lifetime" | "enterprise" | "admin";
+  lifetimeAccess: boolean;
   unlimited: boolean;
-  balance: number;         // profile.user_credits
-  monthlyLimit: number;    // subscription.monthly_credit_limit
-  monthlyUsed: number;     // subscription.monthly_credits_used
+  balance: number;             // profile.user_credits — top-up wallet
+  lifetimeCredits: number;     // profile.lifetime_credits — one-time bucket from lifetime purchase
+  monthlyLimit: number;        // subscription.monthly_credit_limit
+  monthlyUsed: number;         // subscription.monthly_credits_used
   monthlyRemaining: number;
   renewsAt: string | null;
 };
@@ -30,13 +33,14 @@ export async function getAccessInfo(): Promise<AccessInfo | null> {
   if (!user) return null;
 
   const [profRes, subRes] = await Promise.all([
-    supabase.from("profiles").select("user_credits, is_admin, role, email").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("user_credits, lifetime_credits, is_admin, role, email").eq("id", user.id).maybeSingle(),
     supabase.from("subscriptions").select("*").eq("user_id", user.id).eq("status", "active").order("started_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
-  const prof = profRes.data as { user_credits?: number; is_admin?: boolean; email?: string | null } | null;
+  const prof = profRes.data as { user_credits?: number; lifetime_credits?: number; is_admin?: boolean; email?: string | null } | null;
   const sub = subRes.data as {
-    plan_name?: string; monthly_credit_limit?: number; monthly_credits_used?: number;
+    plan_name?: string; plan_type?: string; lifetime_access?: boolean;
+    monthly_credit_limit?: number; monthly_credits_used?: number;
     unlimited_usage?: boolean; renews_at?: string | null;
   } | null;
 
@@ -45,14 +49,20 @@ export async function getAccessInfo(): Promise<AccessInfo | null> {
 
   const limit = sub?.monthly_credit_limit ?? 0;
   const used = sub?.monthly_credits_used ?? 0;
+  const planType = isAdmin
+    ? "admin" as const
+    : ((sub?.plan_type as AccessInfo["planType"]) ?? (sub?.plan_name ? "monthly" : "free"));
 
   return {
     userId: user.id,
     email: user.email ?? prof?.email ?? null,
     isAdmin,
     plan: isAdmin ? "admin" : (sub?.plan_name ?? "free"),
+    planType,
+    lifetimeAccess: !!sub?.lifetime_access,
     unlimited: isAdmin || !!sub?.unlimited_usage,
     balance: prof?.user_credits ?? 0,
+    lifetimeCredits: prof?.lifetime_credits ?? 0,
     monthlyLimit: limit,
     monthlyUsed: used,
     monthlyRemaining: Math.max(0, limit - used),
