@@ -502,7 +502,7 @@ function CreditPacksSection() {
     try {
       const ok = await loadRazorpayScript();
       if (!ok || !window.Razorpay) throw new Error("Could not load Razorpay checkout");
-      const order = await createOrder({ data: { packId: pack.id, currency: "INR" } });
+      const order = await createOrder({ data: { packId: pack.id, currency: "USD" } });
       await new Promise<void>((resolve, reject) => {
         const rzp = new window.Razorpay!({
           key: order.keyId,
