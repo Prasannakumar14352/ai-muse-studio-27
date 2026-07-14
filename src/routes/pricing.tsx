@@ -27,7 +27,7 @@ export const Route = createFileRoute("/pricing")({
   head: () => ({
     meta: [
       { title: "Pricing — CreatorFlow AI" },
-      { name: "description", content: "Simple, affordable pricing for CreatorFlow AI in INR. Monthly, yearly (save ~17%) or pay once for lifetime access." },
+      { name: "description", content: "Simple, affordable pricing for CreatorFlow AI in USD. Monthly, yearly (save ~17%) or pay once for lifetime access." },
       { property: "og:title", content: "Pricing — CreatorFlow AI" },
       { property: "og:description", content: "Monthly, yearly or lifetime access — pick what fits your workflow." },
       { property: "og:type", content: "website" },
