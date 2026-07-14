@@ -1470,6 +1470,7 @@ export const ASPECT_RATIOS: AspectRatio[] = ["16:9", "9:16", "1:1"];
 
 export type JobPhaseId =
   | "planning"
+  | "review"
   | "generating_shots"
   | "voiceover"
   | "rendering"
