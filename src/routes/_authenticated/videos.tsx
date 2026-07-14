@@ -674,7 +674,16 @@ function VideosPage() {
     </div>
   );
 }
-
+      {view === "asset_review" && dash.jobId && assetsBundle && (
+        <AssetReviewGate
+          shots={dash.shots}
+          bundle={assetsBundle}
+          onRender={renderFinal}
+          onRegenerate={regenOneShot}
+          onBackToBlueprint={() => setView("review")}
+          onCancel={() => setView("landing")}
+        />
+      )}
 function EmptyLibrary({ onNew }: { onNew: () => void }) {
   return (
     <div className="glass rounded-2xl p-16 flex flex-col items-center justify-center text-center border border-border">
