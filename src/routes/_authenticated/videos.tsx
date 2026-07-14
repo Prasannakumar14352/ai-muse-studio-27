@@ -325,46 +325,83 @@ function VideosPage() {
     });
   }, []);
 
-  async function start(args: GenerateArgs, resumeJobId?: string) {
+  async function start(args: GenerateArgs) {
     setGen(args);
     setError(null);
     setResult(null);
     setLibraryOpen(null);
-    setDash({ ...initialDash, jobId: resumeJobId ?? null });
+    setDash({ ...initialDash, jobId: null });
     setView("processing");
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const { job, result: r } = await runVideoJobPipeline(args.brief, {
-        jobId: resumeJobId,
+      // Phase 1 only — planning. After this we pause at the Review gate.
+      const { job, script } = await runPlanningPhase(args.brief, {
         niche: args.niche,
         topic: args.topic,
         onEvent: handleJobEvent,
         signal: controller.signal,
       });
+      setDash((prev) => ({ ...prev, jobId: job.id, phase: "review" }));
+
+      // Seed the local blueprint (never overwrites if already set).
+      const existingMeta = await getBlueprintMetadata(localBlueprintId(job.id));
+      if (!existingMeta) {
+        const bp = buildBlueprintFromPlanning(args.brief, script);
+        await initBlueprintMetadata(localBlueprintId(job.id), bp);
+      }
+      await refreshInProgress();
+      setView("review");
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        toast.info("Planning paused.");
+        setView("landing");
+        await refreshInProgress();
+        return;
+      }
+      const msg = e instanceof Error ? e.message : "Planning failed";
+      setError(msg);
+      toast.error(msg);
+    }
+  }
+
+  /** Called from the Blueprint Editor when the user clicks "Approve & Generate Shots". */
+  async function approveAndGenerate(jobId: string) {
+    if (!gen) return;
+    const meta = await getBlueprintMetadata(localBlueprintId(jobId));
+    const edited = meta ? blueprintToScript(meta.currentBlueprint) : undefined;
+    setError(null);
+    setResult(null);
+    setDash({ ...initialDash, jobId, phase: "generating_shots" });
+    setView("processing");
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      const { job, result: r } = await runGenerationPhase(jobId, gen.brief, {
+        niche: gen.niche,
+        topic: gen.topic,
+        onEvent: handleJobEvent,
+        signal: controller.signal,
+      }, edited);
       setDash((prev) => ({ ...prev, jobId: job.id }));
       setResult(r);
       setView("result");
       await refreshInProgress();
 
-      // Persist to browser-local library — no backend, no upload.
-      // We store the raw Blob (never the blob: URL) so it survives reloads.
       try {
         const videoBlob = r.render.blob;
-        if (!videoBlob || videoBlob.size === 0) {
-          throw new Error("Rendered video blob is empty");
-        }
-        const niche = args.niche;
+        if (!videoBlob || videoBlob.size === 0) throw new Error("Rendered video blob is empty");
+        const niche = gen.niche;
         const nicheLabel = NICHES.find((n) => n.id === niche)?.label ?? niche;
-        const styleLabel = STYLE_CARDS.find((s) => s.id === args.brief.style)?.label ?? args.brief.style;
+        const styleLabel = STYLE_CARDS.find((s) => s.id === gen.brief.style)?.label ?? gen.brief.style;
         await saveGeneratedVideo({
-          title: args.brief.title,
+          title: gen.brief.title,
           niche: nicheLabel,
-          topic: args.topic || args.brief.title,
-          styleId: args.brief.style,
+          topic: gen.topic || gen.brief.title,
+          styleId: gen.brief.style,
           styleLabel,
-          videoType: args.brief.videoType,
-          aspectRatio: args.brief.aspectRatio,
+          videoType: gen.brief.videoType,
+          aspectRatio: gen.brief.aspectRatio,
           duration_sec: r.render.duration_sec,
           extension: r.render.extension,
           mime: r.render.mime,
@@ -402,7 +439,15 @@ function VideosPage() {
 
   async function resumeJob(job: JobRecord) {
     const brief = JSON.parse(job.briefJson) as VideoBrief;
-    await start({ brief, niche: job.niche, topic: job.topic }, job.id);
+    setGen({ brief, niche: job.niche, topic: job.topic });
+    // If planning finished but user never approved the blueprint, jump back
+    // to the Review gate. Otherwise resume generation.
+    if (job.phase === "review" || job.phase === "planning") {
+      setDash({ ...initialDash, jobId: job.id, phase: "review" });
+      setView("review");
+      return;
+    }
+    await approveAndGenerate(job.id);
   }
 
   async function discardJob(id: string) {
