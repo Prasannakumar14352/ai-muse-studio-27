@@ -30,7 +30,11 @@ function PricingPage() {
   const { data: access } = useAccess();
   const navigate = useNavigate();
   const [modalPlan, setModalPlan] = useState<PlanDef | null>(null);
-  const [estimatorPlan, setEstimatorPlan] = useState<PlanDef>(PLANS.find((p) => p.featured) ?? PLANS[0]);
+  const [billingMode, setBillingMode] = useState<"monthly" | "lifetime">("monthly");
+  const monthlyPlans = useMemo(() => PLANS.filter((p) => p.planType === "free" || p.planType === "monthly" || p.planType === "enterprise"), []);
+  const lifetimePlans = useMemo(() => PLANS.filter((p) => p.planType === "lifetime"), []);
+  const visiblePlans = billingMode === "lifetime" ? lifetimePlans : monthlyPlans;
+  const [estimatorPlan, setEstimatorPlan] = useState<PlanDef>(PLANS.find((p) => p.featured && p.planType === "monthly") ?? PLANS[0]);
 
   const handleSelect = (p: PlanDef) => {
     if (!access?.email) {
@@ -47,24 +51,51 @@ function PricingPage() {
       {/* Header */}
       <div className="text-center max-w-3xl mx-auto pt-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass text-xs text-muted-foreground mb-4">
-          <Sparkles className="w-3 h-3 text-[color:var(--neon-pink)]" /> Upgrade any time · Secure checkout
+          <Sparkles className="w-3 h-3 text-[color:var(--neon-pink)]" /> Monthly or Lifetime · Secure checkout
         </div>
         <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
           Choose your <span className="gradient-text">plan</span>
         </h1>
         <p className="text-muted-foreground mt-3 text-base md:text-lg">
-          Simple credit-based pricing. Cancel any time. All prices in USD.
+          Pay monthly for the latest AI features — or pay once and own it for life. All prices in USD.
         </p>
         {access?.isAdmin && (
           <div className="mt-4 inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 text-sm">
             <Crown className="w-4 h-4 text-amber-400" /> Admin — Unlimited access, no billing
           </div>
         )}
+
+        {/* Monthly / Lifetime tabs */}
+        <div className="mt-6 inline-flex items-center gap-1 rounded-full glass p-1 border border-border/60">
+          {([
+            { id: "monthly", label: "Monthly" },
+            { id: "lifetime", label: "Lifetime · Pay once" },
+          ] as const).map((t) => {
+            const active = billingMode === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setBillingMode(t.id)}
+                aria-pressed={active}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                  active ? "gradient-primary text-white shadow-lg" : "text-muted-foreground hover:text-foreground"
+                }`}>
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+        {billingMode === "lifetime" && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            One payment. No recurring charges. Credits are added once at purchase — top up any time.
+          </p>
+        )}
       </div>
 
-      {/* Pricing cards: max 3 per row */}
+      {/* Pricing cards */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mx-auto w-full">
-        {PLANS.map((p) => (
+        {visiblePlans.map((p) => (
           <PricingCard
             key={p.id}
             plan={p}
@@ -75,7 +106,7 @@ function PricingPage() {
       </div>
 
       {/* Full comparison table */}
-      <ComparisonSection />
+      <ComparisonSection plans={visiblePlans} mode={billingMode} />
 
       <CreditPacksSection />
 
