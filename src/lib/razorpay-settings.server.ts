@@ -229,7 +229,7 @@ export type RazorpayDiagnostic = {
     card?: boolean;
     netbanking?: boolean;
     wallet?: boolean;
-    raw?: unknown;
+    raw?: Record<string, unknown> | null;
   };
   warnings: string[];
   errors: string[];
