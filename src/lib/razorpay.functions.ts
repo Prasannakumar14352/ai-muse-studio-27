@@ -125,45 +125,87 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     };
   });
 
-/** Create a Razorpay order for a subscription plan (charged as one-time credit purchase). */
+/** Create a Razorpay order for a plan (INR only, billing cycle aware). */
 export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { planId: string; currency?: Currency }) => {
+  .inputValidator((input: { planId: string; billingCycle: "monthly" | "yearly" | "lifetime" }) => {
     if (!input || typeof input.planId !== "string") throw new Error("planId required");
-    const currency: Currency = input.currency === "INR" ? "INR" : "USD";
-    return { planId: input.planId, currency };
+    const cycle = input.billingCycle;
+    if (cycle !== "monthly" && cycle !== "yearly" && cycle !== "lifetime") {
+      throw new Error("Invalid billingCycle");
+    }
+    return { planId: input.planId, billingCycle: cycle };
   })
   .handler(async ({ data, context }) => {
-    const plan = PLANS.find((p) => p.id === data.planId);
-    if (!plan) throw new Error("Unknown plan");
-    if (plan.contactSales) throw new Error("Contact sales for this plan");
-    const priceNum = Number(plan.price.replace(/[^0-9.]/g, ""));
-    if (!priceNum || priceNum <= 0) throw new Error("Plan is not purchasable");
-
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keyId || !keySecret) throw new Error("Razorpay not configured");
 
-    const credits = plan.monthlyCredits + (plan.signupCredits ?? 0);
+    // Look up the plan from the DB (admin-editable pricing)
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: planRow, error: planErr } = await supabaseAdmin
+      .from("pricing_plans")
+      .select("*")
+      .eq("id", data.planId)
+      .maybeSingle();
+    if (planErr || !planRow) throw new Error("Unknown plan");
+    const plan = planRow as unknown as Record<string, unknown>;
+    if (plan.contact_sales) throw new Error("Contact sales for this plan");
+
+    const priceInr =
+      data.billingCycle === "monthly"
+        ? Number(plan.price_monthly_inr ?? 0)
+        : data.billingCycle === "yearly"
+          ? Number(plan.price_yearly_inr ?? 0)
+          : Number(plan.price_lifetime_inr ?? 0);
+    if (!priceInr || priceInr <= 0) throw new Error("Plan is not purchasable for this billing cycle");
+
+    // Credits granted at purchase.
+    // Subscription monthly -> monthly_credits; yearly -> monthly_credits * 12; lifetime -> included_credits.
+    const monthlyCredits = Number(plan.monthly_credits ?? 0);
+    const includedCredits = Number(plan.included_credits ?? 0);
+    const credits =
+      data.billingCycle === "lifetime"
+        ? includedCredits || monthlyCredits
+        : data.billingCycle === "yearly"
+          ? monthlyCredits * 12
+          : monthlyCredits;
+
     const shortUid = context.userId.replace(/-/g, "").slice(0, 12);
     const receipt = `rcpt_${shortUid}_${Date.now().toString(36)}`.slice(0, 40);
 
-    const { order, currencyUsed, amountCharged, fellBack } = await createOrderWithFallback({
-      keyId, keySecret,
-      priceUSD: priceNum,
-      currency: data.currency,
-      receipt,
-      notes: { user_id: context.userId, plan_id: plan.id, credits },
+    const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+    const amount = Math.round(priceInr * 100);
+    const res = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
+      body: JSON.stringify({
+        amount,
+        currency: "INR",
+        receipt,
+        notes: {
+          user_id: context.userId,
+          plan_id: String(plan.id),
+          plan_code: String(plan.code),
+          billing_cycle: data.billingCycle,
+          credits,
+        },
+      }),
     });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("Razorpay plan order error:", res.status, err);
+      throw new Error(`Failed to create order (${res.status})`);
+    }
+    const order = (await res.json()) as { id: string; amount: number; currency: string };
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("payments").insert({
       user_id: context.userId,
       razorpay_order_id: order.id,
-      pack_id: `plan_${plan.id}`,
+      pack_id: `plan_${String(plan.code)}_${data.billingCycle}`,
       credits,
-      amount_cents: amountCharged,
-      currency: currencyUsed,
+      amount_cents: amount,
+      currency: "INR",
       status: "pending",
       receipt_number: receipt,
     });
@@ -177,10 +219,17 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
       amount: order.amount,
       currency: order.currency,
       keyId,
-      fellBackToINR: fellBack,
-      plan: { id: plan.id, name: plan.name, credits, priceUSD: priceNum },
+      plan: {
+        id: String(plan.id),
+        code: String(plan.code),
+        name: String(plan.name),
+        credits,
+        priceInr,
+        billingCycle: data.billingCycle,
+      },
     };
   });
+
 
 
 
