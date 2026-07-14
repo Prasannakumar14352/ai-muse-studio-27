@@ -29,7 +29,21 @@ type Payment = {
   status: string;
   receipt_number: string | null;
   created_at: string;
+  price_usd_cents: number | null;
+  conversion_rate: number | null;
+  amount_inr_paise: number | null;
 };
+
+function fmtAmount(p: Payment): string {
+  if (p.currency === "INR" && p.amount_inr_paise != null) {
+    return `₹${Math.round(p.amount_inr_paise / 100).toLocaleString("en-IN")}`;
+  }
+  return `${p.currency === "USD" ? "$" : ""}${(p.amount_cents / 100).toFixed(2)} ${p.currency}`;
+}
+function fmtUsdListed(p: Payment): string | null {
+  if (p.price_usd_cents == null) return null;
+  return `$${(p.price_usd_cents / 100).toFixed(2)}`;
+}
 
 function InvoicesPage() {
   const list = useServerFn(listMyPayments);
