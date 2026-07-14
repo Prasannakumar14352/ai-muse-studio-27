@@ -44,9 +44,11 @@ export function DemoVideoSection() {
           See CreatorFlow AI <span className="gradient-text">in Action</span>
         </h2>
         <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-          Watch how CreatorFlow AI transforms a single idea into videos, reels, carousels,
-          LinkedIn posts, thumbnails, captions and images in minutes.
+          Watch how a single idea becomes a structured Video Blueprint — script, scenes, voiceover
+          and visuals — with a Review &amp; Edit gate before any credits are spent. Then generate
+          reels, carousels, LinkedIn posts, thumbnails, captions and images in minutes.
         </p>
+
 
         <div className="mt-10 glass rounded-3xl p-2 shadow-[var(--shadow-glow)]">
           <div className="relative aspect-video rounded-2xl overflow-hidden bg-black group">
@@ -77,7 +79,7 @@ export function DemoVideoSection() {
                   <Play className="w-8 h-8 text-white fill-white ml-1" />
                 </div>
                 <span className="absolute bottom-6 left-6 glass px-3 py-1.5 rounded-full text-xs font-medium uppercase tracking-wide text-white/90">
-                  2 min walkthrough
+                  Blueprint · Review &amp; Edit · Render
                 </span>
               </button>
             )}
