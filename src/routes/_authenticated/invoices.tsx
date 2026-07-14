@@ -109,7 +109,12 @@ function InvoicesPage() {
                     <td className="px-4 py-3">{p.pack_id.replace(/_/g, " ")}</td>
                     <td className="px-4 py-3 text-right">{p.credits.toLocaleString()}</td>
                     <td className="px-4 py-3 text-right font-medium">
-                      ${(p.amount_cents / 100).toFixed(2)} {p.currency}
+                      <div>{fmtAmount(p)}</div>
+                      {fmtUsdListed(p) && (
+                        <div className="text-[10px] text-muted-foreground">
+                          Listed {fmtUsdListed(p)}{p.conversion_rate ? ` @ ₹${Number(p.conversion_rate).toFixed(2)}` : ""}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center"><StatusBadge status={p.status} /></td>
                     <td className="px-4 py-3 text-right">
