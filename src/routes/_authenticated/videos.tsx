@@ -876,6 +876,44 @@ function ReviewGate({
   onBack: () => void;
 }) {
   const localId = localBlueprintId(jobId);
+  const [meta, setMeta] = useState<import("@/lib/video-blueprint").VideoBlueprintMetadata | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let m = await getBlueprintMetadata(localId);
+      if (!m) {
+        // Job exists but no blueprint was seeded — build one from the brief.
+        const job = await getJob(jobId);
+        if (job) {
+          try {
+            const brief = JSON.parse(job.briefJson) as VideoBrief;
+            const scenes = job.shots.map((s, i) => ({
+              n: i + 1,
+              time_range: `${i * 3}-${(i + 1) * 3} sec`,
+              role: "Beat",
+              voiceover: s.text,
+              on_screen_text: "",
+              visual: s.prompt.slice(0, 120),
+              image_prompt: s.prompt,
+              duration: "3s",
+            }));
+            const stubScript = {
+              title: brief.title, reel_title: brief.title,
+              length_sec: brief.duration, style_note: "",
+              scenes, caption: "", hashtags: [] as string[],
+            };
+            const bp = buildBlueprintFromPlanning(brief, stubScript);
+            m = await initBlueprintMetadata(localId, bp);
+          } catch (e) { console.warn(e); }
+        }
+      }
+      if (!cancelled) { setMeta(m); setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [jobId, localId]);
+
   return (
     <div className="space-y-4">
       <div className="glass rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3">
@@ -886,10 +924,7 @@ function ReviewGate({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={onBack}
-            className="rounded-lg glass border border-border px-3 py-1.5 text-xs"
-          >
+          <button onClick={onBack} className="rounded-lg glass border border-border px-3 py-1.5 text-xs">
             Back
           </button>
           <button
@@ -900,13 +935,25 @@ function ReviewGate({
           </button>
         </div>
       </div>
-      <VideoBlueprintEditor
-        projectId={localId}
-        onRender={async () => { onApprove(); }}
-      />
+      {loading ? (
+        <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading blueprint…
+        </div>
+      ) : meta ? (
+        <VideoBlueprintEditor
+          projectId={localId}
+          initialMetadata={meta}
+          onRender={async () => { onApprove(); }}
+        />
+      ) : (
+        <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">
+          Couldn't load the blueprint. Try starting a new video.
+        </div>
+      )}
     </div>
   );
 }
+
 
 
 function JobDashboard({
