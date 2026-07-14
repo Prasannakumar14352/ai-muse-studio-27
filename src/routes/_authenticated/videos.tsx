@@ -856,6 +856,7 @@ function ChipRow<T extends string | number>({
 
 const PHASE_LABELS: Record<JobPhaseId, string> = {
   planning: "Planning",
+  review: "Review & edit",
   generating_shots: "Generating shots",
   voiceover: "Narrating & subtitling",
   rendering: "Rendering final video",
@@ -863,7 +864,50 @@ const PHASE_LABELS: Record<JobPhaseId, string> = {
   failed: "Failed",
 };
 
-const PHASE_ORDER: JobPhaseId[] = ["planning", "generating_shots", "voiceover", "rendering", "complete"];
+const PHASE_ORDER: JobPhaseId[] = ["planning", "review", "generating_shots", "voiceover", "rendering", "complete"];
+
+// ---------------- Review Gate (mandatory blueprint edit checkpoint) ----------------
+
+function ReviewGate({
+  jobId, onApprove, onBack,
+}: {
+  jobId: string;
+  onApprove: () => void;
+  onBack: () => void;
+}) {
+  const localId = localBlueprintId(jobId);
+  return (
+    <div className="space-y-4">
+      <div className="glass rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-lg">Review & edit your blueprint</h2>
+          <p className="text-sm text-muted-foreground">
+            Nothing has been generated yet. Edit the script, prompts, timings and voiceover, then approve to start rendering.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onBack}
+            className="rounded-lg glass border border-border px-3 py-1.5 text-xs"
+          >
+            Back
+          </button>
+          <button
+            onClick={onApprove}
+            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-semibold flex items-center gap-2"
+          >
+            <Check className="w-4 h-4" /> Approve & generate shots
+          </button>
+        </div>
+      </div>
+      <VideoBlueprintEditor
+        projectId={localId}
+        onRender={async () => { onApprove(); }}
+      />
+    </div>
+  );
+}
+
 
 function JobDashboard({
   dash, error, onCancel, onRetryFailed, onBack,
