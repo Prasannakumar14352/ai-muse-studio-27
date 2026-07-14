@@ -1,5 +1,6 @@
-// Persist VideoBlueprint inside projects.metadata (JSONB). No new tables.
-// Autosaves are debounced by the caller; this module just does raw reads/writes.
+// Persist VideoBlueprint inside projects.metadata (JSONB) OR in localStorage
+// when the caller passes a projectId prefixed with `local:` (used by the
+// local-only video generation flow which has no projects row yet).
 
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -10,10 +11,22 @@ import {
 import type { VideoBrief } from "@/lib/video-agents";
 
 const KEY = "videoBlueprint" as const;
+const LOCAL_PREFIX = "local:";
+const LS_KEY = (id: string) => `cv:videojob-blueprint:${id.slice(LOCAL_PREFIX.length)}`;
 
 type MetaBag = Record<string, unknown> & { [KEY]?: VideoBlueprintMetadata };
 
+function isLocal(projectId: string): boolean {
+  return projectId.startsWith(LOCAL_PREFIX);
+}
+
 async function readMetaBag(projectId: string): Promise<MetaBag> {
+  if (isLocal(projectId)) {
+    try {
+      const raw = localStorage.getItem(LS_KEY(projectId));
+      return raw ? (JSON.parse(raw) as MetaBag) : {};
+    } catch { return {}; }
+  }
   const { data, error } = await supabase
     .from("projects")
     .select("metadata")
@@ -25,8 +38,10 @@ async function readMetaBag(projectId: string): Promise<MetaBag> {
 }
 
 async function writeMetaBag(projectId: string, bag: MetaBag): Promise<void> {
-  // Cast through unknown: the JSONB column accepts any serializable object,
-  // but the generated Json type doesn't model our record shape.
+  if (isLocal(projectId)) {
+    try { localStorage.setItem(LS_KEY(projectId), JSON.stringify(bag)); } catch { /* quota */ }
+    return;
+  }
   const { error } = await supabase
     .from("projects")
     .update({ metadata: bag as unknown as never })
@@ -63,7 +78,6 @@ export async function saveBlueprintEdit(
   const bag = await readMetaBag(projectId);
   const existing = bag[KEY];
   if (!existing) {
-    // Bootstrap on the fly if planning meta was never written.
     const meta = initMetadata(next);
     bag[KEY] = meta;
     await writeMetaBag(projectId, bag);
@@ -88,7 +102,7 @@ export async function restoreOriginalBlueprint(
   return restored;
 }
 
-/** Take an immutable snapshot at render-start. Called by the render entrypoint. */
+/** Take an immutable snapshot at render-start. */
 export async function saveRenderSnapshot(
   projectId: string,
   brief: VideoBrief,
@@ -107,8 +121,17 @@ export async function saveRenderSnapshot(
   return { snapshot, meta };
 }
 
-/** True when the current blueprint has advanced past the snapshot used to render. */
 export function hasEditsSinceSnapshot(meta: VideoBlueprintMetadata): boolean {
   if (!meta.renderSnapshot) return false;
   return meta.blueprintVersion > meta.renderSnapshot.version;
+}
+
+/** Delete a local blueprint (matches deleteJob lifecycle). */
+export function deleteLocalBlueprint(jobId: string): void {
+  try { localStorage.removeItem(`cv:videojob-blueprint:${jobId}`); } catch { /* noop */ }
+}
+
+/** Helper for callers building the local projectId. */
+export function localBlueprintId(jobId: string): string {
+  return `${LOCAL_PREFIX}${jobId}`;
 }
