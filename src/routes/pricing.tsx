@@ -535,8 +535,19 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
           className="w-full rounded-lg gradient-primary text-white py-3 font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {paying && <Loader2 className="w-4 h-4 animate-spin" />}
-          {paying ? "Opening checkout…" : inrPreview !== null ? `Pay ${inr(inrPreview)}` : "Loading…"}
+          {paying ? "Opening checkout…" : lastError ? "Retry payment" : inrPreview !== null ? `Pay ${inr(inrPreview)}` : "Loading…"}
         </button>
+        {lastError && (
+          <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-100 p-3 text-xs">
+            <div className="font-semibold mb-1">Payment did not complete</div>
+            <div>{lastError.description}</div>
+            {(lastError.code || lastError.source || lastError.reason) && (
+              <div className="mt-1 text-[10px] opacity-75 font-mono">
+                {[lastError.code, lastError.source, lastError.reason].filter(Boolean).join(" · ")}
+              </div>
+            )}
+          </div>
+        )}
         <p className="mt-2 text-[11px] text-center text-muted-foreground">
           Final payment is processed in INR through Razorpay. Credits are only granted after a successful payment.
         </p>
