@@ -74,10 +74,10 @@ export function useAccess() {
   return useQuery({ queryKey: ["access"], queryFn: getAccessInfo, staleTime: 30_000 });
 }
 
-/** Total credits the user could still spend (subscription + balance). Admins return Infinity. */
+/** Total credits the user could still spend (monthly + top-up + lifetime). Admins return Infinity. */
 export function getAvailableCredits(a: AccessInfo): number {
   if (a.unlimited) return Number.POSITIVE_INFINITY;
-  return a.monthlyRemaining + a.balance;
+  return a.monthlyRemaining + a.balance + a.lifetimeCredits;
 }
 
 export function canGenerate(a: AccessInfo, required: number): boolean {
