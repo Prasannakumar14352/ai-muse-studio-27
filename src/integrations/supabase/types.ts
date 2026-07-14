@@ -445,9 +445,11 @@ export type Database = {
       pricing_plans: {
         Row: {
           active: boolean
+          badge: string | null
           code: string
           contact_sales: boolean
           created_at: string
+          discount_pct: number
           featured: boolean
           features: Json
           id: string
@@ -456,15 +458,21 @@ export type Database = {
           name: string
           period_label: string | null
           plan_type: string
+          price_lifetime_inr: number
+          price_monthly_inr: number
           price_usd: number
+          price_yearly_inr: number
           sort_order: number
+          tier: string | null
           updated_at: string
         }
         Insert: {
           active?: boolean
+          badge?: string | null
           code: string
           contact_sales?: boolean
           created_at?: string
+          discount_pct?: number
           featured?: boolean
           features?: Json
           id?: string
@@ -473,15 +481,21 @@ export type Database = {
           name: string
           period_label?: string | null
           plan_type: string
+          price_lifetime_inr?: number
+          price_monthly_inr?: number
           price_usd?: number
+          price_yearly_inr?: number
           sort_order?: number
+          tier?: string | null
           updated_at?: string
         }
         Update: {
           active?: boolean
+          badge?: string | null
           code?: string
           contact_sales?: boolean
           created_at?: string
+          discount_pct?: number
           featured?: boolean
           features?: Json
           id?: string
@@ -490,8 +504,12 @@ export type Database = {
           name?: string
           period_label?: string | null
           plan_type?: string
+          price_lifetime_inr?: number
+          price_monthly_inr?: number
           price_usd?: number
+          price_yearly_inr?: number
           sort_order?: number
+          tier?: string | null
           updated_at?: string
         }
         Relationships: []
