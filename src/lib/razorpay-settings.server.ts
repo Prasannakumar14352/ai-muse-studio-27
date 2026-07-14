@@ -307,7 +307,7 @@ export async function runDiagnostic(): Promise<RazorpayDiagnostic> {
         card: !!j.card,
         netbanking: !!j.netbanking,
         wallet: !!j.wallet,
-        raw: j,
+        rawJson: JSON.stringify(j),
       };
       if (!upi) {
         warnings.push(
@@ -322,7 +322,8 @@ export async function runDiagnostic(): Promise<RazorpayDiagnostic> {
           "UPI QR flow status could not be confirmed from /v1/methods. Verify UPI QR is activated in Razorpay Dashboard → Payment Methods → UPI.",
         );
       }
-      if (keyMode === "live" && !methods.card && !methods.netbanking && !methods.upi) {
+      const m = methods;
+      if (keyMode === "live" && !m.card && !m.netbanking && !m.upi) {
         warnings.push("Live account appears to have no active payment methods — activation may be incomplete.");
       }
     } else {
