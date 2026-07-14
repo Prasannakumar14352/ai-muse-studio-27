@@ -965,6 +965,98 @@ export type Database = {
         }
         Relationships: []
       }
+      template_favorites: {
+        Row: {
+          created_at: string
+          template_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          template_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          template_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_favorites_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      templates: {
+        Row: {
+          access_tier: string
+          active: boolean
+          aspect_ratio: string | null
+          category: string
+          created_at: string
+          created_by: string | null
+          default_brief: Json
+          default_prompt: string
+          description: string
+          featured: boolean
+          id: string
+          name: string
+          platform: string | null
+          preview_image_url: string | null
+          slug: string
+          sort_order: number
+          style: string | null
+          tags: string[]
+          updated_at: string
+        }
+        Insert: {
+          access_tier?: string
+          active?: boolean
+          aspect_ratio?: string | null
+          category: string
+          created_at?: string
+          created_by?: string | null
+          default_brief?: Json
+          default_prompt?: string
+          description?: string
+          featured?: boolean
+          id?: string
+          name: string
+          platform?: string | null
+          preview_image_url?: string | null
+          slug: string
+          sort_order?: number
+          style?: string | null
+          tags?: string[]
+          updated_at?: string
+        }
+        Update: {
+          access_tier?: string
+          active?: boolean
+          aspect_ratio?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          default_brief?: Json
+          default_prompt?: string
+          description?: string
+          featured?: boolean
+          id?: string
+          name?: string
+          platform?: string | null
+          preview_image_url?: string | null
+          slug?: string
+          sort_order?: number
+          style?: string | null
+          tags?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       usage_history: {
         Row: {
           created_at: string

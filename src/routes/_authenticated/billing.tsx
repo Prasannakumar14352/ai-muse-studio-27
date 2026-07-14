@@ -11,7 +11,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/billing")({
   head: () => ({
-    meta: [{ title: "Billing — CreatorVault AI" }],
+    meta: [{ title: "Billing — CreatorFlow AI" }],
   }),
   component: BillingPage,
   errorComponent: ({ error, reset }) => {

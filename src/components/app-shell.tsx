@@ -53,6 +53,7 @@ const SECTIONS: readonly NavSection[] = [
       { to: "/images", label: "Images", icon: ImageIcon, moduleId: "images" },
       { to: "/thumbnails", label: "Thumbnails", icon: Sparkles, moduleId: "thumbnails" },
       { to: "/captions", label: "Captions", icon: Type, moduleId: "captions" },
+      { to: "/templates", label: "Templates", icon: Sparkles },
     ],
   },
   {
@@ -76,6 +77,7 @@ const SECTIONS: readonly NavSection[] = [
     adminOnly: true,
     items: [
       { to: "/admin", label: "Admin", icon: Crown },
+      { to: "/admin/templates", label: "Templates CMS", icon: Sparkles },
       { to: "/admin/integrations", label: "Social Publishing", icon: Plug },
     ],
   },
@@ -206,7 +208,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {collapsed ? (
             <Link
               to="/dashboard"
-              aria-label="CreatorVault AI home"
+              aria-label="CreatorFlow AI home"
               className="flex items-center justify-center rounded-xl p-1.5 transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <BrandLogo alt="" className="h-9 w-auto object-contain" />
@@ -215,7 +217,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="flex items-center gap-3">
               <Link
                 to="/dashboard"
-                aria-label="CreatorVault AI home"
+                aria-label="CreatorFlow AI home"
                 className="shrink-0 flex items-center justify-center rounded-lg p-1 transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <BrandLogo alt="" className="h-[52px] w-auto max-w-[64px] object-contain" />
@@ -223,7 +225,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <div className="min-w-0 flex-1 flex flex-col gap-1">
                 <div className="flex flex-col leading-tight">
                   <span className="text-[15px] font-semibold tracking-tight text-foreground truncate">
-                    CreatorVault AI
+                    CreatorFlow AI
                   </span>
                   <span className="text-[11px] text-muted-foreground/80 truncate">
                     by ProdXStore
@@ -287,18 +289,18 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="md:hidden fixed top-0 inset-x-0 z-40 grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-5 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <Link
           to="/dashboard"
-          aria-label="CreatorVault AI home"
+          aria-label="CreatorFlow AI home"
           className="flex items-center justify-center rounded-lg p-1 transition hover:bg-white/5"
         >
           <BrandLogo alt="" className="h-7 w-auto object-contain" />
         </Link>
         <Link
           to="/dashboard"
-          aria-label="CreatorVault AI home"
+          aria-label="CreatorFlow AI home"
           className="justify-self-center flex items-center justify-center rounded-lg p-1 transition hover:bg-white/5"
         >
           <span className="text-base font-bold tracking-tight whitespace-nowrap bg-gradient-to-r from-[color:var(--brand-orange)] to-[color:var(--neon-pink)] bg-clip-text text-transparent">
-            CreatorVault AI
+            CreatorFlow AI
           </span>
         </Link>
         <div className="flex items-center gap-2 justify-self-end">

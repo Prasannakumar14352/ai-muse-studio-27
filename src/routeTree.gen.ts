@@ -22,6 +22,7 @@ import { Route as ApiGenerateVideoClipRouteImport } from './routes/api/generate-
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as AuthenticatedVideosRouteImport } from './routes/_authenticated/videos'
 import { Route as AuthenticatedThumbnailsRouteImport } from './routes/_authenticated/thumbnails'
+import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedLinkedinPostsRouteImport } from './routes/_authenticated/linkedin-posts'
 import { Route as AuthenticatedInvoicesRouteImport } from './routes/_authenticated/invoices'
@@ -39,6 +40,7 @@ import { Route as AuthenticatedLinkedinPostsNewRouteImport } from './routes/_aut
 import { Route as AuthenticatedLinkedinPostsIdRouteImport } from './routes/_authenticated/linkedin-posts.$id'
 import { Route as AuthenticatedCreateCarouselRouteImport } from './routes/_authenticated/create_.carousel'
 import { Route as AuthenticatedAdminWebhooksRouteImport } from './routes/_authenticated/admin.webhooks'
+import { Route as AuthenticatedAdminTemplatesRouteImport } from './routes/_authenticated/admin.templates'
 import { Route as AuthenticatedAdminIntegrationsRouteImport } from './routes/_authenticated/admin.integrations'
 import { Route as ApiPublicWebhooksRazorpayRouteImport } from './routes/api/public/webhooks/razorpay'
 import { Route as ApiPublicHooksPublishScheduledRouteImport } from './routes/api/public/hooks/publish-scheduled'
@@ -107,6 +109,11 @@ const AuthenticatedVideosRoute = AuthenticatedVideosRouteImport.update({
 const AuthenticatedThumbnailsRoute = AuthenticatedThumbnailsRouteImport.update({
   id: '/thumbnails',
   path: '/thumbnails',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTemplatesRoute = AuthenticatedTemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
@@ -201,6 +208,12 @@ const AuthenticatedAdminWebhooksRoute =
     path: '/webhooks',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminTemplatesRoute =
+  AuthenticatedAdminTemplatesRouteImport.update({
+    id: '/templates',
+    path: '/templates',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminIntegrationsRoute =
   AuthenticatedAdminIntegrationsRouteImport.update({
     id: '/integrations',
@@ -251,12 +264,14 @@ export interface FileRoutesByFullPath {
   '/invoices': typeof AuthenticatedInvoicesRoute
   '/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
+  '/templates': typeof AuthenticatedTemplatesRoute
   '/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/tts': typeof ApiTtsRoute
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
+  '/admin/templates': typeof AuthenticatedAdminTemplatesRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
   '/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
@@ -286,12 +301,14 @@ export interface FileRoutesByTo {
   '/images': typeof AuthenticatedImagesRoute
   '/invoices': typeof AuthenticatedInvoicesRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/templates': typeof AuthenticatedTemplatesRoute
   '/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/tts': typeof ApiTtsRoute
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
+  '/admin/templates': typeof AuthenticatedAdminTemplatesRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/create/carousel': typeof AuthenticatedCreateCarouselRoute
   '/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
@@ -324,12 +341,14 @@ export interface FileRoutesById {
   '/_authenticated/invoices': typeof AuthenticatedInvoicesRoute
   '/_authenticated/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
   '/_authenticated/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/_authenticated/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/tts': typeof ApiTtsRoute
   '/_authenticated/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
+  '/_authenticated/admin/templates': typeof AuthenticatedAdminTemplatesRoute
   '/_authenticated/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/_authenticated/create_/carousel': typeof AuthenticatedCreateCarouselRoute
   '/_authenticated/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
@@ -362,12 +381,14 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/linkedin-posts'
     | '/settings'
+    | '/templates'
     | '/thumbnails'
     | '/videos'
     | '/api/generate-image'
     | '/api/generate-video-clip'
     | '/api/tts'
     | '/admin/integrations'
+    | '/admin/templates'
     | '/admin/webhooks'
     | '/create/carousel'
     | '/linkedin-posts/$id'
@@ -397,12 +418,14 @@ export interface FileRouteTypes {
     | '/images'
     | '/invoices'
     | '/settings'
+    | '/templates'
     | '/thumbnails'
     | '/videos'
     | '/api/generate-image'
     | '/api/generate-video-clip'
     | '/api/tts'
     | '/admin/integrations'
+    | '/admin/templates'
     | '/admin/webhooks'
     | '/create/carousel'
     | '/linkedin-posts/$id'
@@ -434,12 +457,14 @@ export interface FileRouteTypes {
     | '/_authenticated/invoices'
     | '/_authenticated/linkedin-posts'
     | '/_authenticated/settings'
+    | '/_authenticated/templates'
     | '/_authenticated/thumbnails'
     | '/_authenticated/videos'
     | '/api/generate-image'
     | '/api/generate-video-clip'
     | '/api/tts'
     | '/_authenticated/admin/integrations'
+    | '/_authenticated/admin/templates'
     | '/_authenticated/admin/webhooks'
     | '/_authenticated/create_/carousel'
     | '/_authenticated/linkedin-posts/$id'
@@ -562,6 +587,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedThumbnailsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/templates': {
+      id: '/_authenticated/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof AuthenticatedTemplatesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -681,6 +713,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminWebhooksRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/templates': {
+      id: '/_authenticated/admin/templates'
+      path: '/templates'
+      fullPath: '/admin/templates'
+      preLoaderRoute: typeof AuthenticatedAdminTemplatesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/integrations': {
       id: '/_authenticated/admin/integrations'
       path: '/integrations'
@@ -721,11 +760,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminIntegrationsRoute: typeof AuthenticatedAdminIntegrationsRoute
+  AuthenticatedAdminTemplatesRoute: typeof AuthenticatedAdminTemplatesRoute
   AuthenticatedAdminWebhooksRoute: typeof AuthenticatedAdminWebhooksRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminIntegrationsRoute: AuthenticatedAdminIntegrationsRoute,
+  AuthenticatedAdminTemplatesRoute: AuthenticatedAdminTemplatesRoute,
   AuthenticatedAdminWebhooksRoute: AuthenticatedAdminWebhooksRoute,
 }
 
@@ -778,6 +819,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedInvoicesRoute: typeof AuthenticatedInvoicesRoute
   AuthenticatedLinkedinPostsRoute: typeof AuthenticatedLinkedinPostsRouteWithChildren
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
   AuthenticatedThumbnailsRoute: typeof AuthenticatedThumbnailsRoute
   AuthenticatedVideosRoute: typeof AuthenticatedVideosRoute
   AuthenticatedCreateCarouselRoute: typeof AuthenticatedCreateCarouselRoute
@@ -796,6 +838,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInvoicesRoute: AuthenticatedInvoicesRoute,
   AuthenticatedLinkedinPostsRoute: AuthenticatedLinkedinPostsRouteWithChildren,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
   AuthenticatedThumbnailsRoute: AuthenticatedThumbnailsRoute,
   AuthenticatedVideosRoute: AuthenticatedVideosRoute,
   AuthenticatedCreateCarouselRoute: AuthenticatedCreateCarouselRoute,

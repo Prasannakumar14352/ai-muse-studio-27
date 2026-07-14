@@ -1,9 +1,8 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import {
   Wand2, Video, Image as ImageIcon, Type, Mic, Music2,
-  Zap, Layers, Rocket, Check, Mail, ChevronRight, Star,
+  Zap, Layers, Rocket, Mail, ChevronRight, Star,
 } from "lucide-react";
-import { PLANS } from "@/lib/constants";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
@@ -12,6 +11,7 @@ import {
   DemoVideoSection, VideoTestimonialsSection, WrittenTestimonialsSection,
   GuaranteeSection, TrustBadgesSection,
 } from "@/components/landing-sections";
+import { LandingPricingTabs } from "@/components/landing-pricing-tabs";
 import { EXTRA_FAQ } from "@/lib/landing-content";
 
 
@@ -28,7 +28,7 @@ const FEATURES = [
 ];
 
 const FAQ = [
-  { q: "What is CreatorVault AI?", a: "A premium AI content platform that generates full creator-ready projects — scripts, scenes, images, captions, hashtags — in one flow." },
+  { q: "What is CreatorFlow AI?", a: "A premium AI content platform that generates full creator-ready projects — scripts, scenes, images, captions, hashtags — in one flow." },
   { q: "Do I need any editing experience?", a: "No. You describe the topic and pick a style. We generate the entire project blueprint." },
   { q: "Which platforms are supported?", a: "YouTube, Instagram, TikTok, Facebook and LinkedIn — with platform-specific tone and formatting." },
   { q: "Can I use my own brand style?", a: "Yes. Save brand presets in Settings, and every generation adapts to your defaults." },
@@ -42,8 +42,8 @@ function Landing() {
       {/* Nav */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/60 border-b border-border/40">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2" aria-label="CreatorVault AI home">
-            <BrandLogo alt="CreatorVault AI" className="h-9 md:h-10 w-auto object-contain" />
+          <Link to="/" className="flex items-center gap-2" aria-label="CreatorFlow AI home">
+            <BrandLogo alt="CreatorFlow AI" className="h-9 md:h-10 w-auto object-contain" />
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <Link to="/features" className="hover:text-foreground">Features</Link>
@@ -72,7 +72,7 @@ function Landing() {
             faster than you can scroll.
           </h1>
           <p className="mt-6 max-w-2xl mx-auto text-lg text-muted-foreground">
-            CreatorVault AI turns a single idea into a complete creator project — script, scenes, AI images,
+            CreatorFlow AI turns a single idea into a complete creator project — script, scenes, AI images,
             captions, hashtags and voiceover — in seconds.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-3">
@@ -126,54 +126,8 @@ function Landing() {
 
 
       {/* Pricing */}
-      <section id="pricing" className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold">Simple, <span className="gradient-text">creator-first</span> pricing</h2>
-            <p className="mt-4 text-muted-foreground">Start free. Upgrade when you're ready to scale.</p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-5">
-            {PLANS.map((p) => (
-              <div key={p.id} className={`glass rounded-2xl p-6 relative flex flex-col ${p.featured ? "border-[color:var(--neon-purple)]/60 shadow-[var(--shadow-glow)]" : ""} ${p.contactSales ? "border-[color:var(--brand-orange)]/60" : ""}`}>
-                {p.featured && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 gradient-primary text-white text-xs px-3 py-1 rounded-full font-medium">
-                    Most popular
-                  </div>
-                )}
-                {p.contactSales && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[color:var(--brand-orange)] text-black text-xs px-3 py-1 rounded-full font-medium">
-                    For teams
-                  </div>
-                )}
-                <h3 className="text-xl font-semibold">{p.name}</h3>
-                <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-3xl font-bold">{p.price}</span>
-                  <span className="text-sm text-muted-foreground">{p.period}</span>
-                </div>
-                <ul className="mt-6 space-y-3 flex-1">
-                  {p.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm">
-                      <Check className={`w-4 h-4 mt-0.5 shrink-0 ${p.contactSales ? "text-[color:var(--brand-orange)]" : "text-[color:var(--neon-purple)]"}`} />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  to={p.contactSales ? "/contact" : "/auth"}
-                  className={`mt-8 block text-center rounded-lg py-3 text-sm font-medium ${
-                    p.contactSales
-                      ? "bg-[color:var(--brand-orange)] text-black hover:opacity-90"
-                      : p.featured
-                        ? "gradient-primary text-white"
-                        : "glass hover:bg-white/5"
-                  }`}>
-                  {p.cta}
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <LandingPricingTabs />
+
 
       {/* Guarantee */}
       <GuaranteeSection />
@@ -217,12 +171,12 @@ function Landing() {
       <footer className="border-t border-border/40 py-10 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-3">
-            <BrandLogo alt="CreatorVault AI" className="h-7 w-auto object-contain" />
-            <span>© 2026 CreatorVault AI · Digital Products Marketplace</span>
+            <BrandLogo alt="CreatorFlow AI" className="h-7 w-auto object-contain" />
+            <span>© 2026 CreatorFlow AI · Digital Products Marketplace</span>
           </div>
           <div className="flex items-center gap-5">
-            <a href="mailto:support@creatorvault.ai" className="hover:text-foreground inline-flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5" /> support@creatorvault.ai
+            <a href="mailto:support@creatorflow.ai" className="hover:text-foreground inline-flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5" /> support@creatorflow.ai
             </a>
             <Link to="/contact" className="hover:text-foreground">Contact Us</Link>
           </div>

@@ -1,4 +1,4 @@
-# Vercel Deployment Checklist — CreatorVault AI
+# Vercel Deployment Checklist — CreatorFlow AI
 
 This project is a TanStack Start app backed by Lovable Cloud (Supabase). It
 runs on Lovable hosting out of the box; deploying to Vercel requires the

@@ -6,7 +6,7 @@ type Props = {
 };
 
 /**
- * Renders the CreatorVault AI logo from the repo-bundled asset in /public/brand.
+ * Renders the CreatorFlow AI logo from the repo-bundled asset in /public/brand.
  * Falls back to a local SVG mark if the primary PNG fails to load (e.g. static
  * asset misconfigured on the hosting provider). Guarantees the header always
  * shows a brand mark on Vercel, Lovable, or any other host.

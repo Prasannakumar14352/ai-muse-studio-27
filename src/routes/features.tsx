@@ -8,13 +8,13 @@ import { PublicShell } from "@/components/public-shell";
 export const Route = createFileRoute("/features")({
   head: () => ({
     meta: [
-      { title: "Features — CreatorVault AI" },
-      { name: "description", content: "Every AI engine inside CreatorVault: cinematic videos, layered carousels, LinkedIn studio, character consistency, motion director, thumbnail studio and more." },
-      { property: "og:title", content: "Features — CreatorVault AI" },
-      { property: "og:description", content: "Every AI engine inside CreatorVault: videos, carousels, LinkedIn, thumbnails and more." },
+      { title: "Features — CreatorFlow AI" },
+      { name: "description", content: "Every AI engine inside CreatorFlow AI: cinematic videos, layered carousels, LinkedIn studio, character consistency, motion director, thumbnail studio and more." },
+      { property: "og:title", content: "Features — CreatorFlow AI" },
+      { property: "og:description", content: "Every AI engine inside CreatorFlow AI: videos, carousels, LinkedIn, thumbnails and more." },
       { property: "og:type", content: "website" },
-      { name: "twitter:title", content: "Features — CreatorVault AI" },
-      { name: "twitter:description", content: "Every AI engine inside CreatorVault AI." },
+      { name: "twitter:title", content: "Features — CreatorFlow AI" },
+      { name: "twitter:description", content: "Every AI engine inside CreatorFlow AI." },
     ],
   }),
   component: FeaturesPage,
@@ -107,7 +107,7 @@ function FeaturesPage() {
           Ten AI engines. <span className="gradient-text">One creator studio.</span>
         </h1>
         <p className="mt-5 max-w-2xl mx-auto text-lg text-muted-foreground">
-          CreatorVault composes cinematic videos, layered carousels, thumbnails and LinkedIn posts with the same
+          CreatorFlow composes cinematic videos, layered carousels, thumbnails and LinkedIn posts with the same
           character, brand and voice — end to end.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">

@@ -7,7 +7,7 @@ import { Copy, CheckCircle2, XCircle, Loader2, Save, PlayCircle } from "lucide-r
 import { listOAuthProviderConfigs, saveOAuthProviderConfig, testOAuthProviderConfig } from "@/lib/oauth-admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/integrations")({
-  head: () => ({ meta: [{ title: "Admin · Social Publishing — CreatorVaultAI" }] }),
+  head: () => ({ meta: [{ title: "Admin · Social Publishing — CreatorFlow AI" }] }),
   component: AdminIntegrationsPage,
 });
 

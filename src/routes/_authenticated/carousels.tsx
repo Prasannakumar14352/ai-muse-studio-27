@@ -23,9 +23,9 @@ import {
 export const Route = createFileRoute("/_authenticated/carousels")({
   head: () => ({
     meta: [
-      { title: "Carousels — CreatorVaultAI" },
+      { title: "Carousels — CreatorFlow AI" },
       { name: "description", content: "Generate multi-slide Instagram carousels from your project prompts." },
-      { property: "og:title", content: "Carousels — CreatorVaultAI" },
+      { property: "og:title", content: "Carousels — CreatorFlow AI" },
       { property: "og:description", content: "Generate multi-slide Instagram carousels from your project prompts." },
     ],
   }),

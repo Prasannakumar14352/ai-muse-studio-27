@@ -5,12 +5,12 @@ import { PublicShell } from "@/components/public-shell";
 export const Route = createFileRoute("/how-it-works")({
   head: () => ({
     meta: [
-      { title: "How it works — CreatorVault AI" },
+      { title: "How it works — CreatorFlow AI" },
       { name: "description", content: "From a single idea to a finished video, carousel, thumbnail or LinkedIn post in four steps." },
-      { property: "og:title", content: "How CreatorVault AI works" },
+      { property: "og:title", content: "How CreatorFlow AI works" },
       { property: "og:description", content: "From idea to finished asset in four steps." },
       { property: "og:type", content: "website" },
-      { name: "twitter:title", content: "How CreatorVault AI works" },
+      { name: "twitter:title", content: "How CreatorFlow AI works" },
       { name: "twitter:description", content: "From idea to finished asset in four steps." },
     ],
   }),

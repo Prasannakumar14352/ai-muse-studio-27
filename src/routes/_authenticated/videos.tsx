@@ -53,9 +53,9 @@ import styleMinimal from "@/assets/style-minimal.jpg";
 export const Route = createFileRoute("/_authenticated/videos")({
   head: () => ({
     meta: [
-      { title: "Videos — CreatorVaultAI" },
+      { title: "Videos — CreatorFlow AI" },
       { name: "description", content: "Generate a ready-to-post video from a single idea. Script, visuals, voice, music, subtitles, thumbnail and SEO in one flow." },
-      { property: "og:title", content: "Videos — CreatorVaultAI" },
+      { property: "og:title", content: "Videos — CreatorFlow AI" },
       { property: "og:description", content: "Generate a ready-to-post video from a single idea." },
     ],
   }),

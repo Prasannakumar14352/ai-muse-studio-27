@@ -13,9 +13,9 @@ import { Loader2, Wand2, ArrowRight, Layers } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/create_/carousel")({
   head: () => ({
     meta: [
-      { title: "New carousel — CreatorVaultAI" },
+      { title: "New carousel — CreatorFlow AI" },
       { name: "description", content: "Dedicated carousel builder: cover, point slides, and CTA with AI-generated text and visuals." },
-      { property: "og:title", content: "New carousel — CreatorVaultAI" },
+      { property: "og:title", content: "New carousel — CreatorFlow AI" },
       { property: "og:description", content: "Cover, point slides, and CTA — each with text + AI visual, ready to post." },
     ],
   }),
