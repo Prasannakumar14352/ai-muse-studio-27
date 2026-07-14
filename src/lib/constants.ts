@@ -94,7 +94,7 @@ export const NICHES = [
   ]},
   { id: "travel", label: "Travel & Adventure", emoji: "✈️", topics: [
     "5 underrated destinations for 2026",
-    "How to travel for a month on ₹50k",
+    "How to travel for a month on $600",
     "The one packing list I never leave without",
   ]},
   { id: "fashion", label: "Fashion & Style", emoji: "👗", topics: [
