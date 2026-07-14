@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { CREDIT_PACKS, PLANS } from "@/lib/constants";
+import { CREDIT_PACKS } from "@/lib/constants";
 
 /** Approximate USD → INR conversion used when charging in INR via Razorpay.
  *  Kept as a constant so it's easy to update. Actual FX may vary slightly. */
@@ -125,45 +125,87 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     };
   });
 
-/** Create a Razorpay order for a subscription plan (charged as one-time credit purchase). */
+/** Create a Razorpay order for a plan (INR only, billing cycle aware). */
 export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { planId: string; currency?: Currency }) => {
+  .inputValidator((input: { planId: string; billingCycle: "monthly" | "yearly" | "lifetime" }) => {
     if (!input || typeof input.planId !== "string") throw new Error("planId required");
-    const currency: Currency = input.currency === "INR" ? "INR" : "USD";
-    return { planId: input.planId, currency };
+    const cycle = input.billingCycle;
+    if (cycle !== "monthly" && cycle !== "yearly" && cycle !== "lifetime") {
+      throw new Error("Invalid billingCycle");
+    }
+    return { planId: input.planId, billingCycle: cycle };
   })
   .handler(async ({ data, context }) => {
-    const plan = PLANS.find((p) => p.id === data.planId);
-    if (!plan) throw new Error("Unknown plan");
-    if (plan.contactSales) throw new Error("Contact sales for this plan");
-    const priceNum = Number(plan.price.replace(/[^0-9.]/g, ""));
-    if (!priceNum || priceNum <= 0) throw new Error("Plan is not purchasable");
-
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keyId || !keySecret) throw new Error("Razorpay not configured");
 
-    const credits = plan.monthlyCredits + (plan.signupCredits ?? 0);
+    // Look up the plan from the DB (admin-editable pricing)
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: planRow, error: planErr } = await supabaseAdmin
+      .from("pricing_plans")
+      .select("*")
+      .eq("id", data.planId)
+      .maybeSingle();
+    if (planErr || !planRow) throw new Error("Unknown plan");
+    const plan = planRow as unknown as Record<string, unknown>;
+    if (plan.contact_sales) throw new Error("Contact sales for this plan");
+
+    const priceInr =
+      data.billingCycle === "monthly"
+        ? Number(plan.price_monthly_inr ?? 0)
+        : data.billingCycle === "yearly"
+          ? Number(plan.price_yearly_inr ?? 0)
+          : Number(plan.price_lifetime_inr ?? 0);
+    if (!priceInr || priceInr <= 0) throw new Error("Plan is not purchasable for this billing cycle");
+
+    // Credits granted at purchase.
+    // Subscription monthly -> monthly_credits; yearly -> monthly_credits * 12; lifetime -> included_credits.
+    const monthlyCredits = Number(plan.monthly_credits ?? 0);
+    const includedCredits = Number(plan.included_credits ?? 0);
+    const credits =
+      data.billingCycle === "lifetime"
+        ? includedCredits || monthlyCredits
+        : data.billingCycle === "yearly"
+          ? monthlyCredits * 12
+          : monthlyCredits;
+
     const shortUid = context.userId.replace(/-/g, "").slice(0, 12);
     const receipt = `rcpt_${shortUid}_${Date.now().toString(36)}`.slice(0, 40);
 
-    const { order, currencyUsed, amountCharged, fellBack } = await createOrderWithFallback({
-      keyId, keySecret,
-      priceUSD: priceNum,
-      currency: data.currency,
-      receipt,
-      notes: { user_id: context.userId, plan_id: plan.id, credits },
+    const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+    const amount = Math.round(priceInr * 100);
+    const res = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
+      body: JSON.stringify({
+        amount,
+        currency: "INR",
+        receipt,
+        notes: {
+          user_id: context.userId,
+          plan_id: String(plan.id),
+          plan_code: String(plan.code),
+          billing_cycle: data.billingCycle,
+          credits,
+        },
+      }),
     });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("Razorpay plan order error:", res.status, err);
+      throw new Error(`Failed to create order (${res.status})`);
+    }
+    const order = (await res.json()) as { id: string; amount: number; currency: string };
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("payments").insert({
       user_id: context.userId,
       razorpay_order_id: order.id,
-      pack_id: `plan_${plan.id}`,
+      pack_id: `plan_${String(plan.code)}_${data.billingCycle}`,
       credits,
-      amount_cents: amountCharged,
-      currency: currencyUsed,
+      amount_cents: amount,
+      currency: "INR",
       status: "pending",
       receipt_number: receipt,
     });
@@ -177,10 +219,17 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
       amount: order.amount,
       currency: order.currency,
       keyId,
-      fellBackToINR: fellBack,
-      plan: { id: plan.id, name: plan.name, credits, priceUSD: priceNum },
+      plan: {
+        id: String(plan.id),
+        code: String(plan.code),
+        name: String(plan.name),
+        credits,
+        priceInr,
+        billingCycle: data.billingCycle,
+      },
     };
   });
+
 
 
 
@@ -233,37 +282,39 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     if (upErr) throw new Error("Could not update payment");
 
     const packId = payment.pack_id ?? "";
-    const planIdMatch = packId.startsWith("plan_") ? packId.slice(5) : null;
-    const plan = planIdMatch ? PLANS.find((p) => p.id === planIdMatch) : null;
+    // Two formats supported:
+    //   plan_<code>_<cycle>  → DB-backed plan
+    //   plan_<oldConstantId> → legacy (pre-refactor) constant plan
+    let dbPlan: Record<string, unknown> | null = null;
+    let cycle: "monthly" | "yearly" | "lifetime" | null = null;
+    if (packId.startsWith("plan_")) {
+      const rest = packId.slice(5);
+      const m = rest.match(/^(.+)_(monthly|yearly|lifetime)$/);
+      if (m) {
+        const code = m[1];
+        cycle = m[2] as "monthly" | "yearly" | "lifetime";
+        const { data: pr } = await supabaseAdmin.from("pricing_plans").select("*").eq("code", code).maybeSingle();
+        dbPlan = (pr as Record<string, unknown> | null) ?? null;
+      }
+    }
 
-    if (plan && plan.planType === "lifetime") {
-      // Lifetime purchase — credit lifetime bucket + upsert lifetime subscription row.
-      const included = plan.includedCredits ?? payment.credits;
+    if (dbPlan && cycle === "lifetime") {
+      const included = payment.credits;
       const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("lifetime_credits")
-        .eq("id", context.userId)
-        .maybeSingle();
+        .from("profiles").select("lifetime_credits").eq("id", context.userId).maybeSingle();
       const currentLife = (profile as { lifetime_credits?: number } | null)?.lifetime_credits ?? 0;
       const { error: credErr } = await supabaseAdmin
-        .from("profiles")
-        .update({ lifetime_credits: currentLife + included })
-        .eq("id", context.userId);
+        .from("profiles").update({ lifetime_credits: currentLife + included }).eq("id", context.userId);
       if (credErr) throw new Error("Could not credit lifetime account");
-
-      // Deactivate previous subs, insert new lifetime sub row.
-      await supabaseAdmin
-        .from("subscriptions")
-        .update({ status: "canceled" })
-        .eq("user_id", context.userId)
-        .eq("status", "active");
+      await supabaseAdmin.from("subscriptions").update({ status: "canceled" })
+        .eq("user_id", context.userId).eq("status", "active");
       await supabaseAdmin.from("subscriptions").insert({
         user_id: context.userId,
-        plan_name: plan.id,
+        plan_name: String(dbPlan.code),
         plan_type: "lifetime",
         lifetime_access: true,
         included_credits: included,
-        monthly_credit_limit: 0,
+        monthly_credit_limit: Number(dbPlan.monthly_credits ?? 0),
         monthly_credits_used: 0,
         unlimited_usage: false,
         status: "active",
@@ -271,33 +322,33 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
         expires_at: null,
         renews_at: null,
       });
-      return { ok: true, credits: included, lifetime: true, planId: plan.id };
+      return { ok: true, credits: included, lifetime: true, planId: String(dbPlan.code) };
     }
 
-    if (plan && (plan.planType === "monthly" || plan.planType === "yearly")) {
-      // Subscription purchase — set monthly bucket, reset used counter.
-      const nextRenew = new Date();
-      nextRenew.setMonth(nextRenew.getMonth() + 1);
-      await supabaseAdmin
-        .from("subscriptions")
-        .update({ status: "canceled" })
-        .eq("user_id", context.userId)
-        .eq("status", "active");
+    if (dbPlan && (cycle === "monthly" || cycle === "yearly")) {
+      const monthlyLimit = Number(dbPlan.monthly_credits ?? 0);
+      const now = new Date();
+      const renew = new Date(now);
+      if (cycle === "yearly") renew.setFullYear(renew.getFullYear() + 1);
+      else renew.setMonth(renew.getMonth() + 1);
+      await supabaseAdmin.from("subscriptions").update({ status: "canceled" })
+        .eq("user_id", context.userId).eq("status", "active");
       await supabaseAdmin.from("subscriptions").insert({
         user_id: context.userId,
-        plan_name: plan.id,
-        plan_type: plan.planType,
+        plan_name: String(dbPlan.code),
+        plan_type: cycle,
         lifetime_access: false,
         included_credits: 0,
-        monthly_credit_limit: plan.monthlyCredits,
+        monthly_credit_limit: monthlyLimit,
         monthly_credits_used: 0,
         unlimited_usage: false,
         status: "active",
-        started_at: new Date().toISOString(),
-        renews_at: nextRenew.toISOString(),
+        started_at: now.toISOString(),
+        renews_at: renew.toISOString(),
       });
-      return { ok: true, credits: plan.monthlyCredits, subscription: true, planId: plan.id };
+      return { ok: true, credits: payment.credits, subscription: true, planId: String(dbPlan.code) };
     }
+
 
     // Otherwise: top-up credit pack → wallet balance.
     const { data: profile } = await supabaseAdmin
