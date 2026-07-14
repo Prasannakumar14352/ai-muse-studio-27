@@ -58,11 +58,12 @@ export const setUsdInrRate = createServerFn({ method: "POST" })
     return { ok: true, rate: data.rate };
   });
 
-/** Public config for the browser Razorpay checkout (key_id only — safe to expose). */
+/** Public config for the browser Razorpay checkout (key_id + branding only — safe to expose). */
 export const getRazorpayConfig = createServerFn({ method: "GET" }).handler(async () => {
-  const keyId = process.env.RAZORPAY_KEY_ID;
-  if (!keyId) throw new Error("Razorpay not configured");
-  return { keyId };
+  const { resolveRazorpayBranding } = await import("@/lib/razorpay-settings.server");
+  const branding = await resolveRazorpayBranding();
+  if (!branding?.keyId || !branding.enabled) throw new Error("Razorpay not configured");
+  return branding;
 });
 
 /** Create a Razorpay order for a credit pack. Always billed in INR. */
