@@ -87,38 +87,13 @@ function Landing() {
             {[...Array(5)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-[color:var(--neon-pink)] text-[color:var(--neon-pink)]" />)}
             <span className="ml-2">Loved by 10,000+ creators</span>
           </div>
-
-          {/* Live demo video — how the platform works */}
-          <div className="mt-16 max-w-5xl mx-auto">
-            <div className="glass rounded-2xl p-2 shadow-[var(--shadow-glow)]">
-              <div className="rounded-xl overflow-hidden bg-black aspect-video relative group">
-                <video
-                  src={demoVideo.url}
-                  poster={demoVideo.poster}
-                  controls
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  preload="auto"
-                  className="w-full h-full object-cover"
-                  aria-label="How CreatorVault AI works — 20 second walkthrough">
-                  Your browser does not support the video tag.
-                </video>
-
-                <div className="pointer-events-none absolute top-4 left-4 flex gap-2">
-                  <span className="glass px-2.5 py-1 rounded text-[11px] font-medium tracking-wide uppercase text-white/90">Demo</span>
-                  <span className="glass px-2.5 py-1 rounded text-[11px] font-medium tracking-wide uppercase text-white/90">20 sec</span>
-                </div>
-              </div>
-            </div>
-            <p className="mt-4 text-xs text-muted-foreground text-center">
-              Watch how a single idea becomes a full creator project — no sign-in needed.
-            </p>
-          </div>
-
         </div>
       </section>
+
+      {/* Demo Video */}
+      <DemoVideoSection />
+
+
 
       {/* Features */}
       <section id="features" className="py-24 px-6">
