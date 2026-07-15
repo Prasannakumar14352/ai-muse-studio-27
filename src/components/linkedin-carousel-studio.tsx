@@ -413,8 +413,25 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
             </div>
           </div>
           <div className="pt-2 border-t border-border/40">
-
-            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1.5">Palette</div>
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">Brand palette</div>
+              <button
+                onClick={async () => {
+                  try {
+                    const kit = await loadBrandKit();
+                    if (!kit) return toast.message("No default Brand Kit set");
+                    const palette = state.design.palette.slice();
+                    if (kit.primary_color) palette[0] = kit.primary_color;
+                    if (kit.secondary_color) palette[1] = kit.secondary_color;
+                    update({ ...state, design: { ...state.design, palette } });
+                    toast.success("Brand Kit applied");
+                  } catch (e) { toast.error(e instanceof Error ? e.message : "Load failed"); }
+                }}
+                className="text-[11px] inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+              >
+                <Palette className="w-3 h-3" /> Load Brand Kit
+              </button>
+            </div>
             <div className="flex gap-2">
               {state.design.palette.map((c, i) => (
                 <input key={i} type="color" value={c}
@@ -428,6 +445,7 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
               ))}
             </div>
           </div>
+
           <button
             onClick={() => { navigator.clipboard.writeText(JSON.stringify(state, null, 2)); toast.success("Copied JSON"); }}
             className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
