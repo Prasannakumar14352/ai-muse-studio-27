@@ -475,7 +475,11 @@ function ImagesPage() {
                 </button>
                 <button onClick={generate} disabled={loading}
                   className="rounded-lg gradient-primary text-white px-6 py-2.5 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)]">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} Generate {batch}
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                  Generate {batch}
+                  <span className="ml-1 inline-flex items-center rounded-full bg-white/15 border border-white/20 px-1.5 py-0.5 text-[10px] font-semibold">
+                    {batch} credit{batch === 1 ? "" : "s"}
+                  </span>
                 </button>
               </div>
             </div>
