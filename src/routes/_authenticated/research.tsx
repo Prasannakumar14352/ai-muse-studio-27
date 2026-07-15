@@ -347,21 +347,28 @@ function buildActions(findings: ResearchFindings, researchId: string | null): Ac
 
 function OneClickActions({ findings, navigate }: { findings: ResearchFindings; navigate: ReturnType<typeof useNavigate> }) {
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ action: ActionDef; payload: Omit<ResearchPrefill, "at" | "handoffId" | "source"> } | null>(null);
+  const [preview, setPreview] = useState<{ action: ActionDef; payload: Omit<ResearchPrefill, "at" | "handoffId" | "source">; autogen: boolean } | null>(null);
   const researchId = (findings as ResearchFindings & { id?: string }).id ?? null;
   const actions = useMemo(() => buildActions(findings, researchId), [findings, researchId]);
 
-  const runAction = async (action: ActionDef) => {
-    if (busyId) return;
-    setBusyId(action.id);
-    const label = action.label.replace(/^Generate |^Save to |^Add to /, "");
-    const toastId = toast.loading(`Preparing ${label.toLowerCase()} draft…`);
-    try {
-      const payload = action.build(findings, researchId);
-      const record = setResearchPrefill(payload);
-      if (!record) throw new Error("Could not save draft — storage unavailable");
+  // Modules that support the "Generate Now" fast path (have a Review & Edit
+  // step with a prominent Generate button that reads from research prefill).
+  const supportsAutogen = (m: ResearchModuleId) =>
+    ["video", "short", "thumbnail", "carousel", "linkedin", "caption", "image"].includes(m);
 
-      // Mirror into wizard plan-store draft so modules that already read it hydrate too.
+  const nounFor = (action: ActionDef) =>
+    action.label.replace(/^Generate |^Save to |^Add to /, "");
+
+  const runAction = async (action: ActionDef, autogen: boolean) => {
+    if (busyId) return;
+    setBusyId(`${action.id}:${autogen ? "gen" : "draft"}`);
+    const noun = nounFor(action);
+    const toastId = toast.loading(autogen ? `Opening ${noun.toLowerCase()} generator…` : `Preparing ${noun.toLowerCase()} draft…`);
+    try {
+      const payload = { ...action.build(findings, researchId), autogen };
+      const record = setResearchPrefill(payload);
+      if (!record) throw new Error("Could not save handoff — storage unavailable");
+
       const wizardModule = action.module === "short" ? "video" : action.module;
       if (["video", "carousel", "image", "thumbnail", "linkedin", "caption"].includes(wizardModule)) {
         saveDraft({
@@ -371,10 +378,14 @@ function OneClickActions({ findings, navigate }: { findings: ResearchFindings; n
         });
       }
 
-      toast.success(`${label} draft ready`, { id: toastId });
-      navigate({ to: action.route });
+      if (autogen) {
+        toast.success("Opening generator — review & Generate Now", { id: toastId });
+      } else {
+        toast.success("Draft created — review and generate", { id: toastId });
+      }
+      navigate({ to: action.route, search: autogen ? { autogen: 1 } as never : undefined });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Draft creation failed";
+      const msg = e instanceof Error ? e.message : "Handoff failed";
       toast.error(msg, { id: toastId });
     } finally {
       setBusyId(null);
@@ -384,31 +395,56 @@ function OneClickActions({ findings, navigate }: { findings: ResearchFindings; n
   return (
     <div className="glass rounded-2xl border border-white/10 p-4">
       <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">One-click actions</div>
-      <div className="flex flex-wrap gap-2">
+      <p className="text-xs text-muted-foreground mb-3">
+        <span className="text-foreground/80 font-medium">Create Draft</span> opens the destination module prefilled with this research.
+        <span className="mx-1">·</span>
+        <span className="text-foreground/80 font-medium">Generate Now</span> jumps straight to the Review &amp; Generate step. Credits are checked and reserved before any AI provider is called; failed generations are refunded automatically.
+      </p>
+      <div className="flex flex-col gap-2">
         {actions.map((action) => {
-          const busy = busyId === action.id;
+          const noun = nounFor(action);
+          const canAutogen = supportsAutogen(action.module);
+          const draftBusy = busyId === `${action.id}:draft`;
+          const genBusy = busyId === `${action.id}:gen`;
           const anyBusy = !!busyId;
           return (
-            <div key={action.id} className="inline-flex items-stretch rounded-xl border border-white/10 overflow-hidden">
-              <button
-                type="button"
-                disabled={anyBusy}
-                onClick={() => runAction(action)}
-                className="inline-flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                <span className="text-primary">{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : action.icon}</span>
-                {busy ? `Preparing ${action.label.replace(/^Generate |^Save to |^Add to /, "").toLowerCase()} draft…` : action.label}
-              </button>
-              <button
-                type="button"
-                title="Preview handoff"
-                aria-label={`Preview handoff for ${action.label}`}
-                disabled={anyBusy}
-                onClick={() => setPreview({ action, payload: action.build(findings, researchId) })}
-                className="px-2 border-l border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/5 disabled:opacity-50"
-              >
-                <Eye className="w-3.5 h-3.5" />
-              </button>
+            <div key={action.id} className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 text-sm text-foreground/90 min-w-[180px]">
+                <span className="text-primary">{action.icon}</span>
+                <span className="truncate">{noun}</span>
+              </div>
+              <div className="inline-flex items-stretch rounded-xl border border-white/10 overflow-hidden">
+                <button
+                  type="button"
+                  disabled={anyBusy}
+                  onClick={() => runAction(action, false)}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  {draftBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  {action.module === "strategy" ? `Save to ${noun}` : action.module === "calendar" ? `Add to ${noun}` : `Create ${noun} Draft`}
+                </button>
+                {canAutogen && (
+                  <button
+                    type="button"
+                    disabled={anyBusy}
+                    onClick={() => runAction(action, true)}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-xs border-l border-white/10 bg-gradient-to-r from-orange-500/20 to-pink-500/20 hover:from-orange-500/30 hover:to-pink-500/30 text-pink-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    {genBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    Generate {noun} Now
+                  </button>
+                )}
+                <button
+                  type="button"
+                  title="Preview handoff"
+                  aria-label={`Preview handoff for ${action.label}`}
+                  disabled={anyBusy}
+                  onClick={() => setPreview({ action, payload: action.build(findings, researchId), autogen: false })}
+                  className="px-2 border-l border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/5 disabled:opacity-50"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           );
         })}
@@ -417,9 +453,9 @@ function OneClickActions({ findings, navigate }: { findings: ResearchFindings; n
       <PreviewHandoffDialog
         open={!!preview}
         onClose={() => setPreview(null)}
-        onConfirm={() => { const a = preview!.action; setPreview(null); void runAction(a); }}
+        onConfirm={() => { const p = preview!; setPreview(null); void runAction(p.action, p.autogen); }}
         payload={preview?.payload ?? null}
-        moduleLabel={preview?.action.label.replace(/^Generate |^Save to |^Add to /, "") ?? ""}
+        moduleLabel={preview?.action ? nounFor(preview.action) : ""}
       />
     </div>
   );
