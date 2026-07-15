@@ -80,6 +80,10 @@ export type ResearchPrefill = {
   urgency?: string;
   contentType?: string;
 
+  // Intent: when true, destination module should surface a prominent
+  // "Generate Now" CTA (or auto-focus it) rather than a passive draft view.
+  autogen?: boolean;
+
   at: number;
 };
 
