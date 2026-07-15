@@ -17,6 +17,8 @@ export type GenerateImageRequest = {
   background?: "transparent" | "opaque";
   quality?: "low" | "medium" | "high";
   model?: string;
+  /** Optional input image (data URL) for edit / restyle operations. Gemini only. */
+  image?: string;
   /** Optional callback for partial-frame previews (e.g. blurry live preview). */
   onPartial?: (dataUrl: string) => void;
   /** Optional abort signal to cancel the request. */
