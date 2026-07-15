@@ -39,63 +39,63 @@ export type Testimonial = {
 
 export type TrustBadge = { title: string; desc: string; icon: string };
 
-// Public sample MP4s (Google's stable gtv-videos bucket — CORS-open, H.264/AAC).
-// These are clearly labelled "Demo testimonial" until real customer videos
-// replace them via the admin panel.
-const SAMPLE_MP4 = {
-  bunny: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-  elephants: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-  blazes: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-};
+// Testimonial "video" slots are seeded with real product walkthrough clips
+// captured from the live CreatorFlow AI app. They are clearly badged
+// "Product walkthrough" so no visitor mistakes them for a real customer video.
+// Replace via /admin/landing with actual customer footage when available.
+import researchClip from "@/assets/demo/creatorflow-research-walkthrough.mp4.asset.json";
+import thumbnailsClip from "@/assets/demo/creatorflow-thumbnails-walkthrough.mp4.asset.json";
+import analyticsClip from "@/assets/demo/creatorflow-analytics-walkthrough.mp4.asset.json";
+import demoPoster from "@/assets/demo/creatorflow-demo-poster.jpg.asset.json";
 
 export const VIDEO_TESTIMONIALS: Testimonial[] = [
   {
     id: "v1",
-    name: "Priya Menon",
-    country: "India",
-    role: "Instagram Creator",
-    company: "Menon Reels",
-    photo: "https://i.pravatar.cc/400?img=47",
+    name: "Viral Research Engine",
+    country: "Product walkthrough",
+    role: "YouTuber",
+    company: "CreatorFlow AI",
+    photo: demoPoster.url,
     rating: 5,
-    quote: "From 2 reels a week to daily — without burning out.",
+    quote: "Every topic scored before you press record.",
     review:
-      "CreatorFlow AI plans my hooks, scripts and thumbnails in minutes. The Video Studio blueprint means I approve everything before a single credit is spent.",
-    source: "sample",
-    videoUrl: SAMPLE_MP4.bunny,
+      "Type a topic, get a Viral Opportunity Score, verdict, angles, titles and hooks — with one click to prefill Video, Thumbnail, Carousel or LinkedIn.",
+    source: "demo",
+    videoUrl: researchClip.url,
     videoType: "mp4",
-    duration: "1:12",
+    duration: "0:15",
   },
   {
     id: "v2",
-    name: "Marcus Bell",
-    country: "United States",
+    name: "AI Thumbnail Studio",
+    country: "Product walkthrough",
     role: "YouTuber",
-    company: "BellCasts",
-    photo: "https://i.pravatar.cc/400?img=12",
+    company: "CreatorFlow AI",
+    photo: demoPoster.url,
     rating: 5,
-    quote: "The blueprint editor is a game changer.",
+    quote: "CTR-optimised thumbnails in one workflow.",
     review:
-      "I approve the script, tweak scenes, then render. No more slideshow feel — every short looks intentional and on-brand.",
-    source: "sample",
-    videoUrl: SAMPLE_MP4.elephants,
+      "Guided brief → batch concepts → upscale, remove background, inpaint and reverse-engineer competitor thumbnails. All inside the studio.",
+    source: "demo",
+    videoUrl: thumbnailsClip.url,
     videoType: "mp4",
-    duration: "0:58",
+    duration: "0:15",
   },
   {
     id: "v3",
-    name: "Sofia Álvarez",
-    country: "Spain",
-    role: "Course Creator",
-    company: "Álvarez Academy",
-    photo: "https://i.pravatar.cc/400?img=32",
+    name: "Publishing & Analytics",
+    country: "Product walkthrough",
+    role: "Agency",
+    company: "CreatorFlow AI",
+    photo: demoPoster.url,
     rating: 5,
-    quote: "Replaced three tools in my stack.",
+    quote: "Schedule, publish and measure — all in one place.",
     review:
-      "My students get carousels, captions and thumbnails for every lesson. Strategy → Research → Publish, all in one workspace.",
-    source: "sample",
-    videoUrl: SAMPLE_MP4.blazes,
+      "Connect Instagram, YouTube, LinkedIn, Facebook and TikTok. Schedule posts, track CTR, credit usage, top templates and revenue in a single dashboard.",
+    source: "demo",
+    videoUrl: analyticsClip.url,
     videoType: "mp4",
-    duration: "1:24",
+    duration: "0:12",
   },
 ];
 

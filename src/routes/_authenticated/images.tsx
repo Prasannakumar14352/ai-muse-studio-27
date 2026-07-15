@@ -25,7 +25,7 @@ export const Route = createFileRoute("/_authenticated/images")({ component: Imag
 
 const RATIOS = ["1:1", "9:16", "16:9", "4:5"];
 const BATCH_OPTIONS = [1, 2, 4, 8];
-const LS_STATE = "creatorvault:images:v4";
+const LS_STATE = "creatorflow:images:v4";
 
 type ResultItem = { id: string; prompt: string; style: string; ratio: string; image: string };
 
