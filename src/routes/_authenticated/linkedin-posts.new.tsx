@@ -85,6 +85,13 @@ function NewLinkedinPostPage() {
     }
   }
 
+  useAutogen(handoff, () => {
+    if (topic.trim()) {
+      toast.message("Generation started", { description: "Auto-generating from Viral Research…" });
+      void generate();
+    }
+  });
+
   async function save(status: "draft" | "generated") {
     if (!content) return;
     setSaving(true);
