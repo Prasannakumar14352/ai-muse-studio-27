@@ -741,15 +741,32 @@ function EmptyLibrary({ onNew }: { onNew: () => void }) {
 
 // ---------------- Input ----------------
 
-function InputScreen({ onGenerate }: { onGenerate: (args: GenerateArgs) => void }) {
+function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
+  onGenerate: (args: GenerateArgs) => void;
+  initialTopic?: string;
+  initialRatio?: AspectRatio;
+  autogen?: boolean;
+}) {
   const [niche, setNiche] = useState<string>(NICHES[0].id);
   const [customNiche, setCustomNiche] = useState("");
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(initialTopic ?? "");
   const [videoType, setVideoType] = useState<VideoType>("shorts");
   const [duration, setDuration] = useState<DurationSec>(60);
   const [style, setStyle] = useState<StyleId>("cinematic");
   const [voice, setVoice] = useState<VoiceId>("documentary_narrator");
-  const [ratio, setRatio] = useState<AspectRatio>("9:16");
+  const [ratio, setRatio] = useState<AspectRatio>(initialRatio ?? "9:16");
+
+  const autoFiredRef = useRef(false);
+  useEffect(() => {
+    if (autoFiredRef.current) return;
+    if (!autogen) return;
+    if (!title.trim()) return;
+    autoFiredRef.current = true;
+    const id = setTimeout(() => submit(), 300);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autogen, title]);
+
 
   const isCustom = niche === "custom";
   const currentNiche = useMemo(() => NICHES.find((n) => n.id === niche) ?? NICHES[0], [niche]);
