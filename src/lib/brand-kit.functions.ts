@@ -71,6 +71,7 @@ export const upsertBrandKitFn = createServerFn({ method: "POST" })
       intro_url: data.intro_url ?? null,
       outro_url: data.outro_url ?? null,
       keywords: data.keywords ?? [],
+      default_styles: data.default_styles ?? {},
       is_default: !!data.is_default,
     };
     if (data.is_default) {
