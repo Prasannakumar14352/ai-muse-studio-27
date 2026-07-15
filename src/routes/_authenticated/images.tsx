@@ -52,10 +52,11 @@ function fileToDataUrl(file: File): Promise<string> {
 }
 
 function ImagesPage() {
-  const [prompt, setPrompt] = useState("");
-  const [negativePrompt, setNegativePrompt] = useState("");
-  const [style, setStyle] = useState("cinematic");
-  const [ratio, setRatio] = useState("1:1");
+  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("image"));
+  const [prompt, setPrompt] = useState(handoff?.imagePrompt ?? handoff?.topic ?? "");
+  const [negativePrompt, setNegativePrompt] = useState(handoff?.negativePrompt ?? "");
+  const [style, setStyle] = useState(handoff?.style ?? "cinematic");
+  const [ratio, setRatio] = useState(handoff?.aspectRatio ?? "1:1");
   const [batch, setBatch] = useState(4);
   const [seed, setSeed] = useState<number | "">("");
   const [cfg, setCfg] = useState(7);
