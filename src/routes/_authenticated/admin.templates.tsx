@@ -208,10 +208,7 @@ function TemplateEditor({ initial, onClose, onSaved }: {
           <Field label="Style"><input value={f.style ?? ""} onChange={(e) => set("style", e.target.value)} placeholder="cinematic" className={input} /></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Preview type">
-              <select value={f.preview_type ?? "image"} onChange={(e) => set("preview_type", e.target.value as "image" | "video")} className={input}>
-                <option value="image">image</option>
-                <option value="video">video</option>
-              </select>
+              <CreatorFlowSelect ariaLabel="Preview type" value={f.preview_type ?? "image"} onValueChange={(v) => set("preview_type", v as "image" | "video")} options={["image", "video"]} />
             </Field>
             <Field label="Alt text (accessibility)"><input value={f.alt_text ?? ""} onChange={(e) => set("alt_text", e.target.value)} className={input} /></Field>
           </div>
