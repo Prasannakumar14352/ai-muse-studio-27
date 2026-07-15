@@ -545,9 +545,10 @@ export function VideoBlueprintEditor({
         <TabsContent value="timeline" className="mt-4">
           <TimelineEditor
             blueprint={bp}
-            onChangeSceneDuration={setSceneDuration}
+            selectedSceneId={expandedScene}
             onSelectScene={(id) => setExpandedScene(id)}
-            onReplaceShot={(id) => setShotDialogSceneId(id)}
+            onResizeScene={setSceneDuration}
+            onMoveScene={move}
           />
         </TabsContent>
 
@@ -562,28 +563,42 @@ export function VideoBlueprintEditor({
         <TabsContent value="subs" className="mt-4">
           <SubtitleEditor
             blueprint={bp}
-            onGlobalChange={setSubtitleStyle}
-            onSceneSubtitleChange={(id, sub) => patchScene(id, { subtitle: sub })}
+            onUpdateScene={patchScene}
+            onUpdateStyle={setSubtitleStyle}
           />
         </TabsContent>
 
         <TabsContent value="music" className="mt-4">
-          <MusicPicker value={bp.music} onChange={setMusic} />
+          <MusicPicker
+            value={bp.music}
+            musicDirection={bp.style ?? ""}
+            onChange={(v) => setMusic(v ?? undefined)}
+            onDirectionChange={(d) => patchGlobal({ style: d })}
+          />
         </TabsContent>
 
         <TabsContent value="sfx" className="mt-4">
-          <SfxEditor
-            blueprint={bp}
-            onChangeSceneSfx={(id, sfx) => patchScene(id, { sfx })}
-          />
+          <SfxEditor blueprint={bp} onUpdateScene={patchScene} />
         </TabsContent>
 
         <TabsContent value="chars" className="mt-4">
           <CharacterLibrary
-            characters={bp.characterLibrary ?? []}
-            onChange={setCharacters}
+            blueprint={bp}
+            onUpdateLibrary={setCharacters}
+            onAssignToScene={(sceneId, character) =>
+              patchScene(sceneId, {
+                character: {
+                  ...(bp.scenes.find((s) => s.id === sceneId)?.character ?? {
+                    role: "", appearance: "", wardrobe: "", faceLock: true,
+                  }),
+                  role: character.name,
+                  appearance: character.description || character.name,
+                },
+              })
+            }
           />
         </TabsContent>
+
 
         <TabsContent value="versions" className="mt-4">
           <VersionHistoryPanel
