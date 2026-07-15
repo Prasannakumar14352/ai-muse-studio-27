@@ -362,7 +362,7 @@ function TextField({ label, value, onChange, multiline }: { label: string; value
 }
 
 function SlideCanvas({
-  slide, theme, palette, slideNum, total, innerRef,
+  slide, theme, palette, slideNum, total, innerRef, width, height,
 }: {
   slide: LinkedinCarouselSlide;
   theme: "light" | "dark";
@@ -370,7 +370,12 @@ function SlideCanvas({
   slideNum: number;
   total: number;
   innerRef: (el: HTMLDivElement | null) => void;
+  width: number;
+  height: number;
 }) {
+  const SLIDE_W = width;
+  const SLIDE_H = height;
+
   const isDark = theme === "dark";
   const accent = palette[0] ?? "#0A66C2";
   const surface = palette[2] ?? (isDark ? "#0B1220" : "#F3F6F8");
