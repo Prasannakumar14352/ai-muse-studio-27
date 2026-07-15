@@ -389,7 +389,31 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
             />
           </div>
           <TextField label="Footer" value={cur.footer ?? ""} onChange={(v) => patchSlide(active, { footer: v })} />
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1.5">Speaker notes (not exported)</div>
+            <textarea
+              rows={3}
+              value={cur.notes ?? ""}
+              onChange={(e) => patchSlide(active, { notes: e.target.value })}
+              placeholder="Talking points, sources, or reminders for you."
+              className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-xs"
+            />
+          </div>
+          <div className="pt-2 border-t border-border/40 space-y-2">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">AI actions</div>
+            <div className="flex flex-wrap gap-1.5">
+              <button disabled={aiBusyIdx === active} onClick={() => aiTransform(active, "rewrite")}
+                className="rounded-md border border-border/60 px-2 py-1 text-[11px] inline-flex items-center gap-1 hover:bg-white/5 disabled:opacity-50">
+                <Sparkles className="w-3 h-3" /> {aiBusyIdx === active ? "Working…" : "Rewrite"}
+              </button>
+              <button disabled={aiBusyIdx === active} onClick={() => aiTransform(active, "expand")}
+                className="rounded-md border border-border/60 px-2 py-1 text-[11px] hover:bg-white/5 disabled:opacity-50">Expand</button>
+              <button disabled={aiBusyIdx === active} onClick={() => aiTransform(active, "shorten")}
+                className="rounded-md border border-border/60 px-2 py-1 text-[11px] hover:bg-white/5 disabled:opacity-50">Shorten</button>
+            </div>
+          </div>
           <div className="pt-2 border-t border-border/40">
+
             <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1.5">Palette</div>
             <div className="flex gap-2">
               {state.design.palette.map((c, i) => (
