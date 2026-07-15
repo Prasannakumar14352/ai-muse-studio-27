@@ -230,9 +230,23 @@ function TemplateEditor({ initial, onClose, onSaved }: {
           <Field label="Default prompt (topic)">
             <textarea value={f.default_prompt ?? ""} onChange={(e) => set("default_prompt", e.target.value)} rows={2} className={input} />
           </Field>
-          <Field label="default_brief (JSON — merged into brief form)">
-            <textarea value={briefJson} onChange={(e) => setBriefJson(e.target.value)} rows={6} className={`${input} font-mono text-xs`} />
+          <Field label="Negative prompt (what to avoid)">
+            <textarea value={f.negative_prompt ?? ""} onChange={(e) => set("negative_prompt", e.target.value)} rows={2} className={input} placeholder="blurry, low quality, watermark..." />
           </Field>
+          <Field label="Tags (comma separated)">
+            <input value={(f.tags ?? []).join(", ")} onChange={(e) => set("tags", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))} className={input} placeholder="viral, cinematic, tutorial" />
+          </Field>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Credits (per run)">
+              <input type="number" min={0} value={f.credits ?? 1} onChange={(e) => set("credits", Number(e.target.value))} className={input} />
+            </Field>
+            <Field label="Status">
+              <CreatorFlowSelect ariaLabel="Status" value={f.status ?? "published"} onValueChange={(v) => set("status", v as TemplateStatus)} options={["draft", "published"]} />
+            </Field>
+            <Field label="default_brief (JSON)">
+              <textarea value={briefJson} onChange={(e) => setBriefJson(e.target.value)} rows={2} className={`${input} font-mono text-xs`} />
+            </Field>
+          </div>
           <div className="flex items-center gap-4">
             <label className="inline-flex items-center gap-2 text-sm">
               <input type="checkbox" checked={!!f.featured} onChange={(e) => set("featured", e.target.checked)} /> Featured
@@ -241,6 +255,8 @@ function TemplateEditor({ initial, onClose, onSaved }: {
               <input type="checkbox" checked={f.active ?? true} onChange={(e) => set("active", e.target.checked)} /> Active
             </label>
           </div>
+
+          {initial.id && <VersionHistory templateId={initial.id} onRestored={onSaved} />}
         </div>
         <div className="flex items-center justify-end gap-2 mt-6">
           <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm hover:bg-white/5">Cancel</button>
