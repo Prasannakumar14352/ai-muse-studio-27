@@ -133,6 +133,7 @@ function NewLinkedinPostPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
+      <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
       <div className="flex items-center gap-3">
         <Link to="/linkedin-posts" className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
           <ArrowLeft className="w-4 h-4" /> Back
