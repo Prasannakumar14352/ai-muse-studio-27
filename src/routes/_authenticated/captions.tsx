@@ -11,6 +11,8 @@ import { PlanEditor } from "@/components/wizard/PlanEditor";
 import { AssetActions } from "@/components/wizard/AssetActions";
 import { planContentFn, type ContentPlan } from "@/lib/content-plan.functions";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/plan-store";
+import { ActiveStrategyBanner } from "@/components/active-strategy-banner";
+import { getActiveStrategyContext } from "@/lib/active-strategy";
 
 export const Route = createFileRoute("/_authenticated/captions")({ component: CaptionsPage });
 
@@ -23,7 +25,7 @@ function CaptionsPage() {
 
   const plan$ = useServerFn(planContentFn);
   const planM = useMutation({
-    mutationFn: () => plan$({ data: { module: "caption", topic, context: `Platform: ${platform}` } }),
+    mutationFn: () => plan$({ data: { module: "caption", topic, context: `Platform: ${platform}`, strategyContext: getActiveStrategyContext() } }),
     onSuccess: (p) => {
       setPlan(p);
       saveDraft({ module: "caption", originalPrompt: topic, aiPlan: p, editedPlan: p, result: null, exports: [], updatedAt: Date.now() });
