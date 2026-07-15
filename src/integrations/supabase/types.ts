@@ -501,6 +501,69 @@ export type Database = {
           },
         ]
       }
+      landing_media: {
+        Row: {
+          company: string | null
+          country: string | null
+          created_at: string
+          display_order: number
+          duration: string | null
+          id: string
+          kind: string
+          poster_url: string | null
+          quote: string | null
+          rating: number | null
+          review: string | null
+          source: string | null
+          status: string
+          subtitle: string | null
+          title: string | null
+          updated_at: string
+          video_type: string | null
+          video_url: string | null
+        }
+        Insert: {
+          company?: string | null
+          country?: string | null
+          created_at?: string
+          display_order?: number
+          duration?: string | null
+          id?: string
+          kind: string
+          poster_url?: string | null
+          quote?: string | null
+          rating?: number | null
+          review?: string | null
+          source?: string | null
+          status?: string
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+          video_type?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          company?: string | null
+          country?: string | null
+          created_at?: string
+          display_order?: number
+          duration?: string | null
+          id?: string
+          kind?: string
+          poster_url?: string | null
+          quote?: string | null
+          rating?: number | null
+          review?: string | null
+          source?: string | null
+          status?: string
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+          video_type?: string | null
+          video_url?: string | null
+        }
+        Relationships: []
+      }
       marketplace_installs: {
         Row: {
           id: string
