@@ -314,6 +314,20 @@ export function VideoBlueprintEditor({
         </Card>
       )}
 
+      {/* Studio tabs */}
+      <Tabs defaultValue="scenes" className="w-full">
+        <TabsList className="flex flex-wrap gap-1 h-auto">
+          <TabsTrigger value="scenes"><LayoutGrid className="h-3 w-3 mr-1" /> Scenes</TabsTrigger>
+          <TabsTrigger value="timeline"><Film className="h-3 w-3 mr-1" /> Timeline</TabsTrigger>
+          <TabsTrigger value="script"><FileText className="h-3 w-3 mr-1" /> Script</TabsTrigger>
+          <TabsTrigger value="subs"><Type className="h-3 w-3 mr-1" /> Subtitles</TabsTrigger>
+          <TabsTrigger value="music"><Music2 className="h-3 w-3 mr-1" /> Music</TabsTrigger>
+          <TabsTrigger value="sfx"><Volume2 className="h-3 w-3 mr-1" /> SFX</TabsTrigger>
+          <TabsTrigger value="chars"><Users className="h-3 w-3 mr-1" /> Characters</TabsTrigger>
+          <TabsTrigger value="versions"><History className="h-3 w-3 mr-1" /> Versions</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="scenes" className="space-y-6 mt-4">
       {/* Global fields */}
       <Card className="p-5 space-y-4">
         <h3 className="font-medium flex items-center gap-2"><Sparkles className="h-4 w-4" /> Global settings</h3>
