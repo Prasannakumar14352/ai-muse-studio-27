@@ -571,10 +571,11 @@ export function VideoBlueprintEditor({
         <TabsContent value="music" className="mt-4">
           <MusicPicker
             value={bp.music}
-            musicDirection={bp.style ?? ""}
+            musicDirection={bp.musicDirection ?? ""}
             onChange={(v) => setMusic(v ?? undefined)}
-            onDirectionChange={(d) => patchGlobal({ style: d })}
+            onDirectionChange={(d) => patchGlobal({ musicDirection: d })}
           />
+
         </TabsContent>
 
         <TabsContent value="sfx" className="mt-4">
