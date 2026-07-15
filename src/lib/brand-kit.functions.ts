@@ -1,6 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+export type BrandDefaultStyles = {
+  visualStyle?: string;
+  imageStyle?: string;
+  videoStyle?: string;
+  aspectRatio?: string;
+  captionTone?: string;
+};
+
 export type BrandKit = {
   id: string;
   name: string;
@@ -15,6 +23,7 @@ export type BrandKit = {
   intro_url: string | null;
   outro_url: string | null;
   keywords: string[] | null;
+  default_styles: BrandDefaultStyles | null;
   is_default: boolean;
   created_at: string;
   updated_at: string;
@@ -62,6 +71,7 @@ export const upsertBrandKitFn = createServerFn({ method: "POST" })
       intro_url: data.intro_url ?? null,
       outro_url: data.outro_url ?? null,
       keywords: data.keywords ?? [],
+      default_styles: data.default_styles ?? {},
       is_default: !!data.is_default,
     };
     if (data.is_default) {

@@ -2,8 +2,8 @@ import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Edit3, X, Loader2, Save } from "lucide-react";
-import { listTemplatesFn, upsertTemplateFn, deleteTemplateFn, type TemplateRecord, type TemplateAccessTier } from "@/lib/templates.functions";
+import { Plus, Trash2, Edit3, X, Loader2, Save, History, RotateCcw } from "lucide-react";
+import { listAllTemplatesFn, upsertTemplateFn, deleteTemplateFn, listTemplateVersionsFn, restoreTemplateVersionFn, type TemplateRecord, type TemplateAccessTier, type TemplateStatus, type TemplateVersion } from "@/lib/templates.functions";
 import { useAccess } from "@/lib/access";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
@@ -27,7 +27,7 @@ function AdminTemplatesPage() {
   const { data: templates, isLoading } = useQuery({
     queryKey: ["admin-templates"],
     enabled: !!access?.isAdmin,
-    queryFn: () => listTemplatesFn(),
+    queryFn: () => listAllTemplatesFn(),
   });
 
   if (accessLoading) return <div className="glass rounded-2xl h-64 animate-pulse" />;
@@ -78,13 +78,14 @@ function AdminTemplatesPage() {
                   <th className="text-left px-4 py-3">Name</th>
                   <th className="text-left px-4 py-3">Category</th>
                   <th className="text-left px-4 py-3">Tier</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-left px-4 py-3">Credits</th>
                   <th className="text-left px-4 py-3">Featured</th>
-                  <th className="text-left px-4 py-3">Active</th>
                   <th className="text-right px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {(templates ?? []).map((t) => (
+                {(templates ?? []).map((t: TemplateRecord) => (
                   <tr key={t.id} className="border-t border-border/40">
                     <td className="px-4 py-3">
                       <div className="font-medium">{t.name}</div>
@@ -92,8 +93,13 @@ function AdminTemplatesPage() {
                     </td>
                     <td className="px-4 py-3 capitalize">{t.category.replace(/_/g, " ")}</td>
                     <td className="px-4 py-3 capitalize">{t.access_tier}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${t.status === "published" ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
+                        {t.status ?? "published"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">{t.credits ?? 1}</td>
                     <td className="px-4 py-3">{t.featured ? "Yes" : "—"}</td>
-                    <td className="px-4 py-3">{t.active ? "Yes" : "—"}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => setEditing(t)} title="Edit"
@@ -109,7 +115,7 @@ function AdminTemplatesPage() {
                   </tr>
                 ))}
                 {!templates?.length && (
-                  <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">No templates yet.</td></tr>
+                  <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">No templates yet.</td></tr>
                 )}
               </tbody>
             </table>
@@ -159,6 +165,9 @@ function TemplateEditor({ initial, onClose, onSaved }: {
           platform: f.platform ?? null,
           style: f.style ?? null,
           default_prompt: f.default_prompt ?? null,
+          negative_prompt: f.negative_prompt ?? null,
+          credits: f.credits ?? 1,
+          status: (f.status ?? "published") as TemplateStatus,
           default_brief: brief,
           tags: f.tags ?? [],
           access_tier: (f.access_tier ?? "free") as TemplateAccessTier,
@@ -221,9 +230,23 @@ function TemplateEditor({ initial, onClose, onSaved }: {
           <Field label="Default prompt (topic)">
             <textarea value={f.default_prompt ?? ""} onChange={(e) => set("default_prompt", e.target.value)} rows={2} className={input} />
           </Field>
-          <Field label="default_brief (JSON — merged into brief form)">
-            <textarea value={briefJson} onChange={(e) => setBriefJson(e.target.value)} rows={6} className={`${input} font-mono text-xs`} />
+          <Field label="Negative prompt (what to avoid)">
+            <textarea value={f.negative_prompt ?? ""} onChange={(e) => set("negative_prompt", e.target.value)} rows={2} className={input} placeholder="blurry, low quality, watermark..." />
           </Field>
+          <Field label="Tags (comma separated)">
+            <input value={(f.tags ?? []).join(", ")} onChange={(e) => set("tags", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))} className={input} placeholder="viral, cinematic, tutorial" />
+          </Field>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Credits (per run)">
+              <input type="number" min={0} value={f.credits ?? 1} onChange={(e) => set("credits", Number(e.target.value))} className={input} />
+            </Field>
+            <Field label="Status">
+              <CreatorFlowSelect ariaLabel="Status" value={f.status ?? "published"} onValueChange={(v) => set("status", v as TemplateStatus)} options={["draft", "published"]} />
+            </Field>
+            <Field label="default_brief (JSON)">
+              <textarea value={briefJson} onChange={(e) => setBriefJson(e.target.value)} rows={2} className={`${input} font-mono text-xs`} />
+            </Field>
+          </div>
           <div className="flex items-center gap-4">
             <label className="inline-flex items-center gap-2 text-sm">
               <input type="checkbox" checked={!!f.featured} onChange={(e) => set("featured", e.target.checked)} /> Featured
@@ -232,6 +255,8 @@ function TemplateEditor({ initial, onClose, onSaved }: {
               <input type="checkbox" checked={f.active ?? true} onChange={(e) => set("active", e.target.checked)} /> Active
             </label>
           </div>
+
+          {initial.id && <VersionHistory templateId={initial.id} onRestored={onSaved} />}
         </div>
         <div className="flex items-center justify-end gap-2 mt-6">
           <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm hover:bg-white/5">Cancel</button>
@@ -253,5 +278,69 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <div className="text-xs text-muted-foreground mb-1">{label}</div>
       {children}
     </label>
+  );
+}
+
+function VersionHistory({ templateId, onRestored }: { templateId: string; onRestored: () => void }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const { data: versions, isLoading } = useQuery({
+    queryKey: ["template-versions", templateId],
+    enabled: open,
+    queryFn: () => listTemplateVersionsFn({ data: { templateId } }),
+  });
+
+  async function restore(v: TemplateVersion) {
+    const ok = await confirmDialog({
+      title: `Restore version ${v.version}?`,
+      description: "The current template will be overwritten with this snapshot. A new version entry will be created.",
+      confirmText: "Restore",
+    });
+    if (!ok) return;
+    try {
+      await restoreTemplateVersionFn({ data: { versionId: v.id } });
+      toast.success(`Restored to v${v.version}`);
+      qc.invalidateQueries({ queryKey: ["admin-templates"] });
+      qc.invalidateQueries({ queryKey: ["template-versions", templateId] });
+      onRestored();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Restore failed");
+    }
+  }
+
+  return (
+    <div className="mt-4 border-t border-border/40 pt-4">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <History className="w-3.5 h-3.5" />
+        {open ? "Hide" : "Show"} version history
+      </button>
+      {open && (
+        <div className="mt-3 space-y-1.5 max-h-56 overflow-y-auto">
+          {isLoading && <div className="text-xs text-muted-foreground">Loading…</div>}
+          {!isLoading && !versions?.length && (
+            <div className="text-xs text-muted-foreground">No prior versions yet — the first save is v1.</div>
+          )}
+          {versions?.map((v) => (
+            <div key={v.id} className="flex items-center justify-between rounded-md bg-white/5 px-3 py-2 text-xs">
+              <div>
+                <div className="font-medium">v{v.version}</div>
+                <div className="text-muted-foreground">{new Date(v.created_at).toLocaleString()}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => restore(v)}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground"
+              >
+                <RotateCcw className="w-3 h-3" /> Restore
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
