@@ -242,6 +242,16 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
         </label>
         <div className="flex-1" />
         <CreatorFlowSelect
+          ariaLabel="Preview format"
+          className="h-8 w-40"
+          value={format}
+          onValueChange={(v) => setFormat(v as FormatKey)}
+          options={[
+            { value: "linkedin", label: "LinkedIn 4:5" },
+            { value: "instagram", label: "Instagram 1:1" },
+          ]}
+        />
+        <CreatorFlowSelect
           ariaLabel="Theme"
           className="h-8 w-28"
           value={state.design.theme}
@@ -249,14 +259,18 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
           options={[{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }]}
         />
         <button onClick={downloadAll} disabled={busy}
-          className="rounded-lg border border-border/60 px-3 py-1.5 text-xs inline-flex items-center gap-1 hover:bg-white/5">
-          <Package className="w-3.5 h-3.5" /> Download all (ZIP)
+          className="rounded-lg border border-border/60 px-3 py-1.5 text-xs inline-flex items-center gap-1 hover:bg-white/5"
+          title={format === "instagram" ? "Instagram square PNGs (ZIP)" : "LinkedIn 4:5 PNGs (ZIP)"}>
+          {format === "instagram" ? <Instagram className="w-3.5 h-3.5" /> : <Package className="w-3.5 h-3.5" />}
+          {format === "instagram" ? "IG PNGs (ZIP)" : "Download all (ZIP)"}
         </button>
         <button onClick={exportPdf} disabled={busy}
-          className="rounded-lg border border-border/60 px-3 py-1.5 text-xs inline-flex items-center gap-1 hover:bg-white/5">
-          <FileDown className="w-3.5 h-3.5" /> Export PDF
+          className="rounded-lg border border-border/60 px-3 py-1.5 text-xs inline-flex items-center gap-1 hover:bg-white/5"
+          title="LinkedIn document carousel PDF">
+          <Linkedin className="w-3.5 h-3.5" /> <FileDown className="w-3.5 h-3.5" /> LinkedIn PDF
         </button>
       </div>
+
 
       <div className="grid lg:grid-cols-[280px_1fr_320px] gap-4">
         {/* Reorder rail — drag the handle to reorder */}
