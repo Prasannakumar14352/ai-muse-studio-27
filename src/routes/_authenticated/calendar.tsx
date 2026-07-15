@@ -377,7 +377,7 @@ function FailedPanel({ rows, onChange }: { rows: Array<Record<string, unknown>>;
                       <Icon className="w-4 h-4 text-red-300" />
                       <span className="text-sm text-white/80 truncate">{String(r.caption ?? "—")}</span>
                     </div>
-                    {r.last_error && <div className="text-xs text-red-300/80 mt-1"><AlertTriangle className="inline w-3 h-3 mr-1" />{String(r.last_error)}</div>}
+                    {r.last_error ? <div className="text-xs text-red-300/80 mt-1"><AlertTriangle className="inline w-3 h-3 mr-1" />{String(r.last_error)}</div> : null}
                     <div className="text-[11px] text-white/40 mt-1">Attempts: {String(r.attempts ?? 0)}</div>
                   </div>
                   <div className="flex gap-1 shrink-0">
