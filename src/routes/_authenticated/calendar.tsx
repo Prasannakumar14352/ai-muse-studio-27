@@ -100,6 +100,9 @@ function CalendarPage() {
           </Button>
         </header>
 
+        <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
+
+
         <nav className="flex gap-2 flex-wrap mb-6 border-b border-white/10 pb-3">
           {([
             ["calendar", "Monthly Calendar"],
