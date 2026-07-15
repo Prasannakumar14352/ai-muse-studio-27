@@ -8,6 +8,7 @@ import { Linkedin, Wand2, ArrowLeft, Copy, Save } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
 import { HandoffBanner } from "@/components/handoff-banner";
+import { useAutogen } from "@/lib/use-autogen";
 
 export const Route = createFileRoute("/_authenticated/linkedin-posts/new")({
   component: NewLinkedinPostPage,
