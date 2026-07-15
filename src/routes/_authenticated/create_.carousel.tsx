@@ -9,6 +9,9 @@ import { deductUsage, getAccessInfo, canGenerate } from "@/lib/access";
 import { saveOutput } from "@/lib/local-store";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Wand2, ArrowRight, Layers } from "lucide-react";
+import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
+import { HandoffBanner } from "@/components/handoff-banner";
+import { useAutogen } from "@/lib/use-autogen";
 
 export const Route = createFileRoute("/_authenticated/create_/carousel")({
   head: () => ({
