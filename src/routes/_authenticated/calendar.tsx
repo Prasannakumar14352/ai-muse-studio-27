@@ -53,6 +53,7 @@ const PLATFORM_ICON: Record<string, typeof Instagram> = {
 
 function CalendarPage() {
   const [tab, setTab] = useState<Tab>("calendar");
+  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("calendar"));
   const [monthAnchor, setMonthAnchor] = useState(() => {
     const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d;
   });
