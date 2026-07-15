@@ -118,7 +118,10 @@ function Landing() {
         </div>
       </section>
 
-      {/* Video Testimonials */}
+      {/* Product walkthroughs (not testimonials) */}
+      <ProductWalkthroughsSection />
+
+      {/* Video Testimonials (only real customers; hidden when empty) */}
       <VideoTestimonialsSection />
 
       {/* Written Testimonials Carousel */}
