@@ -50,10 +50,10 @@ export function RepurposePicker() {
           <div className="text-xs font-medium text-muted-foreground">Source project (optional)</div>
           <CreatorFlowSelect
             ariaLabel="Source project"
-            value={projectId}
-            onValueChange={(v) => useProject(v)}
+            value={projectId || "__none__"}
+            onValueChange={(v) => useProject(v === "__none__" ? "" : v)}
             options={[
-              { value: "", label: "— No project (paste content below) —" },
+              { value: "__none__", label: "— No project (paste content below) —" },
               ...(projects ?? []).map((p: { id: string; title: string | null }) => ({ value: p.id, label: p.title ?? "Untitled" })),
             ]}
           />
