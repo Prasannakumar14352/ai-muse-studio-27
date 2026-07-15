@@ -27,6 +27,26 @@ export type SceneCharacterLock = {
   locked: boolean;
 };
 
+export type SceneSfx = {
+  id: string;
+  label: string;      // e.g. "Whoosh", "Impact", "Notification"
+  atSec: number;      // offset within the scene
+  volume: number;     // 0..1
+};
+
+export type SceneSubtitle = {
+  text: string;
+  startSec: number;   // relative to scene start
+  endSec: number;
+};
+
+export type ShotReference = {
+  /** Local object URL / data URL / remote URL for reference image or alt shot. */
+  url: string;
+  label: string;      // "Uploaded", "Alt 2", ...
+  addedAt: string;
+};
+
 export type BlueprintScene = {
   id: string;                // stable id for React keys + regen targeting
   n: number;                 // display order (1-based)
@@ -46,6 +66,12 @@ export type BlueprintScene = {
   productPlacement: string;  // free text — how the product shows in the frame
   character: SceneCharacterLock;
   negativePrompt: string;
+  /** Editable subtitle overlay for this scene. Falls back to voiceover text. */
+  subtitle?: SceneSubtitle;
+  /** SFX cues placed inside this scene. */
+  sfx?: SceneSfx[];
+  /** Reference / replacement shot pinned by the user (upload or alt). */
+  shotReference?: ShotReference | null;
   /** Set by editor when user has locally edited this scene since last AI regen. */
   edited?: boolean;
 };
