@@ -20,6 +20,8 @@ import {
   Eraser, Expand, PaintBucket, History, ChevronDown,
 } from "lucide-react";
 import type { GenerateImageRequest } from "@/lib/image-stream";
+import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
+import { HandoffBanner } from "@/components/handoff-banner";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 
@@ -50,10 +52,11 @@ function fileToDataUrl(file: File): Promise<string> {
 }
 
 function ImagesPage() {
-  const [prompt, setPrompt] = useState("");
-  const [negativePrompt, setNegativePrompt] = useState("");
-  const [style, setStyle] = useState("cinematic");
-  const [ratio, setRatio] = useState("1:1");
+  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("image"));
+  const [prompt, setPrompt] = useState(handoff?.imagePrompt ?? handoff?.topic ?? "");
+  const [negativePrompt, setNegativePrompt] = useState(handoff?.negativePrompt ?? "");
+  const [style, setStyle] = useState(handoff?.style ?? "cinematic");
+  const [ratio, setRatio] = useState(handoff?.aspectRatio ?? "1:1");
   const [batch, setBatch] = useState(4);
   const [seed, setSeed] = useState<number | "">("");
   const [cfg, setCfg] = useState(7);
@@ -71,7 +74,7 @@ function ImagesPage() {
   const [showDebug, setShowDebug] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [viewerIdx, setViewerIdx] = useState<number | null>(null);
-  const [view, setView] = useState<"landing" | "input">("landing");
+  const [view, setView] = useState<"landing" | "input">(handoff ? "input" : "landing");
   const qc = useQueryClient();
   const { data: access } = useAccess();
 
@@ -350,6 +353,7 @@ function ImagesPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
+      <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
       <div className="flex items-start justify-between gap-4">
         <div>
           {view === "input" ? (

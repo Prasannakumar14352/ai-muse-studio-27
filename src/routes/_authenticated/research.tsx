@@ -10,9 +10,10 @@ import {
 import { ViralResearchView } from "@/components/viral-research-view";
 import { ResearchReportView } from "@/components/research-report-view";
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
-import { setResearchPrefill } from "@/lib/research-prefill";
+import { setResearchPrefill, type ResearchModuleId, type ResearchPrefill } from "@/lib/research-prefill";
 import { saveDraft } from "@/lib/plan-store";
-import { Search, Loader2, Trash2, Copy, RefreshCw, Sparkles, Image as ImageIcon, Video, Layers, Linkedin, Type, CalendarPlus, Target } from "lucide-react";
+import { PreviewHandoffDialog } from "@/components/preview-handoff-dialog";
+import { Search, Loader2, Trash2, Copy, RefreshCw, Sparkles, Image as ImageIcon, Video, Layers, Linkedin, Type, CalendarPlus, Target, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/research")({ component: ResearchPage });
@@ -221,55 +222,205 @@ function ResearchPage() {
 
 // ---------- One-click actions ----------
 
-function OneClickActions({ findings, navigate }: { findings: ResearchFindings; navigate: ReturnType<typeof useNavigate> }) {
-  const topic = findings.inputs?.topic ?? "";
-  const angle = findings.actionable?.bestAngle;
+type ActionDef = {
+  id: string;
+  module: ResearchModuleId;
+  label: string;
+  route: string;
+  icon: React.ReactNode;
+  build: (f: ResearchFindings, researchId?: string | null) => Omit<ResearchPrefill, "at" | "handoffId" | "source">;
+};
 
-  const prefill = (module: "caption" | "video" | "carousel" | "image" | "thumbnail" | "linkedin", to: string) => {
-    const a = findings.actionable;
-    setResearchPrefill({
-      topic, angle,
-      titles: a?.titles, hooks: a?.hooks,
-      keywords: a?.keywords, hashtags: a?.hashtags,
-      audience: findings.inputs?.audience,
-      platform: findings.inputs?.platform,
-      format: a?.suggestedFormat,
-      thumbnailText: a?.thumbnailText,
-      thumbnailConcepts: a?.thumbnailConcepts,
-      cta: a?.cta,
-    });
-    // Also seed the wizard draft so modules that already read plan-store pick it up.
-    saveDraft({
-      module,
-      originalPrompt: angle ? `${topic}\n\nAngle: ${angle}` : topic,
-      aiPlan: null, editedPlan: null, result: null, exports: [], updatedAt: Date.now(),
-    });
-    toast.success(`Prefilled ${module}`);
-    navigate({ to: to });
+function buildActions(findings: ResearchFindings, researchId: string | null): ActionDef[] {
+  const a = findings.actionable;
+  const topic = findings.inputs?.topic ?? "";
+  const platform = findings.inputs?.platform;
+  const audience = findings.inputs?.audience;
+  const angle = a?.bestAngle;
+  const summary = findings.viralAnalysis?.verdict;
+  const label = `Viral Research · ${topic || "Untitled"}`;
+  const common = { sourceLabel: label, researchId, topic, angle, audience, platform };
+
+  return [
+    {
+      id: "video", module: "video", label: "Generate Video", route: "/videos",
+      icon: <Video className="w-4 h-4" />,
+      build: () => ({
+        ...common, module: "video",
+        duration: 60, format: a?.suggestedFormat, aspectRatio: "16:9",
+        titles: a?.titles, hooks: a?.hooks, cta: a?.cta,
+        keywords: a?.keywords, hashtags: a?.hashtags,
+        outline: a?.hooks, summary,
+        thumbnailText: a?.thumbnailText, thumbnailConcepts: a?.thumbnailConcepts,
+        tone: findings.inputs?.contentFormat,
+      }),
+    },
+    {
+      id: "short", module: "short", label: "Generate Short / Reel", route: "/videos",
+      icon: <Video className="w-4 h-4" />,
+      build: () => ({
+        ...common, module: "short",
+        duration: 45, format: "reel", aspectRatio: "9:16",
+        titles: a?.titles, hooks: a?.hooks, cta: a?.cta,
+        onScreenText: a?.hooks, outline: a?.hooks,
+        voiceoverDirection: angle, summary,
+        keywords: a?.keywords, hashtags: a?.hashtags,
+      }),
+    },
+    {
+      id: "thumbnail", module: "thumbnail", label: "Generate Thumbnail", route: "/thumbnails",
+      icon: <ImageIcon className="w-4 h-4" />,
+      build: () => ({
+        ...common, module: "thumbnail",
+        aspectRatio: platform === "youtube" ? "16:9" : "9:16",
+        thumbnailText: a?.thumbnailText, thumbnailConcepts: a?.thumbnailConcepts,
+        subject: angle, emotion: "curiosity", composition: "rule-of-thirds",
+        colorDirection: "high-contrast warm", ctrTips: a?.hooks, titles: a?.titles,
+      }),
+    },
+    {
+      id: "carousel", module: "carousel", label: "Generate Carousel", route: "/create/carousel",
+      icon: <Layers className="w-4 h-4" />,
+      build: () => ({
+        ...common, module: "carousel",
+        aspectRatio: "4:5", slideCount: 7,
+        slideOutline: a?.titles, keyPoints: a?.hooks,
+        cta: a?.cta, keywords: a?.keywords, hashtags: a?.hashtags,
+        imagePrompt: angle, summary,
+      }),
+    },
+    {
+      id: "linkedin", module: "linkedin", label: "Generate LinkedIn Post", route: "/linkedin-posts/new",
+      icon: <Linkedin className="w-4 h-4" />,
+      build: () => ({
+        ...common, module: "linkedin", platform: "linkedin",
+        hooks: a?.hooks, body: angle, keyPoints: a?.titles,
+        cta: a?.cta, firstComment: a?.cta, hashtags: a?.hashtags,
+        heroConcept: a?.thumbnailConcepts?.[0], includeImage: false, includeCarousel: false,
+        tone: "Professional",
+      }),
+    },
+    {
+      id: "caption", module: "caption", label: "Generate Caption", route: "/captions",
+      icon: <Type className="w-4 h-4" />,
+      build: () => ({
+        ...common, module: "caption",
+        objective: angle, tone: "Conversational",
+        cta: a?.cta, hashtags: a?.hashtags, keywords: a?.keywords,
+        hooks: a?.hooks,
+      }),
+    },
+    {
+      id: "image", module: "image", label: "Generate Image", route: "/images",
+      icon: <ImageIcon className="w-4 h-4" />,
+      build: () => ({
+        ...common, module: "image",
+        imagePrompt: a?.thumbnailConcepts?.[0] ?? angle ?? topic,
+        negativePrompt: "low quality, blurry, text artifacts, extra fingers",
+        style: "cinematic", lighting: "dramatic",
+        aspectRatio: "1:1", composition: "rule-of-thirds",
+      }),
+    },
+    {
+      id: "strategy", module: "strategy", label: "Save to AI Strategy", route: "/strategy",
+      icon: <Target className="w-4 h-4" />,
+      build: () => ({
+        ...common, module: "strategy",
+        opportunityScore: findings.viralAnalysis?.score,
+        contentGap: a?.contentGap, bestAngle: angle,
+        recommendedFormats: a?.suggestedFormat ? [a.suggestedFormat] : undefined,
+        cta: a?.cta,
+        evidence: findings.viralAnalysis?.reasons,
+      }),
+    },
+    {
+      id: "calendar", module: "calendar", label: "Add to Content Calendar", route: "/calendar",
+      icon: <CalendarPlus className="w-4 h-4" />,
+      build: () => ({
+        ...common, module: "calendar",
+        contentType: a?.suggestedFormat, urgency: a?.urgency,
+        titles: a?.titles, cta: a?.cta,
+      }),
+    },
+  ];
+}
+
+function OneClickActions({ findings, navigate }: { findings: ResearchFindings; navigate: ReturnType<typeof useNavigate> }) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ action: ActionDef; payload: Omit<ResearchPrefill, "at" | "handoffId" | "source"> } | null>(null);
+  const researchId = (findings as ResearchFindings & { id?: string }).id ?? null;
+  const actions = useMemo(() => buildActions(findings, researchId), [findings, researchId]);
+
+  const runAction = async (action: ActionDef) => {
+    if (busyId) return;
+    setBusyId(action.id);
+    const label = action.label.replace(/^Generate |^Save to |^Add to /, "");
+    const toastId = toast.loading(`Preparing ${label.toLowerCase()} draft…`);
+    try {
+      const payload = action.build(findings, researchId);
+      const record = setResearchPrefill(payload);
+      if (!record) throw new Error("Could not save draft — storage unavailable");
+
+      // Mirror into wizard plan-store draft so modules that already read it hydrate too.
+      const wizardModule = action.module === "short" ? "video" : action.module;
+      if (["video", "carousel", "image", "thumbnail", "linkedin", "caption"].includes(wizardModule)) {
+        saveDraft({
+          module: wizardModule as "video" | "carousel" | "image" | "thumbnail" | "linkedin" | "caption",
+          originalPrompt: payload.angle ? `${payload.topic}\n\nAngle: ${payload.angle}` : payload.topic,
+          aiPlan: null, editedPlan: null, result: null, exports: [], updatedAt: Date.now(),
+        });
+      }
+
+      toast.success(`${label} draft ready`, { id: toastId });
+      navigate({ to: action.route });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Draft creation failed";
+      toast.error(msg, { id: toastId });
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
     <div className="glass rounded-2xl border border-white/10 p-4">
       <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">One-click actions</div>
       <div className="flex flex-wrap gap-2">
-        <ActionBtn icon={<Video className="w-4 h-4" />} label="Generate Video" onClick={() => prefill("video", "/videos")} />
-        <ActionBtn icon={<Video className="w-4 h-4" />} label="Generate Short / Reel" onClick={() => prefill("video", "/videos")} />
-        <ActionBtn icon={<ImageIcon className="w-4 h-4" />} label="Generate Thumbnail" onClick={() => prefill("thumbnail", "/thumbnails")} />
-        <ActionBtn icon={<Layers className="w-4 h-4" />} label="Generate Carousel" onClick={() => prefill("carousel", "/carousels")} />
-        <ActionBtn icon={<Linkedin className="w-4 h-4" />} label="Generate LinkedIn Post" onClick={() => prefill("linkedin", "/linkedin-posts")} />
-        <ActionBtn icon={<Type className="w-4 h-4" />} label="Generate Caption" onClick={() => prefill("caption", "/captions")} />
-        <ActionBtn icon={<ImageIcon className="w-4 h-4" />} label="Generate Image" onClick={() => prefill("image", "/images")} />
-        <ActionBtn icon={<Target className="w-4 h-4" />} label="Save to AI Strategy" onClick={() => {
-          setResearchPrefill({ topic, angle, titles: findings.actionable?.titles });
-          toast.success("Saved to Strategy prefill");
-          navigate({ to: "/strategy" });
-        }} />
-        <ActionBtn icon={<CalendarPlus className="w-4 h-4" />} label="Add to Content Calendar" onClick={() => {
-          setResearchPrefill({ topic, angle, titles: findings.actionable?.titles, platform: findings.inputs?.platform });
-          toast.success("Opening calendar");
-          navigate({ to: "/calendar" });
-        }} />
+        {actions.map((action) => {
+          const busy = busyId === action.id;
+          const anyBusy = !!busyId;
+          return (
+            <div key={action.id} className="inline-flex items-stretch rounded-xl border border-white/10 overflow-hidden">
+              <button
+                type="button"
+                disabled={anyBusy}
+                onClick={() => runAction(action)}
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                <span className="text-primary">{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : action.icon}</span>
+                {busy ? `Preparing ${action.label.replace(/^Generate |^Save to |^Add to /, "").toLowerCase()} draft…` : action.label}
+              </button>
+              <button
+                type="button"
+                title="Preview handoff"
+                aria-label={`Preview handoff for ${action.label}`}
+                disabled={anyBusy}
+                onClick={() => setPreview({ action, payload: action.build(findings, researchId) })}
+                className="px-2 border-l border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/5 disabled:opacity-50"
+              >
+                <Eye className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          );
+        })}
       </div>
+
+      <PreviewHandoffDialog
+        open={!!preview}
+        onClose={() => setPreview(null)}
+        onConfirm={() => { const a = preview!.action; setPreview(null); void runAction(a); }}
+        payload={preview?.payload ?? null}
+        moduleLabel={preview?.action.label.replace(/^Generate |^Save to |^Add to /, "") ?? ""}
+      />
     </div>
   );
 }
@@ -289,14 +440,7 @@ function IconBtn({ children, onClick, title, tone }: { children: React.ReactNode
   );
 }
 
-function ActionBtn({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
-  return (
-    <button onClick={onClick}
-      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm border border-white/10 hover:border-pink-500/40 hover:bg-white/5 transition">
-      <span className="text-primary">{icon}</span>{label}
-    </button>
-  );
-}
+
 
 function ScorePill({ score, label }: { score: number; label: string }) {
   const s = Math.max(0, Math.min(100, score));

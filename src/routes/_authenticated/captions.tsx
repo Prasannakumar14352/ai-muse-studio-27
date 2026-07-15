@@ -13,14 +13,17 @@ import { planContentFn, type ContentPlan } from "@/lib/content-plan.functions";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/plan-store";
 import { ActiveStrategyBanner } from "@/components/active-strategy-banner";
 import { getActiveStrategyContext } from "@/lib/active-strategy";
+import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
+import { HandoffBanner } from "@/components/handoff-banner";
 
 export const Route = createFileRoute("/_authenticated/captions")({ component: CaptionsPage });
 
 function CaptionsPage() {
   const initial = loadDraft("caption");
+  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("caption"));
   const [step, setStep] = useState<WizardStep>(initial?.aiPlan ? "review" : "plan");
-  const [topic, setTopic] = useState(initial?.originalPrompt ?? "");
-  const [platform, setPlatform] = useState("instagram");
+  const [topic, setTopic] = useState(handoff?.topic ?? initial?.originalPrompt ?? "");
+  const [platform, setPlatform] = useState(handoff?.platform ?? "instagram");
   const [plan, setPlan] = useState<ContentPlan | null>(initial?.editedPlan ?? initial?.aiPlan ?? null);
 
   const plan$ = useServerFn(planContentFn);
@@ -50,6 +53,7 @@ function CaptionsPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
+      <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
       <ActiveStrategyBanner />
       <GenerationWizard
         step={step}

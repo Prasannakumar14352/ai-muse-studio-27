@@ -25,6 +25,8 @@ import {
 import {
   planThumbnailBrief, analyzeThumbnailQuality, reverseEngineerThumbnail,
 } from "@/lib/thumbnail-planner.functions";
+import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
+import { HandoffBanner } from "@/components/handoff-banner";
 
 export const Route = createFileRoute("/_authenticated/thumbnails")({
   head: () => ({
@@ -49,9 +51,22 @@ type Mode = "create" | "reverse";
 type Step = 1 | 2 | 3;
 
 function ThumbnailsPage() {
+  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("thumbnail"));
   const [mode, setMode] = useState<Mode>("create");
   const [step, setStep] = useState<Step>(1);
-  const [brief, setBrief] = useState<ThumbnailBrief>(defaultBrief());
+  const [brief, setBrief] = useState<ThumbnailBrief>(() => {
+    const b = defaultBrief();
+    if (handoff) {
+      if (handoff.topic) b.title = handoff.topic;
+      if (handoff.angle) b.prompt = handoff.angle;
+      if (handoff.thumbnailText) { b.textMode = "custom"; b.customText = handoff.thumbnailText; }
+      if (handoff.aspectRatio && (["16:9","9:16","4:5","1:1","3:4","2:3"] as string[]).includes(handoff.aspectRatio)) {
+        b.aspectRatio = handoff.aspectRatio as typeof b.aspectRatio;
+      }
+      if (handoff.subject) b.customSubject = handoff.subject;
+    }
+    return b;
+  });
   const [plan, setPlan] = useState<PlannedBrief | null>(null);
   const [planning, setPlanning] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -258,6 +273,7 @@ function ThumbnailsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl">
+      <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold">
