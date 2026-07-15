@@ -8,9 +8,9 @@ import {
   Wand2, Send, AlertCircle, Clock, Loader2, Maximize2, Volume2, VolumeX,
 } from "lucide-react";
 import {
-  VIDEO_TESTIMONIALS, WRITTEN_TESTIMONIALS,
+  PRODUCT_WALKTHROUGHS, WRITTEN_TESTIMONIALS,
   REFUND_ELIGIBLE, REFUND_INELIGIBLE, TRUST_BADGES,
-  type Testimonial,
+  type Testimonial, type ProductWalkthrough,
 } from "@/lib/landing-content";
 import { listPublishedLandingMedia, type LandingMediaRow } from "@/lib/landing-media.functions";
 import demoAsset from "@/assets/demo/creatorflow-demo.mp4.asset.json";
