@@ -9,6 +9,8 @@ export type TemplateAccessTier = "free" | "starter" | "creator" | "pro";
 
 export type TemplatePreviewType = "image" | "video";
 
+export type TemplateStatus = "draft" | "published";
+
 export type TemplateRecord = {
   id: string;
   slug: string;
@@ -24,6 +26,9 @@ export type TemplateRecord = {
   platform: string | null;
   style: string | null;
   default_prompt: string | null;
+  negative_prompt: string | null;
+  credits: number;
+  status: TemplateStatus;
   default_brief: any;
   tags: string[] | null;
   access_tier: TemplateAccessTier;
@@ -33,6 +38,16 @@ export type TemplateRecord = {
   created_at: string;
   updated_at: string;
 };
+
+export type TemplateVersion = {
+  id: string;
+  template_id: string;
+  version: number;
+  snapshot: TemplateRecord;
+  created_by: string | null;
+  created_at: string;
+};
+
 
 /** Public read: everyone (including anon) can browse the catalog. */
 export const listTemplatesFn = createServerFn({ method: "GET" }).handler(async () => {
