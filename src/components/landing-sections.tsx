@@ -631,7 +631,10 @@ export function ProductWalkthroughsSection() {
 
 function WrittenCard({ t }: { t: Testimonial }) {
   return (
-    <div className="glass rounded-2xl p-6 w-[340px] shrink-0 flex flex-col">
+    <div className="glass rounded-2xl p-6 w-[340px] shrink-0 flex flex-col relative">
+      <span className="absolute top-3 right-3 glass px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/70">
+        Sample review
+      </span>
       <StarRow n={t.rating} />
       <p className="mt-3 text-sm leading-relaxed text-foreground/90">"{t.review}"</p>
       <div className="mt-5 flex items-center gap-3">
