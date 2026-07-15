@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { repurposeFn, REPURPOSE_FORMATS, type RepurposeFormat } from "@/lib/repurpose.functions";
 import { Loader2, Split, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
+import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 
 export function RepurposePicker() {
   const [projectId, setProjectId] = useState<string>("");
