@@ -49,24 +49,16 @@ export function StrategyWizard({ onCreated }: { onCreated?: (plan: StrategyPlan,
             placeholder="e.g. solo founders 25–40" />
         </Field>
         <Field label="Goal">
-          <select className="input-base" value={form.goal} onChange={(e) => upd("goal", e.target.value)}>
-            {GOALS.map((g) => <option key={g}>{g}</option>)}
-          </select>
+          <CreatorFlowSelect ariaLabel="Goal" value={form.goal} onValueChange={(v) => upd("goal", v)} options={GOALS} />
         </Field>
         <Field label="Primary platform">
-          <select className="input-base" value={form.primaryPlatform} onChange={(e) => upd("primaryPlatform", e.target.value)}>
-            {PLATFORMS.map((p) => <option key={p}>{p}</option>)}
-          </select>
+          <CreatorFlowSelect ariaLabel="Primary platform" value={form.primaryPlatform} onValueChange={(v) => upd("primaryPlatform", v)} options={PLATFORMS} />
         </Field>
         <Field label="Tone">
-          <select className="input-base" value={form.tone} onChange={(e) => upd("tone", e.target.value)}>
-            {TONES.map((t) => <option key={t}>{t}</option>)}
-          </select>
+          <CreatorFlowSelect ariaLabel="Tone" value={form.tone} onValueChange={(v) => upd("tone", v)} options={TONES} />
         </Field>
         <Field label="Frequency">
-          <select className="input-base" value={form.frequency} onChange={(e) => upd("frequency", e.target.value)}>
-            {FREQ.map((f) => <option key={f}>{f}</option>)}
-          </select>
+          <CreatorFlowSelect ariaLabel="Frequency" value={form.frequency} onValueChange={(v) => upd("frequency", v)} options={FREQ} />
         </Field>
         <Field label="Secondary platforms">
           <div className="flex flex-wrap gap-2">
