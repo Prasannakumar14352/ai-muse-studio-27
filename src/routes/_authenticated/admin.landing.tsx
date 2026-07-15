@@ -119,18 +119,19 @@ function AdminLanding() {
       </div>
 
       <MediaSection
-        label="Video testimonials (real customers only)"
+        label="Creator reviews (video + written)"
         kind="testimonial"
         rows={testimonials}
         isLoading={isLoading}
         onNew={() => setEditing({ ...EMPTY_TESTIMONIAL, display_order: testimonials.length })}
         onEdit={(r) => setEditing(r)}
-        onDelete={(id) => confirm("Delete this testimonial?") && deleteMut.mutate(id)}
+        onDelete={(id) => confirm("Delete this review?") && deleteMut.mutate(id)}
         onPublishToggle={(r) => upsertMut.mutate({ ...r, status: r.status === "published" ? "draft" : "published" })}
         onMove={(id, dir) => move(testimonials, id, dir)}
         onPreview={setPreviewUrl}
-        emptyNote="No testimonials yet. The Video Testimonials section on the landing page stays hidden until at least one real customer testimonial is published here. Product walkthroughs are shown separately and are never posted as testimonials."
+        emptyNote="Manage both video testimonials and written Sample Creator Reviews here. Leave the Video URL blank to publish a written-only review (shown in the Sample Creator Reviews marquee). Set Source to 'Customer' + confirm consent to publish a verified review — the 'Sample Review' badge disappears automatically. Set Source to 'Sample' for illustrative sample copy."
       />
+
 
       <MediaSection
         label="Main demo card"
