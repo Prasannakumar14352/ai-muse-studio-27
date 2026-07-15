@@ -10,7 +10,12 @@ export function AgentCard({ agent, onClick, active }: { agent: AgentDef; onClick
       </div>
       <div className="font-semibold">{agent.name}</div>
       <div className="text-xs text-primary mb-2">{agent.role}</div>
-      <div className="text-xs text-muted-foreground line-clamp-3">{agent.system}</div>
+      <div className="text-xs text-muted-foreground line-clamp-3">{agent.tagline ?? agent.system}</div>
+      {agent.kind === "campaign" && (
+        <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-[10px] font-medium px-2 py-0.5 uppercase tracking-wider">
+          Full Campaign
+        </div>
+      )}
     </button>
   );
 }

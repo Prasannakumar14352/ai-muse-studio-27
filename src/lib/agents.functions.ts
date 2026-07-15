@@ -18,8 +18,8 @@ export const runAgentFn = createServerFn({ method: "POST" })
         { role: "system", content: agent.system },
         { role: "user", content: data.input },
       ],
-      temperature: 0.7,
-      maxTokens: 2500,
+      temperature: 0.75,
+      maxTokens: agent.kind === "campaign" ? 8000 : 2500,
     });
 
     if (data.projectId) {
