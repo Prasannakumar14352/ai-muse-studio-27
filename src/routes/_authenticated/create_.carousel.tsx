@@ -171,6 +171,7 @@ function CreateCarouselPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
+      <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="text-[11px] uppercase tracking-widest text-[color:var(--neon-purple)] flex items-center gap-1.5">
