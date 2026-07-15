@@ -103,6 +103,16 @@ export const upsertLandingMedia = createServerFn({ method: "POST" })
     const clean: Record<string, unknown> = { ...data };
     if (clean.poster_url === "") clean.poster_url = null;
     if (clean.video_url === "") clean.video_url = null;
+    if (clean.photo_url === "") clean.photo_url = null;
+    // Enforce: real customer testimonials can only be published with consent confirmed.
+    if (
+      data.kind === "testimonial" &&
+      data.status === "published" &&
+      data.source === "customer" &&
+      !data.consent_confirmed
+    ) {
+      throw new Error("Customer consent must be confirmed before publishing a real customer testimonial.");
+    }
     if (data.id) {
       const { id, ...rest } = clean as any;
       const { data: row, error } = await context.supabase
