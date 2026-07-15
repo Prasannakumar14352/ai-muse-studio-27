@@ -86,7 +86,7 @@ function coerceValue(kind: PlanSection["kind"], raw: unknown): string | string[]
 
 export const planContentFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: { module: PlanModule; topic: string; context?: string; projectId?: string | null }) => {
+  .inputValidator((i: { module: PlanModule; topic: string; context?: string; strategyContext?: string; projectId?: string | null }) => {
     if (!i.module) throw new Error("module required");
     if (!i.topic?.trim()) throw new Error("topic required");
     return i;
@@ -95,6 +95,9 @@ export const planContentFn = createServerFn({ method: "POST" })
     const { gatewayChatJson } = await import("@/lib/ai-gateway.server");
     const schema = SCHEMAS[data.module];
     const keys = schema.map((s) => `- ${s.key} (${s.kind}): ${s.label}`).join("\n");
+    const strategyBlock = data.strategyContext?.trim()
+      ? `\nActive brand strategy (follow positioning, persona, pillars, offer and CTAs from here):\n${data.strategyContext}\n`
+      : "";
     const raw = await gatewayChatJson<Record<string, unknown>>({
       messages: [
         {
@@ -104,7 +107,7 @@ export const planContentFn = createServerFn({ method: "POST" })
         },
         {
           role: "user",
-          content: `Module: ${data.module}\nTopic: ${data.topic}\n${data.context ? `Context: ${data.context}\n` : ""}\nReturn a JSON object with exactly these keys:\n${keys}`,
+          content: `Module: ${data.module}\nTopic: ${data.topic}\n${data.context ? `Context: ${data.context}\n` : ""}${strategyBlock}\nReturn a JSON object with exactly these keys:\n${keys}`,
         },
       ],
       temperature: 0.8,
