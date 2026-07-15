@@ -3,7 +3,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
   Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug, Linkedin,
-  ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target, Calendar as CalendarIcon,
+  ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target, Calendar as CalendarIcon, Library,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -65,6 +65,7 @@ const SECTIONS: readonly NavSection[] = [
       { to: "/repurpose", label: "Repurpose", icon: Split },
       { to: "/templates", label: "Templates", icon: Sparkles },
       { to: "/brand-kit", label: "Brand Kit", icon: Palette },
+      { to: "/library", label: "Asset Library", icon: Library },
       { to: "/marketplace", label: "Marketplace", icon: Store },
     ],
   },

@@ -106,6 +106,75 @@ export type Database = {
         }
         Relationships: []
       }
+      asset_library: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_seconds: number | null
+          favorite: boolean
+          height: number | null
+          id: string
+          kind: string
+          last_used_at: string | null
+          metadata: Json
+          mime_type: string | null
+          size_bytes: number | null
+          storage_path: string | null
+          tags: string[]
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+          url: string
+          usage_count: number
+          user_id: string
+          width: number | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          favorite?: boolean
+          height?: number | null
+          id?: string
+          kind: string
+          last_used_at?: string | null
+          metadata?: Json
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path?: string | null
+          tags?: string[]
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          url: string
+          usage_count?: number
+          user_id: string
+          width?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          favorite?: boolean
+          height?: number | null
+          id?: string
+          kind?: string
+          last_used_at?: string | null
+          metadata?: Json
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path?: string | null
+          tags?: string[]
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          url?: string
+          usage_count?: number
+          user_id?: string
+          width?: number | null
+        }
+        Relationships: []
+      }
       brand_kits: {
         Row: {
           body_font: string | null
