@@ -425,6 +425,22 @@ function OneClickActions({ findings, navigate }: { findings: ResearchFindings; n
   );
 }
 
+// ---------- Bits ----------
+
+function Label({ children }: { children: React.ReactNode }) {
+  return <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{children}</div>;
+}
+
+function IconBtn({ children, onClick, title, tone }: { children: React.ReactNode; onClick: () => void; title: string; tone?: "danger" }) {
+  return (
+    <button title={title} onClick={onClick}
+      className={`p-2 rounded-lg border border-white/10 ${tone === "danger" ? "text-red-400 hover:bg-red-500/10" : "text-muted-foreground hover:text-foreground hover:bg-white/5"}`}>
+      {children}
+    </button>
+  );
+}
+
+
 
 function ScorePill({ score, label }: { score: number; label: string }) {
   const s = Math.max(0, Math.min(100, score));
