@@ -1,6 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+export type BrandDefaultStyles = {
+  visualStyle?: string;
+  imageStyle?: string;
+  videoStyle?: string;
+  aspectRatio?: string;
+  captionTone?: string;
+};
+
 export type BrandKit = {
   id: string;
   name: string;
@@ -15,6 +23,7 @@ export type BrandKit = {
   intro_url: string | null;
   outro_url: string | null;
   keywords: string[] | null;
+  default_styles: BrandDefaultStyles | null;
   is_default: boolean;
   created_at: string;
   updated_at: string;
