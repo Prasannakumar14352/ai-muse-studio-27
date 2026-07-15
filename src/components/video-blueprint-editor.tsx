@@ -589,14 +589,14 @@ export function VideoBlueprintEditor({
             onAssignToScene={(sceneId, character) =>
               patchScene(sceneId, {
                 character: {
-                  ...(bp.scenes.find((s) => s.id === sceneId)?.character ?? {
-                    role: "", appearance: "", wardrobe: "", faceLock: true,
-                  }),
-                  role: character.name,
-                  appearance: character.description || character.name,
+                  reference: character.description
+                    ? `${character.name} — ${character.description}`
+                    : character.name,
+                  locked: character.lockAppearance !== false,
                 },
               })
             }
+
           />
         </TabsContent>
 
