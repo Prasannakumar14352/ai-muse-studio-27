@@ -374,6 +374,22 @@ function EditorModal({
             <input type="number" min={0} value={d.display_order ?? 0} onChange={(e) => set("display_order", Number(e.target.value))} className="w-full glass rounded-lg px-3 py-2 text-sm" />
           </Field>
 
+          {d.kind === "testimonial" && d.source === "customer" && (
+            <label className="flex items-start gap-3 rounded-lg p-3 border border-amber-500/30 bg-amber-500/5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!d.consent_confirmed}
+                onChange={(e) => set("consent_confirmed", e.target.checked)}
+                className="mt-1"
+              />
+              <span className="text-xs text-amber-100/90 leading-relaxed">
+                I confirm this customer has given explicit written consent for their name, photo,
+                video and review to be published on the CreatorFlow AI landing page. Publishing a
+                real customer testimonial without consent is blocked.
+              </span>
+            </label>
+          )}
+
           {error && (
             <div className="rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm p-3 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {error}
