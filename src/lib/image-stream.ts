@@ -19,6 +19,24 @@ export type GenerateImageRequest = {
   model?: string;
   /** Optional input image (data URL) for edit / restyle operations. Gemini only. */
   image?: string;
+  /** Additional subject reference images (data URLs). */
+  referenceImages?: string[];
+  /** Additional style-only reference images (data URLs). */
+  styleImages?: string[];
+  /** Negative prompt — things to avoid. Appended as an instruction. */
+  negativePrompt?: string;
+  /** Optional seed for repeatability (surfaced to model as a hint). */
+  seed?: number;
+  /** Prompt-adherence hint (analog of CFG scale, 1–20). */
+  cfg?: number;
+  /** How strongly style images influence output (0–100). */
+  styleStrength?: number;
+  /** Editing op — the server prepends an instruction the model can follow. */
+  operation?: "generate" | "upscale" | "removeBg" | "inpaint" | "outpaint" | "eraser";
+  /** For inpaint/eraser: natural-language mask ("the person on the left"). */
+  maskHint?: string;
+  /** For outpaint: which side(s) to extend. */
+  outpaintDirection?: "left" | "right" | "top" | "bottom" | "all";
   /** Optional callback for partial-frame previews (e.g. blurry live preview). */
   onPartial?: (dataUrl: string) => void;
   /** Optional abort signal to cancel the request. */
