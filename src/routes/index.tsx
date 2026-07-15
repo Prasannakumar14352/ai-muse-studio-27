@@ -9,7 +9,7 @@ import {
 import { BrandLogo } from "@/components/brand-logo";
 import {
   DemoVideoSection, VideoTestimonialsSection, WrittenTestimonialsSection,
-  GuaranteeSection, TrustBadgesSection,
+  GuaranteeSection, TrustBadgesSection, ProductWalkthroughsSection,
 } from "@/components/landing-sections";
 import { LandingPricingTabs } from "@/components/landing-pricing-tabs";
 import { EXTRA_FAQ } from "@/lib/landing-content";
