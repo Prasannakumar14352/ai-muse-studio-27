@@ -8,6 +8,8 @@ import { listStrategiesFn, deleteStrategyFn, type StrategyPlan } from "@/lib/str
 import { Trash2, Sparkles, Zap, Check } from "lucide-react";
 import { toast } from "sonner";
 import { getActiveStrategy, setActiveStrategy } from "@/lib/active-strategy";
+import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
+import { HandoffBanner } from "@/components/handoff-banner";
 
 export const Route = createFileRoute("/_authenticated/strategy")({ component: StrategyPage });
 
@@ -26,6 +28,8 @@ function StrategyPage() {
   const [tab, setTab] = useState<"new" | "history">("new");
   const [activeId, setActiveId] = useState<string | null>(() => getActiveStrategy()?.id ?? null);
 
+  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("strategy"));
+
   const activate = (row: Row) => {
     const label = row.promoting || row.product || "Strategy";
     setActiveStrategy(row.id, label, row.plan, {
@@ -43,6 +47,8 @@ function StrategyPage() {
         <h1 className="text-3xl font-bold flex items-center gap-2"><Sparkles className="w-7 h-7 text-primary" /> AI Strategy</h1>
         <p className="text-sm text-muted-foreground mt-1">Business strategy, persona, funnel, offer, campaigns, and a 30-day plan — feeding every creation module.</p>
       </header>
+
+      <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
 
       <div className="flex gap-2 border-b border-white/10">
         {(["new", "history"] as const).map((t) => (

@@ -22,6 +22,7 @@ import {
 import type { GenerateImageRequest } from "@/lib/image-stream";
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
 import { HandoffBanner } from "@/components/handoff-banner";
+import { useAutogen } from "@/lib/use-autogen";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 
@@ -258,6 +259,13 @@ function ImagesPage() {
     if (!prompt.trim()) return toast.error("Enter a prompt");
     await runGeneration(prompt, style, ratio, batch);
   }
+
+  useAutogen(handoff, () => {
+    if (prompt.trim()) {
+      toast.message("Generation started", { description: "Auto-generating from Viral Research…" });
+      void generate();
+    }
+  });
 
   async function regenerateExact() {
     if (!lastRun) return toast.error("Generate an image first");

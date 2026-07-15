@@ -9,6 +9,9 @@ import { deductUsage, getAccessInfo, canGenerate } from "@/lib/access";
 import { saveOutput } from "@/lib/local-store";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Wand2, ArrowRight, Layers } from "lucide-react";
+import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
+import { HandoffBanner } from "@/components/handoff-banner";
+import { useAutogen } from "@/lib/use-autogen";
 
 export const Route = createFileRoute("/_authenticated/create_/carousel")({
   head: () => ({
@@ -29,19 +32,27 @@ function CreateCarouselPage() {
   const qc = useQueryClient();
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
+  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("carousel"));
   const [form, setForm] = useState({
-    topic: "",
-    audience: "",
-    platform: "instagram",
+    topic: handoff?.topic ?? "",
+    audience: handoff?.audience ?? "",
+    platform: (handoff?.platform === "linkedin" || handoff?.platform === "instagram") ? handoff.platform : "instagram",
     tone: "Educational",
     style: "minimal",
-    aspect_ratio: "4:5" as (typeof RATIOS)[number],
-    slide_count: 7,
+    aspect_ratio: ((handoff?.aspectRatio === "1:1" || handoff?.aspectRatio === "4:5" || handoff?.aspectRatio === "9:16" || handoff?.aspectRatio === "16:9") ? handoff.aspectRatio : "4:5") as (typeof RATIOS)[number],
+    slide_count: handoff?.slideCount ?? 7,
   });
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
+
+  useAutogen(handoff, () => {
+    if (form.topic.trim()) {
+      toast.message("Generation started", { description: "Auto-generating from Viral Research…" });
+      void generate();
+    }
+  });
 
   const structure = (() => {
     const points = Math.max(1, form.slide_count - 2);
@@ -160,6 +171,7 @@ function CreateCarouselPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
+      <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="text-[11px] uppercase tracking-widest text-[color:var(--neon-purple)] flex items-center gap-1.5">

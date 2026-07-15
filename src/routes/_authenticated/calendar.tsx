@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
+import { HandoffBanner } from "@/components/handoff-banner";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
   component: CalendarPage,
@@ -51,6 +53,7 @@ const PLATFORM_ICON: Record<string, typeof Instagram> = {
 
 function CalendarPage() {
   const [tab, setTab] = useState<Tab>("calendar");
+  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("calendar"));
   const [monthAnchor, setMonthAnchor] = useState(() => {
     const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d;
   });
@@ -96,6 +99,9 @@ function CalendarPage() {
             <RefreshCw className="w-4 h-4 mr-2" /> Refresh
           </Button>
         </header>
+
+        <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
+
 
         <nav className="flex gap-2 flex-wrap mb-6 border-b border-white/10 pb-3">
           {([

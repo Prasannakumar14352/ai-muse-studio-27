@@ -38,6 +38,9 @@ import { VideoBlueprintEditor } from "@/components/video-blueprint-editor";
 import { validateRenderedVideo, type VideoValidation } from "@/lib/video-validate";
 import { ProjectsSection } from "@/components/projects-section";
 import { AlertTriangle } from "lucide-react";
+import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
+import { HandoffBanner } from "@/components/handoff-banner";
+import { useAutogen } from "@/lib/use-autogen";
 import style3d from "@/assets/style-3d.jpg";
 import styleGhibli from "@/assets/style-ghibli.jpg";
 import styleAnime from "@/assets/style-anime.jpg";
@@ -271,6 +274,15 @@ const initialDash: DashState = {
 
 function VideosPage() {
   const [view, setView] = useState<View>("landing");
+  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("video"));
+  useEffect(() => {
+    if (handoff) setView("input");
+  }, [handoff]);
+  useAutogen(handoff, () => {
+    if (handoff?.topic) {
+      toast.message("Draft ready — review & Generate Now", { description: "Prefilled from Viral Research." });
+    }
+  });
   const [gen, setGen] = useState<GenerateArgs | null>(null);
   const [dash, setDash] = useState<DashState>(initialDash);
   const [result, setResult] = useState<PipelineResult | null>(null);
@@ -663,7 +675,8 @@ function VideosPage() {
               ← Back to your videos
             </button>
           </div>
-          <InputScreen onGenerate={start} />
+          <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
+          <InputScreen onGenerate={start} initialTopic={handoff?.topic} initialRatio={handoff?.aspectRatio as AspectRatio | undefined} autogen={handoff?.autogen} />
         </>
       )}
       {view === "processing" && (
@@ -728,15 +741,32 @@ function EmptyLibrary({ onNew }: { onNew: () => void }) {
 
 // ---------------- Input ----------------
 
-function InputScreen({ onGenerate }: { onGenerate: (args: GenerateArgs) => void }) {
+function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
+  onGenerate: (args: GenerateArgs) => void;
+  initialTopic?: string;
+  initialRatio?: AspectRatio;
+  autogen?: boolean;
+}) {
   const [niche, setNiche] = useState<string>(NICHES[0].id);
   const [customNiche, setCustomNiche] = useState("");
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(initialTopic ?? "");
   const [videoType, setVideoType] = useState<VideoType>("shorts");
   const [duration, setDuration] = useState<DurationSec>(60);
   const [style, setStyle] = useState<StyleId>("cinematic");
   const [voice, setVoice] = useState<VoiceId>("documentary_narrator");
-  const [ratio, setRatio] = useState<AspectRatio>("9:16");
+  const [ratio, setRatio] = useState<AspectRatio>(initialRatio ?? "9:16");
+
+  const autoFiredRef = useRef(false);
+  useEffect(() => {
+    if (autoFiredRef.current) return;
+    if (!autogen) return;
+    if (!title.trim()) return;
+    autoFiredRef.current = true;
+    const id = setTimeout(() => submit(), 300);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autogen, title]);
+
 
   const isCustom = niche === "custom";
   const currentNiche = useMemo(() => NICHES.find((n) => n.id === niche) ?? NICHES[0], [niche]);

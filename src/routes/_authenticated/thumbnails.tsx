@@ -27,6 +27,7 @@ import {
 } from "@/lib/thumbnail-planner.functions";
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
 import { HandoffBanner } from "@/components/handoff-banner";
+import { useAutogen } from "@/lib/use-autogen";
 
 export const Route = createFileRoute("/_authenticated/thumbnails")({
   head: () => ({
@@ -118,6 +119,16 @@ function ThumbnailsPage() {
       setPlanning(false);
     }
   }
+
+  // Auto-run pipeline when arriving via "Generate Thumbnail Now" from Research:
+  // step 1 → planning → step 2 → generation → step 3.
+  useAutogen(handoff, async () => {
+    if (!brief.title.trim() && !brief.prompt.trim()) return;
+    toast.message("Generation started", { description: "Auto-planning + generating from Viral Research…" });
+    await runPlanning();
+    // runPlanning sets `plan`; wait a tick for state to commit before firing gen.
+    setTimeout(() => { void runGeneration(); }, 400);
+  });
 
   async function runGeneration() {
     if (!plan) return;

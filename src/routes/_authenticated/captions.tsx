@@ -15,6 +15,7 @@ import { ActiveStrategyBanner } from "@/components/active-strategy-banner";
 import { getActiveStrategyContext } from "@/lib/active-strategy";
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
 import { HandoffBanner } from "@/components/handoff-banner";
+import { useAutogen } from "@/lib/use-autogen";
 
 export const Route = createFileRoute("/_authenticated/captions")({ component: CaptionsPage });
 
@@ -36,6 +37,13 @@ function CaptionsPage() {
       toast.success("Plan ready — edit and continue");
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  useAutogen(handoff, () => {
+    if ((handoff?.topic ?? topic).trim()) {
+      toast.message("Generation started", { description: "Auto-generating from Viral Research…" });
+      planM.mutate();
+    }
   });
 
   const result = useMemo(() => {
