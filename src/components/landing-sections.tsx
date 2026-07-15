@@ -654,7 +654,10 @@ export function WrittenTestimonialsSection() {
   return (
     <section className="py-20">
       <div className="max-w-7xl mx-auto px-6 text-center mb-10">
-        <h2 className="text-3xl md:text-4xl font-bold">Trusted by <span className="gradient-text">thousands of creators</span></h2>
+        <h2 className="text-3xl md:text-4xl font-bold">Sample creator reviews</h2>
+        <p className="mt-3 text-sm text-muted-foreground max-w-xl mx-auto">
+          Illustrative sample copy showing how CreatorFlow AI fits different workflows. Real customer reviews will replace these as they come in.
+        </p>
       </div>
       <div className="relative overflow-hidden group">
         <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-background to-transparent z-10" />
