@@ -4,43 +4,68 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { STYLES } from "@/lib/constants";
 import { pushImageGenLog, listImageGenLogs } from "@/lib/local-store";
+import {
+  readPromptHistory,
+  pushPromptHistory,
+  clearPromptHistory,
+  type ImagePromptHistoryEntry,
+} from "@/lib/image-prompt-history";
 
 import { deductUsage, useAccess, canGenerate } from "@/lib/access";
 import { supabase } from "@/integrations/supabase/client";
 import { useProjectDelete } from "@/hooks/use-project-delete";
-import { Loader2, Wand2, Download, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown, Maximize2, X, ChevronLeft, ChevronRight, Plus, ArrowLeft } from "lucide-react";
+import {
+  Loader2, Wand2, Download, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown,
+  Maximize2, X, ChevronLeft, ChevronRight, Plus, ArrowLeft, Upload, Sparkles, Scissors,
+  Eraser, Expand, PaintBucket, History, ChevronDown,
+} from "lucide-react";
+import type { GenerateImageRequest } from "@/lib/image-stream";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 
-
 const RATIOS = ["1:1", "9:16", "16:9", "4:5"];
-const LS_STATE = "creatorvault:images:v3";
+const BATCH_OPTIONS = [1, 2, 4, 8];
+const LS_STATE = "creatorvault:images:v4";
 
 type ResultItem = { id: string; prompt: string; style: string; ratio: string; image: string };
 
 type DebugInfo = {
   requestedAt: string;
   durationMs: number;
-  request: { prompt: string; style: string; ratio: string; endpoint: string };
-  response?: {
-    model?: string;
-    size?: string;
-    quality?: string;
-    n?: number;
-    fullPrompt?: string;
-    originalPrompt?: string;
-    stylePrefix?: string | null;
-  };
+  request: Record<string, unknown>;
   errors: string[];
   successCount: number;
   failureCount: number;
 };
 
+type EditOp = NonNullable<GenerateImageRequest["operation"]>;
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(new Error("Read failed"));
+    r.readAsDataURL(file);
+  });
+}
+
 function ImagesPage() {
   const [prompt, setPrompt] = useState("");
+  const [negativePrompt, setNegativePrompt] = useState("");
   const [style, setStyle] = useState("cinematic");
   const [ratio, setRatio] = useState("1:1");
+  const [batch, setBatch] = useState(4);
+  const [seed, setSeed] = useState<number | "">("");
+  const [cfg, setCfg] = useState(7);
+  const [styleStrength, setStyleStrength] = useState(70);
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
+  const [styleImages, setStyleImages] = useState<string[]>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<ImagePromptHistoryEntry[]>([]);
+
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<{ prompt: string; style: string; ratio: string } | null>(null);
   const [debug, setDebug] = useState<DebugInfo | null>(null);
   const [showDebug, setShowDebug] = useState(false);
@@ -50,9 +75,6 @@ function ImagesPage() {
   const qc = useQueryClient();
   const { data: access } = useAccess();
 
-  // Source of truth for generated images: the `projects` table.
-  // Base64 images are too large for localStorage (~5MB quota), so we store
-  // them in the DB alongside the sidebar count and hydrate from there.
   const { data: results = [] } = useQuery({
     queryKey: ["images-library", access?.userId],
     enabled: !!access?.userId,
@@ -79,7 +101,6 @@ function ImagesPage() {
     },
   });
 
-  // Keyboard nav for fullscreen viewer.
   useEffect(() => {
     if (viewerIdx === null) return;
     function onKey(e: KeyboardEvent) {
@@ -88,62 +109,90 @@ function ImagesPage() {
       if (e.key === "ArrowLeft") setViewerIdx((i) => (i === null ? i : Math.max(0, i - 1)));
     }
     window.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
+    const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prevOverflow; };
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
   }, [viewerIdx, results.length]);
 
-  // Restore only lightweight prefs from localStorage (no base64 images).
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_STATE);
       if (raw) {
-        const s = JSON.parse(raw) as {
-          prompt?: string; style?: string; ratio?: string;
-          lastRun?: typeof lastRun; debug?: DebugInfo | null;
-        };
+        const s = JSON.parse(raw) as Partial<{
+          prompt: string; negativePrompt: string; style: string; ratio: string;
+          batch: number; seed: number | ""; cfg: number; styleStrength: number;
+          lastRun: typeof lastRun; debug: DebugInfo | null;
+        }>;
         if (s.prompt) setPrompt(s.prompt);
+        if (s.negativePrompt) setNegativePrompt(s.negativePrompt);
         if (s.style) setStyle(s.style);
         if (s.ratio) setRatio(s.ratio);
+        if (s.batch) setBatch(s.batch);
+        if (s.seed !== undefined) setSeed(s.seed);
+        if (typeof s.cfg === "number") setCfg(s.cfg);
+        if (typeof s.styleStrength === "number") setStyleStrength(s.styleStrength);
         if (s.lastRun) setLastRun(s.lastRun);
         if (s.debug) setDebug(s.debug);
       }
     } catch { /* ignore */ }
+    setHistory(readPromptHistory());
     setHydrated(true);
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
     try {
-      localStorage.setItem(LS_STATE, JSON.stringify({ prompt, style, ratio, lastRun, debug }));
+      localStorage.setItem(LS_STATE, JSON.stringify({
+        prompt, negativePrompt, style, ratio, batch, seed, cfg, styleStrength, lastRun, debug,
+      }));
     } catch { /* ignore */ }
-  }, [prompt, style, ratio, lastRun, debug, hydrated]);
+  }, [prompt, negativePrompt, style, ratio, batch, seed, cfg, styleStrength, lastRun, debug, hydrated]);
 
-  async function runGeneration(p: string, s: string, r: string) {
-    // Preflight credit check — need up to 4 credits (1 per concept).
-    if (access && !canGenerate(access, 4)) {
-      toast.error("Not enough credits to generate 4 images. Top up in Pricing.");
+  async function addUploads(kind: "ref" | "style", files: FileList | null) {
+    if (!files || !files.length) return;
+    try {
+      const urls = await Promise.all(Array.from(files).slice(0, 4).map(fileToDataUrl));
+      if (kind === "ref") setReferenceImages((prev) => [...prev, ...urls].slice(0, 4));
+      else setStyleImages((prev) => [...prev, ...urls].slice(0, 4));
+    } catch {
+      toast.error("Could not read image");
+    }
+  }
+
+  async function runGeneration(p: string, s: string, r: string, count: number) {
+    if (access && !canGenerate(access, count)) {
+      toast.error(`Not enough credits for ${count} images.`);
       return;
     }
-    if (!access?.userId) {
-      toast.error("Sign in required");
-      return;
-    }
+    if (!access?.userId) { toast.error("Sign in required"); return; }
+
     setLoading(true);
     const styleLabel = STYLES.find((x) => x.id === s)?.label ?? s;
     const startedAt = Date.now();
     const errors: string[] = [];
-    let lastMeta: DebugInfo["response"] | undefined;
+    const baseReq: GenerateImageRequest = {
+      prompt: p,
+      style: styleLabel,
+      ratio: r,
+      negativePrompt: negativePrompt.trim() || undefined,
+      seed: seed === "" ? undefined : Number(seed),
+      cfg,
+      styleStrength,
+      referenceImages: referenceImages.length ? referenceImages : undefined,
+      styleImages: styleImages.length ? styleImages : undefined,
+    };
+
     try {
       const { fetchGeneratedImage } = await import("@/lib/image-stream");
       const settled = await Promise.allSettled(
-        Array.from({ length: 4 }).map(async () => {
-          const { image, error, status } = await fetchGeneratedImage({
-            prompt: p, style: styleLabel, ratio: r,
-          });
+        Array.from({ length: count }).map(async (_, i) => {
+          const req: GenerateImageRequest = { ...baseReq };
+          // Vary seed per-item when a base seed is supplied so batch items differ.
+          if (typeof req.seed === "number") req.seed = req.seed + i;
+          const { image, error, status } = await fetchGeneratedImage(req);
           if (!image) throw new Error(error || `HTTP ${status}`);
           return { image };
-        })
+        }),
       );
 
       const ok: { image: string }[] = [];
@@ -155,32 +204,27 @@ function ImagesPage() {
       if (ok.length) {
         setLastRun({ prompt: p, style: s, ratio: r });
         setView("landing");
-        // Deduct 1 credit per successful image (admin bypass handled inside).
+        pushPromptHistory({
+          prompt: p, negativePrompt: baseReq.negativePrompt, style: s, ratio: r,
+          seed: baseReq.seed, cfg, styleStrength, batch: count,
+        });
+        setHistory(readPromptHistory());
         for (let i = 0; i < ok.length; i++) {
           await deductUsage({ amount: 1, description: `AI image generated (${styleLabel})` }).catch(() => {});
         }
-        // Save one project row PER image so the gallery and sidebar count match.
         const title = p.trim().slice(0, 80) || `AI image (${styleLabel})`;
         const rows = ok.map((res) => ({
-          user_id: access.userId,
-          title,
-          content_type: "ai_image",
-          topic: p,
-          style: s,
-          status: "generated",
-          thumbnail_url: res.image,
+          user_id: access.userId, title, content_type: "ai_image",
+          topic: p, style: s, status: "generated", thumbnail_url: res.image,
         }));
         const { error: pErr } = await supabase.from("projects").insert(rows);
-        if (pErr) {
-          console.warn("[images] project insert failed", pErr);
-          toast.error("Saved images could not be persisted");
-        }
+        if (pErr) toast.error("Saved images could not be persisted");
         qc.invalidateQueries({ queryKey: ["images-library"] });
         qc.invalidateQueries({ queryKey: ["projects-section"] });
         qc.invalidateQueries({ queryKey: ["recent-projects"] });
         qc.invalidateQueries({ queryKey: ["module-counts"] });
         qc.invalidateQueries({ queryKey: ["access"] });
-        toast.success(`Generated ${ok.length} of 4 concepts`);
+        toast.success(`Generated ${ok.length} of ${count} concepts`);
       } else {
         toast.error(errors[0] || "Generation failed");
       }
@@ -188,27 +232,18 @@ function ImagesPage() {
       const info: DebugInfo = {
         requestedAt: new Date(startedAt).toISOString(),
         durationMs: Date.now() - startedAt,
-        request: { prompt: p, style: styleLabel, ratio: r, endpoint: "/api/generate-image" },
-        response: lastMeta,
-        errors,
-        successCount: ok.length,
-        failureCount: errors.length,
+        request: { ...baseReq, referenceImages: baseReq.referenceImages?.length, styleImages: baseReq.styleImages?.length, batch: count },
+        errors, successCount: ok.length, failureCount: errors.length,
       };
       setDebug(info);
-
       await pushImageGenLog({
-        prompt: p,
-        style: s,
-        ratio: r,
-        full_prompt: lastMeta?.fullPrompt ?? `${styleLabel} style. ${p}`,
-        request: info.request,
-        response: info.response ?? {},
-        errors: info.errors,
-        success_count: info.successCount,
-        failure_count: info.failureCount,
-        duration_ms: info.durationMs,
+        prompt: p, style: s, ratio: r,
+        full_prompt: `${styleLabel} style. ${p}`,
+        request: info.request as Record<string, unknown>,
+        response: {},
+        errors: info.errors, success_count: info.successCount,
+        failure_count: info.failureCount, duration_ms: info.durationMs,
       });
-
     } finally {
       setLoading(false);
     }
@@ -216,12 +251,47 @@ function ImagesPage() {
 
   async function generate() {
     if (!prompt.trim()) return toast.error("Enter a prompt");
-    await runGeneration(prompt, style, ratio);
+    await runGeneration(prompt, style, ratio, batch);
   }
 
   async function regenerateExact() {
     if (!lastRun) return toast.error("Generate an image first");
-    await runGeneration(lastRun.prompt, lastRun.style, lastRun.ratio);
+    await runGeneration(lastRun.prompt, lastRun.style, lastRun.ratio, batch);
+  }
+
+  async function editExisting(row: ResultItem, op: EditOp, opts?: { maskHint?: string; direction?: GenerateImageRequest["outpaintDirection"] }) {
+    if (!access?.userId) return toast.error("Sign in required");
+    if (access && !canGenerate(access, 1)) return toast.error("Not enough credits");
+    setEditingId(row.id);
+    try {
+      const { fetchGeneratedImage } = await import("@/lib/image-stream");
+      const { image, error } = await fetchGeneratedImage({
+        prompt: row.prompt || "edit this image",
+        style: STYLES.find((x) => x.id === row.style)?.label ?? row.style,
+        ratio: row.ratio,
+        image: row.image,
+        operation: op,
+        maskHint: opts?.maskHint,
+        outpaintDirection: opts?.direction,
+      });
+      if (!image) throw new Error(error || "Edit failed");
+      await deductUsage({ amount: 1, description: `Image ${op}` }).catch(() => {});
+      const { error: pErr } = await supabase.from("projects").insert({
+        user_id: access.userId,
+        title: `${op}: ${row.prompt.slice(0, 60)}`,
+        content_type: "ai_image",
+        topic: row.prompt, style: row.style, status: "generated",
+        thumbnail_url: image,
+      });
+      if (pErr) toast.error("Save failed");
+      qc.invalidateQueries({ queryKey: ["images-library"] });
+      qc.invalidateQueries({ queryKey: ["module-counts"] });
+      toast.success(`${op} complete`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Edit failed");
+    } finally {
+      setEditingId(null);
+    }
   }
 
   async function loadHistory() {
@@ -236,6 +306,20 @@ function ImagesPage() {
     downloadJson(`creatorvault-image-debug-${Date.now()}.json`, debug);
   }
 
+  function applyHistoryEntry(h: ImagePromptHistoryEntry) {
+    setPrompt(h.prompt);
+    setNegativePrompt(h.negativePrompt ?? "");
+    if (h.style) setStyle(h.style);
+    if (h.ratio) setRatio(h.ratio);
+    if (typeof h.cfg === "number") setCfg(h.cfg);
+    if (typeof h.styleStrength === "number") setStyleStrength(h.styleStrength);
+    if (h.seed !== undefined) setSeed(h.seed);
+    if (h.batch) setBatch(h.batch);
+    setShowHistory(false);
+    setView("input");
+    toast.success("Loaded from history");
+  }
+
   const deleteProject = useProjectDelete();
   async function deleteImage(id: string) {
     const row = results.find((r) => r.id === id);
@@ -244,11 +328,8 @@ function ImagesPage() {
 
   async function clearSession() {
     if (!access?.userId) return;
-    const { error } = await supabase
-      .from("projects")
-      .delete()
-      .eq("user_id", access.userId)
-      .eq("content_type", "ai_image");
+    const { error } = await supabase.from("projects").delete()
+      .eq("user_id", access.userId).eq("content_type", "ai_image");
     if (error) { toast.error("Clear failed"); return; }
     setLastRun(null); setDebug(null);
     localStorage.removeItem(LS_STATE);
@@ -256,22 +337,16 @@ function ImagesPage() {
     qc.invalidateQueries({ queryKey: ["module-counts"] });
     qc.invalidateQueries({ queryKey: ["projects-section"] });
     qc.invalidateQueries({ queryKey: ["recent-projects"] });
-    qc.invalidateQueries({ queryKey: ["stats"] });
-    qc.invalidateQueries({ queryKey: ["admin-recent-projects"] });
-    qc.invalidateQueries({ queryKey: ["admin-stats"] });
     toast.success("Cleared all generated images");
   }
 
-  // Keep unused-import quiet.
   useMemo(() => results.length, [results.length]);
-
 
   const aspectClass: Record<string, string> = {
     "1:1": "aspect-square", "9:16": "aspect-[9/16]", "16:9": "aspect-video", "4:5": "aspect-[4/5]",
   };
-
   const styleLabelPreview = STYLES.find((s) => s.id === style)?.label ?? style;
-  const previewFullPrompt = prompt ? `${styleLabelPreview} style. ${prompt}` : "";
+  const previewFullPrompt = prompt ? `${styleLabelPreview} style. ${prompt}${negativePrompt.trim() ? ` Avoid: ${negativePrompt.trim()}.` : ""}` : "";
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -279,8 +354,8 @@ function ImagesPage() {
         <div>
           {view === "input" ? (
             <>
-              <h1 className="text-3xl md:text-4xl font-bold">AI <span className="gradient-text">Image</span> Generator</h1>
-              <p className="text-muted-foreground mt-1">Describe the shot. Pick a style. Generate.</p>
+              <h1 className="text-3xl md:text-4xl font-bold">AI <span className="gradient-text">Image</span> Studio</h1>
+              <p className="text-muted-foreground mt-1">Describe. Refine. Generate. Edit.</p>
             </>
           ) : (
             <>
@@ -290,10 +365,8 @@ function ImagesPage() {
           )}
         </div>
         {view === "landing" && (
-          <button
-            onClick={() => setView("input")}
-            className="rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-2 shrink-0"
-          >
+          <button onClick={() => setView("input")}
+            className="rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-2 shrink-0">
             <Plus className="w-4 h-4" /> New generation
           </button>
         )}
@@ -301,19 +374,61 @@ function ImagesPage() {
 
       {view === "input" && (
         <>
-          <div className="flex items-center">
-            <button
-              onClick={() => setView("landing")}
-              className="text-sm text-muted-foreground hover:text-white flex items-center gap-1"
-            >
+          <div className="flex items-center justify-between">
+            <button onClick={() => setView("landing")}
+              className="text-sm text-muted-foreground hover:text-white flex items-center gap-1">
               <ArrowLeft className="w-4 h-4" /> Back to your images
+            </button>
+            <button onClick={() => setShowHistory((v) => !v)}
+              className="text-xs text-muted-foreground hover:text-white flex items-center gap-1">
+              <History className="w-3.5 h-3.5" /> Prompt history ({history.length})
             </button>
           </div>
 
+          {showHistory && (
+            <div className="glass rounded-2xl p-4 max-h-64 overflow-auto">
+              {history.length === 0 ? (
+                <div className="text-xs text-muted-foreground">No prompts yet.</div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-muted-foreground">Last {history.length} prompts</div>
+                    <button onClick={() => { clearPromptHistory(); setHistory([]); }}
+                      className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1">
+                      <Trash2 className="w-3 h-3" /> Clear
+                    </button>
+                  </div>
+                  {history.map((h) => (
+                    <button key={h.id} onClick={() => applyHistoryEntry(h)}
+                      className="w-full text-left glass border border-border rounded-lg px-3 py-2 hover:border-white/20 transition">
+                      <div className="text-xs text-white/90 line-clamp-2">{h.prompt}</div>
+                      <div className="text-[10px] text-muted-foreground mt-1 flex gap-2">
+                        <span>{h.style ?? "—"}</span>
+                        <span>·</span><span>{h.ratio ?? "1:1"}</span>
+                        {typeof h.seed === "number" && (<><span>·</span><span>seed {h.seed}</span></>)}
+                        {typeof h.cfg === "number" && (<><span>·</span><span>cfg {h.cfg}</span></>)}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="glass rounded-2xl p-6 space-y-4">
-            <textarea rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)}
-              placeholder="A lone astronaut watching Earth rise from a lunar cliff, ultra detailed..."
-              className="w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
+            <div>
+              <label className="text-xs uppercase tracking-wider text-muted-foreground mb-1 block">Positive prompt</label>
+              <textarea rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)}
+                placeholder="A lone astronaut watching Earth rise from a lunar cliff, ultra detailed..."
+                className="w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
+            </div>
+
+            <div>
+              <label className="text-xs uppercase tracking-wider text-muted-foreground mb-1 block">Negative prompt (avoid)</label>
+              <textarea rows={2} value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value)}
+                placeholder="blurry, watermark, extra fingers, low quality..."
+                className="w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
+            </div>
 
             <div>
               <div className="text-sm text-muted-foreground mb-2">Style</div>
@@ -328,24 +443,89 @@ function ImagesPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 justify-between">
-              <div className="flex gap-2">
-                {RATIOS.map((r) => (
-                  <button key={r} onClick={() => setRatio(r)}
-                    className={`px-3 py-1.5 rounded-lg text-xs border ${ratio === r ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>{r}</button>
-                ))}
+              <div className="flex flex-wrap gap-4">
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Ratio</div>
+                  <div className="flex gap-2">
+                    {RATIOS.map((r) => (
+                      <button key={r} onClick={() => setRatio(r)}
+                        className={`px-3 py-1.5 rounded-lg text-xs border ${ratio === r ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>{r}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Batch</div>
+                  <div className="flex gap-2">
+                    {BATCH_OPTIONS.map((n) => (
+                      <button key={n} onClick={() => setBatch(n)}
+                        className={`px-3 py-1.5 rounded-lg text-xs border ${batch === n ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>{n}</button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="flex gap-2">
                 <button onClick={regenerateExact} disabled={loading || !lastRun}
                   title={lastRun ? "Rerun with the exact last prompt & settings" : "Generate once first"}
                   className="rounded-lg glass border border-border px-4 py-2.5 text-sm font-medium flex items-center gap-2 disabled:opacity-40">
-                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Regenerate exact
+                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Regenerate
                 </button>
                 <button onClick={generate} disabled={loading}
                   className="rounded-lg gradient-primary text-white px-6 py-2.5 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)]">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} Generate
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} Generate {batch}
                 </button>
               </div>
             </div>
+
+            {/* Advanced */}
+            <button onClick={() => setShowAdvanced((v) => !v)}
+              className="text-xs text-muted-foreground hover:text-white flex items-center gap-1 pt-2">
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+              Advanced controls
+            </button>
+
+            {showAdvanced && (
+              <div className="space-y-4 pt-2 border-t border-border">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wider text-muted-foreground">Seed</label>
+                    <div className="flex gap-2 mt-1">
+                      <input type="number" value={seed} onChange={(e) => setSeed(e.target.value === "" ? "" : Number(e.target.value))}
+                        placeholder="random"
+                        className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--neon-purple)]" />
+                      <button onClick={() => setSeed(Math.floor(Math.random() * 1_000_000))}
+                        className="rounded-lg glass border border-border px-3 text-xs">Roll</button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wider text-muted-foreground">CFG (prompt adherence) — {cfg}</label>
+                    <input type="range" min={1} max={20} value={cfg} onChange={(e) => setCfg(Number(e.target.value))}
+                      className="w-full mt-3 accent-[color:var(--neon-purple)]" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wider text-muted-foreground">Style strength — {styleStrength}%</label>
+                    <input type="range" min={0} max={100} value={styleStrength} onChange={(e) => setStyleStrength(Number(e.target.value))}
+                      className="w-full mt-3 accent-[color:var(--neon-purple)]" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <UploadPanel
+                    title="Reference images (subject)"
+                    hint="Guide the subject, pose, or composition."
+                    images={referenceImages}
+                    onAdd={(f) => addUploads("ref", f)}
+                    onRemove={(i) => setReferenceImages((prev) => prev.filter((_, k) => k !== i))}
+                  />
+                  <UploadPanel
+                    title="Style images"
+                    hint="Guide the color palette, lighting, and look."
+                    images={styleImages}
+                    onAdd={(f) => addUploads("style", f)}
+                    onRemove={(i) => setStyleImages((prev) => prev.filter((_, k) => k !== i))}
+                  />
+                </div>
+              </div>
+            )}
 
             {prompt && (
               <div className="rounded-lg border border-border bg-black/30 p-3">
@@ -353,10 +533,8 @@ function ImagesPage() {
                   <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
                     Exact prompt sent to /api/generate-image
                   </div>
-                  <button
-                    onClick={() => { navigator.clipboard.writeText(previewFullPrompt); toast.success("Prompt copied"); }}
-                    className="text-xs text-muted-foreground hover:text-white flex items-center gap-1"
-                  >
+                  <button onClick={() => { navigator.clipboard.writeText(previewFullPrompt); toast.success("Prompt copied"); }}
+                    className="text-xs text-muted-foreground hover:text-white flex items-center gap-1">
                     <Copy className="w-3 h-3" /> Copy
                   </button>
                 </div>
@@ -367,7 +545,6 @@ function ImagesPage() {
             )}
           </div>
 
-          {/* Debug panel */}
           <div className="glass rounded-2xl">
             <button onClick={() => setShowDebug((v) => !v)} className="w-full flex items-center justify-between px-6 py-3 text-sm">
               <span className="flex items-center gap-2">
@@ -392,32 +569,16 @@ function ImagesPage() {
                     <Download className="w-3 h-3" /> Download saved history (last 20)
                   </button>
                 </div>
-                {!debug ? (
-                  <div className="text-muted-foreground">No generations yet.</div>
-                ) : (
+                {debug && (
                   <>
-                    <Section title="Request">
-                      <pre className="bg-black/40 rounded p-3 overflow-auto">{JSON.stringify(debug.request, null, 2)}</pre>
-                    </Section>
-                    <Section title="Response metadata (model & params)">
-                      <pre className="bg-black/40 rounded p-3 overflow-auto">
-                        {JSON.stringify(debug.response ?? { note: "No metadata returned" }, null, 2)}
-                      </pre>
-                    </Section>
-                    <Section title={`Errors (${debug.errors.length})`}>
-                      {debug.errors.length === 0 ? (
-                        <div className="text-emerald-400">None</div>
-                      ) : (
-                        <ul className="space-y-1">
-                          {debug.errors.map((e, i) => (
-                            <li key={i} className="text-rose-400 font-mono break-all">{e}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </Section>
-                    <div className="text-muted-foreground">
-                      Started {debug.requestedAt} · Took {debug.durationMs}ms · Logged to your account
-                    </div>
+                    <pre className="bg-black/40 rounded p-3 overflow-auto">{JSON.stringify(debug.request, null, 2)}</pre>
+                    {debug.errors.length > 0 && (
+                      <ul className="space-y-1">
+                        {debug.errors.map((e, i) => (
+                          <li key={i} className="text-rose-400 font-mono break-all">{e}</li>
+                        ))}
+                      </ul>
+                    )}
                   </>
                 )}
               </div>
@@ -437,10 +598,8 @@ function ImagesPage() {
               <p className="text-sm text-muted-foreground mt-1 max-w-md">
                 Generate your first AI image — describe a scene, pick a style, and get multiple concepts instantly.
               </p>
-              <button
-                onClick={() => setView("input")}
-                className="mt-5 rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-2"
-              >
+              <button onClick={() => setView("input")}
+                className="mt-5 rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-2">
                 <Plus className="w-4 h-4" /> New generation
               </button>
             </div>
@@ -454,32 +613,15 @@ function ImagesPage() {
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {results.map((r, i) => (
-                  <div key={r.id} className="glass rounded-xl overflow-hidden group">
-                    <button
-                      onClick={() => setViewerIdx(i)}
-                      className={`${aspectClass[r.ratio]} relative overflow-hidden flex items-end p-3 w-full text-left cursor-zoom-in`}
-                      aria-label="View full screen"
-                    >
-                      <img src={r.image} alt={r.prompt} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-                      <span className="relative text-white text-xs glass px-2 py-1 rounded">{r.style} · {r.ratio}</span>
-                      <span className="absolute top-2 right-2 rounded-md bg-black/60 backdrop-blur p-1.5 opacity-0 group-hover:opacity-100 transition">
-                        <Maximize2 className="w-3.5 h-3.5 text-white" />
-                      </span>
-                    </button>
-                    <div className="p-3">
-                      <div className="text-xs text-muted-foreground line-clamp-2">{r.prompt}</div>
-                      <div className="mt-3 flex gap-1.5">
-                        <a href={r.image} download={`creatorvault-${r.id}.png`}
-                          className="flex-1 rounded-lg gradient-primary text-white py-1.5 text-xs flex items-center justify-center gap-1"><Download className="w-3 h-3" /> Download</a>
-                        <button
-                          onClick={() => deleteImage(r.id)}
-                          className="rounded-lg glass hover:bg-rose-500/20 text-rose-300 py-1.5 px-2 text-xs flex items-center justify-center"
-                          title="Delete image"
-                        ><Trash2 className="w-3 h-3" /></button>
-                      </div>
-                    </div>
-                  </div>
+                  <ImageCard
+                    key={r.id}
+                    row={r}
+                    aspectClass={aspectClass[r.ratio]}
+                    onOpen={() => setViewerIdx(i)}
+                    onDelete={() => deleteImage(r.id)}
+                    onEdit={(op, opts) => editExisting(r, op, opts)}
+                    busy={editingId === r.id}
+                  />
                 ))}
               </div>
             </div>
@@ -488,51 +630,34 @@ function ImagesPage() {
       )}
 
       {viewerIdx !== null && results[viewerIdx] && (
-        <div
-          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setViewerIdx(null)}
-        >
-          <button
-            onClick={(e) => { e.stopPropagation(); setViewerIdx(null); }}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
-            aria-label="Close"
-          >
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setViewerIdx(null)}>
+          <button onClick={(e) => { e.stopPropagation(); setViewerIdx(null); }}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
           {viewerIdx > 0 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setViewerIdx((i) => (i === null ? i : i - 1)); }}
-              className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
-              aria-label="Previous"
-            >
+            <button onClick={(e) => { e.stopPropagation(); setViewerIdx((i) => (i === null ? i : i - 1)); }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center" aria-label="Previous">
               <ChevronLeft className="w-6 h-6" />
             </button>
           )}
           {viewerIdx < results.length - 1 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setViewerIdx((i) => (i === null ? i : i + 1)); }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
-              aria-label="Next"
-            >
+            <button onClick={(e) => { e.stopPropagation(); setViewerIdx((i) => (i === null ? i : i + 1)); }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center" aria-label="Next">
               <ChevronRight className="w-6 h-6" />
             </button>
           )}
           <div className="max-w-[92vw] max-h-[92vh] flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={results[viewerIdx].image}
-              alt={results[viewerIdx].prompt}
-              className="max-w-[92vw] max-h-[80vh] object-contain rounded-lg shadow-2xl"
-            />
+            <img src={results[viewerIdx].image} alt={results[viewerIdx].prompt}
+              className="max-w-[92vw] max-h-[80vh] object-contain rounded-lg shadow-2xl" />
             <div className="text-xs text-white/70 text-center max-w-2xl">
               <div className="mb-1">{results[viewerIdx].style} · {results[viewerIdx].ratio} · {viewerIdx + 1}/{results.length}</div>
               <div className="line-clamp-2">{results[viewerIdx].prompt}</div>
             </div>
-            <a
-              href={results[viewerIdx].image}
-              download={`creatorvault-${results[viewerIdx].id}.png`}
+            <a href={results[viewerIdx].image} download={`creatorvault-${results[viewerIdx].id}.png`}
               onClick={(e) => e.stopPropagation()}
-              className="rounded-lg gradient-primary text-white px-4 py-2 text-xs font-medium flex items-center gap-2"
-            >
+              className="rounded-lg gradient-primary text-white px-4 py-2 text-xs font-medium flex items-center gap-2">
               <Download className="w-3 h-3" /> Download
             </a>
           </div>
@@ -542,12 +667,126 @@ function ImagesPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function UploadPanel({
+  title, hint, images, onAdd, onRemove,
+}: {
+  title: string; hint: string; images: string[];
+  onAdd: (files: FileList | null) => void;
+  onRemove: (idx: number) => void;
+}) {
   return (
-    <div>
-      <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{title}</div>
-      {children}
+    <div className="rounded-lg border border-border bg-black/30 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <div className="text-xs font-semibold text-white">{title}</div>
+          <div className="text-[10px] text-muted-foreground">{hint}</div>
+        </div>
+        <label className="rounded-md glass border border-border px-2 py-1 text-xs flex items-center gap-1 cursor-pointer hover:border-white/20">
+          <Upload className="w-3 h-3" /> Upload
+          <input type="file" accept="image/*" multiple className="hidden"
+            onChange={(e) => { onAdd(e.target.files); e.currentTarget.value = ""; }} />
+        </label>
+      </div>
+      {images.length === 0 ? (
+        <div className="text-[10px] text-muted-foreground italic">No images. Up to 4.</div>
+      ) : (
+        <div className="grid grid-cols-4 gap-2">
+          {images.map((src, i) => (
+            <div key={i} className="relative aspect-square rounded overflow-hidden border border-border">
+              <img src={src} alt="" className="w-full h-full object-cover" />
+              <button onClick={() => onRemove(i)}
+                className="absolute top-1 right-1 w-5 h-5 rounded bg-black/70 text-white flex items-center justify-center hover:bg-rose-500/80">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+function ImageCard({
+  row, aspectClass, onOpen, onDelete, onEdit, busy,
+}: {
+  row: ResultItem; aspectClass: string; onOpen: () => void; onDelete: () => void;
+  onEdit: (op: EditOp, opts?: { maskHint?: string; direction?: GenerateImageRequest["outpaintDirection"] }) => void;
+  busy: boolean;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  function askAndEdit(op: EditOp) {
+    if (op === "inpaint" || op === "eraser") {
+      const hint = window.prompt(op === "inpaint"
+        ? "Describe what to change and what to replace it with:"
+        : "Describe what to erase from the image:");
+      if (!hint) return;
+      onEdit(op, { maskHint: hint });
+    } else if (op === "outpaint") {
+      const dir = window.prompt("Direction to extend (left / right / top / bottom / all):", "all") ?? "all";
+      const valid = ["left", "right", "top", "bottom", "all"] as const;
+      const direction = (valid as readonly string[]).includes(dir) ? (dir as (typeof valid)[number]) : "all";
+      onEdit(op, { direction });
+    } else {
+      onEdit(op);
+    }
+    setMenuOpen(false);
+  }
+
+  return (
+    <div className="glass rounded-xl overflow-hidden group relative">
+      <button onClick={onOpen}
+        className={`${aspectClass} relative overflow-hidden flex items-end p-3 w-full text-left cursor-zoom-in`}
+        aria-label="View full screen">
+        <img src={row.image} alt={row.prompt} loading="lazy"
+          className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+        <span className="relative text-white text-xs glass px-2 py-1 rounded">{row.style} · {row.ratio}</span>
+        <span className="absolute top-2 right-2 rounded-md bg-black/60 backdrop-blur p-1.5 opacity-0 group-hover:opacity-100 transition">
+          <Maximize2 className="w-3.5 h-3.5 text-white" />
+        </span>
+        {busy && (
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 text-white animate-spin" />
+          </div>
+        )}
+      </button>
+      <div className="p-3">
+        <div className="text-xs text-muted-foreground line-clamp-2">{row.prompt}</div>
+        <div className="mt-3 flex gap-1.5">
+          <a href={row.image} download={`creatorvault-${row.id}.png`}
+            className="flex-1 rounded-lg gradient-primary text-white py-1.5 text-xs flex items-center justify-center gap-1">
+            <Download className="w-3 h-3" /> Download
+          </a>
+          <button onClick={() => setMenuOpen((v) => !v)} disabled={busy}
+            className="rounded-lg glass border border-border py-1.5 px-2 text-xs flex items-center gap-1 disabled:opacity-40" title="AI edit">
+            <Sparkles className="w-3 h-3" /> Edit
+          </button>
+          <button onClick={onDelete}
+            className="rounded-lg glass hover:bg-rose-500/20 text-rose-300 py-1.5 px-2 text-xs flex items-center justify-center" title="Delete">
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
+        {menuOpen && (
+          <div className="mt-2 rounded-lg border border-border bg-black/70 p-1.5 grid grid-cols-2 gap-1">
+            <MenuBtn icon={<Expand className="w-3 h-3" />} label="Upscale" onClick={() => askAndEdit("upscale")} />
+            <MenuBtn icon={<Scissors className="w-3 h-3" />} label="Remove BG" onClick={() => askAndEdit("removeBg")} />
+            <MenuBtn icon={<PaintBucket className="w-3 h-3" />} label="Inpaint" onClick={() => askAndEdit("inpaint")} />
+            <MenuBtn icon={<Expand className="w-3 h-3 rotate-45" />} label="Outpaint" onClick={() => askAndEdit("outpaint")} />
+            <MenuBtn icon={<Eraser className="w-3 h-3" />} label="Magic Eraser" onClick={() => askAndEdit("eraser")} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MenuBtn({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick}
+      className="rounded-md glass border border-border px-2 py-1.5 text-[11px] flex items-center gap-1 hover:border-white/20 hover:bg-white/5">
+      {icon} {label}
+    </button>
   );
 }
 
