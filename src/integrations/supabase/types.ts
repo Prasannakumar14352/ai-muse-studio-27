@@ -113,6 +113,9 @@ export type Database = {
           brand_voice: string | null
           created_at: string
           default_cta: string | null
+          default_styles: Json
+          font_primary: string | null
+          font_secondary: string | null
           heading_font: string | null
           id: string
           instagram_handle: string | null
@@ -121,9 +124,11 @@ export type Database = {
           keywords: string[] | null
           logo_url: string | null
           metadata: Json
+          name: string | null
           outro_url: string | null
           palette: Json
           primary_color: string | null
+          secondary_color: string | null
           tone: string | null
           updated_at: string
           user_id: string
@@ -136,6 +141,9 @@ export type Database = {
           brand_voice?: string | null
           created_at?: string
           default_cta?: string | null
+          default_styles?: Json
+          font_primary?: string | null
+          font_secondary?: string | null
           heading_font?: string | null
           id?: string
           instagram_handle?: string | null
@@ -144,9 +152,11 @@ export type Database = {
           keywords?: string[] | null
           logo_url?: string | null
           metadata?: Json
+          name?: string | null
           outro_url?: string | null
           palette?: Json
           primary_color?: string | null
+          secondary_color?: string | null
           tone?: string | null
           updated_at?: string
           user_id: string
@@ -159,6 +169,9 @@ export type Database = {
           brand_voice?: string | null
           created_at?: string
           default_cta?: string | null
+          default_styles?: Json
+          font_primary?: string | null
+          font_secondary?: string | null
           heading_font?: string | null
           id?: string
           instagram_handle?: string | null
@@ -167,9 +180,11 @@ export type Database = {
           keywords?: string[] | null
           logo_url?: string | null
           metadata?: Json
+          name?: string | null
           outro_url?: string | null
           palette?: Json
           primary_color?: string | null
+          secondary_color?: string | null
           tone?: string | null
           updated_at?: string
           user_id?: string
@@ -1530,6 +1545,41 @@ export type Database = {
           },
         ]
       }
+      template_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          snapshot: Json
+          template_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          snapshot: Json
+          template_id: string
+          version: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          snapshot?: Json
+          template_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       templates: {
         Row: {
           access_tier: string
@@ -1539,12 +1589,14 @@ export type Database = {
           category: string
           created_at: string
           created_by: string | null
+          credits: number
           default_brief: Json
           default_prompt: string
           description: string
           featured: boolean
           id: string
           name: string
+          negative_prompt: string | null
           platform: string | null
           poster_url: string | null
           preview_image_url: string | null
@@ -1552,6 +1604,7 @@ export type Database = {
           preview_video_url: string | null
           slug: string
           sort_order: number
+          status: string
           style: string | null
           tags: string[]
           updated_at: string
@@ -1564,12 +1617,14 @@ export type Database = {
           category: string
           created_at?: string
           created_by?: string | null
+          credits?: number
           default_brief?: Json
           default_prompt?: string
           description?: string
           featured?: boolean
           id?: string
           name: string
+          negative_prompt?: string | null
           platform?: string | null
           poster_url?: string | null
           preview_image_url?: string | null
@@ -1577,6 +1632,7 @@ export type Database = {
           preview_video_url?: string | null
           slug: string
           sort_order?: number
+          status?: string
           style?: string | null
           tags?: string[]
           updated_at?: string
@@ -1589,12 +1645,14 @@ export type Database = {
           category?: string
           created_at?: string
           created_by?: string | null
+          credits?: number
           default_brief?: Json
           default_prompt?: string
           description?: string
           featured?: boolean
           id?: string
           name?: string
+          negative_prompt?: string | null
           platform?: string | null
           poster_url?: string | null
           preview_image_url?: string | null
@@ -1602,6 +1660,7 @@ export type Database = {
           preview_video_url?: string | null
           slug?: string
           sort_order?: number
+          status?: string
           style?: string | null
           tags?: string[]
           updated_at?: string
