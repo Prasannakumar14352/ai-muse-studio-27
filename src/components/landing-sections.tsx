@@ -630,15 +630,27 @@ export function ProductWalkthroughsSection() {
 /* ---------------------- 3. WRITTEN TESTIMONIAL CAROUSEL ---------------------- */
 
 function WrittenCard({ t }: { t: Testimonial }) {
+  const isSample = (t.source ?? "sample") !== "customer";
   return (
     <div className="glass rounded-2xl p-6 w-[340px] shrink-0 flex flex-col relative">
-      <span className="absolute top-3 right-3 glass px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/70">
-        Sample review
-      </span>
+      {isSample && (
+        <span
+          className="absolute top-3 right-3 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-amber-500/15 border border-amber-400/30 text-amber-200"
+          title="Illustrative sample copy — not a real customer review"
+        >
+          Sample Review
+        </span>
+      )}
       <StarRow n={t.rating} />
       <p className="mt-3 text-sm leading-relaxed text-foreground/90">"{t.review}"</p>
       <div className="mt-5 flex items-center gap-3">
-        <img src={t.photo} alt={t.name} loading="lazy" className="w-10 h-10 rounded-full object-cover" />
+        <img
+          src={t.photo}
+          alt={t.name}
+          loading="lazy"
+          className="w-11 h-11 rounded-full object-cover ring-1 ring-white/10"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).src = `https://ui-avatars.com/api/?background=1f2937&color=fff&name=${encodeURIComponent(t.name)}`; }}
+        />
         <div className="min-w-0">
           <div className="text-sm font-semibold truncate">{t.name}</div>
           <div className="text-xs text-muted-foreground truncate">{t.role} · {t.country}</div>
@@ -649,14 +661,33 @@ function WrittenCard({ t }: { t: Testimonial }) {
 }
 
 export function WrittenTestimonialsSection() {
-  // Duplicate for seamless marquee loop
-  const loop = [...WRITTEN_TESTIMONIALS, ...WRITTEN_TESTIMONIALS];
+  // Merge admin-published written reviews (testimonials with no video) with the
+  // built-in Indian sample reviews. Verified customer reviews (`source === "customer"`)
+  // hide the "Sample Review" badge automatically via WrittenCard.
+  const { data: dbRows } = useQuery({
+    queryKey: ["landing-media-public"],
+    queryFn: () => listPublishedLandingMedia(),
+    staleTime: 60_000,
+  });
+  const dbWritten = (dbRows ?? [])
+    .filter((r) => r.kind === "testimonial" && !r.video_url && (r.review ?? "").trim().length > 0)
+    .map(landingRowToTestimonial);
+
+  // Prefer admin-published rows first; fall back to built-in Indian samples.
+  const combined = dbWritten.length > 0 ? [...dbWritten, ...WRITTEN_TESTIMONIALS] : WRITTEN_TESTIMONIALS;
+  const hasRealCustomers = combined.some((t) => (t.source ?? "sample") === "customer");
+  const loop = [...combined, ...combined];
+
   return (
     <section className="py-20">
       <div className="max-w-7xl mx-auto px-6 text-center mb-10">
-        <h2 className="text-3xl md:text-4xl font-bold">Sample creator reviews</h2>
+        <h2 className="text-3xl md:text-4xl font-bold">
+          {hasRealCustomers ? "Loved by creators" : "Sample Creator Reviews"}
+        </h2>
         <p className="mt-3 text-sm text-muted-foreground max-w-xl mx-auto">
-          Illustrative sample copy showing how CreatorFlow AI fits different workflows. Real customer reviews will replace these as they come in.
+          {hasRealCustomers
+            ? "Real reviews from creators using CreatorFlow AI, alongside illustrative samples clearly marked as such."
+            : "Illustrative sample reviews from Indian creators showing how CreatorFlow AI fits different workflows. Real customer reviews will replace these as they come in."}
         </p>
       </div>
       <div className="relative overflow-hidden group">
