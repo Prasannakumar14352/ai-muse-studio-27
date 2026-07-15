@@ -34,13 +34,14 @@ function NewLinkedinPostPage() {
   const navigate = useNavigate();
   const run = useServerFn(generateLinkedinPost);
 
+  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("linkedin"));
   const [step, setStep] = useState<1 | 2>(1);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [content, setContent] = useState<LinkedinPostContent | null>(null);
 
-  const [topic, setTopic] = useState("");
-  const [audience, setAudience] = useState("");
+  const [topic, setTopic] = useState(handoff?.topic ?? "");
+  const [audience, setAudience] = useState(handoff?.audience ?? "");
   const [industry, setIndustry] = useState("");
   const [goal, setGoal] = useState("Build authority");
   const [tone, setTone] = useState("Professional");
@@ -48,7 +49,7 @@ function NewLinkedinPostPage() {
   const [length, setLength] = useState<(typeof LENGTHS)[number]>("Medium");
   const [customWords, setCustomWords] = useState<number>(220);
   const [brand, setBrand] = useState("");
-  const [cta, setCta] = useState("");
+  const [cta, setCta] = useState(handoff?.cta ?? "");
   const [language, setLanguage] = useState("English");
   const [includeImage, setIncludeImage] = useState(false);
   const [includeCarousel, setIncludeCarousel] = useState(false);
