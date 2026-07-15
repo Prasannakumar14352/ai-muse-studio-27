@@ -29,6 +29,7 @@ import { Route as AuthenticatedResearchRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedRepurposeRouteImport } from './routes/_authenticated/repurpose'
 import { Route as AuthenticatedMarketplaceRouteImport } from './routes/_authenticated/marketplace'
 import { Route as AuthenticatedLinkedinPostsRouteImport } from './routes/_authenticated/linkedin-posts'
+import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
 import { Route as AuthenticatedInvoicesRouteImport } from './routes/_authenticated/invoices'
 import { Route as AuthenticatedImagesRouteImport } from './routes/_authenticated/images'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -160,6 +161,11 @@ const AuthenticatedLinkedinPostsRoute =
     path: '/linkedin-posts',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedInvoicesRoute = AuthenticatedInvoicesRouteImport.update({
   id: '/invoices',
   path: '/invoices',
@@ -342,6 +348,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/images': typeof AuthenticatedImagesRoute
   '/invoices': typeof AuthenticatedInvoicesRoute
+  '/library': typeof AuthenticatedLibraryRoute
   '/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
   '/marketplace': typeof AuthenticatedMarketplaceRoute
   '/repurpose': typeof AuthenticatedRepurposeRoute
@@ -391,6 +398,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/images': typeof AuthenticatedImagesRoute
   '/invoices': typeof AuthenticatedInvoicesRoute
+  '/library': typeof AuthenticatedLibraryRoute
   '/marketplace': typeof AuthenticatedMarketplaceRoute
   '/repurpose': typeof AuthenticatedRepurposeRoute
   '/research': typeof AuthenticatedResearchRoute
@@ -442,6 +450,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/images': typeof AuthenticatedImagesRoute
   '/_authenticated/invoices': typeof AuthenticatedInvoicesRoute
+  '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
   '/_authenticated/marketplace': typeof AuthenticatedMarketplaceRoute
   '/_authenticated/repurpose': typeof AuthenticatedRepurposeRoute
@@ -494,6 +503,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/images'
     | '/invoices'
+    | '/library'
     | '/linkedin-posts'
     | '/marketplace'
     | '/repurpose'
@@ -543,6 +553,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/images'
     | '/invoices'
+    | '/library'
     | '/marketplace'
     | '/repurpose'
     | '/research'
@@ -593,6 +604,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/images'
     | '/_authenticated/invoices'
+    | '/_authenticated/library'
     | '/_authenticated/linkedin-posts'
     | '/_authenticated/marketplace'
     | '/_authenticated/repurpose'
@@ -780,6 +792,13 @@ declare module '@tanstack/react-router' {
       path: '/linkedin-posts'
       fullPath: '/linkedin-posts'
       preLoaderRoute: typeof AuthenticatedLinkedinPostsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/library': {
+      id: '/_authenticated/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof AuthenticatedLibraryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/invoices': {
@@ -1059,6 +1078,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedImagesRoute: typeof AuthenticatedImagesRoute
   AuthenticatedInvoicesRoute: typeof AuthenticatedInvoicesRoute
+  AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
   AuthenticatedLinkedinPostsRoute: typeof AuthenticatedLinkedinPostsRouteWithChildren
   AuthenticatedMarketplaceRoute: typeof AuthenticatedMarketplaceRoute
   AuthenticatedRepurposeRoute: typeof AuthenticatedRepurposeRoute
@@ -1086,6 +1106,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedImagesRoute: AuthenticatedImagesRoute,
   AuthenticatedInvoicesRoute: AuthenticatedInvoicesRoute,
+  AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
   AuthenticatedLinkedinPostsRoute: AuthenticatedLinkedinPostsRouteWithChildren,
   AuthenticatedMarketplaceRoute: AuthenticatedMarketplaceRoute,
   AuthenticatedRepurposeRoute: AuthenticatedRepurposeRoute,
