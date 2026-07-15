@@ -78,13 +78,14 @@ function AdminTemplatesPage() {
                   <th className="text-left px-4 py-3">Name</th>
                   <th className="text-left px-4 py-3">Category</th>
                   <th className="text-left px-4 py-3">Tier</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-left px-4 py-3">Credits</th>
                   <th className="text-left px-4 py-3">Featured</th>
-                  <th className="text-left px-4 py-3">Active</th>
                   <th className="text-right px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {(templates ?? []).map((t) => (
+                {(templates ?? []).map((t: TemplateRecord) => (
                   <tr key={t.id} className="border-t border-border/40">
                     <td className="px-4 py-3">
                       <div className="font-medium">{t.name}</div>
@@ -92,8 +93,13 @@ function AdminTemplatesPage() {
                     </td>
                     <td className="px-4 py-3 capitalize">{t.category.replace(/_/g, " ")}</td>
                     <td className="px-4 py-3 capitalize">{t.access_tier}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${t.status === "published" ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
+                        {t.status ?? "published"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">{t.credits ?? 1}</td>
                     <td className="px-4 py-3">{t.featured ? "Yes" : "—"}</td>
-                    <td className="px-4 py-3">{t.active ? "Yes" : "—"}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => setEditing(t)} title="Edit"
@@ -109,7 +115,7 @@ function AdminTemplatesPage() {
                   </tr>
                 ))}
                 {!templates?.length && (
-                  <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">No templates yet.</td></tr>
+                  <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">No templates yet.</td></tr>
                 )}
               </tbody>
             </table>
