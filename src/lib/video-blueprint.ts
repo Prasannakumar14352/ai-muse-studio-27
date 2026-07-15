@@ -266,9 +266,60 @@ export function buildBlueprintFromPlanning(
     voice: { voiceId: brief.voice, pace: "normal", emotion: "neutral" },
     transitionStyle: "fade",
     motionIntensity: "medium",
+    music: null,
+    subtitleStyle: {
+      enabled: true, font: "sans", size: "lg", color: "#ffffff",
+      background: "blur", position: "bottom", uppercase: false, wordHighlight: true,
+    },
+    characterLibrary: [],
     scenes,
   };
 }
+
+// ---------- Music / SFX / Character library helpers ----------
+
+export const MUSIC_LIBRARY: ReadonlyArray<{ id: string; label: string; mood: string; bpm: number }> = [
+  { id: "cinematic_epic",    label: "Cinematic Epic",       mood: "Cinematic", bpm: 100 },
+  { id: "cinematic_soft",    label: "Emotional Piano",      mood: "Cinematic", bpm: 72 },
+  { id: "upbeat_pop",        label: "Upbeat Pop",           mood: "Upbeat",    bpm: 128 },
+  { id: "hip_hop_trap",      label: "Trap Hook",            mood: "Hip-Hop",   bpm: 140 },
+  { id: "lofi_chill",        label: "Lo-fi Chill",          mood: "Chill",     bpm: 80 },
+  { id: "corporate_clean",   label: "Corporate Clean",      mood: "Corporate", bpm: 110 },
+  { id: "electronic_drive",  label: "Electronic Drive",     mood: "Electronic",bpm: 124 },
+  { id: "acoustic_warm",     label: "Acoustic Warm",        mood: "Acoustic",  bpm: 90 },
+  { id: "ambient_dream",     label: "Ambient Dream",        mood: "Ambient",   bpm: 60 },
+  { id: "dark_tension",      label: "Dark Tension",         mood: "Dark",      bpm: 88 },
+  { id: "documentary",       label: "Documentary Bed",      mood: "Documentary", bpm: 96 },
+  { id: "energetic_rock",    label: "Energetic Rock",       mood: "Rock",      bpm: 132 },
+];
+
+export const SFX_LIBRARY: ReadonlyArray<{ id: string; label: string; category: string }> = [
+  { id: "whoosh",       label: "Whoosh",           category: "Transition" },
+  { id: "impact",       label: "Impact Boom",      category: "Transition" },
+  { id: "swoosh_soft",  label: "Soft Swoosh",      category: "Transition" },
+  { id: "pop",          label: "Pop",              category: "UI" },
+  { id: "click",        label: "Click",            category: "UI" },
+  { id: "notification", label: "Notification",     category: "UI" },
+  { id: "camera",       label: "Camera Shutter",   category: "UI" },
+  { id: "riser",        label: "Riser",            category: "Tension" },
+  { id: "sub_drop",     label: "Sub Drop",         category: "Tension" },
+  { id: "glitch",       label: "Glitch",           category: "Effect" },
+  { id: "sparkle",      label: "Sparkle",          category: "Effect" },
+  { id: "coin",         label: "Coin",             category: "Effect" },
+  { id: "applause",     label: "Applause",         category: "Ambient" },
+  { id: "crowd",        label: "Crowd",            category: "Ambient" },
+];
+
+let _sfxUid = 0;
+export function nextSfxId(): string {
+  return `sfx_${Date.now().toString(36)}_${(_sfxUid++).toString(36)}`;
+}
+
+let _charUid = 0;
+export function nextCharacterId(): string {
+  return `char_${Date.now().toString(36)}_${(_charUid++).toString(36)}`;
+}
+
 
 /** Convert an edited blueprint back into an AiVideoScript the pipeline can consume. */
 export function blueprintToScript(bp: VideoBlueprint): AiVideoScript {
