@@ -20,6 +20,8 @@ import {
   Eraser, Expand, PaintBucket, History, ChevronDown,
 } from "lucide-react";
 import type { GenerateImageRequest } from "@/lib/image-stream";
+import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
+import { HandoffBanner } from "@/components/handoff-banner";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 
