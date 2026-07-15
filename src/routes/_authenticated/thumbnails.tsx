@@ -25,6 +25,8 @@ import {
 import {
   planThumbnailBrief, analyzeThumbnailQuality, reverseEngineerThumbnail,
 } from "@/lib/thumbnail-planner.functions";
+import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
+import { HandoffBanner } from "@/components/handoff-banner";
 
 export const Route = createFileRoute("/_authenticated/thumbnails")({
   head: () => ({
