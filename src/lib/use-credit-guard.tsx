@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { reserveCreditsFn, finalizeCreditsFn, refundLedgerFn } from "@/lib/credits-guard.functions";
 import type { ReserveResult } from "@/lib/credits-guard.functions";
 import { useAccess } from "@/lib/access";
+import { InsufficientCreditsDialog } from "@/components/insufficient-credits-dialog";
 import type { CreditAction } from "@/lib/credit-estimator";
 
 export type RunSpec = {
