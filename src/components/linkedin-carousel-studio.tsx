@@ -292,7 +292,10 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
                       slideNum={i + 1}
                       total={state.slides.length}
                       innerRef={(el) => { refs.current[s.id] = el; }}
+                      width={SLIDE_W}
+                      height={SLIDE_H}
                     />
+
                   )
                 ))}
               </div>
