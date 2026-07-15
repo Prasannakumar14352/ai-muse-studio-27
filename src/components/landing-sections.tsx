@@ -134,30 +134,64 @@ export function DemoVideoSection() {
         </p>
 
         <div ref={containerRef} className="mt-10 glass rounded-3xl p-2 shadow-[var(--shadow-glow)]">
-          <div className="relative aspect-video rounded-2xl overflow-hidden bg-black group">
-            <video
-              ref={videoRef}
-              src={videoUrl}
-              poster={posterUrl}
-              autoPlay
-              muted={muted}
-              loop
-              playsInline
-              preload="metadata"
-              onPlay={() => setPlaying(true)}
-              onPause={() => setPlaying(false)}
-              onTimeUpdate={(e) => {
-                const t = e.currentTarget;
-                setProgress(t.duration > 0 ? (t.currentTime / t.duration) * 100 : 0);
+          <div className="relative aspect-video rounded-2xl overflow-hidden bg-[#0a0714] group">
+            {/* Branded gradient underlay — visible if the <video> element ever
+                fails to paint (network hiccup, decode error, poster missing).
+                Guarantees the card never shows a plain black rectangle. */}
+            <div
+              aria-hidden
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  "radial-gradient(1200px 800px at 20% 10%, rgba(120,40,180,0.35) 0%, transparent 60%), radial-gradient(1000px 700px at 80% 90%, rgba(255,60,140,0.25) 0%, transparent 60%), #0a0714",
               }}
-              className="w-full h-full object-cover bg-black"
             />
-            <span className="absolute top-3 left-3 glass px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/85">
+            {!errored && (
+              <video
+                key={retryKey}
+                ref={videoRef}
+                src={videoUrl}
+                poster={posterUrl}
+                autoPlay
+                muted={muted}
+                loop
+                playsInline
+                preload="metadata"
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                onError={() => setErrored(true)}
+                onTimeUpdate={(e) => {
+                  const t = e.currentTarget;
+                  setProgress(t.duration > 0 ? (t.currentTime / t.duration) * 100 : 0);
+                }}
+                className="relative w-full h-full object-cover"
+              />
+            )}
+            {errored && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 text-white z-10">
+                <div className="glass rounded-2xl px-6 py-5 max-w-sm">
+                  <AlertCircle className="w-8 h-8 text-[color:var(--neon-pink)] mx-auto mb-3" />
+                  <div className="font-semibold">Video failed to load</div>
+                  <p className="text-sm text-white/70 mt-1">
+                    Check your connection and try again.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg gradient-primary text-white text-sm px-4 py-2"
+                  >
+                    <Play className="w-4 h-4" /> Retry
+                  </button>
+                </div>
+              </div>
+            )}
+            <span className="absolute top-3 left-3 glass px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/85 z-10">
               Live product recording
             </span>
 
             {/* Controls overlay */}
-            <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/70 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition">
+            {!errored && (
+            <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/70 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition z-10">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -191,7 +225,9 @@ export function DemoVideoSection() {
                 </button>
               </div>
             </div>
+            )}
           </div>
+
         </div>
 
         <div className="mt-8 flex flex-wrap justify-center gap-3">
