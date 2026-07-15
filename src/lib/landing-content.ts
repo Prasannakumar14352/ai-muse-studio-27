@@ -9,11 +9,17 @@ export type Testimonial = {
   country: string;
   role:
     | "Instagram Creator"
+    | "YouTube Creator"
     | "YouTuber"
     | "Course Creator"
     | "Agency"
+    | "Agency Owner"
     | "Freelancer"
     | "Business Owner"
+    | "Small Business Owner"
+    | "Digital Marketer"
+    | "Coach"
+    | "Entrepreneur"
     | "Teacher";
   /** Company or specific creator brand (e.g. "Menon Reels", "Acme Agency"). */
   company?: string;
