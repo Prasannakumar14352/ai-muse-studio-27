@@ -11,6 +11,7 @@ export type LinkedinCarouselSlide = {
   body?: string;
   bullets?: string[];
   footer?: string;
+  notes?: string;
 };
 
 export type LinkedinCarouselContent = {
@@ -132,3 +133,66 @@ Return JSON EXACTLY:
       return { mode: "demo", content: demo(data), safeError: "AI temporarily unavailable — draft shown." };
     }
   });
+
+const TransformInput = z.object({
+  action: z.enum(["rewrite", "expand", "shorten"]),
+  title: z.string().default(""),
+  body: z.string().default(""),
+  bullets: z.array(z.string()).default([]),
+  tone: z.string().default("Professional"),
+  topic: z.string().default(""),
+});
+
+export type CarouselSlideTransform = {
+  title: string;
+  body: string;
+  bullets: string[];
+};
+
+export const transformCarouselSlide = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => TransformInput.parse(v))
+  .handler(async ({ data }): Promise<{ mode: "ai" | "demo"; slide: CarouselSlideTransform; safeError?: string }> => {
+    const key = process.env.LOVABLE_API_KEY;
+    const fallback: CarouselSlideTransform = {
+      title: data.title,
+      body: data.body,
+      bullets: data.bullets,
+    };
+    if (!key) return { mode: "demo", slide: fallback, safeError: "AI key missing." };
+    const instruction =
+      data.action === "rewrite" ? "Rewrite the slide with sharper phrasing. Keep length similar."
+      : data.action === "expand" ? "Expand this slide: richer body (up to 60 words) and up to 5 punchy bullets."
+      : "Shorten this slide: title 3-6 words, body under 20 words, max 2 bullets.";
+    const sys = "You edit LinkedIn carousel slides. Return ONLY JSON: {\"title\":\"...\",\"body\":\"...\",\"bullets\":[\"...\"]}. No emojis, no fluff, no fabricated stats.";
+    const user = `Topic: ${data.topic}\nTone: ${data.tone}\n${instruction}\n\nCurrent slide:\nTitle: ${data.title}\nBody: ${data.body}\nBullets: ${JSON.stringify(data.bullets)}`;
+    try {
+      const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [{ role: "system", content: sys }, { role: "user", content: user }],
+          response_format: { type: "json_object" },
+        }),
+      });
+      if (!upstream.ok) return { mode: "demo", slide: fallback, safeError: "AI busy." };
+      const j = (await upstream.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const raw = j.choices?.[0]?.message?.content ?? "";
+      let parsed: unknown;
+      try { parsed = JSON.parse(raw); } catch {
+        const m = raw.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : null;
+      }
+      const S = z.object({
+        title: z.string().default(data.title),
+        body: z.string().default(data.body),
+        bullets: z.array(z.string()).default(data.bullets),
+      });
+      const p = S.safeParse(parsed);
+      if (!p.success) return { mode: "demo", slide: fallback, safeError: "AI response invalid." };
+      return { mode: "ai", slide: p.data };
+    } catch {
+      return { mode: "demo", slide: fallback, safeError: "AI unavailable." };
+    }
+  });
+

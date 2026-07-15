@@ -1,5 +1,5 @@
 // LinkedIn Document Carousel Studio — render, edit, reorder, download, PDF export.
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
@@ -8,15 +8,23 @@ import { useServerFn } from "@tanstack/react-start";
 import { saveBlob } from "@/lib/downloads";
 import {
   generateLinkedinCarousel,
+  transformCarouselSlide,
   type LinkedinCarouselContent,
   type LinkedinCarouselSlide,
 } from "@/lib/linkedin-carousel-ai.functions";
-import { ArrowDown, ArrowUp, Copy, Download, FileDown, GripVertical, Package, Plus, Trash2, Wand2 } from "lucide-react";
+import { getDefaultBrandKitFn } from "@/lib/brand-kit.functions";
+import { ArrowDown, ArrowUp, Copy, Download, FileDown, GripVertical, Instagram, Linkedin, Package, Palette, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 
+
 // LinkedIn document carousels display best at portrait ~4:5 (1080x1350).
-const SLIDE_W = 1080;
-const SLIDE_H = 1350;
+// Instagram preview uses 1:1 (1080x1080).
+const FORMATS = {
+  linkedin: { w: 1080, h: 1350, label: "LinkedIn 4:5" },
+  instagram: { w: 1080, h: 1080, label: "Instagram 1:1" },
+} as const;
+type FormatKey = keyof typeof FORMATS;
+
 
 type Props = {
   initial?: LinkedinCarouselContent | null;
@@ -38,8 +46,15 @@ function newSlide(kind: LinkedinCarouselSlide["kind"] = "content"): LinkedinCaro
 
 export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, brand, cta, onChange }: Props) {
   const run = useServerFn(generateLinkedinCarousel);
+  const transform = useServerFn(transformCarouselSlide);
+  const loadBrandKit = useServerFn(getDefaultBrandKitFn);
   const [busy, setBusy] = useState(false);
+  const [aiBusyIdx, setAiBusyIdx] = useState<number | null>(null);
+  const [format, setFormat] = useState<FormatKey>("linkedin");
+  const SLIDE_W = FORMATS[format].w;
+  const SLIDE_H = FORMATS[format].h;
   const [state, setState] = useState<LinkedinCarouselContent>(
+
     initial ?? { slides: [newSlide("cover"), newSlide("content"), newSlide("cta")], design: { palette: ["#0A66C2", "#F3F6F8", "#111827"], theme: "dark" } },
   );
   const [active, setActive] = useState(0);
@@ -102,6 +117,54 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
     slides.splice(after + 1, 0, newSlide(kind));
     update({ ...state, slides }); setActive(after + 1);
   }
+  function duplicate(idx: number) {
+    const src = state.slides[idx];
+    if (!src) return;
+    const clone: LinkedinCarouselSlide = { ...src, id: Math.random().toString(36).slice(2, 9) };
+    const slides = state.slides.slice();
+    slides.splice(idx + 1, 0, clone);
+    update({ ...state, slides }); setActive(idx + 1);
+  }
+  async function aiTransform(idx: number, action: "rewrite" | "expand" | "shorten") {
+    const s = state.slides[idx];
+    if (!s) return;
+    setAiBusyIdx(idx);
+    try {
+      const res = await transform({
+        data: {
+          action, topic, tone: tone ?? "Professional",
+          title: s.title ?? "", body: s.body ?? "", bullets: s.bullets ?? [],
+        },
+      });
+      patchSlide(idx, { title: res.slide.title, body: res.slide.body, bullets: res.slide.bullets });
+      if (res.mode === "ai") toast.success(`Slide ${action}n`);
+      else toast.message("AI unavailable", { description: res.safeError });
+    } catch (e) {
+      toast.error("AI edit failed", { description: e instanceof Error ? e.message : undefined });
+    } finally { setAiBusyIdx(null); }
+  }
+
+  // Auto-apply Brand Kit colors on mount if user has a default kit.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const kit = await loadBrandKit();
+        if (cancelled || !kit) return;
+        const primary = kit.primary_color;
+        const secondary = kit.secondary_color;
+        if (primary || secondary) {
+          const palette = state.design.palette.slice();
+          if (primary) palette[0] = primary;
+          if (secondary) palette[1] = secondary;
+          update({ ...state, design: { ...state.design, palette } });
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   async function captureSlide(id: string): Promise<string | null> {
     const node = refs.current[id];
@@ -179,6 +242,16 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
         </label>
         <div className="flex-1" />
         <CreatorFlowSelect
+          ariaLabel="Preview format"
+          className="h-8 w-40"
+          value={format}
+          onValueChange={(v) => setFormat(v as FormatKey)}
+          options={[
+            { value: "linkedin", label: "LinkedIn 4:5" },
+            { value: "instagram", label: "Instagram 1:1" },
+          ]}
+        />
+        <CreatorFlowSelect
           ariaLabel="Theme"
           className="h-8 w-28"
           value={state.design.theme}
@@ -186,14 +259,18 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
           options={[{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }]}
         />
         <button onClick={downloadAll} disabled={busy}
-          className="rounded-lg border border-border/60 px-3 py-1.5 text-xs inline-flex items-center gap-1 hover:bg-white/5">
-          <Package className="w-3.5 h-3.5" /> Download all (ZIP)
+          className="rounded-lg border border-border/60 px-3 py-1.5 text-xs inline-flex items-center gap-1 hover:bg-white/5"
+          title={format === "instagram" ? "Instagram square PNGs (ZIP)" : "LinkedIn 4:5 PNGs (ZIP)"}>
+          {format === "instagram" ? <Instagram className="w-3.5 h-3.5" /> : <Package className="w-3.5 h-3.5" />}
+          {format === "instagram" ? "IG PNGs (ZIP)" : "Download all (ZIP)"}
         </button>
         <button onClick={exportPdf} disabled={busy}
-          className="rounded-lg border border-border/60 px-3 py-1.5 text-xs inline-flex items-center gap-1 hover:bg-white/5">
-          <FileDown className="w-3.5 h-3.5" /> Export PDF
+          className="rounded-lg border border-border/60 px-3 py-1.5 text-xs inline-flex items-center gap-1 hover:bg-white/5"
+          title="LinkedIn document carousel PDF">
+          <Linkedin className="w-3.5 h-3.5" /> <FileDown className="w-3.5 h-3.5" /> LinkedIn PDF
         </button>
       </div>
+
 
       <div className="grid lg:grid-cols-[280px_1fr_320px] gap-4">
         {/* Reorder rail — drag the handle to reorder */}
@@ -231,8 +308,10 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
                 <div className="flex items-center gap-1">
                   <button onClick={(e) => { e.stopPropagation(); move(i, -1); }} className="p-1 hover:bg-white/10 rounded" title="Move up"><ArrowUp className="w-3 h-3" /></button>
                   <button onClick={(e) => { e.stopPropagation(); move(i, 1); }} className="p-1 hover:bg-white/10 rounded" title="Move down"><ArrowDown className="w-3 h-3" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); duplicate(i); }} className="p-1 hover:bg-white/10 rounded" title="Duplicate"><Copy className="w-3 h-3" /></button>
                   <button onClick={(e) => { e.stopPropagation(); del(i); }} className="p-1 hover:bg-white/10 rounded text-rose-300" title="Delete"><Trash2 className="w-3 h-3" /></button>
                 </div>
+
               </div>
               <p className="text-xs font-medium line-clamp-2 pl-6">{s.title}</p>
             </div>
@@ -259,7 +338,10 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
                     slideNum={i + 1}
                     total={state.slides.length}
                     innerRef={(el) => { refs.current[s.id] = el; }}
+                    width={SLIDE_W}
+                    height={SLIDE_H}
                   />
+
                 </div>
               ))}
               {/* Off-screen render for capture-any-slide */}
@@ -274,7 +356,10 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
                       slideNum={i + 1}
                       total={state.slides.length}
                       innerRef={(el) => { refs.current[s.id] = el; }}
+                      width={SLIDE_W}
+                      height={SLIDE_H}
                     />
+
                   )
                 ))}
               </div>
@@ -304,8 +389,49 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
             />
           </div>
           <TextField label="Footer" value={cur.footer ?? ""} onChange={(v) => patchSlide(active, { footer: v })} />
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1.5">Speaker notes (not exported)</div>
+            <textarea
+              rows={3}
+              value={cur.notes ?? ""}
+              onChange={(e) => patchSlide(active, { notes: e.target.value })}
+              placeholder="Talking points, sources, or reminders for you."
+              className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-xs"
+            />
+          </div>
+          <div className="pt-2 border-t border-border/40 space-y-2">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">AI actions</div>
+            <div className="flex flex-wrap gap-1.5">
+              <button disabled={aiBusyIdx === active} onClick={() => aiTransform(active, "rewrite")}
+                className="rounded-md border border-border/60 px-2 py-1 text-[11px] inline-flex items-center gap-1 hover:bg-white/5 disabled:opacity-50">
+                <Sparkles className="w-3 h-3" /> {aiBusyIdx === active ? "Working…" : "Rewrite"}
+              </button>
+              <button disabled={aiBusyIdx === active} onClick={() => aiTransform(active, "expand")}
+                className="rounded-md border border-border/60 px-2 py-1 text-[11px] hover:bg-white/5 disabled:opacity-50">Expand</button>
+              <button disabled={aiBusyIdx === active} onClick={() => aiTransform(active, "shorten")}
+                className="rounded-md border border-border/60 px-2 py-1 text-[11px] hover:bg-white/5 disabled:opacity-50">Shorten</button>
+            </div>
+          </div>
           <div className="pt-2 border-t border-border/40">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1.5">Palette</div>
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">Brand palette</div>
+              <button
+                onClick={async () => {
+                  try {
+                    const kit = await loadBrandKit();
+                    if (!kit) return toast.message("No default Brand Kit set");
+                    const palette = state.design.palette.slice();
+                    if (kit.primary_color) palette[0] = kit.primary_color;
+                    if (kit.secondary_color) palette[1] = kit.secondary_color;
+                    update({ ...state, design: { ...state.design, palette } });
+                    toast.success("Brand Kit applied");
+                  } catch (e) { toast.error(e instanceof Error ? e.message : "Load failed"); }
+                }}
+                className="text-[11px] inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+              >
+                <Palette className="w-3 h-3" /> Load Brand Kit
+              </button>
+            </div>
             <div className="flex gap-2">
               {state.design.palette.map((c, i) => (
                 <input key={i} type="color" value={c}
@@ -319,6 +445,7 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
               ))}
             </div>
           </div>
+
           <button
             onClick={() => { navigator.clipboard.writeText(JSON.stringify(state, null, 2)); toast.success("Copied JSON"); }}
             className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
@@ -347,7 +474,7 @@ function TextField({ label, value, onChange, multiline }: { label: string; value
 }
 
 function SlideCanvas({
-  slide, theme, palette, slideNum, total, innerRef,
+  slide, theme, palette, slideNum, total, innerRef, width, height,
 }: {
   slide: LinkedinCarouselSlide;
   theme: "light" | "dark";
@@ -355,7 +482,12 @@ function SlideCanvas({
   slideNum: number;
   total: number;
   innerRef: (el: HTMLDivElement | null) => void;
+  width: number;
+  height: number;
 }) {
+  const SLIDE_W = width;
+  const SLIDE_H = height;
+
   const isDark = theme === "dark";
   const accent = palette[0] ?? "#0A66C2";
   const surface = palette[2] ?? (isDark ? "#0B1220" : "#F3F6F8");
