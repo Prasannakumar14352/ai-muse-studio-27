@@ -1,75 +1,111 @@
-# Unified AI Generation Wizard
+## Goal
+Centralize credit enforcement so every AI generation entry point (existing and future) goes through one backend service that reserves credits atomically, refunds on failure, and shows the correct plan-aware upgrade/top-up modal on shortage — without losing user work.
 
-Goal: every generation module (Videos, Carousels, Images, Thumbnails, LinkedIn Posts, Captions) uses the same 5-step wizard and the same "planning-first, editable-plan" experience — so the app feels like one platform instead of six separate generators.
+## 1. Database (single migration)
 
-Thumbnails already follows this pattern (Plan → Brief → Generate). We'll lift its shape into a reusable primitive and retrofit the other modules.
+New table `credit_ledger` (auditable ledger):
+- `id`, `user_id`, `action` (module id, e.g. `video`, `carousel`, `image`, `thumbnail`, `linkedin`, `caption`, `strategy`, `research`, `agent`, `repurpose`, `upscale`, `bg_remove`, `inpaint`, etc.), `project_id`, `render_job_id`
+- `credits_estimated`, `credits_reserved`, `credits_charged`, `credits_refunded`
+- `balance_before`, `balance_after`
+- `source` (`subscription` | `balance` | `lifetime` | `admin`)
+- `status` (`reserved` | `charged` | `refunded` | `failed`)
+- `idempotency_key` (unique per user)
+- `created_at`, `updated_at`
+- RLS: user reads own rows; service_role full access.
 
----
+New RPCs (SECURITY DEFINER, replace `deduct_credits` usage sites):
+- `reserve_credits(_user_id, _amount, _action, _project_id, _idempotency_key, _description)` → returns `{ok, ledger_id, source, balance_before, balance_after}` or `{ok:false, error:'insufficient_credits', required, available, shortage, plan_type}`. Idempotent: if `idempotency_key` exists for the same user, return the existing ledger row untouched (no double charge).
+- `finalize_credits(_ledger_id)` → marks `charged`. No-op if already charged.
+- `refund_credits_by_ledger(_ledger_id, _reason)` → returns credits to the same bucket, marks `refunded`. No-op if already refunded/never reserved.
+- Consumption order: monthly plan credits → top-up balance → lifetime. Admin/unlimited: write ledger row with 0 charged and status `charged`.
 
-## 1. Shared wizard primitive
+## 2. Server functions (`src/lib/credits-guard.functions.ts`)
 
-New files:
-- `src/components/wizard/GenerationWizard.tsx` — controlled 5-step shell: `Plan → Review → Generate → Preview → Export`. Renders step header, progress, Back/Next, and slot per step.
-- `src/components/wizard/PlanEditor.tsx` — generic editor for a plan object: renders each section as an editable card with **Edit / Rewrite / Regenerate section / Delete / Add**.
-- `src/components/wizard/AssetActions.tsx` — post-generation action bar: **Duplicate / Edit / Regenerate / Save / Export / Publish / History**.
-- `src/lib/plan-store.ts` — localStorage-backed store keyed by `{module, projectId}` persisting `{originalPrompt, aiPlan, editedPlan, result, exports[]}` + version history.
+Thin wrappers around the RPCs, all under `requireSupabaseAuth`:
+- `reserveCreditsFn({ amount, action, projectId?, renderJobId?, idempotencyKey, description })`
+- `finalizeCreditsFn({ ledgerId })`
+- `refundCreditsByLedgerFn({ ledgerId, reason })`
+- `getCreditSummaryFn()` — returns `{ available, monthlyRemaining, balance, lifetime, unlimited, planType, canBuyTopups }` for the modal.
 
-## 2. Planning server functions
+Idempotency key = SHA-256 of `userId + action + inputHash + clientNonce` generated client-side; retries reuse it so refresh/double-click never double-charge.
 
-One `createServerFn` per module producing a typed, editable plan JSON via `gatewayChatText` (structured output). Naming: `plan<Module>Fn`.
+## 3. Client guard hook (`src/lib/use-credit-guard.ts`)
 
-New / extended files:
-- `src/lib/video-plan.functions.ts` — outline, script, scenes, image prompts, video prompts, VO, captions, CTA.
-- `src/lib/carousel-plan.functions.ts` — slide titles, slide content, image prompts, CTA, caption, hashtags.
-- `src/lib/image-plan.functions.ts` — positive/negative prompt, composition, camera, lighting, colors.
-- `src/lib/linkedin-plan.functions.ts` — hook, story, CTA, first comment, hashtags.
-- `src/lib/caption-plan.functions.ts` — 3 caption variants, hooks, CTAs, hashtag pack.
-- Reuse existing `src/lib/thumbnail-planner.functions.ts` (already conformant).
+```ts
+const { runWithCredits, InsufficientModal } = useCreditGuard();
+await runWithCredits(
+  { action: 'image', amount: cost, description, projectId, inputHash },
+  async () => callProvider(),
+);
+```
 
-Each also exposes `regenerateSectionFn({plan, section, instruction})` so the PlanEditor's per-section "Regenerate" works without redoing the whole plan.
+Behavior:
+1. `useAccess()` fast client check → if clearly insufficient, open modal immediately (skip network round-trip). If unlimited, skip check.
+2. Call `reserveCreditsFn` (server is the authority). On `insufficient_credits`, open the plan-aware modal with `{required, available, shortage}` and reject.
+3. Run work. If it throws → `refundCreditsByLedgerFn`. If success → `finalizeCreditsFn`. Invalidate `['access']` and `['credit-summary']` queries.
+4. In-flight `Set<idempotencyKey>` prevents double-click while pending; a completed key routes retries to the same ledger row via server-side idempotency.
 
-## 3. Route retrofits
+## 4. Shared insufficient-credits modal (`src/components/insufficient-credits-dialog.tsx`)
 
-Each module route is rewritten to mount `<GenerationWizard>` with module-specific step content. Existing generation logic stays — we only move it behind the wizard's "Generate" step.
+Plan-aware:
+- `free` / no paid plan → "You need more credits", CTAs: **View Plans** → `/pricing`, **Buy Credit Pack** (only if `canBuyTopups` allows free-tier top-ups — otherwise hidden), "Upgrade includes monthly credits + premium features".
+- `paid` / `lifetime` → "Not enough credits", CTAs: **Buy Extra Credits** (opens existing `TopupPacks` checkout in a dialog), **View Usage** → `/billing`.
+- Shows required, available, shortage.
+- Preserves in-flight generation intent: the guard holds the work callback; when access query returns enough credits after top-up, an inline **Retry generation** button re-invokes it. Wizard state stays mounted — modal is a portaled overlay, no route change.
 
-- `src/routes/_authenticated/videos.tsx`
-- `src/routes/_authenticated/carousels.tsx` (and `create_.carousel.tsx`)
-- `src/routes/_authenticated/images.tsx`
-- `src/routes/_authenticated/thumbnails.tsx` — already 2-step; wrap into 5-step shell, no logic changes.
-- `src/routes/_authenticated/linkedin-posts.new.tsx`
-- `src/routes/_authenticated/captions.tsx`
+## 5. Cost estimator (`src/lib/credit-costs.ts` extended)
 
-## 4. Persistence
+Add `estimateCost(action, params)`:
+- `image`: `1 * batch * qualityMultiplier`
+- `video-short`: `1 + scenes` (from plan)
+- `video-long`: `1 + ceil(durationSec / 8)`
+- `carousel`: `1 + slideCount`
+- `thumbnail`: `conceptCount`
+- `upscale` / `bg_remove` / `inpaint`: 1 each
+- `linkedin` / `caption` / `strategy` / `research`: 1
+- `agent-campaign`: 3
+- `repurpose`: `1 * targets`
 
-Every wizard writes to `project_memory` (existing table) with `kind: 'wizard:<module>'` and payload `{originalPrompt, aiPlan, editedPlan, result, exports}`. Version history reads back the last N entries for the same project+module. Local draft mirrored to `plan-store.ts` so refresh doesn't lose in-progress plans.
+Exposed helper `<CreditCostBadge action={...} params={...} />` used on every Generate button ("Generate · N credits").
 
-## 5. Post-generation actions
+## 6. Retrofit call sites
 
-`AssetActions` wires to existing helpers where they exist (download, publish-kit, repurpose), and to new lightweight ones where they don't (Duplicate = clone plan into a new draft; History = list previous `project_memory` entries).
+Replace every existing `deductUsage` / raw provider call with `runWithCredits(...)`:
+- Videos (input screen, regenerate scene, upscale)
+- Thumbnails (concept batch, quality analysis, upscale, remove BG, inpaint, magic eraser)
+- Images (batch generate, edit ops)
+- Carousels + create/carousel
+- LinkedIn posts new
+- Captions wizard
+- Strategy wizard
+- Research (main run + one-click actions that consume credits when generating; **draft-only handoffs stay free per the previous turn**)
+- Agents (campaign + specialists)
+- Repurpose
+- Templates "Use template" → cost applied when it triggers generation, not when opening
+- Any api route that mints media (`/api/generate-image`, `/api/generate-video-clip`, `/api/tts`) — server-side also calls `reserveCreditsFn` inline so a direct HTTP hit can't bypass; frontend still runs the guard for UX.
 
-## 6. Design
+Old `deductUsage`/`withCreditRefund` shim → delegate to new guard so any missed call site keeps working.
 
-Reuse existing glass/dark tokens. No new theme. Wizard step bar uses the same pill styling as the current thumbnails/strategy wizards for visual consistency.
+## 7. UI states
 
----
+- All generation buttons: disabled while `runWithCredits` promise pending, spinner + label ("Generating…").
+- Success toast on charge; failure toast on refund with reason.
+- Cost badge visible before click; batch cost recomputes as batch/quality/duration changes.
 
-## Technical notes
+## 8. Tests (`tests/e2e/credit-guard.py`, plus unit fns)
 
-- No schema changes. `project_memory` already accepts arbitrary `payload jsonb`.
-- Planning fns follow `.middleware([requireSupabaseAuth])` and default `platforms: {}` guard (same fix as publish-kit) to survive model omissions.
-- Wizard is client-only; server fns are called via `useServerFn`.
-- Credits: planning uses the existing `deduct_credits` RPC with a small planning cost (configurable via `credit-costs.ts`); final Generate keeps its current cost.
-- Typecheck (`bunx tsgo --noEmit`) must pass before finishing.
+Playwright-driven scenarios against localhost: free-enough, free-short → upgrade modal, paid-short → top-up modal, top-up success → retry same intent charges once, forced-failure refund, double-click → single ledger row, admin → zero-cost ledger row, refresh mid-flight → no duplicate charge (idempotency).
 
-## Out of scope
+## 9. Out of scope
 
-- No changes to auth, billing, credits math, Razorpay, webhooks, rendering pipeline, or AI providers.
-- No redesign of branding, sidebar, or route structure beyond the wizard mount.
-- Marketplace/Analytics/Brand Kit modules untouched (not generation modules).
+- No pricing changes, no Razorpay flow changes (top-up dialog reuses existing `TopupPacks`).
+- No sidebar/route redesign.
+- Frontend estimator numbers stay authoritative for display; server RPC remains authoritative for enforcement.
 
 ## Deliverable order
 
-1. Wizard primitives + plan store + shared PlanEditor/AssetActions.
-2. Planning server fns for all six modules (parallel).
-3. Retrofit routes one module at a time, starting with Images (simplest) and ending with Videos (most complex).
-4. Typecheck, then a short summary of files changed.
+1. Migration (`credit_ledger` + RPCs + GRANTs + RLS).
+2. `credits-guard.functions.ts` + `use-credit-guard.ts` + modal + cost badge.
+3. Retrofit modules one by one (Images → Thumbnails → Captions → LinkedIn → Carousel → Videos → Strategy → Research → Agents → Repurpose).
+4. Server-side guard inside `/api/generate-image`, `/api/generate-video-clip`, `/api/tts`.
+5. Typecheck + Playwright scenarios.

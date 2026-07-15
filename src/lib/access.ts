@@ -85,82 +85,114 @@ export function canGenerate(a: AccessInfo, required: number): boolean {
   return getAvailableCredits(a) >= required;
 }
 
-/** Deduct credits atomically via SECURITY DEFINER RPC. Returns source used. */
+/**
+ * DEPRECATED direct API. Prefer `useCreditGuard()` in components. Kept as a
+ * compatibility shim so existing modules keep working — it now goes through
+ * the new credit ledger (reserve → finalize) instead of `deduct_credits`, so
+ * every module has atomic reserve, refund, and audit trail.
+ */
 export async function deductUsage(params: {
   amount: number;
   projectId?: string | null;
   description: string;
-}): Promise<{ ok: boolean; source?: string; error?: string; remaining?: number }> {
+  action?: string;
+  idempotencyKey?: string;
+}): Promise<{ ok: boolean; source?: string; error?: string; remaining?: number; ledgerId?: string }> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return { ok: false, error: "not_authenticated" };
 
-  // Client-side bypass mirror (server enforces too)
-  if (isAdminUser(u.user.email)) {
-    return { ok: true, source: "admin", remaining: -1 };
-  }
+  const idempotencyKey =
+    params.idempotencyKey ??
+    `${u.user.id}:${params.action ?? "generic"}:${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-  const { data, error } = await (supabase.rpc as any)("deduct_credits", {
-    _user_id: u.user.id,
-    _amount: params.amount,
-    _project_id: params.projectId ?? null,
-    _description: params.description,
-  });
-  if (error) return { ok: false, error: error.message };
-  return data as { ok: boolean; source?: string; error?: string; remaining?: number };
+  try {
+    const { reserveCreditsFn } = await import("@/lib/credits-guard.functions");
+    const res = await reserveCreditsFn({
+      data: {
+        amount: params.amount,
+        action: params.action ?? "generic",
+        projectId: params.projectId ?? null,
+        idempotencyKey,
+        description: params.description,
+      },
+    });
+    if (!res.ok) {
+      if (res.error === "insufficient_credits") {
+        // Notify the global gate — modal shows without losing user work.
+        try {
+          const { fireCreditGate } = await import("@/components/global-credit-gate");
+          fireCreditGate({
+            required: res.required,
+            available: res.available,
+            shortage: res.shortage,
+            planType: res.plan_type,
+          });
+        } catch { /* non-DOM contexts */ }
+      }
+      return { ok: false, error: res.error, source: "insufficient" };
+    }
+    return { ok: true, source: res.source, ledgerId: res.ledger_id };
+  } catch (e) {
+    console.warn("[deductUsage] reserve failed", e);
+    return { ok: false, error: e instanceof Error ? e.message : "reserve_failed" };
+  }
 }
 
-/**
- * Refund credits to the same bucket they were spent from. Call this when a
- * generation fails AFTER a successful `deductUsage`. Safe to call for admin
- * (server no-ops). Never throws — logs and swallows on failure so callers
- * don't need extra try/catch just to refund.
- */
+/** DEPRECATED. Prefer `useCreditGuard`. Refunds a specific ledger row if available. */
 export async function refundUsage(params: {
   amount: number;
   projectId?: string | null;
   description: string;
-  source: "subscription" | "balance" | "admin";
+  source: "subscription" | "balance" | "admin" | "lifetime";
+  ledgerId?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   try {
-    // Lazy-import so the browser bundle doesn't pull the server fn module eagerly.
+    if (params.ledgerId) {
+      const { refundLedgerFn } = await import("@/lib/credits-guard.functions");
+      const r = await refundLedgerFn({ data: { ledgerId: params.ledgerId, reason: params.description } });
+      return { ok: !!r?.ok };
+    }
     const { refundCreditsFn } = await import("@/lib/credits.functions");
-    const result = await refundCreditsFn({ data: params });
-    return { ok: !!result?.ok };
+    const legacySource = params.source === "lifetime" ? "balance" : params.source;
+    const r = await refundCreditsFn({
+      data: { amount: params.amount, projectId: params.projectId ?? null, description: params.description, source: legacySource },
+    });
+    return { ok: !!r?.ok };
   } catch (e) {
     console.warn("[refundUsage] failed", e);
     return { ok: false, error: e instanceof Error ? e.message : "refund_failed" };
   }
 }
 
-/**
- * Convenience wrapper: run an async generation, deducting BEFORE the work and
- * refunding automatically if the work throws. Returns the generation's result.
- *
- * Usage:
- *   const project = await withCreditRefund(
- *     { amount: 1, description: "AI image", projectId: null },
- *     async () => generateImage(),
- *   );
- */
+/** DEPRECATED wrapper. Callers get the new ledger semantics automatically. */
 export async function withCreditRefund<T>(
-  spend: { amount: number; projectId?: string | null; description: string },
+  spend: { amount: number; projectId?: string | null; description: string; action?: string },
   work: () => Promise<T>,
 ): Promise<T> {
   const deducted = await deductUsage(spend);
   if (!deducted.ok) {
     throw new Error(deducted.error || "Could not deduct credits");
   }
-  const source = (deducted.source ?? "balance") as "subscription" | "balance" | "admin";
   try {
-    return await work();
+    const result = await work();
+    if (deducted.ledgerId) {
+      try {
+        const { finalizeCreditsFn } = await import("@/lib/credits-guard.functions");
+        await finalizeCreditsFn({ data: { ledgerId: deducted.ledgerId } });
+      } catch (e) {
+        console.warn("[withCreditRefund] finalize failed", e);
+      }
+    }
+    return result;
   } catch (err) {
-    // Best-effort refund — don't shadow the original error.
     void refundUsage({
       amount: spend.amount,
       projectId: spend.projectId ?? null,
       description: spend.description,
-      source,
+      source: (deducted.source as "subscription" | "balance" | "admin") ?? "balance",
+      ledgerId: deducted.ledgerId,
     });
     throw err;
   }
 }
+

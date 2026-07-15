@@ -366,6 +366,69 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_ledger: {
+        Row: {
+          action: string
+          balance_after: number
+          balance_before: number
+          created_at: string
+          credits_charged: number
+          credits_estimated: number
+          credits_refunded: number
+          credits_reserved: number
+          description: string | null
+          error: string | null
+          id: string
+          idempotency_key: string
+          project_id: string | null
+          render_job_id: string | null
+          source: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          balance_after?: number
+          balance_before?: number
+          created_at?: string
+          credits_charged?: number
+          credits_estimated?: number
+          credits_refunded?: number
+          credits_reserved?: number
+          description?: string | null
+          error?: string | null
+          id?: string
+          idempotency_key: string
+          project_id?: string | null
+          render_job_id?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          balance_after?: number
+          balance_before?: number
+          created_at?: string
+          credits_charged?: number
+          credits_estimated?: number
+          credits_refunded?: number
+          credits_reserved?: number
+          description?: string | null
+          error?: string | null
+          id?: string
+          idempotency_key?: string
+          project_id?: string | null
+          render_job_id?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       credit_packs: {
         Row: {
           active: boolean
@@ -1878,6 +1941,8 @@ export type Database = {
         }
         Returns: Json
       }
+      finalize_credits: { Args: { _ledger_id: string }; Returns: Json }
+      get_credit_summary: { Args: { _user_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1892,6 +1957,21 @@ export type Database = {
           _description: string
           _project_id: string
           _source: string
+          _user_id: string
+        }
+        Returns: Json
+      }
+      refund_credits_by_ledger: {
+        Args: { _ledger_id: string; _reason: string }
+        Returns: Json
+      }
+      reserve_credits: {
+        Args: {
+          _action: string
+          _amount: number
+          _description: string
+          _idempotency_key: string
+          _project_id: string
           _user_id: string
         }
         Returns: Json

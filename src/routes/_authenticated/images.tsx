@@ -164,7 +164,9 @@ function ImagesPage() {
 
   async function runGeneration(p: string, s: string, r: string, count: number) {
     if (access && !canGenerate(access, count)) {
-      toast.error(`Not enough credits for ${count} images.`);
+      const available = access.unlimited ? Number.POSITIVE_INFINITY : (access.monthlyRemaining + access.balance + access.lifetimeCredits);
+      const { fireCreditGate } = await import("@/components/global-credit-gate");
+      fireCreditGate({ required: count, available, shortage: Math.max(0, count - available), planType: access.planType });
       return;
     }
     if (!access?.userId) { toast.error("Sign in required"); return; }
@@ -475,7 +477,11 @@ function ImagesPage() {
                 </button>
                 <button onClick={generate} disabled={loading}
                   className="rounded-lg gradient-primary text-white px-6 py-2.5 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)]">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} Generate {batch}
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                  Generate {batch}
+                  <span className="ml-1 inline-flex items-center rounded-full bg-white/15 border border-white/20 px-1.5 py-0.5 text-[10px] font-semibold">
+                    {batch} credit{batch === 1 ? "" : "s"}
+                  </span>
                 </button>
               </div>
             </div>
