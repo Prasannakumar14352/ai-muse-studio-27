@@ -192,14 +192,10 @@ function TemplateEditor({ initial, onClose, onSaved }: {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Category">
-              <select value={f.category ?? ""} onChange={(e) => set("category", e.target.value)} className={input}>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <CreatorFlowSelect ariaLabel="Category" value={f.category ?? ""} onValueChange={(v) => set("category", v)} options={CATEGORIES} />
             </Field>
             <Field label="Access tier">
-              <select value={f.access_tier ?? "free"} onChange={(e) => set("access_tier", e.target.value as TemplateAccessTier)} className={input}>
-                {TIERS.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <CreatorFlowSelect ariaLabel="Access tier" value={f.access_tier ?? "free"} onValueChange={(v) => set("access_tier", v as TemplateAccessTier)} options={TIERS} />
             </Field>
           </div>
           <Field label="Description">
