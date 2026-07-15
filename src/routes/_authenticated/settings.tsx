@@ -120,7 +120,7 @@ function DataAndCacheCard() {
     try {
       const bundle = await exportAll();
       download(new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }),
-        `creatorvault-export-${Date.now()}.json`);
+        `creatorflow-export-${Date.now()}.json`);
       toast.success(`Exported ${bundle.outputs.length} projects · ${bundle.image_gens.length} logs`);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Export failed"); }
     finally { setBusy(null); }
@@ -151,7 +151,7 @@ function DataAndCacheCard() {
         });
       }
       const blob = await zip.generateAsync({ type: "blob" });
-      download(blob, `creatorvault-export-${Date.now()}.zip`);
+      download(blob, `creatorflow-export-${Date.now()}.zip`);
       toast.success("ZIP exported");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Export failed"); }
     finally { setBusy(null); }
