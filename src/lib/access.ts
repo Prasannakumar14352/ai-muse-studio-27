@@ -116,7 +116,21 @@ export async function deductUsage(params: {
         description: params.description,
       },
     });
-    if (!res.ok) return { ok: false, error: res.error, source: "insufficient" };
+    if (!res.ok) {
+      if (res.error === "insufficient_credits") {
+        // Notify the global gate — modal shows without losing user work.
+        try {
+          const { fireCreditGate } = await import("@/components/global-credit-gate");
+          fireCreditGate({
+            required: res.required,
+            available: res.available,
+            shortage: res.shortage,
+            planType: res.plan_type,
+          });
+        } catch { /* non-DOM contexts */ }
+      }
+      return { ok: false, error: res.error, source: "insufficient" };
+    }
     return { ok: true, source: res.source, ledgerId: res.ledger_id };
   } catch (e) {
     console.warn("[deductUsage] reserve failed", e);
