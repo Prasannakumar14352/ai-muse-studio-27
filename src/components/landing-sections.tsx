@@ -26,7 +26,7 @@ function landingRowToTestimonial(r: LandingMediaRow): Testimonial {
     country: r.country ?? "",
     role: (r.subtitle as Testimonial["role"]) ?? "Instagram Creator",
     company: r.company ?? undefined,
-    photo: r.poster_url ?? "https://i.pravatar.cc/400",
+    photo: r.photo_url ?? r.poster_url ?? "https://i.pravatar.cc/400",
     rating: (r.rating ?? 5) as Testimonial["rating"],
     review: r.review ?? "",
     quote: r.quote ?? undefined,
