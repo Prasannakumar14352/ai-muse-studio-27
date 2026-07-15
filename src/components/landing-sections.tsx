@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   Play, Star, Check, X, ShieldCheck, Sparkles, Briefcase, Download,
   Infinity as InfinityIcon, Calendar, Coins, Key, Cloud, HeadphonesIcon,
@@ -12,6 +13,26 @@ import {
   type Testimonial,
 } from "@/lib/landing-content";
 import { InteractiveDemo } from "@/components/interactive-demo";
+import { listPublishedLandingMedia, type LandingMediaRow } from "@/lib/landing-media.functions";
+
+function landingRowToTestimonial(r: LandingMediaRow): Testimonial {
+  return {
+    id: r.id,
+    name: r.title ?? "Customer",
+    country: r.country ?? "",
+    role: (r.subtitle as Testimonial["role"]) ?? "Instagram Creator",
+    company: r.company ?? undefined,
+    photo: r.poster_url ?? "https://i.pravatar.cc/400",
+    rating: (r.rating ?? 5) as Testimonial["rating"],
+    review: r.review ?? "",
+    quote: r.quote ?? undefined,
+    source: (r.source ?? "customer") as Testimonial["source"],
+    videoUrl: r.video_url ?? undefined,
+    videoType: (r.video_type === "webm" ? "mp4" : (r.video_type ?? undefined)) as Testimonial["videoType"],
+    duration: r.duration ?? undefined,
+  };
+}
+
 
 const HERO_FEATURES = [
   { icon: VideoIcon, label: "AI Video Studio" },
@@ -280,7 +301,17 @@ function VideoTestimonialCard({
 
 export function VideoTestimonialsSection() {
   const [playing, setPlaying] = useState<PlayingVideo | null>(null);
-  const anySample = VIDEO_TESTIMONIALS.some((t) => t.source && t.source !== "customer");
+  const { data: dbRows } = useQuery({
+    queryKey: ["landing-media-public"],
+    queryFn: () => listPublishedLandingMedia(),
+    staleTime: 60_000,
+  });
+  const dbTestimonials = (dbRows ?? [])
+    .filter((r) => r.kind === "testimonial")
+    .map(landingRowToTestimonial);
+  const testimonials = dbTestimonials.length > 0 ? dbTestimonials : VIDEO_TESTIMONIALS;
+  const anySample = testimonials.some((t) => t.source && t.source !== "customer");
+
   return (
     <section className="py-24 px-6">
       <div className="max-w-7xl mx-auto">
@@ -296,7 +327,7 @@ export function VideoTestimonialsSection() {
           )}
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {VIDEO_TESTIMONIALS.map((t) => (
+          {testimonials.map((t) => (
             <VideoTestimonialCard key={t.id} t={t} onPlay={setPlaying} />
           ))}
         </div>
@@ -307,6 +338,7 @@ export function VideoTestimonialsSection() {
     </section>
   );
 }
+
 
 
 /* ---------------------- 3. WRITTEN TESTIMONIAL CAROUSEL ---------------------- */
