@@ -113,6 +113,11 @@ function AdminPanel() {
           <Coins className="w-4 h-4" /> USD → INR Rate
         </Link>
         <Link
+          to="/admin/landing"
+          className="inline-flex items-center gap-2 rounded-lg glass px-3 py-2 text-sm hover:bg-white/10 transition">
+          <FileText className="w-4 h-4" /> Landing Media
+        </Link>
+        <Link
           to="/admin/webhooks"
           className="inline-flex items-center gap-2 rounded-lg gradient-primary text-white px-3 py-2 text-sm hover:opacity-90 transition">
           <Zap className="w-4 h-4" /> Razorpay Debugger
