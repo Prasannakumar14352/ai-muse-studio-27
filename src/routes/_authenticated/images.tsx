@@ -260,6 +260,13 @@ function ImagesPage() {
     await runGeneration(prompt, style, ratio, batch);
   }
 
+  useAutogen(handoff, () => {
+    if (prompt.trim()) {
+      toast.message("Generation started", { description: "Auto-generating from Viral Research…" });
+      void generate();
+    }
+  });
+
   async function regenerateExact() {
     if (!lastRun) return toast.error("Generate an image first");
     await runGeneration(lastRun.prompt, lastRun.style, lastRun.ratio, batch);
