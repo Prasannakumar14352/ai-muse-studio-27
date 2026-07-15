@@ -103,6 +103,26 @@ export const getTemplateBySlugFn = createServerFn({ method: "GET" })
 
 // -------------------- Admin CRUD --------------------
 
+/** Admin list — includes drafts and inactive rows. */
+export const listAllTemplatesFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await (supabaseAdmin as any)
+      .from("templates")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as TemplateRecord[];
+  });
+
+
 export const upsertTemplateFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: Partial<TemplateRecord> & { slug: string; name: string; category: string }) => input)
