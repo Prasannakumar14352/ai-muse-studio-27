@@ -36,6 +36,7 @@ import { Route as AuthenticatedCreateRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedConnectionsRouteImport } from './routes/_authenticated/connections'
 import { Route as AuthenticatedCarouselsRouteImport } from './routes/_authenticated/carousels'
 import { Route as AuthenticatedCaptionsRouteImport } from './routes/_authenticated/captions'
+import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedBrandKitRouteImport } from './routes/_authenticated/brand-kit'
 import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticated/billing'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
@@ -195,6 +196,11 @@ const AuthenticatedCaptionsRoute = AuthenticatedCaptionsRouteImport.update({
   path: '/captions',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedBrandKitRoute = AuthenticatedBrandKitRouteImport.update({
   id: '/brand-kit',
   path: '/brand-kit',
@@ -328,6 +334,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/billing': typeof AuthenticatedBillingRoute
   '/brand-kit': typeof AuthenticatedBrandKitRoute
+  '/calendar': typeof AuthenticatedCalendarRoute
   '/captions': typeof AuthenticatedCaptionsRoute
   '/carousels': typeof AuthenticatedCarouselsRoute
   '/connections': typeof AuthenticatedConnectionsRoute
@@ -376,6 +383,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/billing': typeof AuthenticatedBillingRoute
   '/brand-kit': typeof AuthenticatedBrandKitRoute
+  '/calendar': typeof AuthenticatedCalendarRoute
   '/captions': typeof AuthenticatedCaptionsRoute
   '/carousels': typeof AuthenticatedCarouselsRoute
   '/connections': typeof AuthenticatedConnectionsRoute
@@ -426,6 +434,7 @@ export interface FileRoutesById {
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/billing': typeof AuthenticatedBillingRoute
   '/_authenticated/brand-kit': typeof AuthenticatedBrandKitRoute
+  '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
   '/_authenticated/captions': typeof AuthenticatedCaptionsRoute
   '/_authenticated/carousels': typeof AuthenticatedCarouselsRoute
   '/_authenticated/connections': typeof AuthenticatedConnectionsRoute
@@ -477,6 +486,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/billing'
     | '/brand-kit'
+    | '/calendar'
     | '/captions'
     | '/carousels'
     | '/connections'
@@ -525,6 +535,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/billing'
     | '/brand-kit'
+    | '/calendar'
     | '/captions'
     | '/carousels'
     | '/connections'
@@ -574,6 +585,7 @@ export interface FileRouteTypes {
     | '/_authenticated/analytics'
     | '/_authenticated/billing'
     | '/_authenticated/brand-kit'
+    | '/_authenticated/calendar'
     | '/_authenticated/captions'
     | '/_authenticated/carousels'
     | '/_authenticated/connections'
@@ -819,6 +831,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCaptionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/calendar': {
+      id: '/_authenticated/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof AuthenticatedCalendarRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/brand-kit': {
       id: '/_authenticated/brand-kit'
       path: '/brand-kit'
@@ -1032,6 +1051,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedBillingRoute: typeof AuthenticatedBillingRoute
   AuthenticatedBrandKitRoute: typeof AuthenticatedBrandKitRoute
+  AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedCaptionsRoute: typeof AuthenticatedCaptionsRoute
   AuthenticatedCarouselsRoute: typeof AuthenticatedCarouselsRoute
   AuthenticatedConnectionsRoute: typeof AuthenticatedConnectionsRoute
@@ -1058,6 +1078,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedBillingRoute: AuthenticatedBillingRoute,
   AuthenticatedBrandKitRoute: AuthenticatedBrandKitRoute,
+  AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
   AuthenticatedCaptionsRoute: AuthenticatedCaptionsRoute,
   AuthenticatedCarouselsRoute: AuthenticatedCarouselsRoute,
   AuthenticatedConnectionsRoute: AuthenticatedConnectionsRoute,
