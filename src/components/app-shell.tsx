@@ -44,16 +44,28 @@ type NavSection = {
 
 const SECTIONS: readonly NavSection[] = [
   {
-    label: "Create",
+    label: "Workspace",
     items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/strategy", label: "AI Strategy", icon: Target },
+      { to: "/research", label: "Research", icon: Search },
+      { to: "/agents", label: "AI Agents", icon: Bot },
+      { to: "/analytics", label: "Analytics", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Create",
+    items: [
       { to: "/create", label: "New Project", icon: Plus },
       { to: "/videos", label: "Videos", icon: Film, moduleId: "videos" },
       { to: "/carousels", label: "Carousels", icon: Layers, moduleId: "carousels" },
       { to: "/images", label: "Images", icon: ImageIcon, moduleId: "images" },
       { to: "/thumbnails", label: "Thumbnails", icon: Sparkles, moduleId: "thumbnails" },
       { to: "/captions", label: "Captions", icon: Type, moduleId: "captions" },
+      { to: "/repurpose", label: "Repurpose", icon: Split },
       { to: "/templates", label: "Templates", icon: Sparkles },
+      { to: "/brand-kit", label: "Brand Kit", icon: Palette },
+      { to: "/marketplace", label: "Marketplace", icon: Store },
     ],
   },
   {
