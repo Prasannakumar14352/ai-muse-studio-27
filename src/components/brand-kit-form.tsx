@@ -68,9 +68,21 @@ export function BrandKitForm() {
         </div>
         <F label="Brand voice"><textarea rows={3} className="input-base" value={editing.brand_voice ?? ""} onChange={(e) => setEditing({ ...editing, brand_voice: e.target.value })} placeholder="e.g. bold, playful, expert" /></F>
         <F label="Brand keywords (comma separated)"><input className="input-base" value={(editing.keywords ?? []).join(", ")} onChange={(e) => setEditing({ ...editing, keywords: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })} /></F>
+
+        <div className="pt-2 border-t border-white/10 space-y-3">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Default styles (auto-applied to every generation)</div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <F label="Visual style"><input className="input-base" placeholder="cinematic, editorial, minimal…" value={editing.default_styles?.visualStyle ?? ""} onChange={(e) => setEditing({ ...editing, default_styles: { ...(editing.default_styles ?? {}), visualStyle: e.target.value } })} /></F>
+            <F label="Preferred aspect ratio"><input className="input-base" placeholder="9:16, 1:1, 16:9" value={editing.default_styles?.aspectRatio ?? ""} onChange={(e) => setEditing({ ...editing, default_styles: { ...(editing.default_styles ?? {}), aspectRatio: e.target.value } })} /></F>
+            <F label="Image style"><input className="input-base" placeholder="photoreal, illustrative, 3d…" value={editing.default_styles?.imageStyle ?? ""} onChange={(e) => setEditing({ ...editing, default_styles: { ...(editing.default_styles ?? {}), imageStyle: e.target.value } })} /></F>
+            <F label="Video style"><input className="input-base" placeholder="fast-cut, documentary, vlog…" value={editing.default_styles?.videoStyle ?? ""} onChange={(e) => setEditing({ ...editing, default_styles: { ...(editing.default_styles ?? {}), videoStyle: e.target.value } })} /></F>
+            <F label="Caption tone"><input className="input-base" placeholder="witty, direct, warm…" value={editing.default_styles?.captionTone ?? ""} onChange={(e) => setEditing({ ...editing, default_styles: { ...(editing.default_styles ?? {}), captionTone: e.target.value } })} /></F>
+          </div>
+        </div>
+
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={!!editing.is_default} onChange={(e) => setEditing({ ...editing, is_default: e.target.checked })} />
-          Set as default kit (applied automatically to new projects)
+          Set as default kit (applied automatically to all generations)
         </label>
 
         <div className="flex justify-between pt-2">
