@@ -102,7 +102,7 @@ const SceneIntro: React.FC = () => {
           color: C.text,
         }}
       >
-        Creator<span style={gradientText}>Vault</span> AI
+        Creator<span style={gradientText}>Flow</span> AI
       </div>
       <div
         style={{

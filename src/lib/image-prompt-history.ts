@@ -14,7 +14,7 @@ export type ImagePromptHistoryEntry = {
   batch?: number;
 };
 
-const KEY = "creatorvault:images:prompt-history:v1";
+const KEY = "creatorflow:images:prompt-history:v1";
 const MAX = 40;
 
 export function readPromptHistory(): ImagePromptHistoryEntry[] {
