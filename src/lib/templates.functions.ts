@@ -68,6 +68,7 @@ export const listTemplatesFn = createServerFn({ method: "GET" }).handler(async (
     .from("templates")
     .select("*")
     .eq("active", true)
+    .eq("status", "published")
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
   if (error) throw new Error(error.message);
