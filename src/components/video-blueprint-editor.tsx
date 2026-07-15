@@ -213,6 +213,7 @@ export function VideoBlueprintEditor({
     toast.info(`Previewing v${version} — click Save now to commit or Restore to make it official.`);
   };
 
+  const restoreOriginal = async () => {
     if (!confirm("Restore original AI blueprint? Your edits will be saved as a version you can access from history.")) return;
     const restored = await restoreOriginalBlueprint(projectId);
     if (restored) {
