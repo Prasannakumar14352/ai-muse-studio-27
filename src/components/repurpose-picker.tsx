@@ -48,12 +48,15 @@ export function RepurposePicker() {
       <div className="glass rounded-2xl p-6 border border-white/10 space-y-4">
         <label className="block space-y-1.5">
           <div className="text-xs font-medium text-muted-foreground">Source project (optional)</div>
-          <select className="input-base" value={projectId} onChange={(e) => useProject(e.target.value)}>
-            <option value="">— No project (paste content below) —</option>
-            {projects?.map((p: { id: string; title: string | null }) => (
-              <option key={p.id} value={p.id}>{p.title ?? "Untitled"}</option>
-            ))}
-          </select>
+          <CreatorFlowSelect
+            ariaLabel="Source project"
+            value={projectId}
+            onValueChange={(v) => useProject(v)}
+            options={[
+              { value: "", label: "— No project (paste content below) —" },
+              ...(projects ?? []).map((p: { id: string; title: string | null }) => ({ value: p.id, label: p.title ?? "Untitled" })),
+            ]}
+          />
         </label>
         <label className="block space-y-1.5">
           <div className="text-xs font-medium text-muted-foreground">Source content</div>
