@@ -120,6 +120,16 @@ function ThumbnailsPage() {
     }
   }
 
+  // Auto-run pipeline when arriving via "Generate Thumbnail Now" from Research:
+  // step 1 → planning → step 2 → generation → step 3.
+  useAutogen(handoff, async () => {
+    if (!brief.title.trim() && !brief.prompt.trim()) return;
+    toast.message("Generation started", { description: "Auto-planning + generating from Viral Research…" });
+    await runPlanning();
+    // runPlanning sets `plan`; wait a tick for state to commit before firing gen.
+    setTimeout(() => { void runGeneration(); }, 400);
+  });
+
   async function runGeneration() {
     if (!plan) return;
     const count = brief.conceptCount;
