@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { listMarketplaceFn, upsertMarketplaceItemFn, deleteMarketplaceItemFn, type MarketplaceItem } from "@/lib/marketplace.functions";
 import { Trash2, Plus, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 
 export const Route = createFileRoute("/_authenticated/admin/marketplace")({ component: AdminMarketplace });
 
