@@ -6,6 +6,7 @@ import { Plus, Trash2, Edit3, X, Loader2, Save } from "lucide-react";
 import { listTemplatesFn, upsertTemplateFn, deleteTemplateFn, type TemplateRecord, type TemplateAccessTier } from "@/lib/templates.functions";
 import { useAccess } from "@/lib/access";
 import { confirmDialog } from "@/components/confirm-dialog";
+import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 
 export const Route = createFileRoute("/_authenticated/admin/templates")({
   head: () => ({ meta: [{ title: "Admin · Templates — CreatorFlow AI" }] }),
