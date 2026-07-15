@@ -165,7 +165,54 @@ export function VideoBlueprintEditor({
     scheduleAutosave({ ...bp, scenes: reindexScenes(scenes) });
   };
 
-  const restoreOriginal = async () => {
+  // ---- Studio helpers (timeline / music / subtitles / characters / versions / shots) ----
+  const [shotDialogSceneId, setShotDialogSceneId] = useState<string | null>(null);
+  const shotDialogScene = useMemo(
+    () => (shotDialogSceneId ? bp.scenes.find((s) => s.id === shotDialogSceneId) ?? null : null),
+    [shotDialogSceneId, bp.scenes],
+  );
+
+  const setSceneDuration = (id: string, durationSec: number) => {
+    const idx = bp.scenes.findIndex((s) => s.id === id);
+    if (idx < 0) return;
+    const clamped = Math.max(0.5, Number(durationSec.toFixed(2)));
+    const scenes = bp.scenes.slice();
+    scenes[idx] = { ...scenes[idx], durationSec: clamped, endSec: scenes[idx].startSec + clamped, edited: true };
+    scheduleAutosave({ ...bp, scenes: reindexScenes(scenes) });
+  };
+  const setShotReference = (id: string, ref: ShotReference | null) => {
+    patchScene(id, { shotReference: ref });
+  };
+  const bulkReplaceScripts = (lines: string[]) => {
+    const scenes = bp.scenes.map((s, i) =>
+      lines[i] !== undefined ? { ...s, voiceover: lines[i], edited: true } : s,
+    );
+    scheduleAutosave({ ...bp, scenes });
+  };
+  const setMusic = (music: MusicTrack | undefined) => patchGlobal({ music });
+  const setSubtitleStyle = (subtitleStyle: SubtitleStyle | undefined) => patchGlobal({ subtitleStyle });
+  const setCharacters = (characterLibrary: Character[]) => patchGlobal({ characterLibrary });
+
+  const restoreVersion = async (version: number) => {
+    if (!confirm(`Restore version ${version}? Current version will remain in history.`)) return;
+    const restored = await restoreBlueprintVersion(projectId, version);
+    if (restored) {
+      setMeta(restored);
+      setBp(restored.currentBlueprint);
+      setLastSavedAt(restored.blueprintUpdatedAt);
+      setDirty(false);
+      onMetadataChange?.(restored);
+      toast.success(`Restored to v${version}`);
+    }
+  };
+  const previewVersion = (version: number) => {
+    const entry = meta.blueprintVersions?.find((v) => v.version === version);
+    if (!entry) return;
+    setBp(entry.blueprint);
+    setDirty(true);
+    toast.info(`Previewing v${version} — click Save now to commit or Restore to make it official.`);
+  };
+
     if (!confirm("Restore original AI blueprint? Your edits will be saved as a version you can access from history.")) return;
     const restored = await restoreOriginalBlueprint(projectId);
     if (restored) {
