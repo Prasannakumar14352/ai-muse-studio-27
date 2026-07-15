@@ -8,7 +8,7 @@ export type MarketplaceItem = {
   slug: string;
   description: string | null;
   preview_url: string | null;
-  payload: Record<string, unknown>;
+  payload: any;
   price_usd_cents: number | null;
   tier: string | null;
   active: boolean;

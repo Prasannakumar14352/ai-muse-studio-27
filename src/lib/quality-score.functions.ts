@@ -13,7 +13,7 @@ export type QualityScores = {
 
 export const scoreAssetFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: { projectId?: string | null; assetType: string; payload: Record<string, unknown> }) => i)
+  .inputValidator((i: { projectId?: string | null; assetType: string; payload: any }) => i)
   .handler(async ({ data, context }) => {
     const { gatewayChatJson } = await import("@/lib/ai-gateway.server");
     const result = await gatewayChatJson<{ scores: QualityScores; recommendations: string[] }>({

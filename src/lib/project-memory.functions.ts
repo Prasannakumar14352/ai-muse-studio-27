@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export type MemoryEntry = {
   id: string;
   kind: string;
-  payload: Record<string, unknown>;
+  payload: any;
   ref_url: string | null;
   version: number;
   created_at: string;
@@ -26,7 +26,7 @@ export const listProjectMemoryFn = createServerFn({ method: "POST" })
 
 export const appendProjectMemoryFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: { projectId: string; kind: string; payload: Record<string, unknown>; refUrl?: string }) => i)
+  .inputValidator((i: { projectId: string; kind: string; payload: any; refUrl?: string }) => i)
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("project_memory" as never).insert({
       user_id: context.userId,
