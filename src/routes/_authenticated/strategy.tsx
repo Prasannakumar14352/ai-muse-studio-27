@@ -28,6 +28,8 @@ function StrategyPage() {
   const [tab, setTab] = useState<"new" | "history">("new");
   const [activeId, setActiveId] = useState<string | null>(() => getActiveStrategy()?.id ?? null);
 
+  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("strategy"));
+
   const activate = (row: Row) => {
     const label = row.promoting || row.product || "Strategy";
     setActiveStrategy(row.id, label, row.plan, {
