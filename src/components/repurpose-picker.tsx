@@ -33,6 +33,7 @@ export function RepurposePicker() {
     setFormats((cur) => cur.includes(f) ? cur.filter((x) => x !== f) : [...cur, f]);
 
   const useProject = useMemo(() => (id: string) => {
+    if (!id) { setProjectId(""); return; }
     const p = projects?.find((x: { id: string }) => x.id === id);
     if (!p) return;
     setProjectId(id);
