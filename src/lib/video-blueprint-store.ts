@@ -116,6 +116,8 @@ export async function restoreBlueprintVersion(
   bag[KEY] = restored;
   await writeMetaBag(projectId, bag);
   return restored;
+}
+
 
 /** Take an immutable snapshot at render-start. */
 export async function saveRenderSnapshot(
