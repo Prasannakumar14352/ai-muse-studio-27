@@ -117,6 +117,54 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
     slides.splice(after + 1, 0, newSlide(kind));
     update({ ...state, slides }); setActive(after + 1);
   }
+  function duplicate(idx: number) {
+    const src = state.slides[idx];
+    if (!src) return;
+    const clone: LinkedinCarouselSlide = { ...src, id: Math.random().toString(36).slice(2, 9) };
+    const slides = state.slides.slice();
+    slides.splice(idx + 1, 0, clone);
+    update({ ...state, slides }); setActive(idx + 1);
+  }
+  async function aiTransform(idx: number, action: "rewrite" | "expand" | "shorten") {
+    const s = state.slides[idx];
+    if (!s) return;
+    setAiBusyIdx(idx);
+    try {
+      const res = await transform({
+        data: {
+          action, topic, tone: tone ?? "Professional",
+          title: s.title ?? "", body: s.body ?? "", bullets: s.bullets ?? [],
+        },
+      });
+      patchSlide(idx, { title: res.slide.title, body: res.slide.body, bullets: res.slide.bullets });
+      if (res.mode === "ai") toast.success(`Slide ${action}n`);
+      else toast.message("AI unavailable", { description: res.safeError });
+    } catch (e) {
+      toast.error("AI edit failed", { description: e instanceof Error ? e.message : undefined });
+    } finally { setAiBusyIdx(null); }
+  }
+
+  // Auto-apply Brand Kit colors on mount if user has a default kit.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const kit = await loadBrandKit();
+        if (cancelled || !kit) return;
+        const primary = kit.primary_color;
+        const secondary = kit.secondary_color;
+        if (primary || secondary) {
+          const palette = state.design.palette.slice();
+          if (primary) palette[0] = primary;
+          if (secondary) palette[1] = secondary;
+          update({ ...state, design: { ...state.design, palette } });
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   async function captureSlide(id: string): Promise<string | null> {
     const node = refs.current[id];
