@@ -27,7 +27,7 @@ function AdminTemplatesPage() {
   const { data: templates, isLoading } = useQuery({
     queryKey: ["admin-templates"],
     enabled: !!access?.isAdmin,
-    queryFn: () => listTemplatesFn(),
+    queryFn: () => listAllTemplatesFn(),
   });
 
   if (accessLoading) return <div className="glass rounded-2xl h-64 animate-pulse" />;
