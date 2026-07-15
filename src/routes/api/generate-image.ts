@@ -27,6 +27,7 @@ export const Route = createFileRoute("/api/generate-image")({
           background,
           quality,
           model: modelOverride,
+          image,
         } = (await request.json()) as {
           prompt: string;
           style?: string;
@@ -34,6 +35,7 @@ export const Route = createFileRoute("/api/generate-image")({
           background?: "transparent" | "opaque";
           quality?: "low" | "medium" | "high";
           model?: string;
+          image?: string;
         };
 
         const key = process.env.LOVABLE_API_KEY;
@@ -53,7 +55,8 @@ export const Route = createFileRoute("/api/generate-image")({
 
         const stylePrefix = style ? `${style} style. ` : "";
         const fullPrompt = `${stylePrefix}${prompt}`;
-        const model = modelOverride ?? "google/gemini-3.1-flash-image";
+        // Editing an input image needs a multimodal-capable Gemini image model.
+        const model = modelOverride ?? (image ? "google/gemini-3.1-flash-image" : "google/gemini-3.1-flash-image");
 
         // Build request body per model family (see ai-image-generation).
         let body: Record<string, unknown>;
@@ -69,10 +72,16 @@ export const Route = createFileRoute("/api/generate-image")({
           };
           if (background === "transparent") body.background = "transparent";
         } else {
-          // Gemini chat-completions image shape.
+          // Gemini chat-completions image shape. If editing, include image_url.
+          const content: unknown = image
+            ? [
+                { type: "text", text: fullPrompt },
+                { type: "image_url", image_url: { url: image } },
+              ]
+            : fullPrompt;
           body = {
             model,
-            messages: [{ role: "user", content: fullPrompt }],
+            messages: [{ role: "user", content }],
             modalities: ["image", "text"],
             stream: true,
           };
