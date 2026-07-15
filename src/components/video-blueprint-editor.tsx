@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import {
   AlertTriangle, Check, Clock, Copy, Plus, RotateCcw, Save, Scissors,
   Trash2, ArrowUp, ArrowDown, Wand2, Undo2, Film, Mic2, Sparkles, Info,
-  FileText,
+  FileText, LayoutGrid, Type, Music2, Volume2, Users, History, Camera,
 } from "lucide-react";
 import { VideoBriefParserPanel } from "@/components/video-brief-parser-panel";
 import { Button } from "@/components/ui/button";
@@ -18,15 +18,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   duplicateScene, emptyScene, estimateCredits, mergeScenes, reindexScenes,
   splitScene, totalDuration, validateBlueprint,
-  type BlueprintScene, type CameraMovement, type RenderAction,
+  type BlueprintScene, type CameraMovement, type Character, type MusicTrack,
+  type RenderAction, type ShotReference, type SubtitleStyle,
   type TransitionStyle, type VideoBlueprint, type VideoBlueprintMetadata,
 } from "@/lib/video-blueprint";
 import {
-  restoreOriginalBlueprint, saveBlueprintEdit,
+  restoreBlueprintVersion, restoreOriginalBlueprint, saveBlueprintEdit,
 } from "@/lib/video-blueprint-store";
+import { TimelineEditor } from "@/components/video-studio/TimelineEditor";
+import { ScriptEditor } from "@/components/video-studio/ScriptEditor";
+import { SubtitleEditor } from "@/components/video-studio/SubtitleEditor";
+import { MusicPicker } from "@/components/video-studio/MusicPicker";
+import { SfxEditor } from "@/components/video-studio/SfxEditor";
+import { CharacterLibrary } from "@/components/video-studio/CharacterLibrary";
+import { VersionHistoryPanel } from "@/components/video-studio/VersionHistoryPanel";
+import { ShotReplacementDialog } from "@/components/video-studio/ShotReplacementDialog";
+
 
 const AUTOSAVE_MS = 900;
 
