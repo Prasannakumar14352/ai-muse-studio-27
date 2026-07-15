@@ -82,6 +82,37 @@ export type BlueprintVoiceSettings = {
   emotion: "neutral" | "energetic" | "calm" | "dramatic" | "friendly";
 };
 
+export type MusicTrack = {
+  id: string;
+  label: string;
+  mood: string;         // "Cinematic", "Upbeat", "Corporate", "Lo-fi", ...
+  bpm?: number;
+  url?: string;         // optional preview / render source
+  volume: number;       // 0..1
+  fadeInSec: number;
+  fadeOutSec: number;
+  loop: boolean;
+};
+
+export type SubtitleStyle = {
+  enabled: boolean;
+  font: "sans" | "serif" | "mono" | "display";
+  size: "sm" | "md" | "lg" | "xl";
+  color: string;                                          // hex
+  background: "none" | "solid" | "gradient" | "blur";
+  position: "top" | "middle" | "bottom";
+  uppercase: boolean;
+  wordHighlight: boolean;                                 // TikTok-style
+};
+
+export type Character = {
+  id: string;
+  name: string;
+  description: string;    // detailed appearance description used in prompts
+  referenceUrl?: string;  // optional reference image
+  lockAppearance: boolean;
+};
+
 export type VideoBlueprint = {
   schemaVersion: typeof BLUEPRINT_SCHEMA_VERSION;
 
@@ -103,6 +134,11 @@ export type VideoBlueprint = {
   voice: BlueprintVoiceSettings;
   transitionStyle: TransitionStyle;   // default per-scene fallback
   motionIntensity: MotionIntensity;
+
+  // ----- Extended editorial layers (optional / additive) -----
+  music?: MusicTrack | null;
+  subtitleStyle?: SubtitleStyle;
+  characterLibrary?: Character[];
 
   // ----- Timeline -----
   scenes: BlueprintScene[];
