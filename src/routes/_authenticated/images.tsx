@@ -22,6 +22,7 @@ import {
 import type { GenerateImageRequest } from "@/lib/image-stream";
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
 import { HandoffBanner } from "@/components/handoff-banner";
+import { useAutogen } from "@/lib/use-autogen";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 
