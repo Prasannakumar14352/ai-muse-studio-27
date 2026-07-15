@@ -164,7 +164,9 @@ function ImagesPage() {
 
   async function runGeneration(p: string, s: string, r: string, count: number) {
     if (access && !canGenerate(access, count)) {
-      toast.error(`Not enough credits for ${count} images.`);
+      const available = access.unlimited ? Number.POSITIVE_INFINITY : (access.monthlyRemaining + access.balance + access.lifetimeCredits);
+      const { fireCreditGate } = await import("@/components/global-credit-gate");
+      fireCreditGate({ required: count, available, shortage: Math.max(0, count - available), planType: access.planType });
       return;
     }
     if (!access?.userId) { toast.error("Sign in required"); return; }
