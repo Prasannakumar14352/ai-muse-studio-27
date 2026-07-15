@@ -162,20 +162,15 @@ export function useCreditGuard() {
     }
   }, [refetch, runIntent]);
 
-  const InsufficientDialog = useMemo(() => {
-    // Lazy render, keep import out of hot path
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { InsufficientCreditsDialog } = require("@/components/insufficient-credits-dialog") as typeof import("@/components/insufficient-credits-dialog");
-    return (
-      <InsufficientCreditsDialog
-        open={!!insufficient}
-        onOpenChange={(o) => { if (!o) setInsufficient(null); }}
-        info={insufficient}
-        onRetry={handleRetry}
-        retrying={retrying}
-      />
-    );
-  }, [insufficient, handleRetry, retrying]);
+  const InsufficientDialog = useMemo(() => (
+    <InsufficientCreditsDialog
+      open={!!insufficient}
+      onOpenChange={(o) => { if (!o) setInsufficient(null); }}
+      info={insufficient}
+      onRetry={handleRetry}
+      retrying={retrying}
+    />
+  ), [insufficient, handleRetry, retrying]);
 
   const isPending = useCallback((spec?: Partial<RunSpec>) => {
     if (!spec || !access?.userId) return pending.size > 0;
