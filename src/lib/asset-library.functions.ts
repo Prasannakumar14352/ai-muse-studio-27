@@ -53,9 +53,9 @@ export const listLibraryAssetsFn = createServerFn({ method: "GET" })
       ...r,
       url: await signIfNeeded(context.supabase, r.storage_path, r.url),
       thumbnail_url: r.thumbnail_url,
-    }))) as LibraryAsset[];
+    })));
     const allTags = Array.from(new Set(((rows ?? []) as { tags: string[] }[]).flatMap((r) => r.tags ?? []))).slice(0, 40);
-    return { items, allTags };
+    return { items: items as unknown as LibraryAsset[], allTags };
   });
 
 const createSchema = z.object({
@@ -78,7 +78,8 @@ export const createLibraryAssetFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => createSchema.parse(d))
   .handler(async ({ data, context }) => {
-    const { data: row, error } = await context.supabase.from("asset_library").insert({ ...data, user_id: context.userId }).select().single();
+    const insertPayload = { ...data, user_id: context.userId } as unknown as never;
+    const { data: row, error } = await context.supabase.from("asset_library").insert(insertPayload).select().single();
     if (error) throw new Error(error.message);
     return row as { id: string };
   });
