@@ -27,6 +27,7 @@ import {
 } from "@/lib/thumbnail-planner.functions";
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
 import { HandoffBanner } from "@/components/handoff-banner";
+import { useAutogen } from "@/lib/use-autogen";
 
 export const Route = createFileRoute("/_authenticated/thumbnails")({
   head: () => ({
