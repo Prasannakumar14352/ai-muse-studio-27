@@ -274,6 +274,15 @@ const initialDash: DashState = {
 
 function VideosPage() {
   const [view, setView] = useState<View>("landing");
+  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("video"));
+  useEffect(() => {
+    if (handoff) setView("input");
+  }, [handoff]);
+  useAutogen(handoff, () => {
+    if (handoff?.topic) {
+      toast.message("Draft ready — review & Generate Now", { description: "Prefilled from Viral Research." });
+    }
+  });
   const [gen, setGen] = useState<GenerateArgs | null>(null);
   const [dash, setDash] = useState<DashState>(initialDash);
   const [result, setResult] = useState<PipelineResult | null>(null);
