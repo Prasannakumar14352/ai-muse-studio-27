@@ -178,14 +178,13 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
             className="w-16 bg-input/50 border border-border rounded px-2 py-1 text-xs" />
         </label>
         <div className="flex-1" />
-        <select
+        <CreatorFlowSelect
+          ariaLabel="Theme"
+          className="h-8 w-28"
           value={state.design.theme}
-          onChange={(e) => update({ ...state, design: { ...state.design, theme: e.target.value as "light" | "dark" } })}
-          className="bg-input/50 border border-border rounded px-2 py-1 text-xs"
-        >
-          <option value="dark">Dark</option>
-          <option value="light">Light</option>
-        </select>
+          onValueChange={(v) => update({ ...state, design: { ...state.design, theme: v as "light" | "dark" } })}
+          options={[{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }]}
+        />
         <button onClick={downloadAll} disabled={busy}
           className="rounded-lg border border-border/60 px-3 py-1.5 text-xs inline-flex items-center gap-1 hover:bg-white/5">
           <Package className="w-3.5 h-3.5" /> Download all (ZIP)
