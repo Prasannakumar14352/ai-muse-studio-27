@@ -28,6 +28,15 @@ export const Route = createFileRoute("/api/generate-image")({
           quality,
           model: modelOverride,
           image,
+          referenceImages,
+          styleImages,
+          negativePrompt,
+          seed,
+          cfg,
+          styleStrength,
+          operation,
+          maskHint,
+          outpaintDirection,
         } = (await request.json()) as {
           prompt: string;
           style?: string;
@@ -36,6 +45,15 @@ export const Route = createFileRoute("/api/generate-image")({
           quality?: "low" | "medium" | "high";
           model?: string;
           image?: string;
+          referenceImages?: string[];
+          styleImages?: string[];
+          negativePrompt?: string;
+          seed?: number;
+          cfg?: number;
+          styleStrength?: number;
+          operation?: "generate" | "upscale" | "removeBg" | "inpaint" | "outpaint" | "eraser";
+          maskHint?: string;
+          outpaintDirection?: "left" | "right" | "top" | "bottom" | "all";
         };
 
         const key = process.env.LOVABLE_API_KEY;
@@ -54,9 +72,52 @@ export const Route = createFileRoute("/api/generate-image")({
               : "1024x1024";
 
         const stylePrefix = style ? `${style} style. ` : "";
-        const fullPrompt = `${stylePrefix}${prompt}`;
-        // Editing an input image needs a multimodal-capable Gemini image model.
-        const model = modelOverride ?? (image ? "google/gemini-3.1-flash-image" : "google/gemini-3.1-flash-image");
+
+        // Editing op prefix — natural-language instruction the model can follow.
+        let opPrefix = "";
+        switch (operation) {
+          case "upscale":
+            opPrefix = "Upscale this image to higher resolution. Preserve every detail; sharpen textures; do not restyle or recompose. ";
+            break;
+          case "removeBg":
+            opPrefix = "Remove the background completely. Output the subject on a fully transparent background (or pure white if transparency unavailable). Preserve edges and hair. ";
+            break;
+          case "inpaint":
+            opPrefix = `Inpaint / replace this region: ${maskHint || "the described area"}. Match lighting, perspective, and grain of the rest of the image. `;
+            break;
+          case "outpaint":
+            opPrefix = `Extend / outpaint this image on the ${outpaintDirection ?? "all"} side(s). Seamlessly continue the scene, lighting, and style. `;
+            break;
+          case "eraser":
+            opPrefix = `Magic-erase: remove ${maskHint || "the described object"} from the image and cleanly fill the background where it was. Do not add anything else. `;
+            break;
+        }
+
+        const negativeSuffix = negativePrompt?.trim()
+          ? ` Avoid: ${negativePrompt.trim()}.`
+          : "";
+        const hintsSuffix = [
+          seed !== undefined ? `seed:${seed}` : null,
+          cfg !== undefined ? `guidance:${cfg}` : null,
+          styleStrength !== undefined ? `style_strength:${styleStrength}` : null,
+        ]
+          .filter(Boolean)
+          .join(" ");
+        const hintsLine = hintsSuffix ? ` [${hintsSuffix}]` : "";
+
+        const fullPrompt = `${opPrefix}${stylePrefix}${prompt}${negativeSuffix}${hintsLine}`;
+
+        const model = modelOverride ?? "google/gemini-3.1-flash-image";
+
+        // Collect all attached images (edit source + refs + style refs).
+        const allImages: string[] = [];
+        if (image) allImages.push(image);
+        if (referenceImages?.length) allImages.push(...referenceImages);
+        if (styleImages?.length) {
+          if (styleImages.length) {
+            allImages.push(...styleImages);
+          }
+        }
 
         // Build request body per model family (see ai-image-generation).
         let body: Record<string, unknown>;
@@ -72,11 +133,11 @@ export const Route = createFileRoute("/api/generate-image")({
           };
           if (background === "transparent") body.background = "transparent";
         } else {
-          // Gemini chat-completions image shape. If editing, include image_url.
-          const content: unknown = image
+          // Gemini chat-completions image shape. Include any attached images.
+          const content: unknown = allImages.length
             ? [
                 { type: "text", text: fullPrompt },
-                { type: "image_url", image_url: { url: image } },
+                ...allImages.map((url) => ({ type: "image_url", image_url: { url } })),
               ]
             : fullPrompt;
           body = {
