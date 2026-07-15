@@ -75,6 +75,14 @@ export function DemoVideoSection() {
   const [playing, setPlaying] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [errored, setErrored] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+
+  const handleRetry = useCallback(() => {
+    setErrored(false);
+    setRetryKey((k) => k + 1);
+  }, []);
+
 
   // Pause when scrolled out of view; resume when visible (saves bandwidth,
   // matches Notion/Vercel demo behavior).
