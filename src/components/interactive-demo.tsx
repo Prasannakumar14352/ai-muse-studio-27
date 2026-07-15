@@ -142,7 +142,7 @@ export function InteractiveDemo({
 function SceneStage({ scene }: { scene: DemoScene }) {
   const Icon = MODULE_ICON[scene.module];
   return (
-    <div key={scene.id} className="absolute inset-0 flex animate-[fadeIn_400ms_ease-out]">
+    <div key={scene.id} className="absolute inset-0 flex">
       {/* Sidebar mock — matches app-shell */}
       <aside className="hidden md:flex w-56 shrink-0 flex-col gap-1 p-3 border-r border-white/5 bg-black/30">
         <div className="flex items-center gap-2 px-2 py-3">
