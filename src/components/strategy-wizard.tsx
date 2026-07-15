@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { generateStrategyFn, type StrategyPlan } from "@/lib/strategy.functions";
 import { Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 
 const GOALS = ["Sales", "Education", "Entertainment", "Personal Brand"];
 const PLATFORMS = ["YouTube", "Instagram", "TikTok", "LinkedIn", "X", "Facebook"];
