@@ -8,6 +8,8 @@ import { listStrategiesFn, deleteStrategyFn, type StrategyPlan } from "@/lib/str
 import { Trash2, Sparkles, Zap, Check } from "lucide-react";
 import { toast } from "sonner";
 import { getActiveStrategy, setActiveStrategy } from "@/lib/active-strategy";
+import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
+import { HandoffBanner } from "@/components/handoff-banner";
 
 export const Route = createFileRoute("/_authenticated/strategy")({ component: StrategyPage });
 
