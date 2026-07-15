@@ -11,6 +11,7 @@ export type LinkedinCarouselSlide = {
   body?: string;
   bullets?: string[];
   footer?: string;
+  notes?: string;
 };
 
 export type LinkedinCarouselContent = {
