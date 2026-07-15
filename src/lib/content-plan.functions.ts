@@ -98,6 +98,31 @@ export const planContentFn = createServerFn({ method: "POST" })
     const strategyBlock = data.strategyContext?.trim()
       ? `\nActive brand strategy (follow positioning, persona, pillars, offer and CTAs from here):\n${data.strategyContext}\n`
       : "";
+
+    // Auto-apply the user's default Brand Kit to every generation.
+    let brandBlock = "";
+    try {
+      const { data: kit } = await context.supabase
+        .from("brand_kits")
+        .select("*")
+        .eq("is_default", true)
+        .limit(1)
+        .maybeSingle();
+      if (kit) {
+        const k = kit as any;
+        const styles = (k.default_styles ?? {}) as Record<string, unknown>;
+        brandBlock = `\nActive Brand Kit (MUST follow — apply to every asset):\n` +
+          `- Brand name: ${k.name ?? "—"}\n` +
+          `- Voice/tone: ${k.brand_voice ?? "—"}\n` +
+          `- Default CTA: ${k.default_cta ?? "—"}\n` +
+          `- Primary colour: ${k.primary_color ?? "—"} | Secondary: ${k.secondary_color ?? "—"}\n` +
+          `- Fonts: heading=${k.font_primary ?? "—"}, body=${k.font_secondary ?? "—"}\n` +
+          `- Keywords: ${(k.keywords ?? []).join(", ") || "—"}\n` +
+          `- Watermark: ${k.watermark_url ? "apply" : "none"}\n` +
+          `- Default styles: ${JSON.stringify(styles)}\n`;
+      }
+    } catch { /* ignore — brand kit is optional */ }
+
     const raw = await gatewayChatJson<Record<string, unknown>>({
       messages: [
         {
@@ -107,7 +132,7 @@ export const planContentFn = createServerFn({ method: "POST" })
         },
         {
           role: "user",
-          content: `Module: ${data.module}\nTopic: ${data.topic}\n${data.context ? `Context: ${data.context}\n` : ""}${strategyBlock}\nReturn a JSON object with exactly these keys:\n${keys}`,
+          content: `Module: ${data.module}\nTopic: ${data.topic}\n${data.context ? `Context: ${data.context}\n` : ""}${strategyBlock}${brandBlock}\nReturn a JSON object with exactly these keys:\n${keys}`,
         },
       ],
       temperature: 0.8,
