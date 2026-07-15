@@ -178,12 +178,14 @@ Return ONLY this JSON shape:
       cta_line: z.string(),
       pinned_comment: z.string(),
       thumbnail: z.object({ concept: z.string(), prompt: z.string() }),
-      platforms: z.object({
-        instagram: z.object({ caption: z.string(), hashtags: z.array(z.string()).default([]) }).optional(),
-        tiktok: z.object({ caption: z.string(), hashtags: z.array(z.string()).default([]) }).optional(),
-        youtube_shorts: z.object({ caption: z.string(), hashtags: z.array(z.string()).default([]) }).optional(),
-        facebook: z.object({ caption: z.string(), hashtags: z.array(z.string()).default([]) }).optional(),
-      }),
+      platforms: z
+        .object({
+          instagram: z.object({ caption: z.string(), hashtags: z.array(z.string()).default([]) }).optional(),
+          tiktok: z.object({ caption: z.string(), hashtags: z.array(z.string()).default([]) }).optional(),
+          youtube_shorts: z.object({ caption: z.string(), hashtags: z.array(z.string()).default([]) }).optional(),
+          facebook: z.object({ caption: z.string(), hashtags: z.array(z.string()).default([]) }).optional(),
+        })
+        .default({}),
     });
 
     const out = await callGatewayJson(key, sys, user, Schema);
