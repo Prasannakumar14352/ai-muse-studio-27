@@ -128,6 +128,9 @@ export const upsertTemplateFn = createServerFn({ method: "POST" })
       platform: data.platform ?? null,
       style: data.style ?? null,
       default_prompt: data.default_prompt ?? null,
+      negative_prompt: data.negative_prompt ?? null,
+      credits: data.credits ?? 1,
+      status: (data.status ?? "published") as TemplateStatus,
       default_brief: data.default_brief ?? {},
       tags: data.tags ?? [],
       access_tier: data.access_tier ?? "free",
@@ -139,6 +142,74 @@ export const upsertTemplateFn = createServerFn({ method: "POST" })
     const { data: row, error } = await (supabaseAdmin as any)
       .from("templates")
       .upsert(payload, { onConflict: "slug" })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+
+    // Snapshot version history
+    try {
+      const { data: last } = await (supabaseAdmin as any)
+        .from("template_versions")
+        .select("version")
+        .eq("template_id", row.id)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextVersion = (last?.version ?? 0) + 1;
+      await (supabaseAdmin as any).from("template_versions").insert({
+        template_id: row.id,
+        version: nextVersion,
+        snapshot: row,
+        created_by: context.userId,
+      });
+    } catch {
+      // history is best-effort; do not block save
+    }
+    return row as TemplateRecord;
+  });
+
+// -------------------- Version history --------------------
+
+export const listTemplateVersionsFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: { templateId: string }) => i)
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { data: rows, error } = await context.supabase
+      .from("template_versions" as never)
+      .select("*")
+      .eq("template_id", data.templateId)
+      .order("version", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (rows ?? []) as unknown as TemplateVersion[];
+  });
+
+export const restoreTemplateVersionFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: { versionId: string }) => i)
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: v, error: vErr } = await (supabaseAdmin as any)
+      .from("template_versions")
+      .select("*")
+      .eq("id", data.versionId)
+      .single();
+    if (vErr) throw new Error(vErr.message);
+    const s = v.snapshot as TemplateRecord;
+    const { id: _id, created_at: _c, updated_at: _u, ...rest } = s;
+    const { data: row, error } = await (supabaseAdmin as any)
+      .from("templates")
+      .update(rest)
+      .eq("id", v.template_id)
       .select()
       .single();
     if (error) throw new Error(error.message);
