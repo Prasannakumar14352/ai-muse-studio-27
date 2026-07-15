@@ -102,6 +102,21 @@ export async function restoreOriginalBlueprint(
   return restored;
 }
 
+/** Restore a specific historical version. Recorded as a new version. */
+export async function restoreBlueprintVersion(
+  projectId: string,
+  version: number,
+): Promise<VideoBlueprintMetadata | null> {
+  const bag = await readMetaBag(projectId);
+  const existing = bag[KEY];
+  if (!existing) return null;
+  const entry = existing.blueprintVersions.find((v) => v.version === version);
+  if (!entry) return null;
+  const restored = pushVersion(existing, entry.blueprint, "restore", `Restored v${version}`);
+  bag[KEY] = restored;
+  await writeMetaBag(projectId, bag);
+  return restored;
+
 /** Take an immutable snapshot at render-start. */
 export async function saveRenderSnapshot(
   projectId: string,
