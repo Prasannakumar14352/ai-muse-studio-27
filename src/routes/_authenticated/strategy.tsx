@@ -48,6 +48,8 @@ function StrategyPage() {
         <p className="text-sm text-muted-foreground mt-1">Business strategy, persona, funnel, offer, campaigns, and a 30-day plan — feeding every creation module.</p>
       </header>
 
+      <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
+
       <div className="flex gap-2 border-b border-white/10">
         {(["new", "history"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
