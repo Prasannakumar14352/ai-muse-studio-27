@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, Edit3, X, Loader2, Save, History, RotateCcw } from "lucide-react";
-import { listTemplatesFn, upsertTemplateFn, deleteTemplateFn, listTemplateVersionsFn, restoreTemplateVersionFn, type TemplateRecord, type TemplateAccessTier, type TemplateStatus, type TemplateVersion } from "@/lib/templates.functions";
+import { listTemplatesFn, listAllTemplatesFn, upsertTemplateFn, deleteTemplateFn, listTemplateVersionsFn, restoreTemplateVersionFn, type TemplateRecord, type TemplateAccessTier, type TemplateStatus, type TemplateVersion } from "@/lib/templates.functions";
 import { useAccess } from "@/lib/access";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
