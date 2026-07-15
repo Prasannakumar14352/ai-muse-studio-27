@@ -91,6 +91,8 @@ const UpsertSchema = z.object({
   rating: z.number().int().min(1).max(5).nullable().optional(),
   status: z.enum(["draft", "published"]),
   display_order: z.number().int().min(0).max(999).default(0),
+  photo_url: z.string().url().max(1000).nullable().optional().or(z.literal("")),
+  consent_confirmed: z.boolean().optional().default(false),
 });
 
 export const upsertLandingMedia = createServerFn({ method: "POST" })
