@@ -10,6 +10,7 @@ import {
   testRazorpayConnection,
 } from "@/lib/razorpay-settings.functions";
 import { ArrowLeft, CheckCircle2, Loader2, ShieldCheck, XCircle } from "lucide-react";
+import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 
 export const Route = createFileRoute("/_authenticated/admin/payments")({
   component: PaymentSettings,
