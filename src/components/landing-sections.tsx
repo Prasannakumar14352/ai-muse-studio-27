@@ -1,19 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Play, Star, Check, X, ShieldCheck, Sparkles, Briefcase, Download,
+  Play, Pause, Star, Check, X, ShieldCheck, Sparkles, Briefcase, Download,
   Infinity as InfinityIcon, Calendar, Coins, Key, Cloud, HeadphonesIcon,
   Video as VideoIcon, Image as ImageIcon, Layers, Linkedin, Type as TypeIcon,
-  Wand2, Send, AlertCircle, Clock, Loader2,
+  Wand2, Send, AlertCircle, Clock, Loader2, Maximize2, Volume2, VolumeX,
 } from "lucide-react";
 import {
   VIDEO_TESTIMONIALS, WRITTEN_TESTIMONIALS,
   REFUND_ELIGIBLE, REFUND_INELIGIBLE, TRUST_BADGES,
   type Testimonial,
 } from "@/lib/landing-content";
-import { InteractiveDemo } from "@/components/interactive-demo";
 import { listPublishedLandingMedia, type LandingMediaRow } from "@/lib/landing-media.functions";
+import demoAsset from "@/assets/demo/creatorflow-demo.mp4.asset.json";
+import demoPosterAsset from "@/assets/demo/creatorflow-demo-poster.jpg.asset.json";
+
+const BUILTIN_DEMO_VIDEO = demoAsset.url;
+const BUILTIN_DEMO_POSTER = demoPosterAsset.url;
 
 function landingRowToTestimonial(r: LandingMediaRow): Testimonial {
   return {
@@ -44,12 +48,54 @@ const HERO_FEATURES = [
   { icon: Send, label: "Direct Publishing" },
 ];
 
-/* ---------------------- 1. DEMO — interactive product walkthrough ---------------------- */
+/* ---------------------- 1. DEMO — real screen recording of the app ---------------------- */
 
+/**
+ * Plays the built-in CreatorFlow AI screen recording captured directly from
+ * the live app. Admins can override the source by publishing a `demo` row
+ * in /admin/landing (MP4 URL). Autoplay is muted+inline to comply with
+ * every browser's autoplay policy; a fullscreen modal offers unmuted play.
+ */
 export function DemoVideoSection() {
-  const [fullscreen, setFullscreen] = useState(false);
+  // Admin override: first published landing_media row of kind 'demo'
+  const { data: dbRows } = useQuery({
+    queryKey: ["landing-media-public"],
+    queryFn: () => listPublishedLandingMedia(),
+    staleTime: 60_000,
+  });
+  const demoOverride = (dbRows ?? []).find(
+    (r) => r.kind === "demo" && r.video_url && (r.video_type === "mp4" || r.video_type === "webm"),
+  );
+  const videoUrl = demoOverride?.video_url ?? BUILTIN_DEMO_VIDEO;
+  const posterUrl = demoOverride?.poster_url ?? BUILTIN_DEMO_POSTER;
 
-  // Escape closes fullscreen; lock body scroll while open.
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [muted, setMuted] = useState(true);
+  const [playing, setPlaying] = useState(true);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  // Pause when scrolled out of view; resume when visible (saves bandwidth,
+  // matches Notion/Vercel demo behavior).
+  useEffect(() => {
+    const el = containerRef.current;
+    const v = videoRef.current;
+    if (!el || !v) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) {
+          v.pause();
+        } else if (playing) {
+          v.play().catch(() => { /* autoplay blocked */ });
+        }
+      },
+      { threshold: 0.25 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [playing]);
+
   useEffect(() => {
     if (!fullscreen) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFullscreen(false); };
@@ -62,6 +108,12 @@ export function DemoVideoSection() {
     };
   }, [fullscreen]);
 
+  const togglePlay = useCallback(() => {
+    const v = videoRef.current; if (!v) return;
+    if (v.paused) { v.play().catch(() => {}); setPlaying(true); }
+    else { v.pause(); setPlaying(false); }
+  }, []);
+
   return (
     <section className="py-24 px-6">
       <div className="max-w-6xl mx-auto text-center">
@@ -69,16 +121,68 @@ export function DemoVideoSection() {
           See CreatorFlow AI <span className="gradient-text">in Action</span>
         </h2>
         <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-          A live walkthrough of the current product — Strategy, Research, Video Studio, Carousel, Image
-          &amp; Thumbnail Studios, LinkedIn, Brand Kit and Direct Publishing.
+          A real screen recording of the live product — Dashboard, Research, Strategy, Video Studio,
+          Thumbnails, Carousels, LinkedIn, Publishing and Analytics.
         </p>
 
-        <div className="mt-10 glass rounded-3xl p-2 shadow-[var(--shadow-glow)]">
-          <div className="relative aspect-video rounded-2xl overflow-hidden bg-black">
-            <InteractiveDemo onRequestFullscreen={() => setFullscreen(true)} />
-            <span className="absolute top-3 left-3 glass px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/80">
-              Interactive product walkthrough
+        <div ref={containerRef} className="mt-10 glass rounded-3xl p-2 shadow-[var(--shadow-glow)]">
+          <div className="relative aspect-video rounded-2xl overflow-hidden bg-black group">
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              poster={posterUrl}
+              autoPlay
+              muted={muted}
+              loop
+              playsInline
+              preload="metadata"
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onTimeUpdate={(e) => {
+                const t = e.currentTarget;
+                setProgress(t.duration > 0 ? (t.currentTime / t.duration) * 100 : 0);
+              }}
+              className="w-full h-full object-cover bg-black"
+            />
+            <span className="absolute top-3 left-3 glass px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/85">
+              Live product recording
             </span>
+
+            {/* Controls overlay */}
+            <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/70 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={togglePlay}
+                  aria-label={playing ? "Pause demo" : "Play demo"}
+                  className="w-9 h-9 rounded-full glass flex items-center justify-center text-white hover:scale-105 transition"
+                >
+                  {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                </button>
+                <div className="flex-1 h-1.5 rounded-full bg-white/15 overflow-hidden">
+                  <div
+                    className="h-full gradient-primary transition-[width] duration-150"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setMuted((m) => !m); if (videoRef.current) videoRef.current.muted = !muted ? false : true; }}
+                  aria-label={muted ? "Unmute" : "Mute"}
+                  className="w-9 h-9 rounded-full glass flex items-center justify-center text-white hover:scale-105 transition"
+                >
+                  {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFullscreen(true)}
+                  aria-label="Open fullscreen"
+                  className="w-9 h-9 rounded-full glass flex items-center justify-center text-white hover:scale-105 transition"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -105,7 +209,7 @@ export function DemoVideoSection() {
           className="fixed inset-0 z-[80] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
-          aria-label="CreatorFlow AI interactive demo"
+          aria-label="CreatorFlow AI product demo"
           onClick={() => setFullscreen(false)}
         >
           <button
@@ -120,7 +224,15 @@ export function DemoVideoSection() {
             className="relative w-full max-w-7xl aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <InteractiveDemo autoPlay />
+            <video
+              src={videoUrl}
+              poster={posterUrl}
+              controls
+              autoPlay
+              playsInline
+              controlsList="nodownload"
+              className="w-full h-full object-contain bg-black"
+            />
           </div>
         </div>
       )}
@@ -230,9 +342,9 @@ function TestimonialVideoModal({ video, onClose }: { video: PlayingVideo; onClos
 
 function SourceBadge({ source }: { source?: Testimonial["source"] }) {
   if (source === "customer" || !source) return null;
-  const label = source === "demo" ? "Demo testimonial" : "Sample testimonial";
+  const label = source === "demo" ? "Product walkthrough" : "Sample testimonial";
   return (
-    <span className="absolute top-3 left-3 glass px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/90">
+    <span className="absolute top-3 left-3 z-10 glass px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/90">
       {label}
     </span>
   );
@@ -242,19 +354,58 @@ function VideoTestimonialCard({
   t, onPlay,
 }: { t: Testimonial; onPlay: (v: PlayingVideo) => void }) {
   const hasVideo = Boolean(t.videoUrl && t.videoType);
+  const isMp4 = hasVideo && t.videoType === "mp4";
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const previewRef = useRef<HTMLVideoElement | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  // Inline autoplay-muted-loop preview when the card is on screen.
+  useEffect(() => {
+    if (!isMp4) return;
+    const el = cardRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        setVisible(entry.isIntersecting);
+        const v = previewRef.current;
+        if (!v) return;
+        if (entry.isIntersecting) v.play().catch(() => { /* autoplay may be blocked */ });
+        else v.pause();
+      },
+      { threshold: 0.4 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [isMp4]);
+
   return (
-    <div className="glass rounded-2xl p-4 flex flex-col">
+    <div ref={cardRef} className="glass rounded-2xl p-4 flex flex-col">
       <div className="relative aspect-[4/5] rounded-xl overflow-hidden bg-black">
-        <img
-          src={t.photo}
-          alt={`Portrait of ${t.name}, ${t.role}${t.company ? " at " + t.company : ""}`}
-          loading="lazy"
-          className="w-full h-full object-cover opacity-85"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+        {/* Inline muted-loop preview for MP4 sources; falls back to portrait */}
+        {isMp4 ? (
+          <video
+            ref={previewRef}
+            src={t.videoUrl}
+            poster={t.photo}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <img
+            src={t.photo}
+            alt={`Portrait of ${t.name}, ${t.role}${t.company ? " at " + t.company : ""}`}
+            loading="lazy"
+            className="w-full h-full object-cover opacity-85"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
         <SourceBadge source={t.source} />
         {t.quote && (
-          <div className="absolute left-4 right-4 bottom-16 text-white font-semibold text-sm md:text-base leading-snug drop-shadow">
+          <div className="absolute left-4 right-4 bottom-16 text-white font-semibold text-sm md:text-base leading-snug drop-shadow pointer-events-none">
             "{t.quote}"
           </div>
         )}
@@ -265,9 +416,9 @@ function VideoTestimonialCard({
               onPlay({ name: t.name, url: t.videoUrl!, type: t.videoType! })
             }
             className="absolute inset-0 w-full h-full group flex items-center justify-center"
-            aria-label={`Play testimonial from ${t.name}`}
+            aria-label={`Play ${t.name}`}
           >
-            <div className="w-14 h-14 rounded-full gradient-primary flex items-center justify-center shadow-[var(--shadow-glow)] group-hover:scale-110 transition">
+            <div className={`w-14 h-14 rounded-full gradient-primary flex items-center justify-center shadow-[var(--shadow-glow)] group-hover:scale-110 transition ${visible && isMp4 ? "opacity-0 group-hover:opacity-100" : "opacity-100"}`}>
               <Play className="w-6 h-6 text-white fill-white ml-0.5" />
             </div>
             {t.duration && (
@@ -310,7 +461,8 @@ export function VideoTestimonialsSection() {
     .filter((r) => r.kind === "testimonial")
     .map(landingRowToTestimonial);
   const testimonials = dbTestimonials.length > 0 ? dbTestimonials : VIDEO_TESTIMONIALS;
-  const anySample = testimonials.some((t) => t.source && t.source !== "customer");
+  const anyWalkthrough = testimonials.some((t) => t.source === "demo");
+  const anySample = testimonials.some((t) => t.source === "sample");
 
   return (
     <section className="py-24 px-6">
@@ -318,11 +470,13 @@ export function VideoTestimonialsSection() {
         <div className="text-center mb-14">
           <h2 className="text-4xl md:text-5xl font-bold">Loved by <span className="gradient-text">creators worldwide</span></h2>
           <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-            Real workflows. Real modules. Instagram creators, YouTubers, course creators, agencies, freelancers, teachers and business owners ship faster with CreatorFlow AI.
+            Real workflows, real modules. The clips below are short live recordings of CreatorFlow AI — the ones marked
+            <span className="text-white/80"> "Product walkthrough" </span>
+            will be replaced with real customer videos as they come in from the admin panel.
           </p>
-          {anySample && (
+          {(anyWalkthrough || anySample) && (
             <p className="mt-3 text-xs text-white/50 max-w-xl mx-auto">
-              Some cards below are clearly marked <span className="text-white/80">Sample testimonial</span> and use placeholder footage until real customer videos are published from the admin panel.
+              Every card is labelled honestly — nothing here impersonates a real customer.
             </p>
           )}
         </div>
@@ -338,6 +492,7 @@ export function VideoTestimonialsSection() {
     </section>
   );
 }
+
 
 
 
