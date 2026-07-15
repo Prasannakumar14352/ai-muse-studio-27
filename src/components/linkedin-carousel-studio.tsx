@@ -46,8 +46,15 @@ function newSlide(kind: LinkedinCarouselSlide["kind"] = "content"): LinkedinCaro
 
 export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, brand, cta, onChange }: Props) {
   const run = useServerFn(generateLinkedinCarousel);
+  const transform = useServerFn(transformCarouselSlide);
+  const loadBrandKit = useServerFn(getDefaultBrandKitFn);
   const [busy, setBusy] = useState(false);
+  const [aiBusyIdx, setAiBusyIdx] = useState<number | null>(null);
+  const [format, setFormat] = useState<FormatKey>("linkedin");
+  const SLIDE_W = FORMATS[format].w;
+  const SLIDE_H = FORMATS[format].h;
   const [state, setState] = useState<LinkedinCarouselContent>(
+
     initial ?? { slides: [newSlide("cover"), newSlide("content"), newSlide("cta")], design: { palette: ["#0A66C2", "#F3F6F8", "#111827"], theme: "dark" } },
   );
   const [active, setActive] = useState(0);
