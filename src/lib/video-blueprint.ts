@@ -27,6 +27,26 @@ export type SceneCharacterLock = {
   locked: boolean;
 };
 
+export type SceneSfx = {
+  id: string;
+  label: string;      // e.g. "Whoosh", "Impact", "Notification"
+  atSec: number;      // offset within the scene
+  volume: number;     // 0..1
+};
+
+export type SceneSubtitle = {
+  text: string;
+  startSec: number;   // relative to scene start
+  endSec: number;
+};
+
+export type ShotReference = {
+  /** Local object URL / data URL / remote URL for reference image or alt shot. */
+  url: string;
+  label: string;      // "Uploaded", "Alt 2", ...
+  addedAt: string;
+};
+
 export type BlueprintScene = {
   id: string;                // stable id for React keys + regen targeting
   n: number;                 // display order (1-based)
@@ -46,6 +66,12 @@ export type BlueprintScene = {
   productPlacement: string;  // free text — how the product shows in the frame
   character: SceneCharacterLock;
   negativePrompt: string;
+  /** Editable subtitle overlay for this scene. Falls back to voiceover text. */
+  subtitle?: SceneSubtitle;
+  /** SFX cues placed inside this scene. */
+  sfx?: SceneSfx[];
+  /** Reference / replacement shot pinned by the user (upload or alt). */
+  shotReference?: ShotReference | null;
   /** Set by editor when user has locally edited this scene since last AI regen. */
   edited?: boolean;
 };
@@ -54,6 +80,37 @@ export type BlueprintVoiceSettings = {
   voiceId: VoiceId;
   pace: "slow" | "normal" | "fast";
   emotion: "neutral" | "energetic" | "calm" | "dramatic" | "friendly";
+};
+
+export type MusicTrack = {
+  id: string;
+  label: string;
+  mood: string;         // "Cinematic", "Upbeat", "Corporate", "Lo-fi", ...
+  bpm?: number;
+  url?: string;         // optional preview / render source
+  volume: number;       // 0..1
+  fadeInSec: number;
+  fadeOutSec: number;
+  loop: boolean;
+};
+
+export type SubtitleStyle = {
+  enabled: boolean;
+  font: "sans" | "serif" | "mono" | "display";
+  size: "sm" | "md" | "lg" | "xl";
+  color: string;                                          // hex
+  background: "none" | "solid" | "gradient" | "blur";
+  position: "top" | "middle" | "bottom";
+  uppercase: boolean;
+  wordHighlight: boolean;                                 // TikTok-style
+};
+
+export type Character = {
+  id: string;
+  name: string;
+  description: string;    // detailed appearance description used in prompts
+  referenceUrl?: string;  // optional reference image
+  lockAppearance: boolean;
 };
 
 export type VideoBlueprint = {
@@ -77,6 +134,11 @@ export type VideoBlueprint = {
   voice: BlueprintVoiceSettings;
   transitionStyle: TransitionStyle;   // default per-scene fallback
   motionIntensity: MotionIntensity;
+
+  // ----- Extended editorial layers (optional / additive) -----
+  music?: MusicTrack | null;
+  subtitleStyle?: SubtitleStyle;
+  characterLibrary?: Character[];
 
   // ----- Timeline -----
   scenes: BlueprintScene[];
@@ -204,9 +266,60 @@ export function buildBlueprintFromPlanning(
     voice: { voiceId: brief.voice, pace: "normal", emotion: "neutral" },
     transitionStyle: "fade",
     motionIntensity: "medium",
+    music: null,
+    subtitleStyle: {
+      enabled: true, font: "sans", size: "lg", color: "#ffffff",
+      background: "blur", position: "bottom", uppercase: false, wordHighlight: true,
+    },
+    characterLibrary: [],
     scenes,
   };
 }
+
+// ---------- Music / SFX / Character library helpers ----------
+
+export const MUSIC_LIBRARY: ReadonlyArray<{ id: string; label: string; mood: string; bpm: number }> = [
+  { id: "cinematic_epic",    label: "Cinematic Epic",       mood: "Cinematic", bpm: 100 },
+  { id: "cinematic_soft",    label: "Emotional Piano",      mood: "Cinematic", bpm: 72 },
+  { id: "upbeat_pop",        label: "Upbeat Pop",           mood: "Upbeat",    bpm: 128 },
+  { id: "hip_hop_trap",      label: "Trap Hook",            mood: "Hip-Hop",   bpm: 140 },
+  { id: "lofi_chill",        label: "Lo-fi Chill",          mood: "Chill",     bpm: 80 },
+  { id: "corporate_clean",   label: "Corporate Clean",      mood: "Corporate", bpm: 110 },
+  { id: "electronic_drive",  label: "Electronic Drive",     mood: "Electronic",bpm: 124 },
+  { id: "acoustic_warm",     label: "Acoustic Warm",        mood: "Acoustic",  bpm: 90 },
+  { id: "ambient_dream",     label: "Ambient Dream",        mood: "Ambient",   bpm: 60 },
+  { id: "dark_tension",      label: "Dark Tension",         mood: "Dark",      bpm: 88 },
+  { id: "documentary",       label: "Documentary Bed",      mood: "Documentary", bpm: 96 },
+  { id: "energetic_rock",    label: "Energetic Rock",       mood: "Rock",      bpm: 132 },
+];
+
+export const SFX_LIBRARY: ReadonlyArray<{ id: string; label: string; category: string }> = [
+  { id: "whoosh",       label: "Whoosh",           category: "Transition" },
+  { id: "impact",       label: "Impact Boom",      category: "Transition" },
+  { id: "swoosh_soft",  label: "Soft Swoosh",      category: "Transition" },
+  { id: "pop",          label: "Pop",              category: "UI" },
+  { id: "click",        label: "Click",            category: "UI" },
+  { id: "notification", label: "Notification",     category: "UI" },
+  { id: "camera",       label: "Camera Shutter",   category: "UI" },
+  { id: "riser",        label: "Riser",            category: "Tension" },
+  { id: "sub_drop",     label: "Sub Drop",         category: "Tension" },
+  { id: "glitch",       label: "Glitch",           category: "Effect" },
+  { id: "sparkle",      label: "Sparkle",          category: "Effect" },
+  { id: "coin",         label: "Coin",             category: "Effect" },
+  { id: "applause",     label: "Applause",         category: "Ambient" },
+  { id: "crowd",        label: "Crowd",            category: "Ambient" },
+];
+
+let _sfxUid = 0;
+export function nextSfxId(): string {
+  return `sfx_${Date.now().toString(36)}_${(_sfxUid++).toString(36)}`;
+}
+
+let _charUid = 0;
+export function nextCharacterId(): string {
+  return `char_${Date.now().toString(36)}_${(_charUid++).toString(36)}`;
+}
+
 
 /** Convert an edited blueprint back into an AiVideoScript the pipeline can consume. */
 export function blueprintToScript(bp: VideoBlueprint): AiVideoScript {

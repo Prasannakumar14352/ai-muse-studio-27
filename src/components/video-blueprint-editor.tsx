@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import {
   AlertTriangle, Check, Clock, Copy, Plus, RotateCcw, Save, Scissors,
   Trash2, ArrowUp, ArrowDown, Wand2, Undo2, Film, Mic2, Sparkles, Info,
-  FileText,
+  FileText, LayoutGrid, Type, Music2, Volume2, Users, History, Camera,
 } from "lucide-react";
 import { VideoBriefParserPanel } from "@/components/video-brief-parser-panel";
 import { Button } from "@/components/ui/button";
@@ -18,15 +18,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   duplicateScene, emptyScene, estimateCredits, mergeScenes, reindexScenes,
   splitScene, totalDuration, validateBlueprint,
-  type BlueprintScene, type CameraMovement, type RenderAction,
+  type BlueprintScene, type CameraMovement, type Character, type MusicTrack,
+  type RenderAction, type ShotReference, type SubtitleStyle,
   type TransitionStyle, type VideoBlueprint, type VideoBlueprintMetadata,
 } from "@/lib/video-blueprint";
 import {
-  restoreOriginalBlueprint, saveBlueprintEdit,
+  restoreBlueprintVersion, restoreOriginalBlueprint, saveBlueprintEdit,
 } from "@/lib/video-blueprint-store";
+import { TimelineEditor } from "@/components/video-studio/TimelineEditor";
+import { ScriptEditor } from "@/components/video-studio/ScriptEditor";
+import { SubtitleEditor } from "@/components/video-studio/SubtitleEditor";
+import { MusicPicker } from "@/components/video-studio/MusicPicker";
+import { SfxEditor } from "@/components/video-studio/SfxEditor";
+import { CharacterLibrary } from "@/components/video-studio/CharacterLibrary";
+import { VersionHistoryPanel } from "@/components/video-studio/VersionHistoryPanel";
+import { ShotReplacementDialog } from "@/components/video-studio/ShotReplacementDialog";
+
 
 const AUTOSAVE_MS = 900;
 
@@ -154,6 +165,54 @@ export function VideoBlueprintEditor({
     scheduleAutosave({ ...bp, scenes: reindexScenes(scenes) });
   };
 
+  // ---- Studio helpers (timeline / music / subtitles / characters / versions / shots) ----
+  const [shotDialogSceneId, setShotDialogSceneId] = useState<string | null>(null);
+  const shotDialogScene = useMemo(
+    () => (shotDialogSceneId ? bp.scenes.find((s) => s.id === shotDialogSceneId) ?? null : null),
+    [shotDialogSceneId, bp.scenes],
+  );
+
+  const setSceneDuration = (id: string, durationSec: number) => {
+    const idx = bp.scenes.findIndex((s) => s.id === id);
+    if (idx < 0) return;
+    const clamped = Math.max(0.5, Number(durationSec.toFixed(2)));
+    const scenes = bp.scenes.slice();
+    scenes[idx] = { ...scenes[idx], durationSec: clamped, endSec: scenes[idx].startSec + clamped, edited: true };
+    scheduleAutosave({ ...bp, scenes: reindexScenes(scenes) });
+  };
+  const setShotReference = (id: string, ref: ShotReference | null) => {
+    patchScene(id, { shotReference: ref });
+  };
+  const bulkReplaceScripts = (lines: string[]) => {
+    const scenes = bp.scenes.map((s, i) =>
+      lines[i] !== undefined ? { ...s, voiceover: lines[i], edited: true } : s,
+    );
+    scheduleAutosave({ ...bp, scenes });
+  };
+  const setMusic = (music: MusicTrack | undefined) => patchGlobal({ music });
+  const setSubtitleStyle = (subtitleStyle: SubtitleStyle | undefined) => patchGlobal({ subtitleStyle });
+  const setCharacters = (characterLibrary: Character[]) => patchGlobal({ characterLibrary });
+
+  const restoreVersion = async (version: number) => {
+    if (!confirm(`Restore version ${version}? Current version will remain in history.`)) return;
+    const restored = await restoreBlueprintVersion(projectId, version);
+    if (restored) {
+      setMeta(restored);
+      setBp(restored.currentBlueprint);
+      setLastSavedAt(restored.blueprintUpdatedAt);
+      setDirty(false);
+      onMetadataChange?.(restored);
+      toast.success(`Restored to v${version}`);
+    }
+  };
+  const previewVersion = (version: number) => {
+    const entry = meta.blueprintVersions?.find((v) => v.version === version);
+    if (!entry) return;
+    setBp(entry.blueprint);
+    setDirty(true);
+    toast.info(`Previewing v${version} — click Save now to commit or Restore to make it official.`);
+  };
+
   const restoreOriginal = async () => {
     if (!confirm("Restore original AI blueprint? Your edits will be saved as a version you can access from history.")) return;
     const restored = await restoreOriginalBlueprint(projectId);
@@ -255,6 +314,20 @@ export function VideoBlueprintEditor({
         </Card>
       )}
 
+      {/* Studio tabs */}
+      <Tabs defaultValue="scenes" className="w-full">
+        <TabsList className="flex flex-wrap gap-1 h-auto">
+          <TabsTrigger value="scenes"><LayoutGrid className="h-3 w-3 mr-1" /> Scenes</TabsTrigger>
+          <TabsTrigger value="timeline"><Film className="h-3 w-3 mr-1" /> Timeline</TabsTrigger>
+          <TabsTrigger value="script"><FileText className="h-3 w-3 mr-1" /> Script</TabsTrigger>
+          <TabsTrigger value="subs"><Type className="h-3 w-3 mr-1" /> Subtitles</TabsTrigger>
+          <TabsTrigger value="music"><Music2 className="h-3 w-3 mr-1" /> Music</TabsTrigger>
+          <TabsTrigger value="sfx"><Volume2 className="h-3 w-3 mr-1" /> SFX</TabsTrigger>
+          <TabsTrigger value="chars"><Users className="h-3 w-3 mr-1" /> Characters</TabsTrigger>
+          <TabsTrigger value="versions"><History className="h-3 w-3 mr-1" /> Versions</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="scenes" className="space-y-6 mt-4">
       {/* Global fields */}
       <Card className="p-5 space-y-4">
         <h3 className="font-medium flex items-center gap-2"><Sparkles className="h-4 w-4" /> Global settings</h3>
@@ -467,6 +540,83 @@ export function VideoBlueprintEditor({
           )}
         </div>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="timeline" className="mt-4">
+          <TimelineEditor
+            blueprint={bp}
+            selectedSceneId={expandedScene}
+            onSelectScene={(id) => setExpandedScene(id)}
+            onResizeScene={setSceneDuration}
+            onMoveScene={move}
+          />
+        </TabsContent>
+
+        <TabsContent value="script" className="mt-4">
+          <ScriptEditor
+            blueprint={bp}
+            onUpdateScene={patchScene}
+            onBulkReplace={bulkReplaceScripts}
+          />
+        </TabsContent>
+
+        <TabsContent value="subs" className="mt-4">
+          <SubtitleEditor
+            blueprint={bp}
+            onUpdateScene={patchScene}
+            onUpdateStyle={setSubtitleStyle}
+          />
+        </TabsContent>
+
+        <TabsContent value="music" className="mt-4">
+          <MusicPicker
+            value={bp.music}
+            musicDirection={bp.musicDirection ?? ""}
+            onChange={(v) => setMusic(v ?? undefined)}
+            onDirectionChange={(d) => patchGlobal({ musicDirection: d })}
+          />
+
+        </TabsContent>
+
+        <TabsContent value="sfx" className="mt-4">
+          <SfxEditor blueprint={bp} onUpdateScene={patchScene} />
+        </TabsContent>
+
+        <TabsContent value="chars" className="mt-4">
+          <CharacterLibrary
+            blueprint={bp}
+            onUpdateLibrary={setCharacters}
+            onAssignToScene={(sceneId, character) =>
+              patchScene(sceneId, {
+                character: {
+                  reference: character.description
+                    ? `${character.name} — ${character.description}`
+                    : character.name,
+                  locked: character.lockAppearance !== false,
+                },
+              })
+            }
+
+          />
+        </TabsContent>
+
+
+        <TabsContent value="versions" className="mt-4">
+          <VersionHistoryPanel
+            metadata={meta}
+            onRestore={restoreVersion}
+            onPreview={previewVersion}
+          />
+        </TabsContent>
+      </Tabs>
+
+      <ShotReplacementDialog
+        open={!!shotDialogSceneId}
+        scene={shotDialogScene}
+        onClose={() => setShotDialogSceneId(null)}
+        onSave={setShotReference}
+        onRegenerate={(id) => void regenScene(id)}
+      />
 
       {/* Render actions */}
       <Card className="p-5">
