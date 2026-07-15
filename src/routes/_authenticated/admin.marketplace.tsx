@@ -52,7 +52,7 @@ function AdminMarketplace() {
           </div>
           <input className="input-base" placeholder="Title" value={editing.title ?? ""} onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
           <input className="input-base" placeholder="Slug" value={editing.slug ?? ""} onChange={(e) => setEditing({ ...editing, slug: e.target.value })} />
-          <select className="input-base" value={editing.kind ?? "prompt_pack"} onChange={(e) => setEditing({ ...editing, kind: e.target.value as MarketplaceItem["kind"] })}>
+          
           <CreatorFlowSelect
             ariaLabel="Kind"
             value={editing.kind ?? "prompt_pack"}
