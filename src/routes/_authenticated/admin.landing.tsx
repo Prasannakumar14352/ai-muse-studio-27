@@ -20,9 +20,9 @@ export const Route = createFileRoute("/_authenticated/admin/landing")({
 type Draft = Partial<LandingMediaRow> & { kind: LandingMediaKind };
 
 const EMPTY_TESTIMONIAL: Draft = {
-  kind: "testimonial", status: "draft", display_order: 0, source: "sample", rating: 5,
+  kind: "testimonial", status: "draft", display_order: 0, source: "customer", rating: 5, consent_confirmed: false,
 };
-const EMPTY_DEMO: Draft = { kind: "demo", status: "draft", display_order: 0 };
+const EMPTY_DEMO: Draft = { kind: "demo", status: "draft", display_order: 0, consent_confirmed: false };
 
 function detectVideoType(url: string): LandingVideoType | null {
   if (!url) return null;
