@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { toPng } from "html-to-image";
 import { fetchGeneratedImage } from "@/lib/image-stream";
 import { Download, Wand2 } from "lucide-react";
+import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 
 export type LinkedinImageSize = {
   key: "share_1200x627" | "square_1080" | "portrait_1080x1350";
