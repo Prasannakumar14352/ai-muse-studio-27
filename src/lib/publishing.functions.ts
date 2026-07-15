@@ -190,11 +190,11 @@ export const getPlatformStatus = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("platform_connections")
-      .select("platform, status, account_name, expires_at, updated_at")
+      .select("platform, status, account_label, expires_at, updated_at")
       .eq("user_id", context.userId);
     if (error) throw error;
     const conns = (data ?? []) as Array<{
-      platform: string; status: string | null; account_name: string | null;
+      platform: string; status: string | null; account_label: string | null;
       expires_at: string | null; updated_at: string | null;
     }>;
     return PLATFORMS.map((p) => {
@@ -204,7 +204,7 @@ export const getPlatformStatus = createServerFn({ method: "GET" })
         platform: p,
         connected: !!c && c.status === "connected" && !expired,
         status: expired ? "expired" : (c?.status ?? "disconnected"),
-        accountName: c?.account_name ?? null,
+        accountName: c?.account_label ?? null,
         expiresAt: c?.expires_at ?? null,
         updatedAt: c?.updated_at ?? null,
       };
