@@ -383,7 +383,7 @@ function OneClickActions({ findings, navigate }: { findings: ResearchFindings; n
       } else {
         toast.success("Draft created — review and generate", { id: toastId });
       }
-      navigate({ to: action.route, search: autogen ? { autogen: 1 } as never : undefined });
+      navigate({ to: action.route });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Handoff failed";
       toast.error(msg, { id: toastId });
