@@ -308,8 +308,10 @@ export function LinkedinCarouselStudio({ initial, topic, audience, tone, body, b
                 <div className="flex items-center gap-1">
                   <button onClick={(e) => { e.stopPropagation(); move(i, -1); }} className="p-1 hover:bg-white/10 rounded" title="Move up"><ArrowUp className="w-3 h-3" /></button>
                   <button onClick={(e) => { e.stopPropagation(); move(i, 1); }} className="p-1 hover:bg-white/10 rounded" title="Move down"><ArrowDown className="w-3 h-3" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); duplicate(i); }} className="p-1 hover:bg-white/10 rounded" title="Duplicate"><Copy className="w-3 h-3" /></button>
                   <button onClick={(e) => { e.stopPropagation(); del(i); }} className="p-1 hover:bg-white/10 rounded text-rose-300" title="Delete"><Trash2 className="w-3 h-3" /></button>
                 </div>
+
               </div>
               <p className="text-xs font-medium line-clamp-2 pl-6">{s.title}</p>
             </div>
