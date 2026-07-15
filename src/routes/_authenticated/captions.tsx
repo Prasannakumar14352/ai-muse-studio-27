@@ -15,6 +15,7 @@ import { ActiveStrategyBanner } from "@/components/active-strategy-banner";
 import { getActiveStrategyContext } from "@/lib/active-strategy";
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
 import { HandoffBanner } from "@/components/handoff-banner";
+import { useAutogen } from "@/lib/use-autogen";
 
 export const Route = createFileRoute("/_authenticated/captions")({ component: CaptionsPage });
 
