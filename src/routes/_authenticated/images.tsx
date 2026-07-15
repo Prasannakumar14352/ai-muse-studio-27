@@ -74,7 +74,7 @@ function ImagesPage() {
   const [showDebug, setShowDebug] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [viewerIdx, setViewerIdx] = useState<number | null>(null);
-  const [view, setView] = useState<"landing" | "input">("landing");
+  const [view, setView] = useState<"landing" | "input">(handoff ? "input" : "landing");
   const qc = useQueryClient();
   const { data: access } = useAccess();
 
