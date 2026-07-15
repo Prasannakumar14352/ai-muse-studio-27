@@ -1,5 +1,5 @@
 // LinkedIn Document Carousel Studio — render, edit, reorder, download, PDF export.
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
@@ -8,11 +8,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { saveBlob } from "@/lib/downloads";
 import {
   generateLinkedinCarousel,
+  transformCarouselSlide,
   type LinkedinCarouselContent,
   type LinkedinCarouselSlide,
 } from "@/lib/linkedin-carousel-ai.functions";
-import { ArrowDown, ArrowUp, Copy, Download, FileDown, GripVertical, Package, Plus, Trash2, Wand2 } from "lucide-react";
+import { getDefaultBrandKitFn } from "@/lib/brand-kit.functions";
+import { ArrowDown, ArrowUp, Copy, Download, FileDown, GripVertical, Instagram, Linkedin, Package, Palette, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
+
 
 // LinkedIn document carousels display best at portrait ~4:5 (1080x1350).
 const SLIDE_W = 1080;
