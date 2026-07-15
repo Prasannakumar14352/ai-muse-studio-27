@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { toPng } from "html-to-image";
 import { fetchGeneratedImage } from "@/lib/image-stream";
 import { Download, Wand2 } from "lucide-react";
+import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 
 export type LinkedinImageSize = {
   key: "share_1200x627" | "square_1080" | "portrait_1080x1350";
@@ -139,16 +140,24 @@ export function LinkedinImageStudio({ topic, initial, suggestedPrompt, suggested
           </button>
         ))}
         <div className="flex-1" />
-        <select value={state.theme} onChange={(e) => setState((v) => ({ ...v, theme: e.target.value as "dark" | "light" }))}
-          className="bg-input/50 border border-border rounded px-2 py-1 text-xs">
-          <option value="dark">Dark</option><option value="light">Light</option>
-        </select>
-        <select value={state.overlayPos} onChange={(e) => setState((v) => ({ ...v, overlayPos: e.target.value as "top" | "bottom" | "left" }))}
-          className="bg-input/50 border border-border rounded px-2 py-1 text-xs">
-          <option value="bottom">Text bottom</option>
-          <option value="top">Text top</option>
-          <option value="left">Text left</option>
-        </select>
+        <CreatorFlowSelect
+          ariaLabel="Theme"
+          className="h-8 w-28"
+          value={state.theme}
+          onValueChange={(v) => setState((s) => ({ ...s, theme: v as "dark" | "light" }))}
+          options={[{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }]}
+        />
+        <CreatorFlowSelect
+          ariaLabel="Text position"
+          className="h-8 w-36"
+          value={state.overlayPos}
+          onValueChange={(v) => setState((s) => ({ ...s, overlayPos: v as "top" | "bottom" | "left" }))}
+          options={[
+            { value: "bottom", label: "Text bottom" },
+            { value: "top", label: "Text top" },
+            { value: "left", label: "Text left" },
+          ]}
+        />
       </div>
 
       <div className="grid lg:grid-cols-[1fr_320px] gap-4">

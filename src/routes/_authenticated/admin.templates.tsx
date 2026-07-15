@@ -6,6 +6,7 @@ import { Plus, Trash2, Edit3, X, Loader2, Save } from "lucide-react";
 import { listTemplatesFn, upsertTemplateFn, deleteTemplateFn, type TemplateRecord, type TemplateAccessTier } from "@/lib/templates.functions";
 import { useAccess } from "@/lib/access";
 import { confirmDialog } from "@/components/confirm-dialog";
+import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 
 export const Route = createFileRoute("/_authenticated/admin/templates")({
   head: () => ({ meta: [{ title: "Admin · Templates — CreatorFlow AI" }] }),
@@ -191,14 +192,10 @@ function TemplateEditor({ initial, onClose, onSaved }: {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Category">
-              <select value={f.category ?? ""} onChange={(e) => set("category", e.target.value)} className={input}>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <CreatorFlowSelect ariaLabel="Category" value={f.category ?? ""} onValueChange={(v) => set("category", v)} options={CATEGORIES} />
             </Field>
             <Field label="Access tier">
-              <select value={f.access_tier ?? "free"} onChange={(e) => set("access_tier", e.target.value as TemplateAccessTier)} className={input}>
-                {TIERS.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <CreatorFlowSelect ariaLabel="Access tier" value={f.access_tier ?? "free"} onValueChange={(v) => set("access_tier", v as TemplateAccessTier)} options={TIERS} />
             </Field>
           </div>
           <Field label="Description">
@@ -211,10 +208,7 @@ function TemplateEditor({ initial, onClose, onSaved }: {
           <Field label="Style"><input value={f.style ?? ""} onChange={(e) => set("style", e.target.value)} placeholder="cinematic" className={input} /></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Preview type">
-              <select value={f.preview_type ?? "image"} onChange={(e) => set("preview_type", e.target.value as "image" | "video")} className={input}>
-                <option value="image">image</option>
-                <option value="video">video</option>
-              </select>
+              <CreatorFlowSelect ariaLabel="Preview type" value={f.preview_type ?? "image"} onValueChange={(v) => set("preview_type", v as "image" | "video")} options={["image", "video"]} />
             </Field>
             <Field label="Alt text (accessibility)"><input value={f.alt_text ?? ""} onChange={(e) => set("alt_text", e.target.value)} className={input} /></Field>
           </div>

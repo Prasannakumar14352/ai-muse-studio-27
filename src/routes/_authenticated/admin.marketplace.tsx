@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { listMarketplaceFn, upsertMarketplaceItemFn, deleteMarketplaceItemFn, type MarketplaceItem } from "@/lib/marketplace.functions";
 import { Trash2, Plus, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 
 export const Route = createFileRoute("/_authenticated/admin/marketplace")({ component: AdminMarketplace });
 
@@ -51,14 +52,20 @@ function AdminMarketplace() {
           </div>
           <input className="input-base" placeholder="Title" value={editing.title ?? ""} onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
           <input className="input-base" placeholder="Slug" value={editing.slug ?? ""} onChange={(e) => setEditing({ ...editing, slug: e.target.value })} />
-          <select className="input-base" value={editing.kind ?? "prompt_pack"} onChange={(e) => setEditing({ ...editing, kind: e.target.value as MarketplaceItem["kind"] })}>
-            <option value="prompt_pack">Prompt Pack</option>
-            <option value="template">Template</option>
-            <option value="thumbnail_pack">Thumbnail Pack</option>
-            <option value="brand_kit">Brand Kit</option>
-            <option value="voice_pack">Voice Pack</option>
-            <option value="carousel_pack">Carousel Pack</option>
-          </select>
+          
+          <CreatorFlowSelect
+            ariaLabel="Kind"
+            value={editing.kind ?? "prompt_pack"}
+            onValueChange={(v) => setEditing({ ...editing, kind: v as MarketplaceItem["kind"] })}
+            options={[
+              { value: "prompt_pack", label: "Prompt Pack" },
+              { value: "template", label: "Template" },
+              { value: "thumbnail_pack", label: "Thumbnail Pack" },
+              { value: "brand_kit", label: "Brand Kit" },
+              { value: "voice_pack", label: "Voice Pack" },
+              { value: "carousel_pack", label: "Carousel Pack" },
+            ]}
+          />
           <textarea rows={3} className="input-base" placeholder="Description" value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
           <input className="input-base" placeholder="Preview URL" value={editing.preview_url ?? ""} onChange={(e) => setEditing({ ...editing, preview_url: e.target.value })} />
           <label className="flex items-center gap-2 text-sm">

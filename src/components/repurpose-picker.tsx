@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { repurposeFn, REPURPOSE_FORMATS, type RepurposeFormat } from "@/lib/repurpose.functions";
 import { Loader2, Split, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
+import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 
 export function RepurposePicker() {
   const [projectId, setProjectId] = useState<string>("");
@@ -32,6 +33,7 @@ export function RepurposePicker() {
     setFormats((cur) => cur.includes(f) ? cur.filter((x) => x !== f) : [...cur, f]);
 
   const useProject = useMemo(() => (id: string) => {
+    if (!id) { setProjectId(""); return; }
     const p = projects?.find((x: { id: string }) => x.id === id);
     if (!p) return;
     setProjectId(id);
@@ -47,12 +49,15 @@ export function RepurposePicker() {
       <div className="glass rounded-2xl p-6 border border-white/10 space-y-4">
         <label className="block space-y-1.5">
           <div className="text-xs font-medium text-muted-foreground">Source project (optional)</div>
-          <select className="input-base" value={projectId} onChange={(e) => useProject(e.target.value)}>
-            <option value="">— No project (paste content below) —</option>
-            {projects?.map((p: { id: string; title: string | null }) => (
-              <option key={p.id} value={p.id}>{p.title ?? "Untitled"}</option>
-            ))}
-          </select>
+          <CreatorFlowSelect
+            ariaLabel="Source project"
+            value={projectId || "__none__"}
+            onValueChange={(v) => useProject(v === "__none__" ? "" : v)}
+            options={[
+              { value: "__none__", label: "— No project (paste content below) —" },
+              ...(projects ?? []).map((p: { id: string; title: string | null }) => ({ value: p.id, label: p.title ?? "Untitled" })),
+            ]}
+          />
         </label>
         <label className="block space-y-1.5">
           <div className="text-xs font-medium text-muted-foreground">Source content</div>
