@@ -53,6 +53,7 @@ function CaptionsPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
+      <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
       <ActiveStrategyBanner />
       <GenerationWizard
         step={step}
