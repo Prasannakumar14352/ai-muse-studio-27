@@ -20,9 +20,9 @@ export const Route = createFileRoute("/_authenticated/admin/landing")({
 type Draft = Partial<LandingMediaRow> & { kind: LandingMediaKind };
 
 const EMPTY_TESTIMONIAL: Draft = {
-  kind: "testimonial", status: "draft", display_order: 0, source: "sample", rating: 5,
+  kind: "testimonial", status: "draft", display_order: 0, source: "customer", rating: 5, consent_confirmed: false,
 };
-const EMPTY_DEMO: Draft = { kind: "demo", status: "draft", display_order: 0 };
+const EMPTY_DEMO: Draft = { kind: "demo", status: "draft", display_order: 0, consent_confirmed: false };
 
 function detectVideoType(url: string): LandingVideoType | null {
   if (!url) return null;
@@ -119,7 +119,7 @@ function AdminLanding() {
       </div>
 
       <MediaSection
-        label="Video testimonials"
+        label="Video testimonials (real customers only)"
         kind="testimonial"
         rows={testimonials}
         isLoading={isLoading}
@@ -129,6 +129,7 @@ function AdminLanding() {
         onPublishToggle={(r) => upsertMut.mutate({ ...r, status: r.status === "published" ? "draft" : "published" })}
         onMove={(id, dir) => move(testimonials, id, dir)}
         onPreview={setPreviewUrl}
+        emptyNote="No testimonials yet. The Video Testimonials section on the landing page stays hidden until at least one real customer testimonial is published here. Product walkthroughs are shown separately and are never posted as testimonials."
       />
 
       <MediaSection
@@ -324,7 +325,13 @@ function EditorModal({
             </>
           )}
 
-          <Field label={d.kind === "testimonial" ? "Poster / portrait URL" : "Poster URL"}>
+          {d.kind === "testimonial" && (
+            <Field label="Customer profile photo URL (square headshot)">
+              <input value={d.photo_url ?? ""} onChange={(e) => set("photo_url", e.target.value)} placeholder="https://…jpg or …png" className="w-full glass rounded-lg px-3 py-2 text-sm" />
+            </Field>
+          )}
+
+          <Field label={d.kind === "testimonial" ? "Video poster / thumbnail URL" : "Poster URL"}>
             <input value={d.poster_url ?? ""} onChange={(e) => set("poster_url", e.target.value)} placeholder="https://…jpg or …png" className="w-full glass rounded-lg px-3 py-2 text-sm" />
           </Field>
 
@@ -367,6 +374,22 @@ function EditorModal({
           <Field label="Display order (lower = first)">
             <input type="number" min={0} value={d.display_order ?? 0} onChange={(e) => set("display_order", Number(e.target.value))} className="w-full glass rounded-lg px-3 py-2 text-sm" />
           </Field>
+
+          {d.kind === "testimonial" && d.source === "customer" && (
+            <label className="flex items-start gap-3 rounded-lg p-3 border border-amber-500/30 bg-amber-500/5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!d.consent_confirmed}
+                onChange={(e) => set("consent_confirmed", e.target.checked)}
+                className="mt-1"
+              />
+              <span className="text-xs text-amber-100/90 leading-relaxed">
+                I confirm this customer has given explicit written consent for their name, photo,
+                video and review to be published on the CreatorFlow AI landing page. Publishing a
+                real customer testimonial without consent is blocked.
+              </span>
+            </label>
+          )}
 
           {error && (
             <div className="rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm p-3 flex items-start gap-2">

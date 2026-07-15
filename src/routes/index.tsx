@@ -9,7 +9,7 @@ import {
 import { BrandLogo } from "@/components/brand-logo";
 import {
   DemoVideoSection, VideoTestimonialsSection, WrittenTestimonialsSection,
-  GuaranteeSection, TrustBadgesSection,
+  GuaranteeSection, TrustBadgesSection, ProductWalkthroughsSection,
 } from "@/components/landing-sections";
 import { LandingPricingTabs } from "@/components/landing-pricing-tabs";
 import { EXTRA_FAQ } from "@/lib/landing-content";
@@ -118,7 +118,10 @@ function Landing() {
         </div>
       </section>
 
-      {/* Video Testimonials */}
+      {/* Product walkthroughs (not testimonials) */}
+      <ProductWalkthroughsSection />
+
+      {/* Video Testimonials (only real customers; hidden when empty) */}
       <VideoTestimonialsSection />
 
       {/* Written Testimonials Carousel */}

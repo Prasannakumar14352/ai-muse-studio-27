@@ -8,9 +8,9 @@ import {
   Wand2, Send, AlertCircle, Clock, Loader2, Maximize2, Volume2, VolumeX,
 } from "lucide-react";
 import {
-  VIDEO_TESTIMONIALS, WRITTEN_TESTIMONIALS,
+  PRODUCT_WALKTHROUGHS, WRITTEN_TESTIMONIALS,
   REFUND_ELIGIBLE, REFUND_INELIGIBLE, TRUST_BADGES,
-  type Testimonial,
+  type Testimonial, type ProductWalkthrough,
 } from "@/lib/landing-content";
 import { listPublishedLandingMedia, type LandingMediaRow } from "@/lib/landing-media.functions";
 import demoAsset from "@/assets/demo/creatorflow-demo.mp4.asset.json";
@@ -26,7 +26,7 @@ function landingRowToTestimonial(r: LandingMediaRow): Testimonial {
     country: r.country ?? "",
     role: (r.subtitle as Testimonial["role"]) ?? "Instagram Creator",
     company: r.company ?? undefined,
-    photo: r.poster_url ?? "https://i.pravatar.cc/400",
+    photo: r.photo_url ?? r.poster_url ?? "https://i.pravatar.cc/400",
     rating: (r.rating ?? 5) as Testimonial["rating"],
     review: r.review ?? "",
     quote: r.quote ?? undefined,
@@ -501,32 +501,119 @@ export function VideoTestimonialsSection() {
     queryFn: () => listPublishedLandingMedia(),
     staleTime: 60_000,
   });
-  const dbTestimonials = (dbRows ?? [])
-    .filter((r) => r.kind === "testimonial")
+  // Genuine customer reviews only. Product walkthroughs and sample rows are
+  // never rendered here — they live in the walkthrough section below.
+  const testimonials = (dbRows ?? [])
+    .filter((r) => r.kind === "testimonial" && r.source === "customer" && r.video_url)
     .map(landingRowToTestimonial);
-  const testimonials = dbTestimonials.length > 0 ? dbTestimonials : VIDEO_TESTIMONIALS;
-  const anyWalkthrough = testimonials.some((t) => t.source === "demo");
-  const anySample = testimonials.some((t) => t.source === "sample");
+
+  // Hide the section entirely until at least one real customer testimonial
+  // has been published from /admin/landing.
+  if (testimonials.length === 0) return null;
 
   return (
     <section className="py-24 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-14">
-          <h2 className="text-4xl md:text-5xl font-bold">Loved by <span className="gradient-text">creators worldwide</span></h2>
+          <h2 className="text-4xl md:text-5xl font-bold">Loved by <span className="gradient-text">real creators</span></h2>
           <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-            Real workflows, real modules. The clips below are short live recordings of CreatorFlow AI — the ones marked
-            <span className="text-white/80"> "Product walkthrough" </span>
-            will be replaced with real customer videos as they come in from the admin panel.
+            Verified customer reviews recorded by CreatorFlow AI users.
           </p>
-          {(anyWalkthrough || anySample) && (
-            <p className="mt-3 text-xs text-white/50 max-w-xl mx-auto">
-              Every card is labelled honestly — nothing here impersonates a real customer.
-            </p>
-          )}
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {testimonials.map((t) => (
+          {testimonials.map((t: Testimonial) => (
             <VideoTestimonialCard key={t.id} t={t} onPlay={setPlaying} />
+          ))}
+        </div>
+      </div>
+      {playing && (
+        <TestimonialVideoModal video={playing} onClose={() => setPlaying(null)} />
+      )}
+    </section>
+  );
+}
+
+/* ---------- 2b. PRODUCT WALKTHROUGHS — "See CreatorFlow AI in Action" ---------- */
+
+function ProductWalkthroughCard({
+  w, onPlay,
+}: { w: ProductWalkthrough; onPlay: (v: PlayingVideo) => void }) {
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const previewRef = useRef<HTMLVideoElement | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        setVisible(entry.isIntersecting);
+        const v = previewRef.current;
+        if (!v) return;
+        if (entry.isIntersecting) v.play().catch(() => {});
+        else v.pause();
+      },
+      { threshold: 0.4 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <div ref={cardRef} className="glass rounded-2xl p-4 flex flex-col">
+      <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
+        <video
+          ref={previewRef}
+          src={w.videoUrl}
+          poster={w.poster}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+        <span className="absolute top-3 left-3 z-10 glass px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/90">
+          Product walkthrough
+        </span>
+        <button
+          type="button"
+          onClick={() => onPlay({ name: w.title, url: w.videoUrl, type: "mp4" })}
+          aria-label={`Play ${w.title}`}
+          className="absolute inset-0 w-full h-full group flex items-center justify-center"
+        >
+          <div className={`w-14 h-14 rounded-full gradient-primary flex items-center justify-center shadow-[var(--shadow-glow)] group-hover:scale-110 transition ${visible ? "opacity-0 group-hover:opacity-100" : "opacity-100"}`}>
+            <Play className="w-6 h-6 text-white fill-white ml-0.5" />
+          </div>
+          <span className="absolute bottom-3 right-3 flex items-center gap-1 glass px-2 py-1 rounded-full text-[11px] text-white/90">
+            <Clock className="w-3 h-3" /> {w.duration}
+          </span>
+        </button>
+      </div>
+      <div className="mt-4">
+        <div className="text-sm font-semibold">{w.title}</div>
+        <p className="mt-1 text-xs text-muted-foreground">{w.caption}</p>
+      </div>
+    </div>
+  );
+}
+
+export function ProductWalkthroughsSection() {
+  const [playing, setPlaying] = useState<PlayingVideo | null>(null);
+  if (PRODUCT_WALKTHROUGHS.length === 0) return null;
+  return (
+    <section className="py-24 px-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-14">
+          <h2 className="text-4xl md:text-5xl font-bold">See CreatorFlow AI <span className="gradient-text">in Action</span></h2>
+          <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
+            Short screen recordings of the real product — not customer testimonials.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {PRODUCT_WALKTHROUGHS.map((w) => (
+            <ProductWalkthroughCard key={w.id} w={w} onPlay={setPlaying} />
           ))}
         </div>
       </div>
@@ -544,7 +631,10 @@ export function VideoTestimonialsSection() {
 
 function WrittenCard({ t }: { t: Testimonial }) {
   return (
-    <div className="glass rounded-2xl p-6 w-[340px] shrink-0 flex flex-col">
+    <div className="glass rounded-2xl p-6 w-[340px] shrink-0 flex flex-col relative">
+      <span className="absolute top-3 right-3 glass px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/70">
+        Sample review
+      </span>
       <StarRow n={t.rating} />
       <p className="mt-3 text-sm leading-relaxed text-foreground/90">"{t.review}"</p>
       <div className="mt-5 flex items-center gap-3">
@@ -564,7 +654,10 @@ export function WrittenTestimonialsSection() {
   return (
     <section className="py-20">
       <div className="max-w-7xl mx-auto px-6 text-center mb-10">
-        <h2 className="text-3xl md:text-4xl font-bold">Trusted by <span className="gradient-text">thousands of creators</span></h2>
+        <h2 className="text-3xl md:text-4xl font-bold">Sample creator reviews</h2>
+        <p className="mt-3 text-sm text-muted-foreground max-w-xl mx-auto">
+          Illustrative sample copy showing how CreatorFlow AI fits different workflows. Real customer reviews will replace these as they come in.
+        </p>
       </div>
       <div className="relative overflow-hidden group">
         <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-background to-transparent z-10" />

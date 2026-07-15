@@ -504,12 +504,14 @@ export type Database = {
       landing_media: {
         Row: {
           company: string | null
+          consent_confirmed: boolean
           country: string | null
           created_at: string
           display_order: number
           duration: string | null
           id: string
           kind: string
+          photo_url: string | null
           poster_url: string | null
           quote: string | null
           rating: number | null
@@ -524,12 +526,14 @@ export type Database = {
         }
         Insert: {
           company?: string | null
+          consent_confirmed?: boolean
           country?: string | null
           created_at?: string
           display_order?: number
           duration?: string | null
           id?: string
           kind: string
+          photo_url?: string | null
           poster_url?: string | null
           quote?: string | null
           rating?: number | null
@@ -544,12 +548,14 @@ export type Database = {
         }
         Update: {
           company?: string | null
+          consent_confirmed?: boolean
           country?: string | null
           created_at?: string
           display_order?: number
           duration?: string | null
           id?: string
           kind?: string
+          photo_url?: string | null
           poster_url?: string | null
           quote?: string | null
           rating?: number | null

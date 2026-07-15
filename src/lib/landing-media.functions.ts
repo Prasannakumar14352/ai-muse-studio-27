@@ -24,6 +24,8 @@ export interface LandingMediaRow {
   rating: number | null;
   status: LandingMediaStatus;
   display_order: number;
+  photo_url: string | null;
+  consent_confirmed: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -89,6 +91,8 @@ const UpsertSchema = z.object({
   rating: z.number().int().min(1).max(5).nullable().optional(),
   status: z.enum(["draft", "published"]),
   display_order: z.number().int().min(0).max(999).default(0),
+  photo_url: z.string().url().max(1000).nullable().optional().or(z.literal("")),
+  consent_confirmed: z.boolean().optional().default(false),
 });
 
 export const upsertLandingMedia = createServerFn({ method: "POST" })
@@ -99,6 +103,16 @@ export const upsertLandingMedia = createServerFn({ method: "POST" })
     const clean: Record<string, unknown> = { ...data };
     if (clean.poster_url === "") clean.poster_url = null;
     if (clean.video_url === "") clean.video_url = null;
+    if (clean.photo_url === "") clean.photo_url = null;
+    // Enforce: real customer testimonials can only be published with consent confirmed.
+    if (
+      data.kind === "testimonial" &&
+      data.status === "published" &&
+      data.source === "customer" &&
+      !data.consent_confirmed
+    ) {
+      throw new Error("Customer consent must be confirmed before publishing a real customer testimonial.");
+    }
     if (data.id) {
       const { id, ...rest } = clean as any;
       const { data: row, error } = await context.supabase
