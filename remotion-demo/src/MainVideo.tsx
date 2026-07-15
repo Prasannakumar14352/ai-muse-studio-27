@@ -757,7 +757,7 @@ const SceneOutro: React.FC = () => {
           color: C.muted,
         }}
       >
-        CreatorVault AI · 5 free generations every month
+        CreatorFlow AI · 5 free generations every month
       </div>
     </AbsoluteFill>
   );
