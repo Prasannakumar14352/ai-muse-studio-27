@@ -13,7 +13,7 @@ import { loadFont as loadSpace } from "@remotion/google-fonts/SpaceGrotesk";
 const inter = loadInter("normal", { weights: ["400", "500", "600"], subsets: ["latin"] });
 const space = loadSpace("normal", { weights: ["500", "700"], subsets: ["latin"] });
 
-// Palette — matches CreatorVault AI dark neon theme
+// Palette — matches CreatorFlow AI dark neon theme
 const C = {
   bg: "#0a0a12",
   bg2: "#12121f",
@@ -757,7 +757,7 @@ const SceneOutro: React.FC = () => {
           color: C.muted,
         }}
       >
-        CreatorVault AI · 5 free generations every month
+        CreatorFlow AI · 5 free generations every month
       </div>
     </AbsoluteFill>
   );

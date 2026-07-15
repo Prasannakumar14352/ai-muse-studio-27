@@ -4,19 +4,17 @@ import {
   Play, Star, Check, X, ShieldCheck, Sparkles, Briefcase, Download,
   Infinity as InfinityIcon, Calendar, Coins, Key, Cloud, HeadphonesIcon,
   Video as VideoIcon, Image as ImageIcon, Layers, Linkedin, Type as TypeIcon,
-  Wand2, Send, AlertCircle,
+  Wand2, Send, AlertCircle, Clock, Loader2,
 } from "lucide-react";
 import {
   VIDEO_TESTIMONIALS, WRITTEN_TESTIMONIALS,
   REFUND_ELIGIBLE, REFUND_INELIGIBLE, TRUST_BADGES,
   type Testimonial,
 } from "@/lib/landing-content";
-
-const DEMO_VIDEO_URL = "/creatorflow-demo.mp4";
-const DEMO_POSTER = "/brand/hero-poster.jpg";
+import { InteractiveDemo } from "@/components/interactive-demo";
 
 const HERO_FEATURES = [
-  { icon: VideoIcon, label: "AI Video Generation" },
+  { icon: VideoIcon, label: "AI Video Studio" },
   { icon: ImageIcon, label: "AI Images" },
   { icon: Layers, label: "Carousels" },
   { icon: Linkedin, label: "LinkedIn Posts" },
@@ -25,30 +23,23 @@ const HERO_FEATURES = [
   { icon: Send, label: "Direct Publishing" },
 ];
 
-/* ---------------------- 1. DEMO VIDEO ---------------------- */
+/* ---------------------- 1. DEMO — interactive product walkthrough ---------------------- */
 
 export function DemoVideoSection() {
-  const [playing, setPlaying] = useState(false);
-  const [error, setError] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
 
-  const handlePlay = () => {
-    setError(false);
-    setPlaying(true);
-  };
-
-  // Once mounted, kick off playback within the same user-gesture window.
+  // Escape closes fullscreen; lock body scroll while open.
   useEffect(() => {
-    if (!playing) return;
-    const v = videoRef.current;
-    if (!v) return;
-    const p = v.play();
-    if (p && typeof p.catch === "function") {
-      // If the browser blocks programmatic play we still show controls so
-      // the user can hit the native play button.
-      p.catch(() => {});
-    }
-  }, [playing]);
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFullscreen(false); };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [fullscreen]);
 
   return (
     <section className="py-24 px-6">
@@ -57,56 +48,16 @@ export function DemoVideoSection() {
           See CreatorFlow AI <span className="gradient-text">in Action</span>
         </h2>
         <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-          Watch how a single idea becomes a structured Video Blueprint — script, scenes, voiceover
-          and visuals — with a Review &amp; Edit gate before any credits are spent. Then generate
-          reels, carousels, LinkedIn posts, thumbnails, captions and images in minutes.
+          A live walkthrough of the current product — Strategy, Research, Video Studio, Carousel, Image
+          &amp; Thumbnail Studios, LinkedIn, Brand Kit and Direct Publishing.
         </p>
 
         <div className="mt-10 glass rounded-3xl p-2 shadow-[var(--shadow-glow)]">
-          <div className="relative aspect-video rounded-2xl overflow-hidden bg-black group">
-            {playing && !error ? (
-              <video
-                ref={videoRef}
-                poster={DEMO_POSTER}
-                controls
-                controlsList="nodownload"
-                playsInline
-                preload="metadata"
-                onError={() => setError(true)}
-                className="w-full h-full object-contain bg-black"
-                aria-label="CreatorFlow AI product demo"
-              >
-                <source src={DEMO_VIDEO_URL} type="video/mp4" />
-                Sorry, your browser can't play this video. You can{" "}
-                <a href={DEMO_VIDEO_URL} download>download it here</a>.
-              </video>
-            ) : (
-              <button
-                type="button"
-                onClick={handlePlay}
-                className="absolute inset-0 w-full h-full flex items-center justify-center"
-                aria-label="Play CreatorFlow AI demo video"
-              >
-                <img
-                  src={DEMO_POSTER}
-                  alt="CreatorFlow AI demo preview"
-                  loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-90 transition"
-                />
-                <div className="relative z-10 w-20 h-20 rounded-full gradient-primary flex items-center justify-center shadow-[var(--shadow-glow)] group-hover:scale-110 transition">
-                  <Play className="w-8 h-8 text-white fill-white ml-1" />
-                </div>
-                <span className="absolute bottom-6 left-6 glass px-3 py-1.5 rounded-full text-xs font-medium uppercase tracking-wide text-white/90">
-                  Blueprint · Review &amp; Edit · Render
-                </span>
-                {error && (
-                  <span className="absolute top-4 right-4 flex items-center gap-1.5 glass px-3 py-1.5 rounded-full text-xs text-rose-300">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    Video failed to load. Please try again.
-                  </span>
-                )}
-              </button>
-            )}
+          <div className="relative aspect-video rounded-2xl overflow-hidden bg-black">
+            <InteractiveDemo onRequestFullscreen={() => setFullscreen(true)} />
+            <span className="absolute top-3 left-3 glass px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/80">
+              Interactive product walkthrough
+            </span>
           </div>
         </div>
 
@@ -127,6 +78,31 @@ export function DemoVideoSection() {
           Start Creating Today
         </Link>
       </div>
+
+      {fullscreen && (
+        <div
+          className="fixed inset-0 z-[80] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="CreatorFlow AI interactive demo"
+          onClick={() => setFullscreen(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setFullscreen(false)}
+            aria-label="Close demo"
+            className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full glass flex items-center justify-center text-white hover:scale-105 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <div
+            className="relative w-full max-w-7xl aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <InteractiveDemo autoPlay />
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -151,6 +127,8 @@ type PlayingVideo = {
 
 function TestimonialVideoModal({ video, onClose }: { video: PlayingVideo; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [loading, setLoading] = useState(video.type === "mp4");
+  const [errored, setErrored] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -160,7 +138,6 @@ function TestimonialVideoModal({ video, onClose }: { video: PlayingVideo; onClos
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
-      // Pause on close so audio stops even if the element hasn't unmounted yet.
       try { videoRef.current?.pause(); } catch { /* noop */ }
     };
   }, [onClose]);
@@ -185,7 +162,20 @@ function TestimonialVideoModal({ video, onClose }: { video: PlayingVideo; onClos
         className="relative w-full max-w-5xl aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {video.type === "mp4" ? (
+        {loading && !errored && (
+          <div className="absolute inset-0 flex items-center justify-center text-white/70 gap-2 text-sm z-10 pointer-events-none">
+            <Loader2 className="w-5 h-5 animate-spin" /> Loading…
+          </div>
+        )}
+        {errored ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 text-white">
+            <AlertCircle className="w-8 h-8 text-rose-400 mb-3" />
+            <div className="font-semibold">This video can't be played right now.</div>
+            <a href={video.url} target="_blank" rel="noreferrer" className="mt-3 text-sm underline text-white/80">
+              Open in a new tab
+            </a>
+          </div>
+        ) : video.type === "mp4" ? (
           <video
             ref={videoRef}
             key={video.url}
@@ -194,6 +184,9 @@ function TestimonialVideoModal({ video, onClose }: { video: PlayingVideo; onClos
             autoPlay
             playsInline
             preload="metadata"
+            controlsList="nodownload"
+            onLoadedData={() => setLoading(false)}
+            onError={() => { setLoading(false); setErrored(true); }}
             className="w-full h-full object-contain bg-black"
           >
             Your browser can't play this video.
@@ -205,11 +198,22 @@ function TestimonialVideoModal({ video, onClose }: { video: PlayingVideo; onClos
             title={`Testimonial from ${video.name}`}
             allow="autoplay; fullscreen; picture-in-picture"
             allowFullScreen
+            onLoad={() => setLoading(false)}
             className="w-full h-full"
           />
         )}
       </div>
     </div>
+  );
+}
+
+function SourceBadge({ source }: { source?: Testimonial["source"] }) {
+  if (source === "customer" || !source) return null;
+  const label = source === "demo" ? "Demo testimonial" : "Sample testimonial";
+  return (
+    <span className="absolute top-3 left-3 glass px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/90">
+      {label}
+    </span>
   );
 }
 
@@ -222,11 +226,17 @@ function VideoTestimonialCard({
       <div className="relative aspect-[4/5] rounded-xl overflow-hidden bg-black">
         <img
           src={t.photo}
-          alt={t.name}
+          alt={`Portrait of ${t.name}, ${t.role}${t.company ? " at " + t.company : ""}`}
           loading="lazy"
-          className="w-full h-full object-cover opacity-80"
+          className="w-full h-full object-cover opacity-85"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+        <SourceBadge source={t.source} />
+        {t.quote && (
+          <div className="absolute left-4 right-4 bottom-16 text-white font-semibold text-sm md:text-base leading-snug drop-shadow">
+            "{t.quote}"
+          </div>
+        )}
         {hasVideo ? (
           <button
             type="button"
@@ -239,20 +249,27 @@ function VideoTestimonialCard({
             <div className="w-14 h-14 rounded-full gradient-primary flex items-center justify-center shadow-[var(--shadow-glow)] group-hover:scale-110 transition">
               <Play className="w-6 h-6 text-white fill-white ml-0.5" />
             </div>
+            {t.duration && (
+              <span className="absolute bottom-3 right-3 flex items-center gap-1 glass px-2 py-1 rounded-full text-[11px] text-white/90">
+                <Clock className="w-3 h-3" /> {t.duration}
+              </span>
+            )}
           </button>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-end pb-4 pointer-events-none">
-            <span className="glass px-3 py-1.5 rounded-full text-[11px] font-medium uppercase tracking-wide text-white/90">
-              Sample testimonial
+            <span className="glass px-3 py-1.5 rounded-full text-[11px] font-medium uppercase tracking-wide text-white/80">
+              Video coming soon
             </span>
           </div>
         )}
       </div>
       <div className="mt-4 flex items-center gap-3">
-        <img src={t.photo} alt={t.name} loading="lazy" className="w-10 h-10 rounded-full object-cover" />
+        <img src={t.photo} alt="" loading="lazy" className="w-10 h-10 rounded-full object-cover" />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold truncate">{t.name}</div>
-          <div className="text-xs text-muted-foreground truncate">{t.role} · {t.country}</div>
+          <div className="text-xs text-muted-foreground truncate">
+            {t.role}{t.company ? ` · ${t.company}` : ""} · {t.country}
+          </div>
         </div>
         <StarRow n={t.rating} />
       </div>
@@ -263,14 +280,20 @@ function VideoTestimonialCard({
 
 export function VideoTestimonialsSection() {
   const [playing, setPlaying] = useState<PlayingVideo | null>(null);
+  const anySample = VIDEO_TESTIMONIALS.some((t) => t.source && t.source !== "customer");
   return (
     <section className="py-24 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-14">
           <h2 className="text-4xl md:text-5xl font-bold">Loved by <span className="gradient-text">creators worldwide</span></h2>
           <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-            Real creators, real results. Instagram creators, YouTubers, course creators, agencies, freelancers, teachers and business owners ship faster with CreatorFlow AI.
+            Real workflows. Real modules. Instagram creators, YouTubers, course creators, agencies, freelancers, teachers and business owners ship faster with CreatorFlow AI.
           </p>
+          {anySample && (
+            <p className="mt-3 text-xs text-white/50 max-w-xl mx-auto">
+              Some cards below are clearly marked <span className="text-white/80">Sample testimonial</span> and use placeholder footage until real customer videos are published from the admin panel.
+            </p>
+          )}
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {VIDEO_TESTIMONIALS.map((t) => (
@@ -284,6 +307,7 @@ export function VideoTestimonialsSection() {
     </section>
   );
 }
+
 
 /* ---------------------- 3. WRITTEN TESTIMONIAL CAROUSEL ---------------------- */
 

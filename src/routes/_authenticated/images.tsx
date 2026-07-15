@@ -297,13 +297,13 @@ function ImagesPage() {
   async function loadHistory() {
     const logs = await listImageGenLogs();
     if (logs.length === 0) return toast.info("No saved debug logs yet");
-    downloadJson(`creatorvault-image-debug-history-${Date.now()}.json`, logs);
+    downloadJson(`creatorflow-image-debug-history-${Date.now()}.json`, logs);
     toast.success(`Downloaded ${logs.length} logs`);
   }
 
   function downloadCurrentDebug() {
     if (!debug) return toast.error("No debug data yet");
-    downloadJson(`creatorvault-image-debug-${Date.now()}.json`, debug);
+    downloadJson(`creatorflow-image-debug-${Date.now()}.json`, debug);
   }
 
   function applyHistoryEntry(h: ImagePromptHistoryEntry) {
@@ -655,7 +655,7 @@ function ImagesPage() {
               <div className="mb-1">{results[viewerIdx].style} · {results[viewerIdx].ratio} · {viewerIdx + 1}/{results.length}</div>
               <div className="line-clamp-2">{results[viewerIdx].prompt}</div>
             </div>
-            <a href={results[viewerIdx].image} download={`creatorvault-${results[viewerIdx].id}.png`}
+            <a href={results[viewerIdx].image} download={`creatorflow-${results[viewerIdx].id}.png`}
               onClick={(e) => e.stopPropagation()}
               className="rounded-lg gradient-primary text-white px-4 py-2 text-xs font-medium flex items-center gap-2">
               <Download className="w-3 h-3" /> Download
@@ -754,7 +754,7 @@ function ImageCard({
       <div className="p-3">
         <div className="text-xs text-muted-foreground line-clamp-2">{row.prompt}</div>
         <div className="mt-3 flex gap-1.5">
-          <a href={row.image} download={`creatorvault-${row.id}.png`}
+          <a href={row.image} download={`creatorflow-${row.id}.png`}
             className="flex-1 rounded-lg gradient-primary text-white py-1.5 text-xs flex items-center justify-center gap-1">
             <Download className="w-3 h-3" /> Download
           </a>

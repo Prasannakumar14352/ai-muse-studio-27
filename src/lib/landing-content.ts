@@ -1,6 +1,8 @@
 // Landing page content data.
 // Structured so it can later be moved to a DB-backed CMS without touching the UI.
 
+export type TestimonialSource = "customer" | "sample" | "demo";
+
 export type Testimonial = {
   id: string;
   name: string;
@@ -13,55 +15,87 @@ export type Testimonial = {
     | "Freelancer"
     | "Business Owner"
     | "Teacher";
-  photo: string; // URL
+  /** Company or specific creator brand (e.g. "Menon Reels", "Acme Agency"). */
+  company?: string;
+  /** Poster/thumbnail image. */
+  photo: string;
   rating: 1 | 2 | 3 | 4 | 5;
+  /** Longer written review used on the card and marquee. */
   review: string;
+  /** Short pull-quote overlaid on the video poster. */
+  quote?: string;
+  /** Provenance — controls the badge on the card. */
+  source?: TestimonialSource;
   /**
-   * Real, browser-playable video source (MP4 file, Supabase Storage URL,
+   * Real, browser-playable video source (MP4 URL, Supabase Storage URL,
    * or YouTube/Vimeo EMBED url — never a watch-page URL).
-   * Omit when no real testimonial video exists yet: the card renders as a
-   * clearly labelled "Sample testimonial" with a disabled play button.
+   * When omitted the card renders as a labelled sample with no play button.
    */
   videoUrl?: string;
   videoType?: "mp4" | "youtube" | "vimeo";
+  /** Duration label shown on the play button (e.g. "1:12"). */
+  duration?: string;
 };
 
 export type TrustBadge = { title: string; desc: string; icon: string };
 
-// NOTE: All entries below are currently poster-only "Sample testimonial"
-// cards. To enable playback, add `videoUrl` + `videoType` with a real
-// asset (MP4 in /public, Supabase Storage URL, or a YouTube/Vimeo EMBED
-// url like https://www.youtube.com/embed/VIDEO_ID).
+// Public sample MP4s (Google's stable gtv-videos bucket — CORS-open, H.264/AAC).
+// These are clearly labelled "Demo testimonial" until real customer videos
+// replace them via the admin panel.
+const SAMPLE_MP4 = {
+  bunny: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+  elephants: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+  blazes: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+};
+
 export const VIDEO_TESTIMONIALS: Testimonial[] = [
   {
     id: "v1",
     name: "Priya Menon",
     country: "India",
     role: "Instagram Creator",
-    photo: "https://i.pravatar.cc/160?img=47",
+    company: "Menon Reels",
+    photo: "https://i.pravatar.cc/400?img=47",
     rating: 5,
+    quote: "From 2 reels a week to daily — without burning out.",
     review:
-      "I went from posting twice a week to daily reels. CreatorFlow AI plans my hooks, scripts and thumbnails in minutes.",
+      "CreatorFlow AI plans my hooks, scripts and thumbnails in minutes. The Video Studio blueprint means I approve everything before a single credit is spent.",
+    source: "sample",
+    videoUrl: SAMPLE_MP4.bunny,
+    videoType: "mp4",
+    duration: "1:12",
   },
   {
     id: "v2",
     name: "Marcus Bell",
     country: "United States",
     role: "YouTuber",
-    photo: "https://i.pravatar.cc/160?img=12",
+    company: "BellCasts",
+    photo: "https://i.pravatar.cc/400?img=12",
     rating: 5,
+    quote: "The blueprint editor is a game changer.",
     review:
-      "The blueprint editor is a game changer. I approve the script, tweak scenes, then render — no more slideshow feel.",
+      "I approve the script, tweak scenes, then render. No more slideshow feel — every short looks intentional and on-brand.",
+    source: "sample",
+    videoUrl: SAMPLE_MP4.elephants,
+    videoType: "mp4",
+    duration: "0:58",
   },
   {
     id: "v3",
     name: "Sofia Álvarez",
     country: "Spain",
     role: "Course Creator",
-    photo: "https://i.pravatar.cc/160?img=32",
+    company: "Álvarez Academy",
+    photo: "https://i.pravatar.cc/400?img=32",
     rating: 5,
+    quote: "Replaced three tools in my stack.",
     review:
-      "My students get carousels, captions and thumbnails for every lesson. It replaced three tools in my stack.",
+      "My students get carousels, captions and thumbnails for every lesson. Strategy → Research → Publish, all in one workspace.",
+    source: "sample",
+    videoUrl: SAMPLE_MP4.blazes,
+    videoType: "mp4",
+    duration: "1:24",
   },
 ];
 
@@ -145,4 +179,31 @@ export const EXTRA_FAQ = [
   { q: "Can I download everything?", a: "Yes — videos as MP4, images and thumbnails as PNG, carousels as PDF or ZIP. No watermarks, unlimited downloads." },
   { q: "Can I request a refund?", a: "Refunds are available for eligible platform issues — see our Satisfaction Guarantee section for the full policy." },
   { q: "What happens if there is a technical issue?", a: "Contact support and we aim to respond within one business day. Most issues are resolved in 24–48 hours; unresolved eligible issues are credited or refunded." },
+];
+
+/* -------------------- Product demo scene script -------------------- */
+
+export type DemoScene = {
+  id: string;
+  module:
+    | "Dashboard" | "Strategy" | "Research" | "Video Studio" | "Carousel Studio"
+    | "Image Studio" | "Thumbnail Studio" | "LinkedIn Posts"
+    | "Templates & Brand Kit" | "Publishing" | "Result";
+  title: string;
+  caption: string;
+  accent: "purple" | "pink" | "blend";
+};
+
+export const DEMO_SCENES: DemoScene[] = [
+  { id: "s1", module: "Dashboard", title: "Your CreatorFlow AI command center", caption: "Credit balance, recent projects, quick actions — all in one glass dashboard.", accent: "blend" },
+  { id: "s2", module: "Strategy", title: "AI Content Strategy in one click", caption: "Product, audience, goal, platform → a full 30-day content plan.", accent: "purple" },
+  { id: "s3", module: "Research", title: "Viral Research Engine", caption: "Topic research, keywords, competitor gaps and trending signals.", accent: "pink" },
+  { id: "s4", module: "Video Studio", title: "AI Video Studio", caption: "Blueprint → edit script, scenes, voice, captions → render.", accent: "blend" },
+  { id: "s5", module: "Carousel Studio", title: "Carousel Studio", caption: "Plan slides, edit copy, apply brand — export PDF or PNG ZIP.", accent: "purple" },
+  { id: "s6", module: "Image Studio", title: "Image Studio", caption: "Prompt, style, aspect — generate concepts in a batch.", accent: "pink" },
+  { id: "s7", module: "Thumbnail Studio", title: "Thumbnail Studio", caption: "Title + style → multiple CTR-optimized thumbnail concepts.", accent: "blend" },
+  { id: "s8", module: "LinkedIn Posts", title: "LinkedIn workspace", caption: "Post + carousel + hero image in one guided flow.", accent: "purple" },
+  { id: "s9", module: "Templates & Brand Kit", title: "Templates & Brand Kit", caption: "Pick a premium template — logo, colors, fonts, voice auto-applied.", accent: "pink" },
+  { id: "s10", module: "Publishing", title: "Direct Publishing", caption: "Connect Instagram, Facebook, YouTube, LinkedIn — schedule or ship now.", accent: "blend" },
+  { id: "s11", module: "Result", title: "One idea. Every format.", caption: "Video · Carousel · Image · Thumbnail · Caption · LinkedIn — from a single prompt.", accent: "blend" },
 ];

@@ -28,7 +28,7 @@ await renderMedia({
   composition,
   serveUrl: bundled,
   codec: "h264",
-  outputLocation: "/mnt/documents/creatorvault-demo.mp4",
+  outputLocation: "/mnt/documents/creatorflow-demo.mp4",
   puppeteerInstance: browser,
   muted: true,
   concurrency: 1,
