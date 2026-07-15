@@ -1,89 +1,81 @@
-# CreatorFlow AI → AI Content Operating System (Additive Update)
+# AI Thumbnail Studio — Pro Workflow Upgrade
 
-**Non-negotiable:** No changes to existing auth, credits, billing, subscriptions, renderer, AI provider wiring, current routes, or working generation flows. Everything below is **new** modules plugged into the existing shell (sidebar entries, new routes under `src/routes/_authenticated/*`, new tables, new server fns).
+Additive rebuild of `/thumbnails`. Keeps existing dark glassmorphism theme, projects table, layered renderer, and local library. Everything new plugs into the current `thumbnail-director` / `thumbnail-agents` pipeline.
 
----
+## Step 1 — Planning UI (`src/routes/_authenticated/thumbnails.tsx`)
 
-## 1. Database (single migration, additive)
+Replace the single textarea with a 2-step wizard. Step 1 is a form with collapsible "Advanced" section. All fields optional except **Video Title**.
 
-New tables (all in `public`, RLS + GRANTs per project rules, scoped to `auth.uid()`; admin CRUD via `has_role(auth.uid(),'admin')` where relevant):
+Fields:
+- **Title** (required), **Prompt** (optional — AI fills if empty), **Platform** (YouTube / Shorts / IG / FB / LinkedIn / Pinterest / TikTok / X)
+- **Aspect ratio** chips: 16:9, 9:16, 4:5, 1:1, 3:4, 2:3, Custom (W/H inputs)
+- **Style preset** (expanded to 21 presets — see below)
+- **Text overlay mode**: Auto / Custom (textarea) / None
+- **Main subject**: Man / Woman / Child / AI Robot / Product / Building / Animal / Vehicle / Logo / Upload / Custom
+- **Face expression**: Happy / Shocked / Excited / Thinking / Fear / Angry / Confident / Confused / None
+- **Background**: Realistic / Studio / Office / City / Nature / Cyberpunk / Luxury / Space / Minimal / Abstract / Classroom / Dark
+- **Lighting**: Golden Hour / Studio / Neon / Moody / Soft / High Contrast / Sunset / Blue
+- **Color palette**: Auto / Warm / Cool / Orange / Blue / Purple / Black&Gold / Green / Brand
+- **CTR optimization checkboxes**: Large Face, Eye Contact, Rule of Thirds, Large Readable Text, High Contrast, Blur Background, Mobile Optimized, Safe Text Area
+- **Brand kit toggles**: Logo / Colors / Font / Watermark (reads default brand kit via existing `brand-kit.functions`)
+- **Concepts**: 4 / 8 / 12 / 16
+- **Quality**: Fast / Balanced / Ultra
 
-- `strategies` — user_id, project_id (nullable), promoting, product, audience, goal, primary_platform, secondary_platforms[], tone, frequency, plan jsonb (calendar/pillars/hooks/ctas), created/updated.
-- `research_reports` — user_id, project_id (nullable), topic, niche, findings jsonb (trends, keywords, faqs, competitors, gaps, intent, pains, hooks[]), sources jsonb.
-- `brand_kits` **(already exists — extend via ALTER TABLE only if columns missing)**: add `brand_voice`, `default_cta`, `watermark_url`, `intro_url`, `outro_url`, `keywords text[]`, `is_default bool`. Skip existing columns.
-- `project_memory` — project_id (FK), kind (`research|strategy|script|image|voice|video|thumbnail|seo|publish|file|version`), payload jsonb, ref_url, version int, created_at. Append-only log.
-- `quality_scores` — project_id, asset_type, scores jsonb (hook, retention, seo, thumbnail, script, cta, overall 0-100), recommendations jsonb, created_at.
-- `ai_edits` — project_id, target (`script|caption|title|scene`), target_ref, instruction, before_text, after_text, created_at.
-- `repurposed_assets` — source_project_id, format (`shorts|reels|tiktok|linkedin|ig_carousel|fb_post|blog|newsletter|podcast_transcript|x_thread`), content jsonb, status, created_at.
-- `analytics_events` — user_id, event (`credit_used|project_created|video_generated|image_generated|published|template_used`), meta jsonb, occurred_at. (Aggregations computed via `read_query` server fns; no materialized view yet.)
-- `marketplace_items` — kind (`prompt_pack|template|thumbnail_pack|brand_kit|voice_pack|carousel_pack`), title, slug, description, preview_url, payload jsonb, price_usd_cents (nullable, no payments yet), tier, active, sort. Public read of active; admin CRUD.
-- `marketplace_installs` — user_id, item_id, installed_at.
+## Step 2 — AI Plan Preview
 
-Every new table: GRANT SELECT/INSERT/UPDATE/DELETE to `authenticated` (owner-scoped), GRANT ALL to `service_role`, RLS ON, policies scoped to `auth.uid()`; marketplace public read for `active=true` via `TO authenticated`.
+New server fn `planThumbnailBrief` (`src/lib/thumbnail-planner.functions.ts`) calls Lovable AI Gateway (`google/gemini-3.5-flash`) with structured JSON output:
+```
+{ sceneDescription, positivePrompt, negativePrompt, thumbnailText,
+  composition, cameraAngle, lighting, colorPalette, ctrTips[] }
+```
+Rendered as editable textareas/inputs. "Regenerate plan" and "Generate images" buttons.
 
-## 2. Server functions (client-safe modules, no edits to existing files)
+## Generation
 
-- `src/lib/strategy.functions.ts` — `generateStrategy(brief)` (Lovable AI Gateway, `openai/gpt-5.5`, structured `Output.object` with prompt-based limits per `ai-sdk-agent-patterns`), CRUD.
-- `src/lib/research.functions.ts` — `runResearch(topic, niche, platform)`; uses AI Gateway with web-search style prompt (no live crawl — synthesized from model + optional user seeds). Persists to `research_reports` + `project_memory`.
-- `src/lib/agents.functions.ts` — one dispatcher `runAgent({ agentId, projectId, input })`; agent registry in `src/lib/ai-agents.ts` (id, name, persona, icon, system prompt): research, script, thumbnail, video-director, seo, social, sales-copy.
-- `src/lib/brand-kit.functions.ts` — get default kit, upsert, list. Applied automatically by a new `applyBrandKit(prompt, kit)` helper reused by carousel/video/image generators via optional param — no changes to existing generators' behavior when kit is absent.
-- `src/lib/quality-score.functions.ts` — `scoreAsset({ type, payload })` returns rubric-based scores + recs.
-- `src/lib/ai-editor.functions.ts` — `editText({ instruction, text, targetType })` returns rewritten section.
-- `src/lib/repurpose.functions.ts` — `repurpose({ projectId, formats[] })` fans out to model per format, writes `repurposed_assets`.
-- `src/lib/analytics.functions.ts` — `getDashboard()` reads existing `usage_history`, `projects`, `render_jobs`, `generated_assets`, `scheduled_posts` + new `analytics_events`.
-- `src/lib/marketplace.functions.ts` — list active, install (writes `marketplace_installs`), admin CRUD.
-- `src/lib/project-memory.functions.ts` — `appendMemory`, `listMemory(projectId)`.
+Feeds edited plan into existing `renderConcept` pipeline, replicated N times (4/8/12/16). Passes aspect ratio down to image gen (`size` param), platform + palette + lighting appended into prompt template. Each concept saved to existing local library.
 
-All use `createServerFn` + `requireSupabaseAuth`. Credit deduction via existing `deduct_credits` RPC where a generation occurs (strategy=3, research=5, agent run=2, quality score=1, ai edit=1, repurpose=4/format). No changes to `credit-costs.ts` — new constants file `src/lib/new-costs.ts`.
+## Per-thumbnail Actions (result grid)
 
-## 3. Routes (all under `src/routes/_authenticated/`)
+Extend existing card with dropdown menu:
+- Preview (modal), Edit Prompt (reopens plan), Regenerate, Duplicate
+- Replace Text (inline), Replace Background / Subject / Face (regen that layer via existing `regenerateLayer`)
+- Crop (existing modal), Download PNG / JPG / WebP (canvas re-encode)
+- Upscale, Remove Background, Magic Eraser — call new `thumbnail-edit.functions.ts` server fns that hit Gemini image edit endpoint. If the model can't do it, surface a clean toast.
+- Publish (routes to existing publish flow)
 
-- `strategy.tsx` — wizard + generated plan viewer + calendar grid.
-- `research.tsx` — new-research form + list of past reports.
-- `agents.tsx` — grid of 7 agent cards; click opens chat-style single-shot runner (uses existing chat UI patterns; no thread persistence — one-off runs stored in `project_memory`).
-- `brand-kit.tsx` — form for logo upload (existing `renders` bucket under `brand/` prefix), colors, fonts, voice, CTA, watermark, intro/outro, keywords. Default toggle.
-- `repurpose.tsx` — pick source project → choose formats → generate; results list with copy/download.
-- `analytics.tsx` — 8 stat cards + recent-activity table + top templates/projects (queries existing tables).
-- `marketplace.tsx` — public grid, category filter, "Install" (no payments). Admin CMS at `admin.marketplace.tsx`.
+## AI Quality Analysis
 
-Project detail (`projects.$id.tsx`) — add a **Memory** tab showing the timeline from `project_memory` and a **Quality Score** panel; both additive, no existing tab touched.
+New `analyzeThumbnailQuality` server fn — returns CTR, Readability, Contrast, Mobile Visibility, Face Detection, Text Balance, Brand Consistency (0–100). Rendered as a `QualityScorePanel`-style card under each thumbnail.
 
-## 4. Sidebar (`src/components/app-shell.tsx`)
+## Reverse Engineer Mode
 
-Append new items (do NOT remove existing): Dashboard, **AI Strategy**, **Research**, **Agents**, Projects, Generate (existing `/create`), **Repurpose**, **Brand Kit**, **Marketplace**, **Analytics**, Templates, Settings, Admin (existing groups preserved). Reuse existing active-state logic (longest-prefix wins) — no bug fixes needed there.
+New tab in Step 1: **"Analyze existing thumbnail"**. Upload/drag image → server fn `reverseEngineerThumbnail` sends the image to Gemini vision with structured JSON schema: `{ style, composition, lighting, cameraAngle, colors[], prompt, negativePrompt, fontSuggestions[], textPlacement }`. Result shows with 3 CTAs: **Create Similar / Use This Style / Generate Variations** — each pre-fills the Step 1 form and jumps into Step 2.
 
-## 5. Reusable components
+## History
 
-- `src/components/strategy-wizard.tsx`, `strategy-calendar.tsx`
-- `src/components/research-report-view.tsx`
-- `src/components/agent-card.tsx`, `agent-runner.tsx`
-- `src/components/brand-kit-form.tsx`, `brand-kit-preview.tsx`
-- `src/components/quality-score-panel.tsx`
-- `src/components/ai-editor-inline.tsx` (drop-in for any text field)
-- `src/components/repurpose-picker.tsx`, `repurpose-result-card.tsx`
-- `src/components/analytics-stat-card.tsx`, `analytics-activity-table.tsx`
-- `src/components/marketplace-card.tsx`, `marketplace-install-button.tsx`
-- `src/components/project-memory-timeline.tsx`
+Extend existing `LocalThumbnail` store with: `platform`, `aspectRatio`, `styleId`, `prompt`, `versions[]`, `downloads`. Existing library grid gains: Duplicate, Delete, version count badge.
 
-All styled with existing tokens (glassmorphism, dark theme, `bg-card/50 backdrop-blur`, `border-white/10`, primary gradient). No new global CSS.
+## Files
 
-## 6. Performance
+New:
+- `src/lib/thumbnail-planner.functions.ts` — plan, reverse-engineer, quality analysis, edit ops
+- `src/lib/thumbnail-presets.ts` — 21 style presets, platform/palette/lighting/background enums
+- `src/components/thumbnail-wizard.tsx` — Step 1 form
+- `src/components/thumbnail-plan-editor.tsx` — Step 2 editable plan
+- `src/components/thumbnail-actions-menu.tsx` — per-card action dropdown
+- `src/components/thumbnail-quality-card.tsx`
+- `src/components/thumbnail-reverse-engineer.tsx`
 
-- Every new route file uses TanStack Query via `queryOptions` + `useSuspenseQuery` (Query is already in the project). Loaders `ensureQueryData`.
-- Heavy panels (calendar grid, marketplace grid, analytics charts) are `lazy()` + `Suspense`.
-- Marketplace + templates lists paginated (limit 24).
-- Analytics dashboard uses one server fn returning a single aggregate payload.
+Edited:
+- `src/routes/_authenticated/thumbnails.tsx` — wire wizard + step state; keep existing renderer/library
+- `src/lib/thumbnail-director.ts` — add extra style presets, aspect ratio support
+- `src/lib/thumbnail-agents.ts` — accept aspect ratio + enriched prompt
+- `src/lib/thumbnailLocalStore.ts` — extend schema (backwards compatible)
 
-## 7. Safety / backward-compat verification
+## Design
 
-- No edits to: `client.ts`, `client.server.ts`, `auth-middleware.ts`, `types.ts`, `start.ts`, existing carousel/video/thumbnail/image generators, `razorpay.functions.ts`, `deduct_credits`, `pricing_plans`, `constants.ts` billing, existing routes.
-- Migration is additive (CREATE TABLE / minimal ALTER on `brand_kits` guarded by `IF NOT EXISTS`).
-- `bun run typecheck` after changes.
+Reuses `glass`, `gradient-primary`, `neon-purple` tokens. No new global styles. Wizard uses same chip/pill patterns as existing style picker. Advanced sections collapsed by default via `<details>` or local state.
 
-## 8. Deliverables report
+## Scope Note
 
-At the end, list: new tables (10), new server-fn modules (10), new routes (8 + 1 admin), new components (14), sidebar items added (6), and confirm zero modifications to existing generation/billing/auth code paths.
-
-## Out of scope
-
-Marketplace payments, live web scraping for research (model-synthesized only), publishing to new platforms beyond existing connectors, mobile app, real-time collab, character voice cloning.
+This is a large feature — I'll implement in this single pass but keep new AI edit ops (upscale / bg remove / magic eraser) as best-effort wrappers around Gemini image editing; if a specific op isn't supported it degrades to a toast rather than blocking the flow.
