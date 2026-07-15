@@ -324,7 +324,13 @@ function EditorModal({
             </>
           )}
 
-          <Field label={d.kind === "testimonial" ? "Poster / portrait URL" : "Poster URL"}>
+          {d.kind === "testimonial" && (
+            <Field label="Customer profile photo URL (square headshot)">
+              <input value={d.photo_url ?? ""} onChange={(e) => set("photo_url", e.target.value)} placeholder="https://…jpg or …png" className="w-full glass rounded-lg px-3 py-2 text-sm" />
+            </Field>
+          )}
+
+          <Field label={d.kind === "testimonial" ? "Video poster / thumbnail URL" : "Poster URL"}>
             <input value={d.poster_url ?? ""} onChange={(e) => set("poster_url", e.target.value)} placeholder="https://…jpg or …png" className="w-full glass rounded-lg px-3 py-2 text-sm" />
           </Field>
 
