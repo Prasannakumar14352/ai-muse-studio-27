@@ -10,9 +10,10 @@ import {
 import { ViralResearchView } from "@/components/viral-research-view";
 import { ResearchReportView } from "@/components/research-report-view";
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
-import { setResearchPrefill } from "@/lib/research-prefill";
+import { setResearchPrefill, type ResearchModuleId, type ResearchPrefill } from "@/lib/research-prefill";
 import { saveDraft } from "@/lib/plan-store";
-import { Search, Loader2, Trash2, Copy, RefreshCw, Sparkles, Image as ImageIcon, Video, Layers, Linkedin, Type, CalendarPlus, Target } from "lucide-react";
+import { PreviewHandoffDialog } from "@/components/preview-handoff-dialog";
+import { Search, Loader2, Trash2, Copy, RefreshCw, Sparkles, Image as ImageIcon, Video, Layers, Linkedin, Type, CalendarPlus, Target, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/research")({ component: ResearchPage });
