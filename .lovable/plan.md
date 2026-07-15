@@ -1,72 +1,89 @@
-## Scope
+# CreatorFlow AI → AI Content Operating System (Additive Update)
 
-Four workstreams for the existing CreatorFlow AI (currently branded "CreatorVault AI") project. No unrelated redesigns.
+**Non-negotiable:** No changes to existing auth, credits, billing, subscriptions, renderer, AI provider wiring, current routes, or working generation flows. Everything below is **new** modules plugged into the existing shell (sidebar entries, new routes under `src/routes/_authenticated/*`, new tables, new server fns).
 
 ---
 
-### 1. Branding: CreatorVault AI → CreatorFlow AI
+## 1. Database (single migration, additive)
 
-**Finding:** ~27 source files contain `CreatorVault` / `creatorvault.ai`. `ProdXStore` already exists as parent company (see `src/assets/prodxstore-*` assets). Nothing renames ProdXStore.
+New tables (all in `public`, RLS + GRANTs per project rules, scoped to `auth.uid()`; admin CRUD via `has_role(auth.uid(),'admin')` where relevant):
 
-**Changes:**
-- Text replace across every user-facing file listed by grep (routes, components, `constants.ts` `BRAND`, `SUPPORT_EMAIL`, `landing-content.ts`, `public-shell`, `app-shell`, `auth.tsx`, `__root.tsx` head/OG/JSON-LD, `styles.css` comments, `pricing.tsx`, `billing.tsx`, `settings.tsx`, `VERCEL_DEPLOYMENT.md`, etc.).
-- Update `SUPPORT_EMAIL` to `support@creatorflow.ai` (matches new brand).
-- Add "by ProdXStore" tagline under the wordmark in `PublicShell` header, landing footer, auth page, and sidebar workspace header.
-- Update Razorpay `description`/`notes` strings in `src/lib/razorpay.functions.ts` (checkout modal + order name) to "CreatorFlow AI".
-- Rename demo asset reference logically: keep filename `creatorvault-demo.mp4` (bundled binary can't be re-uploaded from here), but add `src/assets/creatorflow-demo.mp4.asset.json` alias pointer and update all imports/labels/captions/poster alt-text to "CreatorFlow AI demo". Report the filename as an intentionally retained internal identifier.
-- Retained internal identifiers to report: the bundled `creatorvault-demo.mp4` binary and its R2 key (cannot re-render from repo agent), plus DB column names / migration filenames (never user-visible).
+- `strategies` — user_id, project_id (nullable), promoting, product, audience, goal, primary_platform, secondary_platforms[], tone, frequency, plan jsonb (calendar/pillars/hooks/ctas), created/updated.
+- `research_reports` — user_id, project_id (nullable), topic, niche, findings jsonb (trends, keywords, faqs, competitors, gaps, intent, pains, hooks[]), sources jsonb.
+- `brand_kits` **(already exists — extend via ALTER TABLE only if columns missing)**: add `brand_voice`, `default_cta`, `watermark_url`, `intro_url`, `outro_url`, `keywords text[]`, `is_default bool`. Skip existing columns.
+- `project_memory` — project_id (FK), kind (`research|strategy|script|image|voice|video|thumbnail|seo|publish|file|version`), payload jsonb, ref_url, version int, created_at. Append-only log.
+- `quality_scores` — project_id, asset_type, scores jsonb (hook, retention, seo, thumbnail, script, cta, overall 0-100), recommendations jsonb, created_at.
+- `ai_edits` — project_id, target (`script|caption|title|scene`), target_ref, instruction, before_text, after_text, created_at.
+- `repurposed_assets` — source_project_id, format (`shorts|reels|tiktok|linkedin|ig_carousel|fb_post|blog|newsletter|podcast_transcript|x_thread`), content jsonb, status, created_at.
+- `analytics_events` — user_id, event (`credit_used|project_created|video_generated|image_generated|published|template_used`), meta jsonb, occurred_at. (Aggregations computed via `read_query` server fns; no materialized view yet.)
+- `marketplace_items` — kind (`prompt_pack|template|thumbnail_pack|brand_kit|voice_pack|carousel_pack`), title, slug, description, preview_url, payload jsonb, price_usd_cents (nullable, no payments yet), tier, active, sort. Public read of active; admin CRUD.
+- `marketplace_installs` — user_id, item_id, installed_at.
 
-### 2. Real Premium Templates module
+Every new table: GRANT SELECT/INSERT/UPDATE/DELETE to `authenticated` (owner-scoped), GRANT ALL to `service_role`, RLS ON, policies scoped to `auth.uid()`; marketplace public read for `active=true` via `TO authenticated`.
 
-**Finding:** No template system exists — "Premium Templates" is only a pricing bullet today.
+## 2. Server functions (client-safe modules, no edits to existing files)
 
-**Database migration** (single new table + seed):
-- `public.templates` — name, slug, category (enum-like text: `short_video|long_video|product_promo|documentary|carousel|linkedin_post|image|thumbnail|seo_pack`), description, preview_image_url, aspect_ratio, platform, style, default_prompt (text), default_brief (jsonb — scene/slide structure + prefill for existing brief form), tags (text[]), access_tier (`free|starter|creator|pro`), featured (bool), active (bool), sort_order (int), created_by (uuid nullable — null = system seed), timestamps.
-- `public.template_favorites` — (user_id, template_id) composite PK.
-- GRANTs + RLS: authenticated can SELECT active templates; only admin (`has_role`) can INSERT/UPDATE/DELETE. Favorites: user owns their rows.
-- Seed 3+ templates per category (9 categories × 3 = 27 rows) with realistic prompts/briefs.
+- `src/lib/strategy.functions.ts` — `generateStrategy(brief)` (Lovable AI Gateway, `openai/gpt-5.5`, structured `Output.object` with prompt-based limits per `ai-sdk-agent-patterns`), CRUD.
+- `src/lib/research.functions.ts` — `runResearch(topic, niche, platform)`; uses AI Gateway with web-search style prompt (no live crawl — synthesized from model + optional user seeds). Persists to `research_reports` + `project_memory`.
+- `src/lib/agents.functions.ts` — one dispatcher `runAgent({ agentId, projectId, input })`; agent registry in `src/lib/ai-agents.ts` (id, name, persona, icon, system prompt): research, script, thumbnail, video-director, seo, social, sales-copy.
+- `src/lib/brand-kit.functions.ts` — get default kit, upsert, list. Applied automatically by a new `applyBrandKit(prompt, kit)` helper reused by carousel/video/image generators via optional param — no changes to existing generators' behavior when kit is absent.
+- `src/lib/quality-score.functions.ts` — `scoreAsset({ type, payload })` returns rubric-based scores + recs.
+- `src/lib/ai-editor.functions.ts` — `editText({ instruction, text, targetType })` returns rewritten section.
+- `src/lib/repurpose.functions.ts` — `repurpose({ projectId, formats[] })` fans out to model per format, writes `repurposed_assets`.
+- `src/lib/analytics.functions.ts` — `getDashboard()` reads existing `usage_history`, `projects`, `render_jobs`, `generated_assets`, `scheduled_posts` + new `analytics_events`.
+- `src/lib/marketplace.functions.ts` — list active, install (writes `marketplace_installs`), admin CRUD.
+- `src/lib/project-memory.functions.ts` — `appendMemory`, `listMemory(projectId)`.
 
-**Client:**
-- `src/lib/templates.functions.ts` — list, get, favorite, admin CRUD server fns.
-- `src/lib/template-access.ts` — access rule: free→free, starter/starter_life→free+starter, creator/creator_life→+creator, pro/pro_life→all, admin→all.
-- `src/routes/_authenticated/templates.tsx` — grid with category tabs, search, Free/Premium filter, favorites. Locked cards show badge + "Upgrade" CTA linking to `/pricing`. "Use Template" navigates to the matching creation flow (`/create` for videos/images/etc., `/create/carousel` for carousels, `/linkedin-posts/new` for LinkedIn) with `?template=<slug>` query. Read `template` param in `project-brief-form.tsx` and prefill via `templates.functions.ts` `getTemplate`.
-- `src/routes/_authenticated/admin.templates.tsx` — admin CRUD, mark free/premium/pro, featured toggle, sort_order reorder, activate/deactivate, thumbnail upload (uses existing `renders` storage bucket at new prefix `templates/`).
-- Sidebar entry "Templates" in `app-shell.tsx`.
+All use `createServerFn` + `requireSupabaseAuth`. Credit deduction via existing `deduct_credits` RPC where a generation occurs (strategy=3, research=5, agent run=2, quality score=1, ai edit=1, repurpose=4/format). No changes to `credit-costs.ts` — new constants file `src/lib/new-costs.ts`.
 
-### 3. Landing pricing tabs
+## 3. Routes (all under `src/routes/_authenticated/`)
 
-- Replace flat grid in `src/routes/index.tsx` "Pricing" section with a `LandingPricingSection` component that mounts tabs (Subscription / Lifetime), reusing `MONTHLY_PLANS` / `LIFETIME_PLANS` from `constants.ts` — same source as `/pricing`.
-- Include the concise bullet transformer + comparison block + Credit-packs section (reusing `<TopupPacks />`; for public users the checkout button routes to `/auth?next=/pricing`).
-- Ensure `pricing.tsx` and landing both read `MONTHLY_PLANS` / `LIFETIME_PLANS` from `constants.ts` (already the case for `pricing.tsx`).
+- `strategy.tsx` — wizard + generated plan viewer + calendar grid.
+- `research.tsx` — new-research form + list of past reports.
+- `agents.tsx` — grid of 7 agent cards; click opens chat-style single-shot runner (uses existing chat UI patterns; no thread persistence — one-off runs stored in `project_memory`).
+- `brand-kit.tsx` — form for logo upload (existing `renders` bucket under `brand/` prefix), colors, fonts, voice, CTA, watermark, intro/outro, keywords. Default toggle.
+- `repurpose.tsx` — pick source project → choose formats → generate; results list with copy/download.
+- `analytics.tsx` — 8 stat cards + recent-activity table + top templates/projects (queries existing tables).
+- `marketplace.tsx` — public grid, category filter, "Install" (no payments). Admin CMS at `admin.marketplace.tsx`.
 
-### 4. Demo video refresh
+Project detail (`projects.$id.tsx`) — add a **Memory** tab showing the timeline from `project_memory` and a **Quality Score** panel; both additive, no existing tab touched.
 
-- The bundled MP4 binary can't be re-rendered by this agent, so:
-  - Rewrite `DemoVideoSection` in `landing-sections.tsx` with new title "See CreatorFlow AI in action", new 10-step storyboard captions, updated poster, no autoplay, `preload="metadata"`, `loading="lazy"` iframe pattern, `<track>` placeholder for captions.
-  - Generate a new poster PNG via imagegen matching CreatorFlow AI dark/orange-pink theme with sidebar mockup.
-  - Update `remotion-demo/src/MainVideo.tsx` + `Root.tsx` to reflect current UI (dashboard → content type → Review & Edit blueprint → generate → templates → pricing tabs → CTA), driven by the current theme tokens. Provide the exact render command in the final report: `cd remotion-demo && bun install && bun run render`.
-  - Do NOT claim a new MP4 was rendered. Existing MP4 remains served until the user runs the render step and replaces `/mnt/user-uploads/creatorvault-demo.mp4` (or the CDN asset).
+## 4. Sidebar (`src/components/app-shell.tsx`)
 
-### 5. Acceptance / verification
+Append new items (do NOT remove existing): Dashboard, **AI Strategy**, **Research**, **Agents**, Projects, Generate (existing `/create`), **Repurpose**, **Brand Kit**, **Marketplace**, **Analytics**, Templates, Settings, Admin (existing groups preserved). Reuse existing active-state logic (longest-prefix wins) — no bug fixes needed there.
 
-- `rg -i "creatorvault|creator vault"` returns only the retained internal identifiers list.
-- Typecheck passes.
-- Manual smoke: landing tabs render both sets; `/pricing` unchanged in behavior; template card → creation flow prefills; admin templates CRUD works; Razorpay modal shows "CreatorFlow AI".
+## 5. Reusable components
 
-## Technical details
+- `src/components/strategy-wizard.tsx`, `strategy-calendar.tsx`
+- `src/components/research-report-view.tsx`
+- `src/components/agent-card.tsx`, `agent-runner.tsx`
+- `src/components/brand-kit-form.tsx`, `brand-kit-preview.tsx`
+- `src/components/quality-score-panel.tsx`
+- `src/components/ai-editor-inline.tsx` (drop-in for any text field)
+- `src/components/repurpose-picker.tsx`, `repurpose-result-card.tsx`
+- `src/components/analytics-stat-card.tsx`, `analytics-activity-table.tsx`
+- `src/components/marketplace-card.tsx`, `marketplace-install-button.tsx`
+- `src/components/project-memory-timeline.tsx`
 
-- Migration order per project rules: CREATE TABLE → GRANT → ALTER ENABLE RLS → CREATE POLICY. `templates` gets SELECT to `authenticated` (filtered by `active=true` policy) + ALL to `service_role`; INSERT/UPDATE/DELETE gated by `has_role(auth.uid(),'admin')`. `template_favorites` scoped to `auth.uid()`.
-- Template `default_brief` jsonb shape matches `project-brief-form.tsx` inputs (topic, tone, platform, style, aspect_ratio, scenes[]) so prefill is a shallow merge.
-- `project-brief-form.tsx` reads `useSearch({ from: '__root__' })` `template` param on mount; if present, calls `getTemplate({ slug })` and merges into form state before first render (guarded by hydration flag to avoid mismatch).
-- Access enforcement: `template-access.ts` returns `canUse(template, access)`; server fn `useTemplate` re-checks server-side before returning prefill payload — locked users get 403.
-- Landing pricing "Contact Sales" and "Get Started" CTAs point to `/contact` and `/auth` respectively; authenticated users see "Open app" per existing `PublicShell` pattern.
-- Sidebar highlighting: add `/templates` to sidebar items list; existing `useRouterState` match handles active state.
+All styled with existing tokens (glassmorphism, dark theme, `bg-card/50 backdrop-blur`, `border-white/10`, primary gradient). No new global CSS.
+
+## 6. Performance
+
+- Every new route file uses TanStack Query via `queryOptions` + `useSuspenseQuery` (Query is already in the project). Loaders `ensureQueryData`.
+- Heavy panels (calendar grid, marketplace grid, analytics charts) are `lazy()` + `Suspense`.
+- Marketplace + templates lists paginated (limit 24).
+- Analytics dashboard uses one server fn returning a single aggregate payload.
+
+## 7. Safety / backward-compat verification
+
+- No edits to: `client.ts`, `client.server.ts`, `auth-middleware.ts`, `types.ts`, `start.ts`, existing carousel/video/thumbnail/image generators, `razorpay.functions.ts`, `deduct_credits`, `pricing_plans`, `constants.ts` billing, existing routes.
+- Migration is additive (CREATE TABLE / minimal ALTER on `brand_kits` guarded by `IF NOT EXISTS`).
+- `bun run typecheck` after changes.
+
+## 8. Deliverables report
+
+At the end, list: new tables (10), new server-fn modules (10), new routes (8 + 1 admin), new components (14), sidebar items added (6), and confirm zero modifications to existing generation/billing/auth code paths.
 
 ## Out of scope
 
-- No changes to billing math, credit consumption order, Razorpay integration internals, existing generation pipelines, or auth flow.
-- No re-render of the bundled demo MP4 binary from this agent — the Remotion source will be updated and ready to render.
-
-## Deliverables report (after implementation)
-
-Will include: pre-existing template state (none), file list, migration summary, branding replacements count, template access matrix, landing pricing diff, demo work vs remaining render step, test steps, known limitations.
+Marketplace payments, live web scraping for research (model-synthesized only), publishing to new platforms beyond existing connectors, mobile app, real-time collab, character voice cloning.

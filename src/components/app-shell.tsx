@@ -3,7 +3,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
   Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug, Linkedin,
-  ChevronLeft,
+  ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -44,16 +44,28 @@ type NavSection = {
 
 const SECTIONS: readonly NavSection[] = [
   {
-    label: "Create",
+    label: "Workspace",
     items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/strategy", label: "AI Strategy", icon: Target },
+      { to: "/research", label: "Research", icon: Search },
+      { to: "/agents", label: "AI Agents", icon: Bot },
+      { to: "/analytics", label: "Analytics", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Create",
+    items: [
       { to: "/create", label: "New Project", icon: Plus },
       { to: "/videos", label: "Videos", icon: Film, moduleId: "videos" },
       { to: "/carousels", label: "Carousels", icon: Layers, moduleId: "carousels" },
       { to: "/images", label: "Images", icon: ImageIcon, moduleId: "images" },
       { to: "/thumbnails", label: "Thumbnails", icon: Sparkles, moduleId: "thumbnails" },
       { to: "/captions", label: "Captions", icon: Type, moduleId: "captions" },
+      { to: "/repurpose", label: "Repurpose", icon: Split },
       { to: "/templates", label: "Templates", icon: Sparkles },
+      { to: "/brand-kit", label: "Brand Kit", icon: Palette },
+      { to: "/marketplace", label: "Marketplace", icon: Store },
     ],
   },
   {
@@ -79,6 +91,7 @@ const SECTIONS: readonly NavSection[] = [
       { to: "/admin", label: "Admin", icon: Crown },
       { to: "/admin/templates", label: "Templates CMS", icon: Sparkles },
       { to: "/admin/integrations", label: "Social Publishing", icon: Plug },
+      { to: "/admin/marketplace", label: "Marketplace CMS", icon: Store },
     ],
   },
   {
