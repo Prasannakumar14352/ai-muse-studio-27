@@ -540,6 +540,67 @@ export function VideoBlueprintEditor({
           )}
         </div>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="timeline" className="mt-4">
+          <TimelineEditor
+            blueprint={bp}
+            onChangeSceneDuration={setSceneDuration}
+            onSelectScene={(id) => setExpandedScene(id)}
+            onReplaceShot={(id) => setShotDialogSceneId(id)}
+          />
+        </TabsContent>
+
+        <TabsContent value="script" className="mt-4">
+          <ScriptEditor
+            blueprint={bp}
+            onUpdateScene={patchScene}
+            onBulkReplace={bulkReplaceScripts}
+          />
+        </TabsContent>
+
+        <TabsContent value="subs" className="mt-4">
+          <SubtitleEditor
+            blueprint={bp}
+            onGlobalChange={setSubtitleStyle}
+            onSceneSubtitleChange={(id, sub) => patchScene(id, { subtitle: sub })}
+          />
+        </TabsContent>
+
+        <TabsContent value="music" className="mt-4">
+          <MusicPicker value={bp.music} onChange={setMusic} />
+        </TabsContent>
+
+        <TabsContent value="sfx" className="mt-4">
+          <SfxEditor
+            blueprint={bp}
+            onChangeSceneSfx={(id, sfx) => patchScene(id, { sfx })}
+          />
+        </TabsContent>
+
+        <TabsContent value="chars" className="mt-4">
+          <CharacterLibrary
+            characters={bp.characterLibrary ?? []}
+            onChange={setCharacters}
+          />
+        </TabsContent>
+
+        <TabsContent value="versions" className="mt-4">
+          <VersionHistoryPanel
+            metadata={meta}
+            onRestore={restoreVersion}
+            onPreview={previewVersion}
+          />
+        </TabsContent>
+      </Tabs>
+
+      <ShotReplacementDialog
+        open={!!shotDialogSceneId}
+        scene={shotDialogScene}
+        onClose={() => setShotDialogSceneId(null)}
+        onSave={setShotReference}
+        onRegenerate={(id) => void regenScene(id)}
+      />
 
       {/* Render actions */}
       <Card className="p-5">
