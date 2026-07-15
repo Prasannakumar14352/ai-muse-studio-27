@@ -18,8 +18,13 @@ import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 
 
 // LinkedIn document carousels display best at portrait ~4:5 (1080x1350).
-const SLIDE_W = 1080;
-const SLIDE_H = 1350;
+// Instagram preview uses 1:1 (1080x1080).
+const FORMATS = {
+  linkedin: { w: 1080, h: 1350, label: "LinkedIn 4:5" },
+  instagram: { w: 1080, h: 1080, label: "Instagram 1:1" },
+} as const;
+type FormatKey = keyof typeof FORMATS;
+
 
 type Props = {
   initial?: LinkedinCarouselContent | null;
