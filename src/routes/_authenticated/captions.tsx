@@ -39,6 +39,13 @@ function CaptionsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  useAutogen(handoff, () => {
+    if ((handoff?.topic ?? topic).trim()) {
+      toast.message("Generation started", { description: "Auto-generating from Viral Research…" });
+      planM.mutate();
+    }
+  });
+
   const result = useMemo(() => {
     if (!plan) return null;
     const get = (k: string) => plan.sections.find((s) => s.key === k)?.value;
