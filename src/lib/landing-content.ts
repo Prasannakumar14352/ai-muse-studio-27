@@ -93,48 +93,63 @@ export const PRODUCT_WALKTHROUGHS: ProductWalkthrough[] = [
   },
 ];
 
+// Sample creator reviews shown until real, consented customer reviews are
+// published via /admin/landing. Every entry is tagged `source: "sample"` so
+// the UI can render a "Sample Review" badge — never presented as a real
+// customer testimonial. Indian creators only, mixed cities and professions.
 export const WRITTEN_TESTIMONIALS: Testimonial[] = [
   {
-    id: "w1", name: "Jonas Weber", country: "Germany", role: "Agency",
-    photo: "https://i.pravatar.cc/120?img=15", rating: 5,
-    review: "We onboarded 12 clients in a month. The LinkedIn carousel + image studio alone pays for the plan.",
+    id: "w1", name: "Rahul Sharma", country: "Bangalore, India", role: "YouTube Creator",
+    photo: "https://randomuser.me/api/portraits/men/75.jpg", rating: 5, source: "sample",
+    review: "I wanted one place to generate YouTube videos, LinkedIn posts, thumbnails and Instagram carousels. CreatorFlow AI makes the workflow much faster and keeps every project neatly organized in one dashboard.",
   },
   {
-    id: "w2", name: "Amara Okafor", country: "Nigeria", role: "Business Owner",
-    photo: "https://i.pravatar.cc/120?img=48", rating: 5,
-    review: "Finally, an AI tool that keeps my character consistent across every scene of a short.",
+    id: "w2", name: "Priya Verma", country: "Mumbai, India", role: "Instagram Creator",
+    photo: "https://randomuser.me/api/portraits/women/68.jpg", rating: 5, source: "sample",
+    review: "Reels, carousels and captions from a single brief. My feed finally looks consistent and I ship 3x more posts every week without burning out on editing.",
   },
   {
-    id: "w3", name: "Lucas Martin", country: "France", role: "Freelancer",
-    photo: "https://i.pravatar.cc/120?img=8", rating: 5,
-    review: "Lifetime plan was a no-brainer. Top-up credits mean I never worry about limits mid-project.",
+    id: "w3", name: "Ankit Patel", country: "Ahmedabad, India", role: "Digital Marketer",
+    photo: "https://randomuser.me/api/portraits/men/32.jpg", rating: 5, source: "sample",
+    review: "The research engine surfaces trending angles I would have missed, and I can push them straight into a video plan or LinkedIn campaign. Cuts my ideation time by half.",
   },
   {
-    id: "w4", name: "Emily Chen", country: "Singapore", role: "Teacher",
-    photo: "https://i.pravatar.cc/120?img=45", rating: 5,
-    review: "I generate lesson thumbnails and Instagram carousels in the same afternoon. Insane time saver.",
+    id: "w4", name: "Sneha Reddy", country: "Hyderabad, India", role: "Course Creator",
+    photo: "https://randomuser.me/api/portraits/women/44.jpg", rating: 5, source: "sample",
+    review: "I run a paid cohort and needed thumbnails, lesson carousels and email banners on repeat. Brand Kit keeps colors and fonts locked, so every asset feels like the same course.",
   },
   {
-    id: "w5", name: "Rahul Verma", country: "India", role: "YouTuber",
-    photo: "https://i.pravatar.cc/120?img=22", rating: 5,
-    review: "Retention agent + chapter agent bumped my average watch time by 41%. Real numbers.",
+    id: "w5", name: "Karan Mehta", country: "Pune, India", role: "Agency Owner",
+    photo: "https://randomuser.me/api/portraits/men/22.jpg", rating: 5, source: "sample",
+    review: "We onboarded eight clients in a month. The LinkedIn carousel studio and image studio alone pay for the plan — my team ships client work in a fraction of the time.",
   },
   {
-    id: "w6", name: "Isabella Rossi", country: "Italy", role: "Instagram Creator",
-    photo: "https://i.pravatar.cc/120?img=25", rating: 5,
-    review: "The visual director keeps my brand aesthetic locked. Every post looks like me — not generic AI.",
+    id: "w6", name: "Neha Singh", country: "Delhi, India", role: "Coach",
+    photo: "https://randomuser.me/api/portraits/women/12.jpg", rating: 5, source: "sample",
+    review: "As a mindset coach I post daily. The captions and carousel agents match my tone perfectly and the direct publishing to Instagram and LinkedIn saves me at least an hour every morning.",
   },
   {
-    id: "w7", name: "David Park", country: "South Korea", role: "Course Creator",
-    photo: "https://i.pravatar.cc/120?img=33", rating: 5,
-    review: "Direct publishing to LinkedIn saved me an entire step. Approve → schedule → done.",
+    id: "w7", name: "Arjun Nair", country: "Kochi, India", role: "Freelancer",
+    photo: "https://randomuser.me/api/portraits/men/45.jpg", rating: 5, source: "sample",
+    review: "Lifetime plan was a no-brainer. Top-up credits mean I never worry about running out mid-project, and every asset — video, thumbnail, carousel — downloads clean with no watermark.",
   },
   {
-    id: "w8", name: "Chloe Bennett", country: "United Kingdom", role: "Agency",
-    photo: "https://i.pravatar.cc/120?img=49", rating: 5,
-    review: "Layer-based slide editor is the missing piece every AI carousel tool has been ignoring.",
+    id: "w8", name: "Pooja Iyer", country: "Chennai, India", role: "Small Business Owner",
+    photo: "https://randomuser.me/api/portraits/women/29.jpg", rating: 5, source: "sample",
+    review: "I run a boutique studio and used to outsource every social post. Now I generate a week of content in one sitting — hero images, reels, carousels and captions all in my brand voice.",
+  },
+  {
+    id: "w9", name: "Vikram Iyer", country: "Bangalore, India", role: "Entrepreneur",
+    photo: "https://randomuser.me/api/portraits/men/60.jpg", rating: 5, source: "sample",
+    review: "Launched two D2C brands this year. The AI Strategy plus 30-day content calendar gave me a real plan on day one instead of blank pages. Publishing to Instagram and YouTube directly is the cherry on top.",
+  },
+  {
+    id: "w10", name: "Aditi Joshi", country: "Pune, India", role: "Teacher",
+    photo: "https://randomuser.me/api/portraits/women/50.jpg", rating: 5, source: "sample",
+    review: "I make explainer videos and worksheets for my students. Thumbnails that actually get clicks, carousels for revision, and captions in one place. Easily the most useful tool I subscribed to this year.",
   },
 ];
+
 
 export const REFUND_ELIGIBLE = [
   "Payment processed successfully but account was never activated.",
