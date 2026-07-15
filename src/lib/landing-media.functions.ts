@@ -24,6 +24,8 @@ export interface LandingMediaRow {
   rating: number | null;
   status: LandingMediaStatus;
   display_order: number;
+  photo_url: string | null;
+  consent_confirmed: boolean;
   created_at: string;
   updated_at: string;
 }
