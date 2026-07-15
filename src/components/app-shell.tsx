@@ -72,6 +72,7 @@ const SECTIONS: readonly NavSection[] = [
     label: "Publishing",
     items: [
       { to: "/connections", label: "Connections", icon: Plug },
+      { to: "/calendar", label: "Content Calendar", icon: CalendarIcon },
       { to: "/linkedin-posts", label: "LinkedIn Posts", icon: Linkedin, moduleId: "linkedin" },
     ],
   },
