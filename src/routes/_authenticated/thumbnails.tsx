@@ -273,6 +273,7 @@ function ThumbnailsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl">
+      <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold">
