@@ -39,62 +39,50 @@ export type Testimonial = {
 
 export type TrustBadge = { title: string; desc: string; icon: string };
 
-// Testimonial "video" slots are seeded with real product walkthrough clips
-// captured from the live CreatorFlow AI app. They are clearly badged
-// "Product walkthrough" so no visitor mistakes them for a real customer video.
-// Replace via /admin/landing with actual customer footage when available.
+// Video testimonials must represent GENUINE customer reviews only.
+// Until real customer videos are uploaded via /admin/landing, this list is
+// intentionally empty and the landing page hides the section entirely.
+export const VIDEO_TESTIMONIALS: Testimonial[] = [];
+
+// Short product walkthrough clips shown in a separate "See CreatorFlow AI in
+// Action" section — never presented as customer testimonials.
 import researchClip from "@/assets/demo/creatorflow-research-walkthrough.mp4.asset.json";
 import thumbnailsClip from "@/assets/demo/creatorflow-thumbnails-walkthrough.mp4.asset.json";
 import analyticsClip from "@/assets/demo/creatorflow-analytics-walkthrough.mp4.asset.json";
 import demoPoster from "@/assets/demo/creatorflow-demo-poster.jpg.asset.json";
 
-export const VIDEO_TESTIMONIALS: Testimonial[] = [
+export type ProductWalkthrough = {
+  id: string;
+  title: string;
+  caption: string;
+  videoUrl: string;
+  poster: string;
+  duration: string;
+};
+
+export const PRODUCT_WALKTHROUGHS: ProductWalkthrough[] = [
   {
-    id: "v1",
-    name: "Viral Research Engine",
-    country: "Product walkthrough",
-    role: "YouTuber",
-    company: "CreatorFlow AI",
-    photo: demoPoster.url,
-    rating: 5,
-    quote: "Every topic scored before you press record.",
-    review:
-      "Type a topic, get a Viral Opportunity Score, verdict, angles, titles and hooks — with one click to prefill Video, Thumbnail, Carousel or LinkedIn.",
-    source: "demo",
+    id: "pw1",
+    title: "Viral Research Engine",
+    caption: "Score a topic, get titles, hooks and one-click prefill into every studio.",
     videoUrl: researchClip.url,
-    videoType: "mp4",
+    poster: demoPoster.url,
     duration: "0:15",
   },
   {
-    id: "v2",
-    name: "AI Thumbnail Studio",
-    country: "Product walkthrough",
-    role: "YouTuber",
-    company: "CreatorFlow AI",
-    photo: demoPoster.url,
-    rating: 5,
-    quote: "CTR-optimised thumbnails in one workflow.",
-    review:
-      "Guided brief → batch concepts → upscale, remove background, inpaint and reverse-engineer competitor thumbnails. All inside the studio.",
-    source: "demo",
+    id: "pw2",
+    title: "AI Thumbnail Studio",
+    caption: "Guided brief → batch concepts → upscale, remove background, inpaint.",
     videoUrl: thumbnailsClip.url,
-    videoType: "mp4",
+    poster: demoPoster.url,
     duration: "0:15",
   },
   {
-    id: "v3",
-    name: "Publishing & Analytics",
-    country: "Product walkthrough",
-    role: "Agency",
-    company: "CreatorFlow AI",
-    photo: demoPoster.url,
-    rating: 5,
-    quote: "Schedule, publish and measure — all in one place.",
-    review:
-      "Connect Instagram, YouTube, LinkedIn, Facebook and TikTok. Schedule posts, track CTR, credit usage, top templates and revenue in a single dashboard.",
-    source: "demo",
+    id: "pw3",
+    title: "Publishing & Analytics",
+    caption: "Schedule to Instagram, YouTube, LinkedIn & more. Track CTR and revenue.",
     videoUrl: analyticsClip.url,
-    videoType: "mp4",
+    poster: demoPoster.url,
     duration: "0:12",
   },
 ];
