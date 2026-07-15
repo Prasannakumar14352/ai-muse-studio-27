@@ -675,7 +675,8 @@ function VideosPage() {
               ← Back to your videos
             </button>
           </div>
-          <InputScreen onGenerate={start} />
+          <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
+          <InputScreen onGenerate={start} initialTopic={handoff?.topic} initialRatio={handoff?.aspectRatio as AspectRatio | undefined} autogen={handoff?.autogen} />
         </>
       )}
       {view === "processing" && (
