@@ -140,10 +140,11 @@
   font-size: 0.875rem;
   outline: none;
   transition: border-color 120ms ease, background 120ms ease;
-}
-@utility input-base:focus {
-  border-color: var(--primary);
-  background: oklch(1 0 0 / 0.05);
+
+  &:focus {
+    border-color: var(--primary);
+    background: oklch(1 0 0 / 0.05);
+  }
 }
 
 @utility glow {
