@@ -2,14 +2,34 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type ResearchFindings = {
+  // Original core signals
   trendingTopics: string[];
-  keywords: { term: string; intent: string }[];
+  keywords: { term: string; intent: string; volume?: string; difficulty?: string }[];
   faqs: string[];
-  competitors: { name: string; angle: string }[];
+  competitors: { name: string; angle: string; strength?: string; weakness?: string }[];
   contentGaps: string[];
   searchIntent: string;
   audiencePains: string[];
   suggestedHooks: string[];
+
+  // New source-specific signals (AI-synthesized; can be replaced with live connectors later)
+  googleTrends: {
+    risingQueries: { term: string; growth: string }[];
+    relatedTopics: string[];
+    seasonality: string;
+  };
+  redditDiscussions: {
+    subreddit: string;
+    title: string;
+    insight: string;
+    sentiment: "positive" | "negative" | "mixed" | "curious";
+  }[];
+  youtubeSearches: {
+    query: string;
+    topVideoAngle: string;
+    estViews: string;
+    contentGap: string;
+  }[];
 };
 
 export const runResearchFn = createServerFn({ method: "POST" })
@@ -19,16 +39,36 @@ export const runResearchFn = createServerFn({ method: "POST" })
     const { gatewayChatJson } = await import("@/lib/ai-gateway.server");
     const findings = await gatewayChatJson<ResearchFindings>({
       messages: [
-        { role: "system", content: "You are a viral content research analyst. Return ONLY valid JSON with the requested keys." },
-        { role: "user", content: `Research this topic for a content creator.
-Return JSON: { trendingTopics: string[] (max 10), keywords: {term, intent}[] (max 15), faqs: string[] (max 10), competitors: {name, angle}[] (max 6), contentGaps: string[] (max 8), searchIntent: string, audiencePains: string[] (max 8), suggestedHooks: string[] (max 10) }.
+        { role: "system", content: "You are a viral content research analyst with deep knowledge of Google Trends patterns, active Reddit communities, and YouTube search dynamics. Return ONLY a valid JSON object matching the requested schema. No prose, no markdown fences. Base your synthesis on well-known patterns in the topic space." },
+        { role: "user", content: `Research this topic across multiple signal sources.
+
+Return a JSON object with EXACTLY these keys:
+
+trendingTopics: string[] (max 10)
+keywords: array of max 15 { term, intent, volume ("Low"|"Medium"|"High"|"Very High"), difficulty ("Easy"|"Medium"|"Hard") }
+faqs: string[] (max 10, phrased as real questions people ask)
+competitors: array of max 6 { name, angle, strength, weakness }
+contentGaps: string[] (max 8)
+searchIntent: string (one paragraph describing dominant intent)
+audiencePains: string[] (max 8)
+suggestedHooks: string[] (max 10)
+
+googleTrends: {
+  risingQueries: array of 6-8 { term, growth ("+120%" style) },
+  relatedTopics: string[] (6-8),
+  seasonality: string (1-2 sentences on when interest peaks)
+}
+
+redditDiscussions: array of 6-8 { subreddit (e.g. "r/entrepreneur"), title (realistic thread title), insight (what the community actually wants), sentiment ("positive"|"negative"|"mixed"|"curious") }
+
+youtubeSearches: array of 6-8 { query (what people type into YouTube search), topVideoAngle (angle winning videos take), estViews ("100K+"|"500K+"|"1M+" style), contentGap (what winners miss) }
 
 Topic: ${data.topic}
 Niche: ${data.niche ?? "general"}
 Platform: ${data.platform ?? "any"}` },
       ],
       temperature: 0.6,
-      maxTokens: 4000,
+      maxTokens: 8000,
     });
 
     const { data: row, error } = await context.supabase
@@ -40,7 +80,7 @@ Platform: ${data.platform ?? "any"}` },
         niche: data.niche ?? null,
         platform: data.platform ?? null,
         findings,
-        sources: [],
+        sources: ["ai_synthesized:google_trends", "ai_synthesized:reddit", "ai_synthesized:youtube"],
       } as never)
       .select()
       .single();
