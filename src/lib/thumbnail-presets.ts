@@ -191,6 +191,14 @@ export type ThumbnailBrief = {
   brand: BrandKitOptions;
   conceptCount: ConceptCount;
   quality: QualityId;
+  /** Optional data URL for the primary subject reference (face-preserve). */
+  subjectImage?: string;
+  /** Optional data URLs for secondary reference images (objects/context). */
+  referenceImages?: string[];
+  /** Optional overrides — when empty, the AI optimizer infers them. */
+  overrideSubjectAction?: string;
+  overrideBackground?: string;
+  overrideCameraAngle?: string;
 };
 
 export type PlannedBrief = {
