@@ -150,6 +150,20 @@ function PromoVideosPage() {
   const [renderProgress, setRenderProgress] = useState(0);
   const [regeneratingIdx, setRegeneratingIdx] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Idempotency keys — one UUID per intentional Generate click. Kept in refs
+  // so React re-renders never mint a new key mid-flight. Cleared on success
+  // or terminal failure so the next click starts a fresh operation. Retries
+  // of the same in-flight request reuse the same key → server dedupes via
+  // credit_ledger.idempotency_key and never double-charges / double-creates.
+  const planKeyRef = useRef<string | null>(null);
+  const renderKeyRef = useRef<string | null>(null);
+  const sceneKeyRefs = useRef<Map<number, string>>(new Map());
+  const newKey = () =>
+    (typeof crypto !== "undefined" && "randomUUID" in crypto)
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  const GENERIC_ERR = "Couldn’t start generation. Please try again.";
+
 
   useEffect(() => { saveDraft(draft); }, [draft]);
 
