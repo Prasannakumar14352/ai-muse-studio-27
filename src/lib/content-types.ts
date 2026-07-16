@@ -96,6 +96,12 @@ export const CONTENT_TYPES: ContentTypeMeta[] = [
     description: "Professional LinkedIn text post with headlines, hooks, hashtags and first comment.",
     icon: Linkedin, module: "linkedin", route: "/create",
   },
+  {
+    id: "promo_video", label: "Promo Video", short: "Promo",
+    description: "Multi-scene promotional video for any product, brand, app, course or event — Reels, Shorts, TikTok, Facebook, YouTube, or Square Ad.",
+    icon: Megaphone, module: "promo_videos", route: "/create", aspect: "9:16",
+    badge: "New",
+  },
 ];
 
 export const CONTENT_TYPES_BY_ID: Record<ContentTypeId, ContentTypeMeta> =
@@ -104,6 +110,7 @@ export const CONTENT_TYPES_BY_ID: Record<ContentTypeId, ContentTypeMeta> =
 /** Content-type values that belong to each sidebar module tab. */
 export const MODULE_CONTENT_TYPES: Record<ModuleId, ContentTypeId[]> = {
   videos: ["long_video", "short_reel", "talking_object", "documentary", "product_promo"],
+  promo_videos: ["promo_video"],
   carousels: ["carousel"],
   images: ["ai_image"],
   thumbnails: ["thumbnail"],
