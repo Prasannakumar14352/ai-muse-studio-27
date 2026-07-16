@@ -195,28 +195,36 @@ function PromoVideosPage() {
     !!draft.brief.productName.trim() && !!draft.brief.topic.trim() && draft.brief.durationSec >= 5;
 
   const runPlanning = async () => {
-    if (!detailsReady) return;
+    if (!detailsReady || planning) return;
     setPlanning(true);
+    if (!planKeyRef.current) planKeyRef.current = newKey();
     try {
       const plan = await runWithCredits(
         {
           action: "promo_plan",
           amount: 2,
-          description: `Promo plan — ${draft.brief.productName}`,
-          inputHash: `${draft.brief.productName}|${draft.brief.topic}|${draft.brief.format}|${draft.brief.durationSec}`,
+          description: `Promo plan — ${draft.brief.productName}`.slice(0, 200),
+          inputHash: planKeyRef.current,
         },
         () => planFn({ data: draft.brief }) as Promise<PromoPlan>,
       );
       setDraft((d) => ({ ...d, plan, step: 2, sceneImages: new Array(plan.scenes.length).fill(null) }));
+      planKeyRef.current = null; // success → new operation gets a fresh key
       toast.success("AI plan ready — review or edit before generating");
     } catch (e) {
-      if ((e as { code?: string })?.code !== "insufficient_credits") {
-        toast.error(e instanceof Error ? e.message : "Planning failed");
+      const code = (e as { code?: string })?.code;
+      if (code === "insufficient_credits") {
+        // Modal already surfaced by useCreditGuard; keep key for retry.
+      } else {
+        console.error("[promo-video] planning failed", e);
+        planKeyRef.current = null; // terminal failure → next click is a new op
+        toast.error(GENERIC_ERR);
       }
     } finally {
       setPlanning(false);
     }
   };
+
 
   const updateScene = (i: number, patch: Partial<PromoScene>) => {
     setDraft((d) => {
