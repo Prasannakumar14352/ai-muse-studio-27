@@ -441,8 +441,25 @@ function PlanningWizard({ brief, update, onNext, planning }: {
   update: <K extends keyof ThumbnailBrief>(k: K, v: ThumbnailBrief[K]) => void;
   onNext: () => void; planning: boolean;
 }) {
+  const activeFormatId = formatFromAspectRatio(brief.aspectRatio, brief.platform);
+  function selectFormat(id: ThumbnailFormatId) {
+    const f = getFormat(id);
+    // Sync aspect ratio + platform to the chosen format.
+    update("aspectRatio", f.generatorRatio as AspectRatioId);
+    // Best-effort platform sync (optional, purely cosmetic for chips below).
+    if (id === "youtube_shorts_9_16") update("platform", "youtube_shorts");
+    else if (id === "youtube_16_9")   update("platform", "youtube");
+    else if (id === "instagram_1_1")  update("platform", "instagram");
+    else if (id === "facebook_1_91_1")update("platform", "facebook");
+    else if (id === "linkedin_1_91_1")update("platform", "linkedin");
+    else if (id === "pinterest_2_3")  update("platform", "pinterest");
+  }
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="lg:col-span-2">
+        <FormatSelector activeId={activeFormatId} onSelect={selectFormat} />
+      </div>
+
       <Section title="Video & Prompt" icon={Wand}>
         <label className="block text-xs text-muted-foreground">Video title / topic</label>
         <input value={brief.title} onChange={(e) => update("title", e.target.value)}
@@ -454,7 +471,7 @@ function PlanningWizard({ brief, update, onNext, planning }: {
           className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-sm" />
       </Section>
 
-      <Section title="Platform & Aspect Ratio" icon={Sliders}>
+      <Section title="More platforms & aspect ratios" icon={Sliders} defaultOpen={false}>
         <div>
           <div className="text-xs text-muted-foreground mb-1.5">Platform</div>
           <Chips options={PLATFORMS} value={brief.platform} onChange={(v) => update("platform", v)} />
@@ -472,6 +489,37 @@ function PlanningWizard({ brief, update, onNext, planning }: {
           </div>
         )}
       </Section>
+
+      <Section title="Primary subject image (optional)" icon={Upload} defaultOpen={false}>
+        <p className="text-[11px] text-muted-foreground">
+          Upload a face/subject to preserve identity exactly. Additional images below act as
+          object / environment references only.
+        </p>
+        <SubjectUploader
+          value={brief.subjectImage}
+          onChange={(v) => update("subjectImage", v)}
+        />
+        <ReferenceUploader
+          value={brief.referenceImages ?? []}
+          onChange={(v) => update("referenceImages", v)}
+        />
+      </Section>
+
+      <Section title="AI Optimizer overrides (optional)" icon={Wand2} defaultOpen={false}>
+        <p className="text-[11px] text-muted-foreground">
+          Leave blank to let the AI Thumbnail Optimizer infer these automatically for your niche.
+        </p>
+        <input value={brief.overrideSubjectAction ?? ""} onChange={(e) => update("overrideSubjectAction", e.target.value)}
+          placeholder="Subject action / pose (auto if empty)"
+          className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-sm" />
+        <input value={brief.overrideBackground ?? ""} onChange={(e) => update("overrideBackground", e.target.value)}
+          placeholder="Background description (auto if empty)"
+          className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-sm" />
+        <input value={brief.overrideCameraAngle ?? ""} onChange={(e) => update("overrideCameraAngle", e.target.value)}
+          placeholder="Camera angle (auto if empty)"
+          className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-sm" />
+      </Section>
+
 
       <Section title="Style" icon={PaletteIcon}>
         <Chips options={EXTENDED_STYLES.map((s) => ({ id: s.id, label: s.label, hint: s.hint }))}
