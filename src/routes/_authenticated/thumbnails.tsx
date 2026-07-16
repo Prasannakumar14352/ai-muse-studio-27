@@ -146,25 +146,26 @@ function ThumbnailsPage() {
     setItems([]);
     setProgress({ done: 0, total: count });
     const q = QUALITIES.find((x) => x.id === brief.quality)!;
-    const { ratio } = ratioSize(brief);
-    const supportedRatio = ratio === "16:9" || ratio === "9:16" || ratio === "1:1" ? ratio : "1:1";
+    const format = getFormat(formatFromAspectRatio(brief.aspectRatio, brief.platform));
 
     for (let i = 0; i < count; i++) {
       const seedTag = ` [variation ${i + 1}/${count}]`;
-      const positive = `${plan.positivePrompt}\nText overlay: "${plan.thumbnailText}"\nAvoid: ${plan.negativePrompt}${seedTag}`;
+      const positive = `${plan.positivePrompt}\nAvoid: ${plan.negativePrompt}${seedTag}`;
       try {
         const { image, error } = await fetchGeneratedImage({
           prompt: positive,
-          ratio: supportedRatio,
+          ratio: format.generatorRatio,
           background: "opaque",
           quality: q.imageQuality,
+          image: brief.subjectImage,
+          referenceImages: brief.referenceImages,
         });
         if (image) {
           const item: GeneratedItem = {
             id: crypto.randomUUID(),
             image,
             prompt: positive,
-            ratio,
+            ratio: format.ratio,
             createdAt: Date.now(),
           };
           setItems((prev) => [...prev, item]);
