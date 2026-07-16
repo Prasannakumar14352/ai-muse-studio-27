@@ -3,7 +3,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
   Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug, Linkedin,
-  ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target, Calendar as CalendarIcon, Library,
+  ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target, Calendar as CalendarIcon, Library, Megaphone,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -22,6 +22,7 @@ const CONTENT_TYPE_TO_NAV: Record<string, string> = {
   talking_object: "/videos",
   documentary: "/videos",
   product_promo: "/videos",
+  promo_video: "/promo-videos",
   ai_image: "/images",
   carousel: "/carousels",
   thumbnail: "/thumbnails",
@@ -58,6 +59,7 @@ const SECTIONS: readonly NavSection[] = [
     items: [
       { to: "/create", label: "New Project", icon: Plus },
       { to: "/videos", label: "Videos", icon: Film, moduleId: "videos" },
+      { to: "/promo-videos", label: "Promo Video", icon: Megaphone, moduleId: "promo_videos" },
       { to: "/carousels", label: "Carousels", icon: Layers, moduleId: "carousels" },
       { to: "/images", label: "Images", icon: ImageIcon, moduleId: "images" },
       { to: "/thumbnails", label: "Thumbnails", icon: Sparkles, moduleId: "thumbnails" },
@@ -113,7 +115,7 @@ function useModuleCounts() {
       const { data, error } = await supabase.from("projects").select("content_type");
       if (error) throw error;
       const counts: Record<ModuleId, number> = {
-        videos: 0, carousels: 0, images: 0, thumbnails: 0, captions: 0, linkedin: 0,
+        videos: 0, promo_videos: 0, carousels: 0, images: 0, thumbnails: 0, captions: 0, linkedin: 0,
       };
       const inv: Record<string, ModuleId> = {};
       (Object.keys(MODULE_CONTENT_TYPES) as ModuleId[]).forEach((m) => {
