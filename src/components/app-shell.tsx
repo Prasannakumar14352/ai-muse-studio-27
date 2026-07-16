@@ -22,6 +22,7 @@ const CONTENT_TYPE_TO_NAV: Record<string, string> = {
   talking_object: "/videos",
   documentary: "/videos",
   product_promo: "/videos",
+  promo_video: "/promo-videos",
   ai_image: "/images",
   carousel: "/carousels",
   thumbnail: "/thumbnails",
