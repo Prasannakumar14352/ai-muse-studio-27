@@ -236,23 +236,31 @@ function PromoVideosPage() {
   };
 
   const regenerateScene = async (i: number, instruction?: string) => {
-    if (!draft.plan) return;
+    if (!draft.plan || regeneratingIdx !== null) return;
     setRegeneratingIdx(i);
+    if (!sceneKeyRefs.current.get(i)) sceneKeyRefs.current.set(i, newKey());
+    const key = sceneKeyRefs.current.get(i)!;
     try {
       const next = await runWithCredits(
         {
           action: "promo_scene_regen",
           amount: 1,
           description: `Rewrite scene ${i + 1}`,
-          inputHash: `${draft.brief.productName}|scene-${i}|${Date.now()}`,
+          inputHash: key,
         },
         () => regenSceneFn({ data: { brief: draft.brief, scene: draft.plan!.scenes[i], instruction } }) as Promise<PromoScene>,
       );
       updateScene(i, next);
+      sceneKeyRefs.current.delete(i);
       toast.success(`Scene ${i + 1} rewritten`);
     } catch (e) {
-      if ((e as { code?: string })?.code !== "insufficient_credits") {
-        toast.error(e instanceof Error ? e.message : "Regenerate failed");
+      const code = (e as { code?: string })?.code;
+      if (code === "insufficient_credits") {
+        // keep key for retry after top-up
+      } else {
+        console.error("[promo-video] scene regen failed", e);
+        sceneKeyRefs.current.delete(i);
+        toast.error(GENERIC_ERR);
       }
     } finally {
       setRegeneratingIdx(null);
@@ -260,29 +268,37 @@ function PromoVideosPage() {
   };
 
   const runGeneration = async () => {
-    if (!draft.plan || !access?.userId) return;
+    if (!draft.plan || !access?.userId || rendering) return;
     setRendering(true);
     setRenderProgress(0);
     abortRef.current = new AbortController();
+    if (!renderKeyRef.current) renderKeyRef.current = newKey();
     try {
       await runWithCredits(
         {
           action: "promo_video",
           amount: draft.plan.scenes.length * 2,
-          description: `Promo video — ${draft.plan.title}`,
-          inputHash: `${draft.brief.productName}|render|${Date.now()}`,
+          description: `Promo video — ${draft.plan.title}`.slice(0, 200),
+          inputHash: renderKeyRef.current,
         },
         () => renderPipeline(),
       );
+      renderKeyRef.current = null; // success
     } catch (e) {
-      if ((e as { code?: string })?.code !== "insufficient_credits") {
-        toast.error(e instanceof Error ? e.message : "Generation failed");
+      const code = (e as { code?: string })?.code;
+      if (code === "insufficient_credits") {
+        // keep key for retry
+      } else {
+        console.error("[promo-video] generation failed", e);
+        renderKeyRef.current = null; // terminal failure → next click new op
+        toast.error(GENERIC_ERR);
       }
     } finally {
       setRendering(false);
       abortRef.current = null;
     }
   };
+
 
   const renderPipeline = async () => {
     if (!draft.plan || !access?.userId) throw new Error("Missing plan");
