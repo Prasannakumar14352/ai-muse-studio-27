@@ -355,7 +355,7 @@ function PromoVideosPage() {
   };
 
   return (
-    <AppShell title="Promo Video Studio" subtitle="One promo, every platform">
+    <AppShell>
       <div className="mx-auto max-w-6xl space-y-6">
         <Stepper current={draft.step} onGoto={(s) => stepValid(s) && goto(s)} />
 
