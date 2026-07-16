@@ -18,7 +18,7 @@ import {
 import {
   PLATFORMS, ASPECT_RATIOS, EXTENDED_STYLES, SUBJECTS, EXPRESSIONS,
   BACKGROUNDS, LIGHTINGS, PALETTES, CTR_OPTIONS, QUALITIES,
-  defaultBrief, ratioSize,
+  defaultBrief,
   type ThumbnailBrief, type PlannedBrief, type ThumbnailQualityReport,
   type ConceptCount, type AspectRatioId,
 } from "@/lib/thumbnail-presets";
