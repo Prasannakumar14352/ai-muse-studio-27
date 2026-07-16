@@ -19,6 +19,11 @@ import {
   SUBJECTS,
   PALETTES,
 } from "@/lib/thumbnail-presets";
+import {
+  buildUniversalThumbnailPrompt,
+  formatFromAspectRatio,
+  getFormat,
+} from "@/lib/thumbnail-formats";
 
 function lookup<T extends { id: string }>(arr: T[], id: string): T {
   return arr.find((x) => x.id === id) ?? arr[0];
@@ -42,52 +47,110 @@ function briefContext(brief: ThumbnailBrief): string {
     `Lighting: ${light.label} — ${light.prompt}`,
     `Palette: ${pal.label}${pal.hint ? " — " + pal.hint : ""}`,
     brief.ctrOptions.length ? `CTR optimizations: ${brief.ctrOptions.join(", ")}` : "",
+    brief.overrideSubjectAction ? `User override — subject action: ${brief.overrideSubjectAction}` : "",
+    brief.overrideBackground    ? `User override — background: ${brief.overrideBackground}` : "",
+    brief.overrideCameraAngle   ? `User override — camera angle: ${brief.overrideCameraAngle}` : "",
+    brief.subjectImage ? "A primary subject reference image has been uploaded — its facial identity MUST be preserved exactly." : "",
     brief.textMode === "custom" && brief.customText
       ? `Required overlay text: "${brief.customText}"`
       : brief.textMode === "none"
         ? "No overlay text."
-        : "Overlay text: auto (invent a punchy 2–5 word hook).",
+        : "Overlay text: auto (invent a punchy 2–4 word hook).",
   ].filter(Boolean).join("\n");
 }
 
-/** Ask the AI to expand a brief into a structured, editable render plan. */
+/**
+ * Ask the AI Thumbnail Optimizer to infer creative decisions (subject action,
+ * expression, camera angle, background, thumbnail text, text placement,
+ * lighting/color grading) for the given topic, then build the FINAL image-gen
+ * prompt using the single universal template driven by the selected format.
+ */
 export const planThumbnailBrief = createServerFn({ method: "POST" })
   .inputValidator((data: { brief: ThumbnailBrief }) => data)
   .handler(async ({ data }): Promise<PlannedBrief> => {
     const ctx = briefContext(data.brief);
-    const plan = await gatewayChatJson<PlannedBrief>({
+    const format = getFormat(formatFromAspectRatio(data.brief.aspectRatio, data.brief.platform));
+
+    type Optimized = {
+      sceneDescription: string;
+      subjectAction: string;
+      subjectExpression: string;
+      cameraAngle: string;
+      backgroundDescription: string;
+      thumbnailText: string;
+      textPlacement: string;
+      lighting: string;
+      colorPalette: string;
+      composition: string;
+      negativePrompt: string;
+      ctrTips: string[];
+    };
+
+    const optimized = await gatewayChatJson<Optimized>({
       model: "google/gemini-2.5-flash",
       messages: [
         {
           role: "system",
           content:
-            "You are an expert YouTube thumbnail art director. Produce concise, punchy plans optimized for high CTR. Return STRICT JSON matching the schema — no prose.",
+            "You are the AI Thumbnail Optimizer — an expert art director for viral thumbnails across ANY niche. " +
+            "Infer the strongest creative choices (facial expression, subject pose/action, camera angle, background, " +
+            "thumbnail text of 2–4 impactful words, text placement that NEVER covers the face, lighting, and color " +
+            "grading) tailored to the topic and target format. Respect user overrides when provided. " +
+            "Return STRICT JSON — no prose.",
         },
         {
           role: "user",
           content:
-            `Create a thumbnail plan.\n\n${ctx}\n\n` +
-            `Return JSON with keys: sceneDescription (string, ≤200 chars), ` +
-            `positivePrompt (string, single dense image-gen prompt ≤600 chars), ` +
-            `negativePrompt (string, comma list of things to avoid), ` +
-            `thumbnailText (string, 2–5 words UPPERCASE), ` +
-            `composition (string), cameraAngle (string), lighting (string), ` +
-            `colorPalette (string), ctrTips (string[] of 3–5 short tips).`,
+            `Target format: ${format.label} (${format.ratio}, ${format.outputWidth}x${format.outputHeight}).\n` +
+            `Composition rule: ${format.compositionRule}\n` +
+            `Text placement rule: ${format.textPlacement}\n\n` +
+            `${ctx}\n\n` +
+            `Return JSON with keys: sceneDescription, subjectAction, subjectExpression, cameraAngle, ` +
+            `backgroundDescription, thumbnailText (2–4 UPPERCASE words), textPlacement, lighting, colorPalette, ` +
+            `composition, negativePrompt (comma list), ctrTips (string[] of 3–5 short tips).`,
         },
       ],
     });
+
+    // Force user overrides to win over AI inference.
+    const subjectAction     = data.brief.overrideSubjectAction || optimized.subjectAction || "";
+    const backgroundDesc    = data.brief.overrideBackground    || optimized.backgroundDescription || "";
+    const cameraAngle       = data.brief.overrideCameraAngle   || optimized.cameraAngle || "";
+    const thumbnailText =
+      data.brief.textMode === "none"
+        ? ""
+        : data.brief.textMode === "custom"
+          ? (data.brief.customText || "").toUpperCase()
+          : String(optimized.thumbnailText ?? "").toUpperCase().slice(0, 40);
+    const subjectExpression =
+      data.brief.expression && data.brief.expression !== "none"
+        ? data.brief.expression
+        : (optimized.subjectExpression || "confident, engaging");
+
+    // Build the FINAL image-generation prompt from the single universal template.
+    const positivePrompt = buildUniversalThumbnailPrompt(format, {
+      TOPIC: data.brief.title || data.brief.prompt || "",
+      SUBJECT_ACTION: subjectAction,
+      SUBJECT_EXPRESSION: subjectExpression,
+      BACKGROUND_DESCRIPTION: backgroundDesc,
+      THUMBNAIL_TEXT: thumbnailText,
+      ASPECT_RATIO: format.ratio,
+      hasUploadedSubject: Boolean(data.brief.subjectImage),
+    });
+
     return {
-      sceneDescription: String(plan.sceneDescription ?? ""),
-      positivePrompt:   String(plan.positivePrompt   ?? ""),
-      negativePrompt:   String(plan.negativePrompt   ?? "blurry, low quality, extra fingers, watermark, text artifacts"),
-      thumbnailText:    String(plan.thumbnailText    ?? "").toUpperCase().slice(0, 40),
-      composition:      String(plan.composition      ?? ""),
-      cameraAngle:      String(plan.cameraAngle      ?? ""),
-      lighting:         String(plan.lighting         ?? ""),
-      colorPalette:     String(plan.colorPalette     ?? ""),
-      ctrTips:          Array.isArray(plan.ctrTips) ? plan.ctrTips.map(String).slice(0, 6) : [],
+      sceneDescription: String(optimized.sceneDescription ?? ""),
+      positivePrompt,
+      negativePrompt:   String(optimized.negativePrompt   ?? "blurry, low quality, extra fingers, watermark, text artifacts, misspelled text, distorted face"),
+      thumbnailText,
+      composition:      String(optimized.composition      ?? format.compositionRule),
+      cameraAngle:      cameraAngle,
+      lighting:         String(optimized.lighting         ?? ""),
+      colorPalette:     String(optimized.colorPalette     ?? ""),
+      ctrTips:          Array.isArray(optimized.ctrTips) ? optimized.ctrTips.map(String).slice(0, 6) : [],
     };
   });
+
 
 /** Score a rendered thumbnail across CTR heuristics. */
 export const analyzeThumbnailQuality = createServerFn({ method: "POST" })
