@@ -247,23 +247,24 @@ function ThumbnailsPage() {
   }
 
   async function download(item: GeneratedItem, fmt: "png" | "jpg" | "webp") {
-    // Render into an offscreen node at target size so we can control format & size.
+    // Render into an offscreen canvas at the FORMAT's target output size.
+    const format = getFormat(formatFromAspectRatio(brief.aspectRatio, brief.platform));
     const img = new Image();
     img.src = item.image;
     await new Promise((r) => { img.onload = r; img.onerror = r; });
     const canvas = document.createElement("canvas");
-    canvas.width = img.naturalWidth || 1280;
-    canvas.height = img.naturalHeight || 720;
+    canvas.width = format.outputWidth;
+    canvas.height = format.outputHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.drawImage(img, 0, 0);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     const mime = fmt === "jpg" ? "image/jpeg" : fmt === "webp" ? "image/webp" : "image/png";
     const url = canvas.toDataURL(mime, 0.95);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `thumbnail-${item.id.slice(0, 8)}.${fmt}`;
+    a.download = `thumbnail-${format.shortLabel.toLowerCase()}-${item.id.slice(0, 8)}.${fmt}`;
     a.click();
-    toast.success(`Downloaded ${fmt.toUpperCase()}`);
+    toast.success(`Downloaded ${fmt.toUpperCase()} (${canvas.width}×${canvas.height})`);
     // silence unused import
     void toPng; void toJpeg;
   }
