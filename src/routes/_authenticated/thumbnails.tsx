@@ -23,6 +23,10 @@ import {
   type ConceptCount, type AspectRatioId,
 } from "@/lib/thumbnail-presets";
 import {
+  THUMBNAIL_FORMATS, getFormat, formatFromAspectRatio,
+  type ThumbnailFormatId,
+} from "@/lib/thumbnail-formats";
+import {
   planThumbnailBrief, analyzeThumbnailQuality, reverseEngineerThumbnail,
 } from "@/lib/thumbnail-planner.functions";
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
