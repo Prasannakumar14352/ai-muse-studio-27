@@ -115,7 +115,7 @@ function useModuleCounts() {
       const { data, error } = await supabase.from("projects").select("content_type");
       if (error) throw error;
       const counts: Record<ModuleId, number> = {
-        videos: 0, carousels: 0, images: 0, thumbnails: 0, captions: 0, linkedin: 0,
+        videos: 0, promo_videos: 0, carousels: 0, images: 0, thumbnails: 0, captions: 0, linkedin: 0,
       };
       const inv: Record<string, ModuleId> = {};
       (Object.keys(MODULE_CONTENT_TYPES) as ModuleId[]).forEach((m) => {
