@@ -15,6 +15,7 @@ export type ContentTypeId =
   | "talking_object"
   | "documentary"
   | "product_promo"
+  | "promo_video"
   | "carousel"
   | "ai_image"
   | "thumbnail"
@@ -22,7 +23,7 @@ export type ContentTypeId =
   | "seo_pack"
   | "linkedin_post";
 
-export type ModuleId = "videos" | "carousels" | "images" | "thumbnails" | "captions" | "linkedin";
+export type ModuleId = "videos" | "promo_videos" | "carousels" | "images" | "thumbnails" | "captions" | "linkedin";
 
 export type ContentTypeMeta = {
   id: ContentTypeId;
