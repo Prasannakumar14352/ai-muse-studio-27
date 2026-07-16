@@ -59,6 +59,7 @@ const SECTIONS: readonly NavSection[] = [
     items: [
       { to: "/create", label: "New Project", icon: Plus },
       { to: "/videos", label: "Videos", icon: Film, moduleId: "videos" },
+      { to: "/promo-videos", label: "Promo Video", icon: Megaphone, moduleId: "promo_videos" },
       { to: "/carousels", label: "Carousels", icon: Layers, moduleId: "carousels" },
       { to: "/images", label: "Images", icon: ImageIcon, moduleId: "images" },
       { to: "/thumbnails", label: "Thumbnails", icon: Sparkles, moduleId: "thumbnails" },
