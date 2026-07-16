@@ -6,7 +6,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Film, Zap, MessageCircleMore, Camera, Package, Layers,
-  Image as ImageIcon, Sparkles, Type, Search, Linkedin,
+  Image as ImageIcon, Sparkles, Type, Search, Linkedin, Megaphone,
 } from "lucide-react";
 
 export type ContentTypeId =
