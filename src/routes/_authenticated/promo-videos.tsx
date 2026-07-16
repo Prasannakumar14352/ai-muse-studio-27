@@ -150,6 +150,20 @@ function PromoVideosPage() {
   const [renderProgress, setRenderProgress] = useState(0);
   const [regeneratingIdx, setRegeneratingIdx] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Idempotency keys — one UUID per intentional Generate click. Kept in refs
+  // so React re-renders never mint a new key mid-flight. Cleared on success
+  // or terminal failure so the next click starts a fresh operation. Retries
+  // of the same in-flight request reuse the same key → server dedupes via
+  // credit_ledger.idempotency_key and never double-charges / double-creates.
+  const planKeyRef = useRef<string | null>(null);
+  const renderKeyRef = useRef<string | null>(null);
+  const sceneKeyRefs = useRef<Map<number, string>>(new Map());
+  const newKey = () =>
+    (typeof crypto !== "undefined" && "randomUUID" in crypto)
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  const GENERIC_ERR = "Couldn’t start generation. Please try again.";
+
 
   useEffect(() => { saveDraft(draft); }, [draft]);
 
@@ -181,28 +195,36 @@ function PromoVideosPage() {
     !!draft.brief.productName.trim() && !!draft.brief.topic.trim() && draft.brief.durationSec >= 5;
 
   const runPlanning = async () => {
-    if (!detailsReady) return;
+    if (!detailsReady || planning) return;
     setPlanning(true);
+    if (!planKeyRef.current) planKeyRef.current = newKey();
     try {
       const plan = await runWithCredits(
         {
           action: "promo_plan",
           amount: 2,
-          description: `Promo plan — ${draft.brief.productName}`,
-          inputHash: `${draft.brief.productName}|${draft.brief.topic}|${draft.brief.format}|${draft.brief.durationSec}`,
+          description: `Promo plan — ${draft.brief.productName}`.slice(0, 200),
+          inputHash: planKeyRef.current,
         },
         () => planFn({ data: draft.brief }) as Promise<PromoPlan>,
       );
       setDraft((d) => ({ ...d, plan, step: 2, sceneImages: new Array(plan.scenes.length).fill(null) }));
+      planKeyRef.current = null; // success → new operation gets a fresh key
       toast.success("AI plan ready — review or edit before generating");
     } catch (e) {
-      if ((e as { code?: string })?.code !== "insufficient_credits") {
-        toast.error(e instanceof Error ? e.message : "Planning failed");
+      const code = (e as { code?: string })?.code;
+      if (code === "insufficient_credits") {
+        // Modal already surfaced by useCreditGuard; keep key for retry.
+      } else {
+        console.error("[promo-video] planning failed", e);
+        planKeyRef.current = null; // terminal failure → next click is a new op
+        toast.error(GENERIC_ERR);
       }
     } finally {
       setPlanning(false);
     }
   };
+
 
   const updateScene = (i: number, patch: Partial<PromoScene>) => {
     setDraft((d) => {
@@ -214,23 +236,31 @@ function PromoVideosPage() {
   };
 
   const regenerateScene = async (i: number, instruction?: string) => {
-    if (!draft.plan) return;
+    if (!draft.plan || regeneratingIdx !== null) return;
     setRegeneratingIdx(i);
+    if (!sceneKeyRefs.current.get(i)) sceneKeyRefs.current.set(i, newKey());
+    const key = sceneKeyRefs.current.get(i)!;
     try {
       const next = await runWithCredits(
         {
           action: "promo_scene_regen",
           amount: 1,
           description: `Rewrite scene ${i + 1}`,
-          inputHash: `${draft.brief.productName}|scene-${i}|${Date.now()}`,
+          inputHash: key,
         },
         () => regenSceneFn({ data: { brief: draft.brief, scene: draft.plan!.scenes[i], instruction } }) as Promise<PromoScene>,
       );
       updateScene(i, next);
+      sceneKeyRefs.current.delete(i);
       toast.success(`Scene ${i + 1} rewritten`);
     } catch (e) {
-      if ((e as { code?: string })?.code !== "insufficient_credits") {
-        toast.error(e instanceof Error ? e.message : "Regenerate failed");
+      const code = (e as { code?: string })?.code;
+      if (code === "insufficient_credits") {
+        // keep key for retry after top-up
+      } else {
+        console.error("[promo-video] scene regen failed", e);
+        sceneKeyRefs.current.delete(i);
+        toast.error(GENERIC_ERR);
       }
     } finally {
       setRegeneratingIdx(null);
@@ -238,29 +268,37 @@ function PromoVideosPage() {
   };
 
   const runGeneration = async () => {
-    if (!draft.plan || !access?.userId) return;
+    if (!draft.plan || !access?.userId || rendering) return;
     setRendering(true);
     setRenderProgress(0);
     abortRef.current = new AbortController();
+    if (!renderKeyRef.current) renderKeyRef.current = newKey();
     try {
       await runWithCredits(
         {
           action: "promo_video",
           amount: draft.plan.scenes.length * 2,
-          description: `Promo video — ${draft.plan.title}`,
-          inputHash: `${draft.brief.productName}|render|${Date.now()}`,
+          description: `Promo video — ${draft.plan.title}`.slice(0, 200),
+          inputHash: renderKeyRef.current,
         },
         () => renderPipeline(),
       );
+      renderKeyRef.current = null; // success
     } catch (e) {
-      if ((e as { code?: string })?.code !== "insufficient_credits") {
-        toast.error(e instanceof Error ? e.message : "Generation failed");
+      const code = (e as { code?: string })?.code;
+      if (code === "insufficient_credits") {
+        // keep key for retry
+      } else {
+        console.error("[promo-video] generation failed", e);
+        renderKeyRef.current = null; // terminal failure → next click new op
+        toast.error(GENERIC_ERR);
       }
     } finally {
       setRendering(false);
       abortRef.current = null;
     }
   };
+
 
   const renderPipeline = async () => {
     if (!draft.plan || !access?.userId) throw new Error("Missing plan");
