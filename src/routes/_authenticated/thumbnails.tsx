@@ -18,10 +18,14 @@ import {
 import {
   PLATFORMS, ASPECT_RATIOS, EXTENDED_STYLES, SUBJECTS, EXPRESSIONS,
   BACKGROUNDS, LIGHTINGS, PALETTES, CTR_OPTIONS, QUALITIES,
-  defaultBrief, ratioSize,
+  defaultBrief,
   type ThumbnailBrief, type PlannedBrief, type ThumbnailQualityReport,
   type ConceptCount, type AspectRatioId,
 } from "@/lib/thumbnail-presets";
+import {
+  THUMBNAIL_FORMATS, getFormat, formatFromAspectRatio,
+  type ThumbnailFormatId,
+} from "@/lib/thumbnail-formats";
 import {
   planThumbnailBrief, analyzeThumbnailQuality, reverseEngineerThumbnail,
 } from "@/lib/thumbnail-planner.functions";
@@ -142,25 +146,26 @@ function ThumbnailsPage() {
     setItems([]);
     setProgress({ done: 0, total: count });
     const q = QUALITIES.find((x) => x.id === brief.quality)!;
-    const { ratio } = ratioSize(brief);
-    const supportedRatio = ratio === "16:9" || ratio === "9:16" || ratio === "1:1" ? ratio : "1:1";
+    const format = getFormat(formatFromAspectRatio(brief.aspectRatio, brief.platform));
 
     for (let i = 0; i < count; i++) {
       const seedTag = ` [variation ${i + 1}/${count}]`;
-      const positive = `${plan.positivePrompt}\nText overlay: "${plan.thumbnailText}"\nAvoid: ${plan.negativePrompt}${seedTag}`;
+      const positive = `${plan.positivePrompt}\nAvoid: ${plan.negativePrompt}${seedTag}`;
       try {
         const { image, error } = await fetchGeneratedImage({
           prompt: positive,
-          ratio: supportedRatio,
+          ratio: format.generatorRatio,
           background: "opaque",
           quality: q.imageQuality,
+          image: brief.subjectImage,
+          referenceImages: brief.referenceImages,
         });
         if (image) {
           const item: GeneratedItem = {
             id: crypto.randomUUID(),
             image,
             prompt: positive,
-            ratio,
+            ratio: format.ratio,
             createdAt: Date.now(),
           };
           setItems((prev) => [...prev, item]);
@@ -242,23 +247,24 @@ function ThumbnailsPage() {
   }
 
   async function download(item: GeneratedItem, fmt: "png" | "jpg" | "webp") {
-    // Render into an offscreen node at target size so we can control format & size.
+    // Render into an offscreen canvas at the FORMAT's target output size.
+    const format = getFormat(formatFromAspectRatio(brief.aspectRatio, brief.platform));
     const img = new Image();
     img.src = item.image;
     await new Promise((r) => { img.onload = r; img.onerror = r; });
     const canvas = document.createElement("canvas");
-    canvas.width = img.naturalWidth || 1280;
-    canvas.height = img.naturalHeight || 720;
+    canvas.width = format.outputWidth;
+    canvas.height = format.outputHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.drawImage(img, 0, 0);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     const mime = fmt === "jpg" ? "image/jpeg" : fmt === "webp" ? "image/webp" : "image/png";
     const url = canvas.toDataURL(mime, 0.95);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `thumbnail-${item.id.slice(0, 8)}.${fmt}`;
+    a.download = `thumbnail-${format.shortLabel.toLowerCase()}-${item.id.slice(0, 8)}.${fmt}`;
     a.click();
-    toast.success(`Downloaded ${fmt.toUpperCase()}`);
+    toast.success(`Downloaded ${fmt.toUpperCase()} (${canvas.width}×${canvas.height})`);
     // silence unused import
     void toPng; void toJpeg;
   }
@@ -435,8 +441,25 @@ function PlanningWizard({ brief, update, onNext, planning }: {
   update: <K extends keyof ThumbnailBrief>(k: K, v: ThumbnailBrief[K]) => void;
   onNext: () => void; planning: boolean;
 }) {
+  const activeFormatId = formatFromAspectRatio(brief.aspectRatio, brief.platform);
+  function selectFormat(id: ThumbnailFormatId) {
+    const f = getFormat(id);
+    // Sync aspect ratio + platform to the chosen format.
+    update("aspectRatio", f.generatorRatio as AspectRatioId);
+    // Best-effort platform sync (optional, purely cosmetic for chips below).
+    if (id === "youtube_shorts_9_16") update("platform", "youtube_shorts");
+    else if (id === "youtube_16_9")   update("platform", "youtube");
+    else if (id === "instagram_1_1")  update("platform", "instagram");
+    else if (id === "facebook_1_91_1")update("platform", "facebook");
+    else if (id === "linkedin_1_91_1")update("platform", "linkedin");
+    else if (id === "pinterest_2_3")  update("platform", "pinterest");
+  }
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="lg:col-span-2">
+        <FormatSelector activeId={activeFormatId} onSelect={selectFormat} />
+      </div>
+
       <Section title="Video & Prompt" icon={Wand}>
         <label className="block text-xs text-muted-foreground">Video title / topic</label>
         <input value={brief.title} onChange={(e) => update("title", e.target.value)}
@@ -448,7 +471,7 @@ function PlanningWizard({ brief, update, onNext, planning }: {
           className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-sm" />
       </Section>
 
-      <Section title="Platform & Aspect Ratio" icon={Sliders}>
+      <Section title="More platforms & aspect ratios" icon={Sliders} defaultOpen={false}>
         <div>
           <div className="text-xs text-muted-foreground mb-1.5">Platform</div>
           <Chips options={PLATFORMS} value={brief.platform} onChange={(v) => update("platform", v)} />
@@ -466,6 +489,37 @@ function PlanningWizard({ brief, update, onNext, planning }: {
           </div>
         )}
       </Section>
+
+      <Section title="Primary subject image (optional)" icon={Upload} defaultOpen={false}>
+        <p className="text-[11px] text-muted-foreground">
+          Upload a face/subject to preserve identity exactly. Additional images below act as
+          object / environment references only.
+        </p>
+        <SubjectUploader
+          value={brief.subjectImage}
+          onChange={(v) => update("subjectImage", v)}
+        />
+        <ReferenceUploader
+          value={brief.referenceImages ?? []}
+          onChange={(v) => update("referenceImages", v)}
+        />
+      </Section>
+
+      <Section title="AI Optimizer overrides (optional)" icon={Wand2} defaultOpen={false}>
+        <p className="text-[11px] text-muted-foreground">
+          Leave blank to let the AI Thumbnail Optimizer infer these automatically for your niche.
+        </p>
+        <input value={brief.overrideSubjectAction ?? ""} onChange={(e) => update("overrideSubjectAction", e.target.value)}
+          placeholder="Subject action / pose (auto if empty)"
+          className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-sm" />
+        <input value={brief.overrideBackground ?? ""} onChange={(e) => update("overrideBackground", e.target.value)}
+          placeholder="Background description (auto if empty)"
+          className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-sm" />
+        <input value={brief.overrideCameraAngle ?? ""} onChange={(e) => update("overrideCameraAngle", e.target.value)}
+          placeholder="Camera angle (auto if empty)"
+          className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-sm" />
+      </Section>
+
 
       <Section title="Style" icon={PaletteIcon}>
         <Chips options={EXTENDED_STYLES.map((s) => ({ id: s.id, label: s.label, hint: s.hint }))}
@@ -895,3 +949,127 @@ function Row({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+/* ---------- Prominent Format selector (extensible) ---------- */
+
+function FormatSelector({ activeId, onSelect }: {
+  activeId: ThumbnailFormatId; onSelect: (id: ThumbnailFormatId) => void;
+}) {
+  const primary = THUMBNAIL_FORMATS.filter((f) => f.primary);
+  const secondary = THUMBNAIL_FORMATS.filter((f) => !f.primary);
+  return (
+    <div className="glass rounded-2xl border border-border p-4 space-y-3">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <Sliders className="w-4 h-4 text-primary" /> Choose format
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {primary.map((f) => {
+          const active = activeId === f.id;
+          return (
+            <button key={f.id} onClick={() => onSelect(f.id)}
+              className={`text-left rounded-xl border p-4 transition ${
+                active
+                  ? "border-[color:var(--neon-purple)] bg-primary/10 ring-2 ring-[color:var(--neon-purple)]/40"
+                  : "glass border-border hover:border-white/20"
+              }`}>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold">{f.label}</div>
+                <div className="text-[11px] text-muted-foreground">{f.outputWidth}×{f.outputHeight}</div>
+              </div>
+              <div className="mt-1 text-[11px] text-muted-foreground">{f.description}</div>
+              <div className="mt-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                Subject ~{f.subjectCoverage}% · {f.mobileOptimized ? "Mobile-optimized" : "Landscape"}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div>
+        <div className="text-[11px] text-muted-foreground mb-1.5">Other formats</div>
+        <div className="flex flex-wrap gap-1.5">
+          {secondary.map((f) => (
+            <button key={f.id} onClick={() => onSelect(f.id)}
+              title={`${f.outputWidth}×${f.outputHeight}`}
+              className={`px-2.5 py-1 rounded-full text-[11px] border transition ${
+                activeId === f.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"
+              }`}>
+              {f.shortLabel} · {f.ratio}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Subject / reference image uploaders ---------- */
+
+function SubjectUploader({ value, onChange }: { value?: string; onChange: (v: string | undefined) => void }) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  function pick(f: File | null) {
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => onChange(String(r.result));
+    r.readAsDataURL(f);
+  }
+  return (
+    <div className="space-y-2">
+      <input ref={ref} type="file" accept="image/*" className="hidden"
+        onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+      {value ? (
+        <div className="flex items-center gap-2">
+          <img src={value} alt="subject" className="w-16 h-16 rounded-lg object-cover border border-border" />
+          <button onClick={() => ref.current?.click()} className="text-xs glass border border-border rounded-lg px-2 py-1">
+            Replace
+          </button>
+          <button onClick={() => onChange(undefined)} className="text-xs glass border border-border rounded-lg px-2 py-1 text-rose-300">
+            Remove
+          </button>
+        </div>
+      ) : (
+        <button onClick={() => ref.current?.click()}
+          className="w-full rounded-lg glass border border-dashed border-border py-3 text-xs text-muted-foreground hover:border-white/20 flex items-center justify-center gap-2">
+          <Upload className="w-4 h-4" /> Upload primary subject (face)
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ReferenceUploader({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  function pick(files: FileList | null) {
+    if (!files) return;
+    const arr = Array.from(files);
+    Promise.all(arr.map((f) => new Promise<string>((res) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result));
+      r.readAsDataURL(f);
+    }))).then((imgs) => onChange([...value, ...imgs].slice(0, 6)));
+  }
+  return (
+    <div className="space-y-2">
+      <input ref={ref} type="file" accept="image/*" multiple className="hidden"
+        onChange={(e) => pick(e.target.files)} />
+      <div className="flex flex-wrap gap-2">
+        {value.map((src, i) => (
+          <div key={i} className="relative">
+            <img src={src} alt={`ref-${i}`} className="w-14 h-14 rounded-lg object-cover border border-border" />
+            <button onClick={() => onChange(value.filter((_, j) => j !== i))}
+              className="absolute -top-1 -right-1 bg-rose-500/80 text-white rounded-full p-0.5">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+        <button onClick={() => ref.current?.click()}
+          className="w-14 h-14 rounded-lg glass border border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-white/20">
+          <Upload className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="text-[10px] text-muted-foreground">
+        Reference images (objects, environments, context) — not used to alter the subject's face.
+      </div>
+    </div>
+  );
+}
+
