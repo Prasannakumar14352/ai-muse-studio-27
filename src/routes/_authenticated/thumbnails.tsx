@@ -949,3 +949,127 @@ function Row({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+/* ---------- Prominent Format selector (extensible) ---------- */
+
+function FormatSelector({ activeId, onSelect }: {
+  activeId: ThumbnailFormatId; onSelect: (id: ThumbnailFormatId) => void;
+}) {
+  const primary = THUMBNAIL_FORMATS.filter((f) => f.primary);
+  const secondary = THUMBNAIL_FORMATS.filter((f) => !f.primary);
+  return (
+    <div className="glass rounded-2xl border border-border p-4 space-y-3">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <Sliders className="w-4 h-4 text-primary" /> Choose format
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {primary.map((f) => {
+          const active = activeId === f.id;
+          return (
+            <button key={f.id} onClick={() => onSelect(f.id)}
+              className={`text-left rounded-xl border p-4 transition ${
+                active
+                  ? "border-[color:var(--neon-purple)] bg-primary/10 ring-2 ring-[color:var(--neon-purple)]/40"
+                  : "glass border-border hover:border-white/20"
+              }`}>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold">{f.label}</div>
+                <div className="text-[11px] text-muted-foreground">{f.outputWidth}×{f.outputHeight}</div>
+              </div>
+              <div className="mt-1 text-[11px] text-muted-foreground">{f.description}</div>
+              <div className="mt-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                Subject ~{f.subjectCoverage}% · {f.mobileOptimized ? "Mobile-optimized" : "Landscape"}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div>
+        <div className="text-[11px] text-muted-foreground mb-1.5">Other formats</div>
+        <div className="flex flex-wrap gap-1.5">
+          {secondary.map((f) => (
+            <button key={f.id} onClick={() => onSelect(f.id)}
+              title={`${f.outputWidth}×${f.outputHeight}`}
+              className={`px-2.5 py-1 rounded-full text-[11px] border transition ${
+                activeId === f.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"
+              }`}>
+              {f.shortLabel} · {f.ratio}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Subject / reference image uploaders ---------- */
+
+function SubjectUploader({ value, onChange }: { value?: string; onChange: (v: string | undefined) => void }) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  function pick(f: File | null) {
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => onChange(String(r.result));
+    r.readAsDataURL(f);
+  }
+  return (
+    <div className="space-y-2">
+      <input ref={ref} type="file" accept="image/*" className="hidden"
+        onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+      {value ? (
+        <div className="flex items-center gap-2">
+          <img src={value} alt="subject" className="w-16 h-16 rounded-lg object-cover border border-border" />
+          <button onClick={() => ref.current?.click()} className="text-xs glass border border-border rounded-lg px-2 py-1">
+            Replace
+          </button>
+          <button onClick={() => onChange(undefined)} className="text-xs glass border border-border rounded-lg px-2 py-1 text-rose-300">
+            Remove
+          </button>
+        </div>
+      ) : (
+        <button onClick={() => ref.current?.click()}
+          className="w-full rounded-lg glass border border-dashed border-border py-3 text-xs text-muted-foreground hover:border-white/20 flex items-center justify-center gap-2">
+          <Upload className="w-4 h-4" /> Upload primary subject (face)
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ReferenceUploader({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  function pick(files: FileList | null) {
+    if (!files) return;
+    const arr = Array.from(files);
+    Promise.all(arr.map((f) => new Promise<string>((res) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result));
+      r.readAsDataURL(f);
+    }))).then((imgs) => onChange([...value, ...imgs].slice(0, 6)));
+  }
+  return (
+    <div className="space-y-2">
+      <input ref={ref} type="file" accept="image/*" multiple className="hidden"
+        onChange={(e) => pick(e.target.files)} />
+      <div className="flex flex-wrap gap-2">
+        {value.map((src, i) => (
+          <div key={i} className="relative">
+            <img src={src} alt={`ref-${i}`} className="w-14 h-14 rounded-lg object-cover border border-border" />
+            <button onClick={() => onChange(value.filter((_, j) => j !== i))}
+              className="absolute -top-1 -right-1 bg-rose-500/80 text-white rounded-full p-0.5">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+        <button onClick={() => ref.current?.click()}
+          className="w-14 h-14 rounded-lg glass border border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-white/20">
+          <Upload className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="text-[10px] text-muted-foreground">
+        Reference images (objects, environments, context) — not used to alter the subject's face.
+      </div>
+    </div>
+  );
+}
+
