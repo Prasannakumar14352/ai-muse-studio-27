@@ -123,18 +123,21 @@ export const listImageEditsFn = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { data: rows, error } = await context.supabase
       .from("generated_assets")
-      .select("id, project_id, storage_path, mime_type, width, height, metadata, created_at")
+      .select("id, project_id, storage_path, metadata, created_at")
       .eq("asset_type", "image")
       .order("created_at", { ascending: false })
       .limit(data.limit);
     if (error) throw new Error(error.message);
-    return (rows ?? []).map((r) => ({
-      id: r.id as string,
-      projectId: r.project_id as string | null,
-      storagePath: r.storage_path as string,
-      mime: r.mime_type as string,
-      width: r.width as number | null,
-      height: r.height as number | null,
-      createdAt: r.created_at as string,
-    }));
+    return (rows ?? []).map((r) => {
+      const meta = (r.metadata ?? {}) as { mime?: string; width?: number; height?: number };
+      return {
+        id: r.id as string,
+        projectId: (r.project_id as string | null) ?? null,
+        storagePath: (r.storage_path as string | null) ?? "",
+        mime: meta.mime ?? "image/png",
+        width: meta.width ?? null,
+        height: meta.height ?? null,
+        createdAt: r.created_at as string,
+      };
+    });
   });
