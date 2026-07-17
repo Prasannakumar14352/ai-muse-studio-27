@@ -129,6 +129,8 @@ function Landing() {
       {/* Written Testimonials Carousel */}
       <WrittenTestimonialsSection />
 
+      {/* Honest tool comparison */}
+      <ComparisonSection />
 
       {/* Pricing */}
       <LandingPricingTabs />
