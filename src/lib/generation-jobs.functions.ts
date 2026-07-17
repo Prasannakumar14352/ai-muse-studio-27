@@ -21,7 +21,9 @@ export type JobStatus =
   | "cancelled";
 
 // JSON-serializable payload shape (matches Supabase `jsonb`).
-export type JsonPayload = Record<string, unknown>;
+// Must not use `unknown` — TanStack serialization rejects it at the RPC boundary.
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue };
+export type JsonPayload = { [k: string]: JsonValue };
 
 export type GenerationJob = {
   id: string;
