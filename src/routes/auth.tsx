@@ -204,11 +204,11 @@ function AuthPage() {
             <span className="ml-1 text-[10px] uppercase tracking-wide text-white/50">Lovable</span>
           </button> */}
 
-          <button onClick={() => handleLovable("apple")} disabled={loading}
+          {/* <button onClick={() => handleLovable("apple")} disabled={loading}
             className="mt-2 w-full flex items-center justify-center gap-3 rounded-lg bg-black text-white py-2.5 text-sm font-medium hover:bg-black/80 disabled:opacity-60 border border-white/10">
             <Apple className="w-4 h-4" />
             Continue with Apple
-          </button>
+          </button> */}
 
           <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
             <div className="flex-1 h-px bg-border" /> or <div className="flex-1 h-px bg-border" />
