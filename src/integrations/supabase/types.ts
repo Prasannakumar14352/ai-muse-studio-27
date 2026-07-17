@@ -380,6 +380,7 @@ export type Database = {
           error: string | null
           id: string
           idempotency_key: string
+          job_id: string | null
           project_id: string | null
           render_job_id: string | null
           source: string
@@ -400,6 +401,7 @@ export type Database = {
           error?: string | null
           id?: string
           idempotency_key: string
+          job_id?: string | null
           project_id?: string | null
           render_job_id?: string | null
           source?: string
@@ -420,6 +422,7 @@ export type Database = {
           error?: string | null
           id?: string
           idempotency_key?: string
+          job_id?: string | null
           project_id?: string | null
           render_job_id?: string | null
           source?: string
@@ -427,7 +430,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "credit_ledger_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       credit_packs: {
         Row: {
@@ -464,6 +475,66 @@ export type Database = {
           label?: string
           price_usd?: number
           sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      feature_readiness: {
+        Row: {
+          backend_implemented: boolean
+          blockers: string[]
+          created_at: string
+          credits_tested: boolean
+          download_tested: boolean
+          feature_id: string
+          generation_tested: boolean
+          last_verified_at: string | null
+          no_production_mocks: boolean
+          notes: string | null
+          persistence_tested: boolean
+          preview_tested: boolean
+          provider_configured: boolean
+          retry_tested: boolean
+          status: string
+          ui_implemented: boolean
+          updated_at: string
+        }
+        Insert: {
+          backend_implemented?: boolean
+          blockers?: string[]
+          created_at?: string
+          credits_tested?: boolean
+          download_tested?: boolean
+          feature_id: string
+          generation_tested?: boolean
+          last_verified_at?: string | null
+          no_production_mocks?: boolean
+          notes?: string | null
+          persistence_tested?: boolean
+          preview_tested?: boolean
+          provider_configured?: boolean
+          retry_tested?: boolean
+          status?: string
+          ui_implemented?: boolean
+          updated_at?: string
+        }
+        Update: {
+          backend_implemented?: boolean
+          blockers?: string[]
+          created_at?: string
+          credits_tested?: boolean
+          download_tested?: boolean
+          feature_id?: string
+          generation_tested?: boolean
+          last_verified_at?: string | null
+          no_production_mocks?: boolean
+          notes?: string | null
+          persistence_tested?: boolean
+          preview_tested?: boolean
+          provider_configured?: boolean
+          retry_tested?: boolean
+          status?: string
+          ui_implemented?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -560,6 +631,95 @@ export type Database = {
             columns: ["scene_id"]
             isOneToOne: false
             referencedRelation: "project_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      generation_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          credits_charged: number
+          credits_reserved: number
+          current_step: string | null
+          error_code: string | null
+          error_message: string | null
+          failed_at: string | null
+          id: string
+          idempotency_key: string | null
+          job_type: string
+          ledger_id: string | null
+          module_type: string
+          output_payload: Json
+          progress: number
+          project_id: string | null
+          provider: string | null
+          provider_job_id: string | null
+          request_payload: Json
+          retry_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          credits_charged?: number
+          credits_reserved?: number
+          current_step?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          failed_at?: string | null
+          id?: string
+          idempotency_key?: string | null
+          job_type: string
+          ledger_id?: string | null
+          module_type: string
+          output_payload?: Json
+          progress?: number
+          project_id?: string | null
+          provider?: string | null
+          provider_job_id?: string | null
+          request_payload?: Json
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          credits_charged?: number
+          credits_reserved?: number
+          current_step?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          failed_at?: string | null
+          id?: string
+          idempotency_key?: string | null
+          job_type?: string
+          ledger_id?: string | null
+          module_type?: string
+          output_payload?: Json
+          progress?: number
+          project_id?: string | null
+          provider?: string | null
+          provider_job_id?: string | null
+          request_payload?: Json
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generation_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]

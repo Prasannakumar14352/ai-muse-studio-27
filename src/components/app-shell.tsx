@@ -64,6 +64,7 @@ const SECTIONS: readonly NavSection[] = [
       { to: "/images", label: "Images", icon: ImageIcon, moduleId: "images" },
       { to: "/thumbnails", label: "Thumbnails", icon: Sparkles, moduleId: "thumbnails" },
       { to: "/captions", label: "Captions", icon: Type, moduleId: "captions" },
+      { to: "/seo", label: "SEO Package", icon: Type },
       { to: "/repurpose", label: "Repurpose", icon: Split },
       { to: "/templates", label: "Templates", icon: Sparkles },
       { to: "/brand-kit", label: "Brand Kit", icon: Palette },
@@ -96,6 +97,7 @@ const SECTIONS: readonly NavSection[] = [
       { to: "/admin/templates", label: "Templates CMS", icon: Sparkles },
       { to: "/admin/integrations", label: "Social Publishing", icon: Plug },
       { to: "/admin/marketplace", label: "Marketplace CMS", icon: Store },
+      { to: "/admin/readiness", label: "Feature Readiness", icon: Crown },
     ],
   },
   {
