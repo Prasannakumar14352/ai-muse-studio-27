@@ -12,6 +12,7 @@ import {
   GuaranteeSection, TrustBadgesSection, ProductWalkthroughsSection,
 } from "@/components/landing-sections";
 import { LandingPricingTabs } from "@/components/landing-pricing-tabs";
+import { ComparisonSection } from "@/components/comparison/ComparisonSection";
 import { EXTRA_FAQ } from "@/lib/landing-content";
 
 
