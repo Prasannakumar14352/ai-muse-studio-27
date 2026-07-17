@@ -97,6 +97,7 @@ const SECTIONS: readonly NavSection[] = [
       { to: "/admin/templates", label: "Templates CMS", icon: Sparkles },
       { to: "/admin/integrations", label: "Social Publishing", icon: Plug },
       { to: "/admin/marketplace", label: "Marketplace CMS", icon: Store },
+      { to: "/admin/readiness", label: "Feature Readiness", icon: Crown },
     ],
   },
   {
