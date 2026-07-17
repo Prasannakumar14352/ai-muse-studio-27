@@ -9,6 +9,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import type { JsonValue } from "@/lib/generation-jobs.functions";
 import { gatewayChatJson } from "@/lib/ai-gateway.server";
 import {
   createGenerationJobFn,
@@ -136,7 +137,7 @@ export const generateSeoPackageFn = createServerFn({ method: "POST" })
     try {
       await updateJobProgressAdmin({ jobId: job.id, status: "processing", progress: 15, currentStep: "Generating SEO package" });
 
-      const result = await gatewayChatJson<Record<string, unknown>>({
+      const result = await gatewayChatJson<Record<string, JsonValue>>({
         model: "openai/gpt-5.5",
         maxTokens: data.length === "long" ? 8000 : 5000,
         temperature: 0.4,
@@ -206,9 +207,9 @@ export const regenerateSeoSectionFn = createServerFn({ method: "POST" })
       const { data: proj, error } = await supabaseAdmin
         .from("projects").select("id, user_id, metadata").eq("id", data.projectId).maybeSingle();
       if (error || !proj || proj.user_id !== context.userId) throw new Error("project not found");
-      const meta = (proj.metadata ?? {}) as { seoPackage?: Record<string, unknown>; contentType?: SeoContentType; input?: SeoPackageInput };
+      const meta = (proj.metadata ?? {}) as { seoPackage?: Record<string, JsonValue>; contentType?: SeoContentType; input?: SeoPackageInput };
       const pkg = meta.seoPackage ?? {};
-      const currentValue = (pkg as Record<string, unknown>)[data.sectionKey];
+      const currentValue = (pkg as Record<string, JsonValue>)[data.sectionKey];
       if (currentValue === undefined) throw new Error("Section not found");
 
       await updateJobProgressAdmin({ jobId: job.id, status: "processing", progress: 30, currentStep: `Rewriting ${data.sectionKey}` });
@@ -219,7 +220,7 @@ export const regenerateSeoSectionFn = createServerFn({ method: "POST" })
         data.instruction === "retune" ? `Rewrite in a ${data.tone ?? "friendlier"} tone.` :
         "Rewrite from scratch keeping the same intent.";
 
-      const newValue = await gatewayChatJson<{ value: unknown }>({
+      const newValue = await gatewayChatJson<{ value: JsonValue }>({
         model: "openai/gpt-5.5",
         maxTokens: 3000,
         temperature: 0.6,
@@ -251,7 +252,7 @@ export const getSeoProjectFn = createServerFn({ method: "GET" })
       .from("projects").select("id, title, metadata, updated_at").eq("id", data.projectId).maybeSingle();
     if (error) throw new Error(error.message);
     if (!proj) return null;
-    const meta = (proj.metadata ?? {}) as { seoPackage?: Record<string, unknown>; contentType?: SeoContentType; input?: SeoPackageInput };
+    const meta = (proj.metadata ?? {}) as { seoPackage?: Record<string, JsonValue>; contentType?: SeoContentType; input?: SeoPackageInput };
     return {
       id: proj.id,
       title: proj.title,
