@@ -20,6 +20,9 @@ export type JobStatus =
   | "failed"
   | "cancelled";
 
+// JSON-serializable payload shape (matches Supabase `jsonb`).
+export type JsonPayload = Record<string, unknown>;
+
 export type GenerationJob = {
   id: string;
   user_id: string;
@@ -31,8 +34,8 @@ export type GenerationJob = {
   current_step: string | null;
   provider: string | null;
   provider_job_id: string | null;
-  request_payload: Record<string, unknown>;
-  output_payload: Record<string, unknown>;
+  request_payload: JsonPayload;
+  output_payload: JsonPayload;
   error_code: string | null;
   error_message: string | null;
   retry_count: number;
@@ -51,47 +54,49 @@ const createSchema = z.object({
   moduleType: z.string().min(1).max(64),
   jobType: z.string().min(1).max(64),
   projectId: z.string().uuid().nullable().optional(),
-  requestPayload: z.record(z.unknown()).default({}),
+  requestPayload: z.record(z.string(), z.unknown()).default({}),
   creditsEstimated: z.number().int().min(0).max(5000).default(0),
   provider: z.string().max(64).optional(),
   idempotencyKey: z.string().min(1).max(128),
 });
 
+function rowToJob(row: unknown): GenerationJob {
+  return row as GenerationJob;
+}
+
 export const createGenerationJobFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => createSchema.parse(v))
-  .handler(async ({ data, context }): Promise<{ job: GenerationJob; reused: boolean }> => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Idempotency: return the existing job if one exists for this key.
     const { data: existing } = await supabaseAdmin
       .from("generation_jobs")
       .select("*")
       .eq("user_id", context.userId)
       .eq("idempotency_key", data.idempotencyKey)
       .maybeSingle();
-    if (existing) return { job: existing as GenerationJob, reused: true };
+    if (existing) return { job: rowToJob(existing), reused: true } as { job: GenerationJob; reused: boolean };
 
-    // Insert queued job first so we have an id to attach to the ledger row.
+    const insertRow = {
+      user_id: context.userId,
+      project_id: data.projectId ?? null,
+      module_type: data.moduleType,
+      job_type: data.jobType,
+      status: "queued" as JobStatus,
+      progress: 0,
+      request_payload: data.requestPayload as never,
+      provider: data.provider ?? null,
+      credits_reserved: data.creditsEstimated,
+      idempotency_key: data.idempotencyKey,
+    };
     const { data: inserted, error: insErr } = await supabaseAdmin
       .from("generation_jobs")
-      .insert({
-        user_id: context.userId,
-        project_id: data.projectId ?? null,
-        module_type: data.moduleType,
-        job_type: data.jobType,
-        status: "queued",
-        progress: 0,
-        request_payload: data.requestPayload,
-        provider: data.provider ?? null,
-        credits_reserved: data.creditsEstimated,
-        idempotency_key: data.idempotencyKey,
-      })
+      .insert(insertRow)
       .select("*")
       .single();
-    if (insErr) throw new Error(insErr.message);
+    if (insErr || !inserted) throw new Error(insErr?.message ?? "insert failed");
 
-    // Reserve credits if the job costs anything.
     if (data.creditsEstimated > 0) {
       const { data: res, error: rpcErr } = await supabaseAdmin.rpc("reserve_credits", {
         _user_id: context.userId,
@@ -110,7 +115,7 @@ export const createGenerationJobFn = createServerFn({ method: "POST" })
         }).eq("id", inserted.id);
         throw new Error(rpcErr.message);
       }
-      const r = res as { ok: boolean; ledger_id?: string; error?: string };
+      const r = (res ?? {}) as { ok?: boolean; ledger_id?: string; error?: string };
       if (!r.ok) {
         await supabaseAdmin.from("generation_jobs").update({
           status: "failed",
@@ -123,29 +128,31 @@ export const createGenerationJobFn = createServerFn({ method: "POST" })
         (err as { code?: string; details?: unknown }).details = res;
         throw err;
       }
-      await supabaseAdmin
-        .from("generation_jobs")
-        .update({ ledger_id: r.ledger_id ?? null })
-        .eq("id", inserted.id);
-      await supabaseAdmin
-        .from("credit_ledger")
-        .update({ job_id: inserted.id })
-        .eq("id", r.ledger_id!);
+      if (r.ledger_id) {
+        await supabaseAdmin
+          .from("generation_jobs")
+          .update({ ledger_id: r.ledger_id })
+          .eq("id", inserted.id);
+        await supabaseAdmin
+          .from("credit_ledger")
+          .update({ job_id: inserted.id })
+          .eq("id", r.ledger_id);
+      }
     }
 
     const { data: fresh } = await supabaseAdmin
       .from("generation_jobs").select("*").eq("id", inserted.id).single();
-    return { job: fresh as GenerationJob, reused: false };
+    return { job: rowToJob(fresh), reused: false } as { job: GenerationJob; reused: boolean };
   });
 
 export const getGenerationJobFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => z.object({ id: z.string().uuid() }).parse(v))
-  .handler(async ({ data, context }): Promise<GenerationJob | null> => {
+  .handler(async ({ data, context }) => {
     const { data: row, error } = await context.supabase
       .from("generation_jobs").select("*").eq("id", data.id).maybeSingle();
     if (error) throw new Error(error.message);
-    return row as GenerationJob | null;
+    return (row ? rowToJob(row) : null) as GenerationJob | null;
   });
 
 export const listGenerationJobsFn = createServerFn({ method: "GET" })
@@ -157,13 +164,13 @@ export const listGenerationJobsFn = createServerFn({ method: "GET" })
       limit: z.number().int().min(1).max(100).default(20),
     }).parse(v),
   )
-  .handler(async ({ data, context }): Promise<GenerationJob[]> => {
+  .handler(async ({ data, context }) => {
     let q = context.supabase.from("generation_jobs").select("*").order("created_at", { ascending: false }).limit(data.limit);
     if (data.moduleType) q = q.eq("module_type", data.moduleType);
     if (data.projectId) q = q.eq("project_id", data.projectId);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    return (rows as GenerationJob[]) ?? [];
+    return ((rows ?? []) as unknown[]).map(rowToJob) as GenerationJob[];
   });
 
 export const cancelGenerationJobFn = createServerFn({ method: "POST" })
@@ -174,23 +181,26 @@ export const cancelGenerationJobFn = createServerFn({ method: "POST" })
     const { data: row } = await supabaseAdmin.from("generation_jobs")
       .select("id, user_id, status, ledger_id").eq("id", data.id).maybeSingle();
     if (!row || row.user_id !== context.userId) throw new Error("forbidden");
-    if (["completed", "failed", "cancelled"].includes(row.status)) return { ok: true, alreadyTerminal: true };
+    if (row.status === "completed" || row.status === "failed" || row.status === "cancelled") {
+      return { ok: true, alreadyTerminal: true };
+    }
     await supabaseAdmin.from("generation_jobs").update({
       status: "cancelled", failed_at: new Date().toISOString(), error_code: "cancelled_by_user",
     }).eq("id", data.id);
     if (row.ledger_id) {
-      await supabaseAdmin.rpc("refund_credits_by_ledger", { _ledger_id: row.ledger_id, _reason: "user_cancelled" }).catch(() => {});
+      try {
+        await supabaseAdmin.rpc("refund_credits_by_ledger", { _ledger_id: row.ledger_id, _reason: "user_cancelled" });
+      } catch (e) { console.warn("[cancel] refund failed", e); }
     }
-    return { ok: true };
+    return { ok: true, alreadyTerminal: false };
   });
 
 /**
- * Finalize a job that succeeded. Server-side helpers call this at the end
- * of their handler. Idempotent — safe on retries.
+ * Finalize a job that succeeded. Idempotent.
  */
 export async function markJobCompleteAdmin(opts: {
   jobId: string;
-  outputPayload: Record<string, unknown>;
+  outputPayload: JsonPayload;
   provider?: string | null;
   providerJobId?: string | null;
 }) {
@@ -203,14 +213,15 @@ export async function markJobCompleteAdmin(opts: {
     status: "completed",
     progress: 100,
     current_step: "done",
-    output_payload: opts.outputPayload,
+    output_payload: opts.outputPayload as never,
     provider: opts.provider ?? undefined,
     provider_job_id: opts.providerJobId ?? undefined,
     credits_charged: row.credits_reserved,
     completed_at: new Date().toISOString(),
   }).eq("id", opts.jobId);
   if (row.ledger_id) {
-    await supabaseAdmin.rpc("finalize_credits", { _ledger_id: row.ledger_id }).catch((e) => console.warn("finalize_credits", e));
+    try { await supabaseAdmin.rpc("finalize_credits", { _ledger_id: row.ledger_id }); }
+    catch (e) { console.warn("finalize_credits", e); }
   }
 }
 
@@ -231,7 +242,8 @@ export async function markJobFailedAdmin(opts: {
     failed_at: new Date().toISOString(),
   }).eq("id", opts.jobId);
   if (opts.refund && row.ledger_id) {
-    await supabaseAdmin.rpc("refund_credits_by_ledger", { _ledger_id: row.ledger_id, _reason: opts.code }).catch(() => {});
+    try { await supabaseAdmin.rpc("refund_credits_by_ledger", { _ledger_id: row.ledger_id, _reason: opts.code }); }
+    catch (e) { console.warn("refund_credits_by_ledger", e); }
   }
 }
 
@@ -242,10 +254,15 @@ export async function updateJobProgressAdmin(opts: {
   currentStep?: string;
 }) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const patch: Record<string, unknown> = {};
+  const patch: {
+    status?: JobStatus;
+    progress?: number;
+    current_step?: string;
+    started_at?: string;
+  } = {};
   if (opts.status) patch.status = opts.status;
   if (typeof opts.progress === "number") patch.progress = Math.max(0, Math.min(100, opts.progress));
   if (opts.currentStep) patch.current_step = opts.currentStep.slice(0, 120);
-  if (opts.status === "processing" && !patch.started_at) patch.started_at = new Date().toISOString();
+  if (opts.status === "processing") patch.started_at = new Date().toISOString();
   await supabaseAdmin.from("generation_jobs").update(patch).eq("id", opts.jobId);
 }

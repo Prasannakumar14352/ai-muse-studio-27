@@ -4,7 +4,6 @@ import { getGenerationJobFn, type GenerationJob } from "@/lib/generation-jobs.fu
 
 /**
  * Polls a generation job until it reaches a terminal state.
- * Returns the latest snapshot for progress UI.
  */
 export function useGenerationJob(jobId: string | null, intervalMs = 2000) {
   const get = useServerFn(getGenerationJobFn);
@@ -17,10 +16,10 @@ export function useGenerationJob(jobId: string | null, intervalMs = 2000) {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const tick = async () => {
       try {
-        const j = await get({ data: { id: jobId } });
+        const j = (await get({ data: { id: jobId } })) as GenerationJob | null;
         if (cancelled) return;
         setJob(j);
-        const terminal = j && ["completed", "failed", "cancelled"].includes(j.status);
+        const terminal = j ? ["completed", "failed", "cancelled"].includes(j.status) : false;
         if (!terminal) timer = setTimeout(tick, intervalMs);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
