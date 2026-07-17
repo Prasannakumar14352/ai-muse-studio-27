@@ -50,6 +50,7 @@ function Landing() {
             <Link to="/features" className="hover:text-foreground">Features</Link>
             <Link to="/how-it-works" className="hover:text-foreground">How it works</Link>
             <Link to="/pricing" className="hover:text-foreground">Pricing</Link>
+            <a href="#comparison" className="hover:text-foreground hidden xl:inline">Compare</a>
             <Link to="/contact" className="hover:text-foreground">Contact</Link>
           </nav>
           <div className="flex items-center gap-3">
