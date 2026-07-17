@@ -25,6 +25,7 @@ import { Route as AuthenticatedThumbnailsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
 import { Route as AuthenticatedStrategyRouteImport } from './routes/_authenticated/strategy'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSeoRouteImport } from './routes/_authenticated/seo'
 import { Route as AuthenticatedResearchRouteImport } from './routes/_authenticated/research'
 import { Route as AuthenticatedRepurposeRouteImport } from './routes/_authenticated/repurpose'
 import { Route as AuthenticatedPromoVideosRouteImport } from './routes/_authenticated/promo-videos'
@@ -140,6 +141,11 @@ const AuthenticatedStrategyRoute = AuthenticatedStrategyRouteImport.update({
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSeoRoute = AuthenticatedSeoRouteImport.update({
+  id: '/seo',
+  path: '/seo',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedResearchRoute = AuthenticatedResearchRouteImport.update({
@@ -375,6 +381,7 @@ export interface FileRoutesByFullPath {
   '/promo-videos': typeof AuthenticatedPromoVideosRoute
   '/repurpose': typeof AuthenticatedRepurposeRoute
   '/research': typeof AuthenticatedResearchRoute
+  '/seo': typeof AuthenticatedSeoRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/strategy': typeof AuthenticatedStrategyRoute
   '/templates': typeof AuthenticatedTemplatesRoute
@@ -427,6 +434,7 @@ export interface FileRoutesByTo {
   '/promo-videos': typeof AuthenticatedPromoVideosRoute
   '/repurpose': typeof AuthenticatedRepurposeRoute
   '/research': typeof AuthenticatedResearchRoute
+  '/seo': typeof AuthenticatedSeoRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/strategy': typeof AuthenticatedStrategyRoute
   '/templates': typeof AuthenticatedTemplatesRoute
@@ -483,6 +491,7 @@ export interface FileRoutesById {
   '/_authenticated/promo-videos': typeof AuthenticatedPromoVideosRoute
   '/_authenticated/repurpose': typeof AuthenticatedRepurposeRoute
   '/_authenticated/research': typeof AuthenticatedResearchRoute
+  '/_authenticated/seo': typeof AuthenticatedSeoRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/strategy': typeof AuthenticatedStrategyRoute
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
@@ -539,6 +548,7 @@ export interface FileRouteTypes {
     | '/promo-videos'
     | '/repurpose'
     | '/research'
+    | '/seo'
     | '/settings'
     | '/strategy'
     | '/templates'
@@ -591,6 +601,7 @@ export interface FileRouteTypes {
     | '/promo-videos'
     | '/repurpose'
     | '/research'
+    | '/seo'
     | '/settings'
     | '/strategy'
     | '/templates'
@@ -646,6 +657,7 @@ export interface FileRouteTypes {
     | '/_authenticated/promo-videos'
     | '/_authenticated/repurpose'
     | '/_authenticated/research'
+    | '/_authenticated/seo'
     | '/_authenticated/settings'
     | '/_authenticated/strategy'
     | '/_authenticated/templates'
@@ -803,6 +815,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/seo': {
+      id: '/_authenticated/seo'
+      path: '/seo'
+      fullPath: '/seo'
+      preLoaderRoute: typeof AuthenticatedSeoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/research': {
@@ -1148,6 +1167,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPromoVideosRoute: typeof AuthenticatedPromoVideosRoute
   AuthenticatedRepurposeRoute: typeof AuthenticatedRepurposeRoute
   AuthenticatedResearchRoute: typeof AuthenticatedResearchRoute
+  AuthenticatedSeoRoute: typeof AuthenticatedSeoRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedStrategyRoute: typeof AuthenticatedStrategyRoute
   AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
@@ -1177,6 +1197,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPromoVideosRoute: AuthenticatedPromoVideosRoute,
   AuthenticatedRepurposeRoute: AuthenticatedRepurposeRoute,
   AuthenticatedResearchRoute: AuthenticatedResearchRoute,
+  AuthenticatedSeoRoute: AuthenticatedSeoRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedStrategyRoute: AuthenticatedStrategyRoute,
   AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
