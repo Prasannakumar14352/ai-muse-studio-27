@@ -64,6 +64,7 @@ const SECTIONS: readonly NavSection[] = [
       { to: "/images", label: "Images", icon: ImageIcon, moduleId: "images" },
       { to: "/thumbnails", label: "Thumbnails", icon: Sparkles, moduleId: "thumbnails" },
       { to: "/captions", label: "Captions", icon: Type, moduleId: "captions" },
+      { to: "/seo", label: "SEO Package", icon: Type, moduleId: "seo_package" },
       { to: "/repurpose", label: "Repurpose", icon: Split },
       { to: "/templates", label: "Templates", icon: Sparkles },
       { to: "/brand-kit", label: "Brand Kit", icon: Palette },
