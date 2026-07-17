@@ -56,7 +56,7 @@ const createSchema = z.object({
   moduleType: z.string().min(1).max(64),
   jobType: z.string().min(1).max(64),
   projectId: z.string().uuid().nullable().optional(),
-  requestPayload: z.record(z.string(), z.unknown()).default({}),
+  requestPayload: z.any(),
   creditsEstimated: z.number().int().min(0).max(5000).default(0),
   provider: z.string().max(64).optional(),
   idempotencyKey: z.string().min(1).max(128),
