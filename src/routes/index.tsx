@@ -12,6 +12,7 @@ import {
   GuaranteeSection, TrustBadgesSection, ProductWalkthroughsSection,
 } from "@/components/landing-sections";
 import { LandingPricingTabs } from "@/components/landing-pricing-tabs";
+import { ComparisonSection } from "@/components/comparison/ComparisonSection";
 import { EXTRA_FAQ } from "@/lib/landing-content";
 
 
@@ -49,6 +50,7 @@ function Landing() {
             <Link to="/features" className="hover:text-foreground">Features</Link>
             <Link to="/how-it-works" className="hover:text-foreground">How it works</Link>
             <Link to="/pricing" className="hover:text-foreground">Pricing</Link>
+            <a href="#comparison" className="hover:text-foreground hidden xl:inline">Compare</a>
             <Link to="/contact" className="hover:text-foreground">Contact</Link>
           </nav>
           <div className="flex items-center gap-3">
@@ -127,6 +129,8 @@ function Landing() {
       {/* Written Testimonials Carousel */}
       <WrittenTestimonialsSection />
 
+      {/* Honest tool comparison */}
+      <ComparisonSection />
 
       {/* Pricing */}
       <LandingPricingTabs />
