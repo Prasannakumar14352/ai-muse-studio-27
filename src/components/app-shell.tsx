@@ -52,48 +52,58 @@ type NavSection = {
 
 const SECTIONS: readonly NavSection[] = [
   {
-    label: "Workspace",
+    label: "Home",
     items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { to: "/strategy", label: "AI Strategy", icon: Target },
-      { to: "/research", label: "Research", icon: Search },
-      { to: "/agents", label: "AI Agents", icon: Bot },
-      { to: "/analytics", label: "Analytics", icon: BarChart3 },
     ],
   },
   {
     label: "Create",
     items: [
-      { to: "/create", label: "New Project", icon: Plus },
-      { to: "/videos", label: "Videos", icon: Film, moduleId: "videos" },
+      { to: "/videos", label: "Projects", icon: FolderKanban, moduleId: "videos" },
+      { to: "/create", label: "AI Studio", icon: Bot },
       { to: "/promo-videos", label: "Promo Video", icon: Megaphone, moduleId: "promo_videos" },
       { to: "/carousels", label: "Carousels", icon: Layers, moduleId: "carousels" },
       { to: "/images", label: "Images", icon: ImageIcon, moduleId: "images" },
       { to: "/thumbnails", label: "Thumbnails", icon: Sparkles, moduleId: "thumbnails" },
       { to: "/captions", label: "Captions", icon: Type, moduleId: "captions" },
       { to: "/seo", label: "SEO Package", icon: Type },
+      { to: "/linkedin-posts", label: "LinkedIn Posts", icon: Linkedin, moduleId: "linkedin" },
       { to: "/repurpose", label: "Repurpose", icon: Split },
       { to: "/templates", label: "Templates", icon: Sparkles },
-      { to: "/brand-kit", label: "Brand Kit", icon: Palette },
-      { to: "/library", label: "Asset Library", icon: Library },
       { to: "/marketplace", label: "Marketplace", icon: Store },
     ],
   },
   {
-    label: "Publishing",
+    label: "Intelligence",
     items: [
-      { to: "/connections", label: "Connections", icon: Plug },
-      { to: "/calendar", label: "Content Calendar", icon: CalendarIcon },
-      { to: "/linkedin-posts", label: "LinkedIn Posts", icon: Linkedin, moduleId: "linkedin" },
+      { to: "/research", label: "Research", icon: Search },
+      { to: "/strategy", label: "AI Strategy", icon: Target },
+      { to: "/agents", label: "AI Agents", icon: Bot },
+      { to: "/analytics", label: "Analytics", icon: BarChart3 },
     ],
   },
   {
-    label: "Manage",
+    label: "Plan & Assets",
     items: [
+      { to: "/calendar", label: "Planner", icon: CalendarIcon },
+      { to: "/brand-kit", label: "Brand Kit", icon: Palette },
+      { to: "/library", label: "Media Library", icon: Library },
+    ],
+  },
+  {
+    label: "Publish",
+    items: [
+      { to: "/connections", label: "Connections", icon: Plug },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { to: "/settings", label: "Settings", icon: Settings },
       { to: "/pricing", label: "Pricing", icon: CreditCard },
       { to: "/billing", label: "Billing", icon: Wallet },
       { to: "/invoices", label: "Invoices", icon: Receipt },
-      { to: "/settings", label: "Settings", icon: Settings },
     ],
   },
   {
@@ -114,6 +124,7 @@ const SECTIONS: readonly NavSection[] = [
     ],
   },
 ];
+
 
 const SIDEBAR_COLLAPSED_KEY = "cvai:sidebar:collapsed";
 
