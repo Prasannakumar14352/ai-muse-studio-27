@@ -214,14 +214,9 @@ function CreatePage() {
         }
       }
 
-      const result = await deductUsage({
-        amount: GENERATION_COST,
-        projectId: project.id,
-        description: `Generated ${form.content_type}: ${output.title}`,
-      });
-      if (!result.ok && result.error !== "not_authenticated") {
-        console.warn("Deduction failed:", result.error);
-      }
+      // Credit deduction is handled server-side inside planContentFn and
+      // the underlying generator server functions.
+
 
       qc.invalidateQueries({ queryKey: ["access"] });
       qc.invalidateQueries({ queryKey: ["stats"] });
