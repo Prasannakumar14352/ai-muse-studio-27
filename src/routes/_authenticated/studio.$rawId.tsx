@@ -104,11 +104,11 @@ function StudioPage() {
   };
 
   if (raw.isLoading) {
-    return <AppShell title="Studio"><div className="p-8 text-muted-foreground">Loading raw master…</div></AppShell>;
+    return <AppShell><div className="p-8 text-muted-foreground">Loading raw master…</div></AppShell>;
   }
   if (!raw.data) {
     return (
-      <AppShell title="Studio">
+      <AppShell>
         <div className="p-8 space-y-4">
           <div className="text-lg font-medium">Raw master unavailable</div>
           <p className="text-sm text-muted-foreground max-w-lg">
@@ -122,7 +122,7 @@ function StudioPage() {
   }
 
   return (
-    <AppShell title="Post-Generation Studio">
+    <AppShell>
       <div className="p-4 md:p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -314,7 +314,7 @@ function VoiceTab({
 
   function previewInBrowser() {
     if (!("speechSynthesis" in window)) {
-      toast({ title: "Browser preview unavailable", description: "Your browser does not support speech synthesis." });
+      toast("Browser preview unavailable", { description: "Your browser does not support speech synthesis." });
       return;
     }
     const u = new SpeechSynthesisUtterance(previewText);
@@ -330,8 +330,8 @@ function VoiceTab({
       label: label || `${voiceId || "Preview"} @ ${speed}x`, speed, pitch, volume: 1,
       script: [{ text: previewText, startSec: 0, endSec: 5 }], status: "ready",
     } }),
-    onSuccess: () => { onChanged(); toast({ title: "Narration preset saved" }); setLabel(""); },
-    onError: (e) => toast({ title: "Save failed", description: e instanceof Error ? e.message : String(e) }),
+    onSuccess: () => { onChanged(); toast("Narration preset saved"); setLabel(""); },
+    onError: (e) => toast("Save failed", { description: e instanceof Error ? e.message : String(e) }),
   });
 
   return (
@@ -431,8 +431,8 @@ function SubtitleTab({
       style: getStylePreset(presetId).style, cues,
       label: label || getStylePreset(presetId).label,
     } }),
-    onSuccess: () => { onChanged(); toast({ title: "Subtitle version saved" }); setLabel(""); },
-    onError: (e) => toast({ title: "Save failed", description: e instanceof Error ? e.message : String(e) }),
+    onSuccess: () => { onChanged(); toast("Subtitle version saved"); setLabel(""); },
+    onError: (e) => toast("Save failed", { description: e instanceof Error ? e.message : String(e) }),
   });
 
   return (
@@ -556,8 +556,8 @@ function ExportTab({
       status: "ready",
       metadata: { note: "Preview export — points to raw master. Composite render coming in Phase 2." },
     } }),
-    onSuccess: () => { onChanged(); toast({ title: "Export saved" }); },
-    onError: (e) => toast({ title: "Save failed", description: e instanceof Error ? e.message : String(e) }),
+    onSuccess: () => { onChanged(); toast("Export saved"); },
+    onError: (e) => toast("Save failed", { description: e instanceof Error ? e.message : String(e) }),
   });
 
   return (
