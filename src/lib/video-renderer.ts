@@ -2,7 +2,10 @@
 // MediaRecorder. Produces a real downloadable file (MP4 where the browser
 // supports it, WebM as fallback) — no server dependency required.
 
-import fixWebmDuration from "webm-duration-fix";
+// webm-duration-fix is loaded lazily inside the render function — its
+// transitive deps (ts-ebml / node streams) explode at module init in some
+// browser bundles ("Class extends value undefined is not a constructor"),
+// which was crashing every route that pulled this module into its graph.
 import { getStyle } from "./constants";
 import { deductUsage } from "./access";
 
@@ -570,6 +573,9 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   // broken. Patch the container so exported files have valid metadata.
   if (ext === "webm") {
     try {
+      const mod = await import("webm-duration-fix");
+      const fixWebmDuration = (mod as { default?: (b: Blob) => Promise<Blob> }).default
+        ?? (mod as unknown as (b: Blob) => Promise<Blob>);
       const fixed = await fixWebmDuration(blob);
       if (fixed && fixed.size > 0) {
         blob = fixed;
