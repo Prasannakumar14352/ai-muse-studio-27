@@ -148,14 +148,9 @@ function CreateCarouselPage() {
         });
       }
 
-      const result = await deductUsage({
-        amount: GENERATION_COST,
-        projectId: project.id,
-        description: `Generated carousel: ${title}`,
-      });
-      if (!result.ok && result.error !== "not_authenticated") {
-        console.warn("Deduction failed:", result.error);
-      }
+      // Credit deduction is handled server-side inside generateAiCarousel
+      // (see chargeMiddleware in src/lib/credits-guard.server.ts).
+
 
       qc.invalidateQueries({ queryKey: ["access"] });
       qc.invalidateQueries({ queryKey: ["stats"] });
