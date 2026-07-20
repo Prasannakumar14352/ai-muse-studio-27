@@ -333,15 +333,26 @@ export const upsertFinalVideoExportFn = createServerFn({ method: "POST" })
     };
     const client = context.supabase;
     if (data.id) {
+      // Updates (retries, metadata edits) are free.
       const { data: row, error } = await client
         .from("final_video_exports").update(payload).eq("id", data.id).select("*").single();
       if (error) throw new Error(error.message);
       return row as unknown as FinalVideoExport;
     }
-    const { data: row, error } = await client
-      .from("final_video_exports").insert(payload).select("*").single();
-    if (error) throw new Error(error.message);
-    return row as unknown as FinalVideoExport;
+    // Charge 1 credit when a new export is finalized with a video_url.
+    const shouldCharge = !!data.videoUrl && data.status === "ready";
+    const insert = async () => {
+      const { data: row, error } = await client
+        .from("final_video_exports").insert(payload).select("*").single();
+      if (error) throw new Error(error.message);
+      return row as unknown as FinalVideoExport;
+    };
+    if (!shouldCharge) return insert();
+    const { withCharge } = await import("@/lib/credits-guard.server");
+    return withCharge(
+      { userId: context.userId, action: "final_export", description: "Final video export" },
+      insert,
+    );
   });
 
 export const listFinalVideoExportsFn = createServerFn({ method: "GET" })
