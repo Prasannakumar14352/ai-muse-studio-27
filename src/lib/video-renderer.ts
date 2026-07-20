@@ -60,6 +60,15 @@ export type RenderOptions = {
   preferredContainer?: "webm" | "mp4";
   /** When false, on_screen_text overlays are not drawn. Defaults to true. */
   showOnScreenText?: boolean;
+  /**
+   * Hard cap for total rendered duration in seconds. When set, per-scene
+   * durations are normalized (scaled proportionally) so the sum matches this
+   * value within ±0.01s. Audio playbackRate is adjusted (clamped to
+   * [0.9, 1.15]) to keep narration synced without extending the timeline.
+   * This is the single source of truth for final runtime — narration length,
+   * scene sums and transitions cannot independently extend it.
+   */
+  targetDurationSec?: number;
 };
 
 export type RenderResult = {
