@@ -1960,6 +1960,49 @@ export async function runAssetGenerationPhase(
     },
   });
 
+  // Automatic recovery pass: if any shots failed, retry them once more before
+  // giving up so we never proceed to render with a hole in the timeline.
+  const stillFailed = job.shots.filter((s) => s.status === "failed");
+  if (stillFailed.length > 0 && !signal?.aborted) {
+    console.info("[video-pipeline] auto-retry failed shots", { count: stillFailed.length });
+    const retryJobs = stillFailed.map((shot) => ({
+      id: shot.id,
+      run: async (sig: AbortSignal) => {
+        shot.status = "running";
+        shot.attempts += 1;
+        return await generateOneShot(shot, brief, job.id, sig);
+      },
+    }));
+    await runShotPool(retryJobs, {
+      concurrency: 4,
+      maxAttempts: 2,
+      signal,
+      onShotSettled: (outcome) => {
+        const shot = job.shots.find((s) => s.id === outcome.id);
+        if (!shot) return;
+        if (outcome.ok) {
+          shot.status = "done"; shot.kind = outcome.value.kind;
+          shot.blobKey = outcome.value.blobKey; shot.mime = outcome.value.mime;
+          shot.error = null; done += 1; failed = Math.max(0, failed - 1);
+          onEvent({
+            type: "shot", done, failed, total: job.shots.length,
+            shot: { id: shot.id, index: shot.index, status: "done", kind: shot.kind,
+              previewUrl: outcome.value.previewUrl, error: null, attempts: shot.attempts },
+          });
+        } else {
+          shot.status = "failed"; shot.error = outcome.error;
+          onEvent({
+            type: "shot", done, failed, total: job.shots.length,
+            shot: { id: shot.id, index: shot.index, status: "failed", kind: null,
+              previewUrl: null, error: outcome.error, attempts: shot.attempts },
+          });
+        }
+        job.shotsDone = done; job.shotsFailed = failed;
+        void saveJob(job);
+      },
+    });
+  }
+
   if (signal?.aborted) {
     job.phase = "paused";
     await saveJob(job);
