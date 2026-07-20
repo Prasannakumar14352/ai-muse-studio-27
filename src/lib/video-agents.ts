@@ -1475,6 +1475,7 @@ export type JobPhaseId =
   | "voiceover"
   | "asset_review"
   | "rendering"
+  | "validating"
   | "complete"
   | "failed";
 
