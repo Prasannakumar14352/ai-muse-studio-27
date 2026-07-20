@@ -60,6 +60,15 @@ export type RenderOptions = {
   preferredContainer?: "webm" | "mp4";
   /** When false, on_screen_text overlays are not drawn. Defaults to true. */
   showOnScreenText?: boolean;
+  /**
+   * Hard cap for total rendered duration in seconds. When set, per-scene
+   * durations are normalized (scaled proportionally) so the sum matches this
+   * value within ±0.01s. Audio playbackRate is adjusted (clamped to
+   * [0.9, 1.15]) to keep narration synced without extending the timeline.
+   * This is the single source of truth for final runtime — narration length,
+   * scene sums and transitions cannot independently extend it.
+   */
+  targetDurationSec?: number;
 };
 
 export type RenderResult = {
@@ -431,14 +440,63 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
 
   // Scene durations — stretched to fit voiceover audio when requested so the
   // audio never cuts off mid-sentence.
-  const durations = opts.scenes.map((s, i) => {
+  const rawDurations = opts.scenes.map((s, i) => {
     const base = parseDuration(s.duration);
     if (opts.fitToAudio && opts.sceneAudio?.[i]) {
       return Math.max(base, opts.sceneAudio[i]!.duration + 0.25);
     }
     return base;
   });
+  const rawTotal = rawDurations.reduce((a, b) => a + b, 0);
+
+  // Timeline normalization — user-requested duration is the SINGLE source of
+  // truth. If narration/scene sums drift, scale scenes proportionally so the
+  // final render matches the target within ±0.01s. Audio playbackRate is
+  // adjusted (clamped) to keep narration synced without extending runtime.
+  const target = opts.targetDurationSec && opts.targetDurationSec > 0
+    ? opts.targetDurationSec
+    : rawTotal;
+  const timelineScale = rawTotal > 0 ? target / rawTotal : 1;
+  const durations = opts.targetDurationSec
+    ? rawDurations.map((d) => d * timelineScale)
+    : rawDurations;
   const totalDuration = durations.reduce((a, b) => a + b, 0);
+  // Audio must play faster/slower to match compressed/expanded visual timeline
+  // so lip-sync and beat boundaries stay aligned. Clamp to a musical range —
+  // anything past this and the pipeline should have shortened the script.
+  const audioPlaybackRate = Math.max(0.9, Math.min(1.15, 1 / (timelineScale || 1)));
+
+  // Structured timeline log — one row per scene + summary.
+  const totalNarration = (opts.sceneAudio ?? []).reduce(
+    (a, b) => a + (b?.duration ?? 0), 0,
+  );
+  LOG("timeline", {
+    requestedDurationSec: opts.targetDurationSec ?? null,
+    narrationDurationSec: Number(totalNarration.toFixed(2)),
+    totalSceneCount: opts.scenes.length,
+    rawTimelineDurationSec: Number(rawTotal.toFixed(2)),
+    calculatedTimelineDurationSec: Number(totalDuration.toFixed(2)),
+    timelineScale: Number(timelineScale.toFixed(4)),
+    audioPlaybackRate: Number(audioPlaybackRate.toFixed(4)),
+  });
+  {
+    let cursor = 0;
+    for (let i = 0; i < durations.length; i++) {
+      const narrSec = opts.sceneAudio?.[i]?.duration ?? 0;
+      const start = cursor;
+      const end = cursor + durations[i];
+      LOG(`scene[${i + 1}]`, {
+        narrationStart: Number(start.toFixed(2)),
+        narrationEnd: Number((start + narrSec / audioPlaybackRate).toFixed(2)),
+        assignedDurationSec: Number(durations[i].toFixed(2)),
+        rawDurationSec: Number(rawDurations[i].toFixed(2)),
+        timelineStart: Number(start.toFixed(2)),
+        timelineEnd: Number(end.toFixed(2)),
+      });
+      cursor = end;
+    }
+  }
+
 
   // Build a mixed audio stream from per-scene voiceover buffers.
   // We schedule each buffer at that scene's start on a single AudioContext,
@@ -505,7 +563,9 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       const buf = opts.sceneAudio[i];
       if (buf) {
         const src = audioCtx.createBufferSource();
-        src.buffer = buf; src.connect(audioDest); src.start(t0 + offset);
+        src.buffer = buf;
+        try { src.playbackRate.value = audioPlaybackRate; } catch { /* noop */ }
+        src.connect(audioDest); src.start(t0 + offset);
       }
       offset += durations[i];
     }
