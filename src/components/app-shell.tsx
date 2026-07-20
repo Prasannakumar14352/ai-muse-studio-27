@@ -4,11 +4,18 @@ import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
   Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug, Linkedin,
   ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target, Calendar as CalendarIcon, Library, Megaphone,
+  Bell, User as UserIcon, FolderKanban, Command as CommandIcon,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAccess, getAvailableCredits } from "@/lib/access";
 import { MODULE_CONTENT_TYPES, type ModuleId } from "@/lib/content-types";
+import { CommandPalette, openCommandPalette } from "@/components/command-palette";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { BrandLogo } from "@/components/brand-logo";
@@ -45,48 +52,58 @@ type NavSection = {
 
 const SECTIONS: readonly NavSection[] = [
   {
-    label: "Workspace",
+    label: "Home",
     items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { to: "/strategy", label: "AI Strategy", icon: Target },
-      { to: "/research", label: "Research", icon: Search },
-      { to: "/agents", label: "AI Agents", icon: Bot },
-      { to: "/analytics", label: "Analytics", icon: BarChart3 },
     ],
   },
   {
     label: "Create",
     items: [
-      { to: "/create", label: "New Project", icon: Plus },
-      { to: "/videos", label: "Videos", icon: Film, moduleId: "videos" },
+      { to: "/videos", label: "Projects", icon: FolderKanban, moduleId: "videos" },
+      { to: "/create", label: "AI Studio", icon: Bot },
       { to: "/promo-videos", label: "Promo Video", icon: Megaphone, moduleId: "promo_videos" },
       { to: "/carousels", label: "Carousels", icon: Layers, moduleId: "carousels" },
       { to: "/images", label: "Images", icon: ImageIcon, moduleId: "images" },
       { to: "/thumbnails", label: "Thumbnails", icon: Sparkles, moduleId: "thumbnails" },
       { to: "/captions", label: "Captions", icon: Type, moduleId: "captions" },
       { to: "/seo", label: "SEO Package", icon: Type },
+      { to: "/linkedin-posts", label: "LinkedIn Posts", icon: Linkedin, moduleId: "linkedin" },
       { to: "/repurpose", label: "Repurpose", icon: Split },
       { to: "/templates", label: "Templates", icon: Sparkles },
-      { to: "/brand-kit", label: "Brand Kit", icon: Palette },
-      { to: "/library", label: "Asset Library", icon: Library },
       { to: "/marketplace", label: "Marketplace", icon: Store },
     ],
   },
   {
-    label: "Publishing",
+    label: "Intelligence",
     items: [
-      { to: "/connections", label: "Connections", icon: Plug },
-      { to: "/calendar", label: "Content Calendar", icon: CalendarIcon },
-      { to: "/linkedin-posts", label: "LinkedIn Posts", icon: Linkedin, moduleId: "linkedin" },
+      { to: "/research", label: "Research", icon: Search },
+      { to: "/strategy", label: "AI Strategy", icon: Target },
+      { to: "/agents", label: "AI Agents", icon: Bot },
+      { to: "/analytics", label: "Analytics", icon: BarChart3 },
     ],
   },
   {
-    label: "Manage",
+    label: "Plan & Assets",
     items: [
+      { to: "/calendar", label: "Planner", icon: CalendarIcon },
+      { to: "/brand-kit", label: "Brand Kit", icon: Palette },
+      { to: "/library", label: "Media Library", icon: Library },
+    ],
+  },
+  {
+    label: "Publish",
+    items: [
+      { to: "/connections", label: "Connections", icon: Plug },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { to: "/settings", label: "Settings", icon: Settings },
       { to: "/pricing", label: "Pricing", icon: CreditCard },
       { to: "/billing", label: "Billing", icon: Wallet },
       { to: "/invoices", label: "Invoices", icon: Receipt },
-      { to: "/settings", label: "Settings", icon: Settings },
     ],
   },
   {
@@ -107,6 +124,7 @@ const SECTIONS: readonly NavSection[] = [
     ],
   },
 ];
+
 
 const SIDEBAR_COLLAPSED_KEY = "cvai:sidebar:collapsed";
 
@@ -397,15 +415,83 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Main */}
       <main className="flex-1 min-w-0 pt-14 md:pt-0 overflow-y-auto">
-        <div className="hidden md:flex sticky top-0 z-20 items-center justify-end gap-3 px-6 md:px-10 py-3 border-b border-border/50 bg-background/70 backdrop-blur-xl">
+        <div className="hidden md:flex sticky top-0 z-20 items-center gap-3 px-6 md:px-10 py-3 border-b border-border/50 bg-background/70 backdrop-blur-xl">
+          <button
+            onClick={openCommandPalette}
+            className="group flex-1 max-w-xl flex items-center gap-2 rounded-xl border border-border/60 bg-white/[0.03] hover:bg-white/[0.06] px-3 py-2 text-sm text-muted-foreground transition"
+          >
+            <Search className="w-4 h-4" />
+            <span className="flex-1 text-left">Search or run a command…</span>
+            <span className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
+              <kbd className="rounded border border-border/70 bg-white/[0.04] px-1.5 py-0.5">⌘</kbd>
+              <kbd className="rounded border border-border/70 bg-white/[0.04] px-1.5 py-0.5">K</kbd>
+            </span>
+          </button>
+          <Link
+            to="/create"
+            className="hidden lg:inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-white gradient-primary shadow-[var(--shadow-glow)] hover:opacity-95"
+          >
+            <Plus className="w-4 h-4" /> New
+          </Link>
+          <button
+            aria-label="Notifications"
+            className="relative rounded-xl p-2 border border-border/60 bg-white/[0.03] hover:bg-white/[0.06] transition"
+          >
+            <Bell className="w-4 h-4" />
+          </button>
           <CreditsChip />
+          <ProfileMenu onSignOut={signOut} />
         </div>
         <div className="max-w-7xl mx-auto p-6 md:p-10">{children}</div>
       </main>
       <ConfirmDialogHost />
+      <CommandPalette />
     </div>
   );
+
 }
+
+function ProfileMenu({ onSignOut }: { onSignOut: () => void }) {
+  const { data: access } = useAccess();
+  const initial = (access?.email ?? "?").charAt(0).toUpperCase();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          aria-label="Account menu"
+          className="grid h-9 w-9 place-items-center rounded-full text-sm font-semibold text-white gradient-primary hover:opacity-95 transition"
+        >
+          {initial}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="truncate">
+          <div className="text-xs text-muted-foreground">Signed in as</div>
+          <div className="truncate text-sm font-medium">{access?.email ?? "—"}</div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/settings"><Settings className="mr-2 h-4 w-4" /> Settings</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/billing"><Wallet className="mr-2 h-4 w-4" /> Billing</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/invoices"><Receipt className="mr-2 h-4 w-4" /> Invoices</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={openCommandPalette}>
+          <CommandIcon className="mr-2 h-4 w-4" /> Command palette
+          <span className="ml-auto text-[10px] text-muted-foreground">⌘K</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onSignOut} className="text-rose-400 focus:text-rose-300">
+          <LogOut className="mr-2 h-4 w-4" /> Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 
 function CreditsChip() {
   const { data: access } = useAccess();
