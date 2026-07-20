@@ -451,6 +451,48 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 }
 
+function ProfileMenu({ onSignOut }: { onSignOut: () => void }) {
+  const { data: access } = useAccess();
+  const initial = (access?.email ?? "?").charAt(0).toUpperCase();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          aria-label="Account menu"
+          className="grid h-9 w-9 place-items-center rounded-full text-sm font-semibold text-white gradient-primary hover:opacity-95 transition"
+        >
+          {initial}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="truncate">
+          <div className="text-xs text-muted-foreground">Signed in as</div>
+          <div className="truncate text-sm font-medium">{access?.email ?? "—"}</div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/settings"><Settings className="mr-2 h-4 w-4" /> Settings</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/billing"><Wallet className="mr-2 h-4 w-4" /> Billing</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/invoices"><Receipt className="mr-2 h-4 w-4" /> Invoices</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={openCommandPalette}>
+          <CommandIcon className="mr-2 h-4 w-4" /> Command palette
+          <span className="ml-auto text-[10px] text-muted-foreground">⌘K</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onSignOut} className="text-rose-400 focus:text-rose-300">
+          <LogOut className="mr-2 h-4 w-4" /> Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+
 function CreditsChip() {
   const { data: access } = useAccess();
   if (!access) return null;
