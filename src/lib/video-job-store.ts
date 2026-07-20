@@ -13,6 +13,7 @@ export type JobPhase =
   | "voiceover"
   | "asset_review"
   | "rendering"
+  | "validating"
   | "complete"
   | "failed"
   | "paused";

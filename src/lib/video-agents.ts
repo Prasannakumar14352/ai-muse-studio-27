@@ -1475,6 +1475,7 @@ export type JobPhaseId =
   | "voiceover"
   | "asset_review"
   | "rendering"
+  | "validating"
   | "complete"
   | "failed";
 
@@ -1959,6 +1960,49 @@ export async function runAssetGenerationPhase(
     },
   });
 
+  // Automatic recovery pass: if any shots failed, retry them once more before
+  // giving up so we never proceed to render with a hole in the timeline.
+  const stillFailed = job.shots.filter((s) => s.status === "failed");
+  if (stillFailed.length > 0 && !signal?.aborted) {
+    console.info("[video-pipeline] auto-retry failed shots", { count: stillFailed.length });
+    const retryJobs = stillFailed.map((shot) => ({
+      id: shot.id,
+      run: async (sig: AbortSignal) => {
+        shot.status = "running";
+        shot.attempts += 1;
+        return await generateOneShot(shot, brief, job.id, sig);
+      },
+    }));
+    await runShotPool(retryJobs, {
+      concurrency: 4,
+      maxAttempts: 2,
+      signal,
+      onShotSettled: (outcome) => {
+        const shot = job.shots.find((s) => s.id === outcome.id);
+        if (!shot) return;
+        if (outcome.ok) {
+          shot.status = "done"; shot.kind = outcome.value.kind;
+          shot.blobKey = outcome.value.blobKey; shot.mime = outcome.value.mime;
+          shot.error = null; done += 1; failed = Math.max(0, failed - 1);
+          onEvent({
+            type: "shot", done, failed, total: job.shots.length,
+            shot: { id: shot.id, index: shot.index, status: "done", kind: shot.kind,
+              previewUrl: outcome.value.previewUrl, error: null, attempts: shot.attempts },
+          });
+        } else {
+          shot.status = "failed"; shot.error = outcome.error;
+          onEvent({
+            type: "shot", done, failed, total: job.shots.length,
+            shot: { id: shot.id, index: shot.index, status: "failed", kind: null,
+              previewUrl: null, error: outcome.error, attempts: shot.attempts },
+          });
+        }
+        job.shotsDone = done; job.shotsFailed = failed;
+        void saveJob(job);
+      },
+    });
+  }
+
   if (signal?.aborted) {
     job.phase = "paused";
     await saveJob(job);
@@ -2010,9 +2054,23 @@ export async function runRenderPhase(
     voiceover, subtitles, timeline, music, sfx,
   } = bundle;
 
+  // Gate: every planned shot must have a generated asset before we start
+  // rendering — otherwise the timeline has a hole and the export ends up
+  // showing a static placeholder for that beat.
+  const missing = job.shots.filter((s) => s.status !== "done" || !s.blobKey);
+  if (missing.length > 0) {
+    const msg = `Cannot render: ${missing.length} shot${missing.length === 1 ? "" : "s"} did not generate. Please retry generation.`;
+    job.phase = "failed"; job.error = msg;
+    await saveJob(job);
+    onEvent({ type: "phase", phase: "failed" });
+    onEvent({ type: "error", message: msg });
+    throw new Error(msg);
+  }
+
   job.phase = "rendering";
   await saveJob(job);
   onEvent({ type: "phase", phase: "rendering" });
+  console.info("[video-pipeline] rendering", { jobId, shots: job.shots.length, target: brief.duration });
 
   const visuals: VisualAsset[] = await Promise.all(job.shots.map(async (s, i) => {
     let url: string | null = null;
@@ -2029,6 +2087,24 @@ export async function runRenderPhase(
     onEvent({ type: "render", progress: p }),
   );
   job.renderProgress = 1;
+
+  // Validate the produced file before we mark the job complete. If the
+  // browser can't decode metadata or the file is empty, mark the job failed
+  // instead of returning a broken preview.
+  job.phase = "validating";
+  await saveJob(job);
+  onEvent({ type: "phase", phase: "validating" });
+  const { validateRenderedVideo } = await import("./video-validate");
+  const validation = await validateRenderedVideo(render.blob ?? null, brief.duration);
+  console.info("[video-pipeline] validation", validation);
+  if (!validation.ok) {
+    const msg = `Rendered video failed validation: ${validation.reason ?? "unknown"}`;
+    job.phase = "failed"; job.error = msg;
+    await saveJob(job);
+    onEvent({ type: "phase", phase: "failed" });
+    onEvent({ type: "error", message: msg });
+    throw new Error(msg);
+  }
 
   const thumbnail = await ThumbnailAgent.run(brief);
   const seo = await SeoAgent.run(brief, script, timeline);

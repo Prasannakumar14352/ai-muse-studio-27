@@ -974,12 +974,13 @@ const PHASE_LABELS: Record<JobPhaseId, string> = {
   voiceover: "Narrating & subtitling",
   asset_review: "Review assets",
   rendering: "Rendering final video",
+  validating: "Validating output",
   complete: "Complete",
   failed: "Failed",
 };
 
 const PHASE_ORDER: JobPhaseId[] = [
-  "planning", "review", "generating_shots", "voiceover", "asset_review", "rendering", "complete",
+  "planning", "review", "generating_shots", "voiceover", "asset_review", "rendering", "validating", "complete",
 ];
 
 // ---------------- Review Gate (mandatory blueprint edit checkpoint) ----------------

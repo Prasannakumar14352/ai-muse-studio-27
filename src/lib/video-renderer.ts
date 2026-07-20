@@ -2,8 +2,12 @@
 // MediaRecorder. Produces a real downloadable file (MP4 where the browser
 // supports it, WebM as fallback) — no server dependency required.
 
+import fixWebmDuration from "webm-duration-fix";
 import { getStyle } from "./constants";
 import { deductUsage } from "./access";
+
+const LOG = (...args: unknown[]) => console.info("[video-renderer]", ...args);
+const WARN = (...args: unknown[]) => console.warn("[video-renderer]", ...args);
 
 // Legacy 7 motions are kept as a subset; the Motion Director adds cinematic
 // variants (orbit, dolly, crane, macro, parallax, floating, spin, page-flip,
@@ -446,12 +450,22 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
     audioDest = audioCtx.createMediaStreamDestination();
   }
 
-  const videoStream = canvas.captureStream(fps);
+  // captureStream(0) yields a stream that only emits frames when we call
+  // requestFrame() on the video track. This guarantees the recorder samples
+  // exactly one frame per RAF tick — without it, background-throttled tabs
+  // or GPU pauses can produce recordings that look "mostly static".
+  const videoStream = canvas.captureStream(0);
+  const videoTrack = videoStream.getVideoTracks()[0] as
+    (CanvasCaptureMediaStreamTrack & { requestFrame?: () => void }) | undefined;
+  const requestFrame = () => {
+    try { videoTrack?.requestFrame?.(); } catch { /* noop */ }
+  };
   const combined = new MediaStream();
   videoStream.getVideoTracks().forEach((t) => combined.addTrack(t));
   if (audioDest) audioDest.stream.getAudioTracks().forEach((t) => combined.addTrack(t));
 
   const { mime, ext } = pickRecorderMime(opts.preferredContainer);
+  LOG("start recording", { mime, ext, W, H, fps, beats: beatCount, totalDuration, hasAudio });
   const recorder = new MediaRecorder(combined, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
@@ -461,6 +475,7 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   drawScene(ctx, sceneMedia[0] ?? fallbackImg, opts.scenes[0], {
     progress: 0, accent: style.accent, showOnScreenText: opts.showOnScreenText,
   });
+  requestFrame();
 
   // Kick off the first beat's clip playback if it's a video.
   const currentPlaying = { idx: -1 };
@@ -513,6 +528,7 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       drawScene(ctx, sceneMedia[sceneIdx] ?? fallbackImg, opts.scenes[sceneIdx], {
         progress: localProgress, accent: style.accent, showOnScreenText: opts.showOnScreenText,
       });
+      requestFrame();
       opts.onProgress?.(clamped / totalDuration);
       if (elapsed >= totalDuration) { resolve(); return; }
       requestAnimationFrame(tick);
@@ -521,6 +537,10 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   });
 
   opts.signal?.removeEventListener("abort", abortHandler);
+  // Ensure a final frame is captured before stop() so the encoder flushes
+  // the last GOP with real content rather than a keyframe of the previous state.
+  requestFrame();
+  try { recorder.requestData(); } catch { /* not all impls */ }
   try { recorder.stop(); } catch { /* already stopped */ }
   await done;
   combined.getTracks().forEach((t) => t.stop());
@@ -538,7 +558,32 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
     throw err;
   }
 
-  const blob = new Blob(chunks, { type: mime });
+  if (chunks.length === 0) {
+    throw new Error("Recorder produced no data — canvas capture failed. Try reloading and keeping this tab in the foreground.");
+  }
+
+  let blob = new Blob(chunks, { type: mime });
+  LOG("recording finished", { chunks: chunks.length, bytes: blob.size, mime });
+
+  // WebM from MediaRecorder is streamed without a Duration element in the
+  // SegmentInfo, which is why players show "Duration: N/A" and seek bars are
+  // broken. Patch the container so exported files have valid metadata.
+  if (ext === "webm") {
+    try {
+      const fixed = await fixWebmDuration(blob);
+      if (fixed && fixed.size > 0) {
+        blob = fixed;
+        LOG("webm duration patched", { bytes: blob.size });
+      }
+    } catch (e) {
+      WARN("fixWebmDuration failed — exporting raw blob", e);
+    }
+  }
+
+  if (blob.size === 0) {
+    throw new Error("Rendered video blob is empty after encoding.");
+  }
+
   return { blob, mimeType: mime, extension: ext, durationSec: totalDuration };
 }
 
