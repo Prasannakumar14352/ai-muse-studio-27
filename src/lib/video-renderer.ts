@@ -563,7 +563,9 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       const buf = opts.sceneAudio[i];
       if (buf) {
         const src = audioCtx.createBufferSource();
-        src.buffer = buf; src.connect(audioDest); src.start(t0 + offset);
+        src.buffer = buf;
+        try { src.playbackRate.value = audioPlaybackRate; } catch { /* noop */ }
+        src.connect(audioDest); src.start(t0 + offset);
       }
       offset += durations[i];
     }
