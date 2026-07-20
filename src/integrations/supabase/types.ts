@@ -326,43 +326,61 @@ export type Database = {
       }
       characters: {
         Row: {
+          age_range: string | null
           character_lock: Json
           character_type: string | null
           created_at: string
+          description: string | null
+          gender: string | null
           id: string
+          language: string | null
           metadata: Json
           name: string
+          outfit: string | null
           reference_image_url: string | null
           seed: string | null
           style: string | null
           updated_at: string
           user_id: string
+          voice_id: string | null
         }
         Insert: {
+          age_range?: string | null
           character_lock?: Json
           character_type?: string | null
           created_at?: string
+          description?: string | null
+          gender?: string | null
           id?: string
+          language?: string | null
           metadata?: Json
           name: string
+          outfit?: string | null
           reference_image_url?: string | null
           seed?: string | null
           style?: string | null
           updated_at?: string
           user_id: string
+          voice_id?: string | null
         }
         Update: {
+          age_range?: string | null
           character_lock?: Json
           character_type?: string | null
           created_at?: string
+          description?: string | null
+          gender?: string | null
           id?: string
+          language?: string | null
           metadata?: Json
           name?: string
+          outfit?: string | null
           reference_image_url?: string | null
           seed?: string | null
           style?: string | null
           updated_at?: string
           user_id?: string
+          voice_id?: string | null
         }
         Relationships: []
       }
@@ -478,6 +496,87 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      dialogue_lines: {
+        Row: {
+          audio_url: string | null
+          created_at: string
+          emotion: string | null
+          end_time: number | null
+          id: string
+          language: string | null
+          lip_sync_required: boolean
+          metadata: Json
+          project_id: string | null
+          scene_id: string | null
+          speaker_id: string | null
+          speaker_name: string | null
+          speech_type: string
+          start_time: number | null
+          status: string
+          text: string
+          updated_at: string
+          user_id: string
+          voice_id: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string
+          emotion?: string | null
+          end_time?: number | null
+          id?: string
+          language?: string | null
+          lip_sync_required?: boolean
+          metadata?: Json
+          project_id?: string | null
+          scene_id?: string | null
+          speaker_id?: string | null
+          speaker_name?: string | null
+          speech_type?: string
+          start_time?: number | null
+          status?: string
+          text?: string
+          updated_at?: string
+          user_id: string
+          voice_id?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string
+          emotion?: string | null
+          end_time?: number | null
+          id?: string
+          language?: string | null
+          lip_sync_required?: boolean
+          metadata?: Json
+          project_id?: string | null
+          scene_id?: string | null
+          speaker_id?: string | null
+          speaker_name?: string | null
+          speech_type?: string
+          start_time?: number | null
+          status?: string
+          text?: string
+          updated_at?: string
+          user_id?: string
+          voice_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dialogue_lines_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dialogue_lines_speaker_id_fkey"
+            columns: ["speaker_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       feature_readiness: {
         Row: {
@@ -792,6 +891,85 @@ export type Database = {
           video_url?: string | null
         }
         Relationships: []
+      }
+      lip_sync_jobs: {
+        Row: {
+          attempts: number
+          character_id: string | null
+          created_at: string
+          credits_charged: number
+          dialogue_line_id: string | null
+          duration_sec: number | null
+          error: string | null
+          id: string
+          input: Json
+          mode: string
+          output_url: string | null
+          project_id: string | null
+          provider: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          character_id?: string | null
+          created_at?: string
+          credits_charged?: number
+          dialogue_line_id?: string | null
+          duration_sec?: number | null
+          error?: string | null
+          id?: string
+          input?: Json
+          mode?: string
+          output_url?: string | null
+          project_id?: string | null
+          provider?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          character_id?: string | null
+          created_at?: string
+          credits_charged?: number
+          dialogue_line_id?: string | null
+          duration_sec?: number | null
+          error?: string | null
+          id?: string
+          input?: Json
+          mode?: string
+          output_url?: string | null
+          project_id?: string | null
+          provider?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lip_sync_jobs_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lip_sync_jobs_dialogue_line_id_fkey"
+            columns: ["dialogue_line_id"]
+            isOneToOne: false
+            referencedRelation: "dialogue_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lip_sync_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       marketplace_installs: {
         Row: {
@@ -1477,6 +1655,51 @@ export type Database = {
           updated_at?: string
           user_id?: string
           voice?: string | null
+        }
+        Relationships: []
+      }
+      provider_status: {
+        Row: {
+          available: boolean
+          created_at: string
+          id: string
+          kind: string
+          last_checked_at: string | null
+          max_duration_sec: number | null
+          metadata: Json
+          mode: string
+          notes: string | null
+          provider: string
+          supported_languages: string[]
+          updated_at: string
+        }
+        Insert: {
+          available?: boolean
+          created_at?: string
+          id?: string
+          kind: string
+          last_checked_at?: string | null
+          max_duration_sec?: number | null
+          metadata?: Json
+          mode?: string
+          notes?: string | null
+          provider: string
+          supported_languages?: string[]
+          updated_at?: string
+        }
+        Update: {
+          available?: boolean
+          created_at?: string
+          id?: string
+          kind?: string
+          last_checked_at?: string | null
+          max_duration_sec?: number | null
+          metadata?: Json
+          mode?: string
+          notes?: string | null
+          provider?: string
+          supported_languages?: string[]
+          updated_at?: string
         }
         Relationships: []
       }
