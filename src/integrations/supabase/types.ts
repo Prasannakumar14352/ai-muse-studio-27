@@ -638,6 +638,91 @@ export type Database = {
         }
         Relationships: []
       }
+      final_video_exports: {
+        Row: {
+          audio_mix: Json
+          branding: Json | null
+          created_at: string
+          duration_sec: number | null
+          error: string | null
+          format: string
+          id: string
+          metadata: Json
+          music: Json | null
+          name: string
+          narration_version_id: string | null
+          raw_video_id: string
+          resolution: string | null
+          status: string
+          subtitle_version_id: string | null
+          updated_at: string
+          user_id: string
+          video_url: string | null
+        }
+        Insert: {
+          audio_mix?: Json
+          branding?: Json | null
+          created_at?: string
+          duration_sec?: number | null
+          error?: string | null
+          format?: string
+          id?: string
+          metadata?: Json
+          music?: Json | null
+          name?: string
+          narration_version_id?: string | null
+          raw_video_id: string
+          resolution?: string | null
+          status?: string
+          subtitle_version_id?: string | null
+          updated_at?: string
+          user_id: string
+          video_url?: string | null
+        }
+        Update: {
+          audio_mix?: Json
+          branding?: Json | null
+          created_at?: string
+          duration_sec?: number | null
+          error?: string | null
+          format?: string
+          id?: string
+          metadata?: Json
+          music?: Json | null
+          name?: string
+          narration_version_id?: string | null
+          raw_video_id?: string
+          resolution?: string | null
+          status?: string
+          subtitle_version_id?: string | null
+          updated_at?: string
+          user_id?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "final_video_exports_narration_version_id_fkey"
+            columns: ["narration_version_id"]
+            isOneToOne: false
+            referencedRelation: "narration_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "final_video_exports_raw_video_id_fkey"
+            columns: ["raw_video_id"]
+            isOneToOne: false
+            referencedRelation: "raw_video_outputs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "final_video_exports_subtitle_version_id_fkey"
+            columns: ["subtitle_version_id"]
+            isOneToOne: false
+            referencedRelation: "subtitle_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fx_rates: {
         Row: {
           base_currency: string
@@ -1050,6 +1135,77 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      narration_versions: {
+        Row: {
+          audio_url: string | null
+          created_at: string
+          duration_sec: number | null
+          error: string | null
+          id: string
+          label: string | null
+          language: string | null
+          pitch: number
+          provider: string
+          raw_video_id: string
+          script: Json
+          speed: number
+          status: string
+          style: string | null
+          updated_at: string
+          user_id: string
+          voice_id: string
+          volume: number
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string
+          duration_sec?: number | null
+          error?: string | null
+          id?: string
+          label?: string | null
+          language?: string | null
+          pitch?: number
+          provider?: string
+          raw_video_id: string
+          script?: Json
+          speed?: number
+          status?: string
+          style?: string | null
+          updated_at?: string
+          user_id: string
+          voice_id: string
+          volume?: number
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string
+          duration_sec?: number | null
+          error?: string | null
+          id?: string
+          label?: string | null
+          language?: string | null
+          pitch?: number
+          provider?: string
+          raw_video_id?: string
+          script?: Json
+          speed?: number
+          status?: string
+          style?: string | null
+          updated_at?: string
+          user_id?: string
+          voice_id?: string
+          volume?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "narration_versions_raw_video_id_fkey"
+            columns: ["raw_video_id"]
+            isOneToOne: false
+            referencedRelation: "raw_video_outputs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       oauth_provider_configs: {
         Row: {
@@ -1741,6 +1897,60 @@ export type Database = {
           },
         ]
       }
+      raw_video_outputs: {
+        Row: {
+          blueprint_id: string | null
+          created_at: string
+          duration_sec: number
+          format: string
+          height: number
+          id: string
+          metadata: Json
+          project_id: string | null
+          scene_manifest: Json
+          status: string
+          updated_at: string
+          user_id: string
+          version: number
+          video_url: string
+          width: number
+        }
+        Insert: {
+          blueprint_id?: string | null
+          created_at?: string
+          duration_sec: number
+          format?: string
+          height: number
+          id?: string
+          metadata?: Json
+          project_id?: string | null
+          scene_manifest?: Json
+          status?: string
+          updated_at?: string
+          user_id: string
+          version?: number
+          video_url: string
+          width: number
+        }
+        Update: {
+          blueprint_id?: string | null
+          created_at?: string
+          duration_sec?: number
+          format?: string
+          height?: number
+          id?: string
+          metadata?: Json
+          project_id?: string | null
+          scene_manifest?: Json
+          status?: string
+          updated_at?: string
+          user_id?: string
+          version?: number
+          video_url?: string
+          width?: number
+        }
+        Relationships: []
+      }
       razorpay_webhook_events: {
         Row: {
           created_at: string
@@ -2102,6 +2312,50 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      subtitle_versions: {
+        Row: {
+          created_at: string
+          cues: Json
+          id: string
+          label: string | null
+          raw_video_id: string
+          style: Json
+          style_preset: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          cues?: Json
+          id?: string
+          label?: string | null
+          raw_video_id: string
+          style?: Json
+          style_preset?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          cues?: Json
+          id?: string
+          label?: string | null
+          raw_video_id?: string
+          style?: Json
+          style_preset?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subtitle_versions_raw_video_id_fkey"
+            columns: ["raw_video_id"]
+            isOneToOne: false
+            referencedRelation: "raw_video_outputs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       template_favorites: {
         Row: {
