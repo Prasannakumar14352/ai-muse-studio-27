@@ -111,15 +111,30 @@ export const planContentFn = createServerFn({ method: "POST" })
       if (kit) {
         const k = kit as any;
         const styles = (k.default_styles ?? {}) as Record<string, unknown>;
-        brandBlock = `\nActive Brand Kit (MUST follow — apply to every asset):\n` +
-          `- Brand name: ${k.name ?? "—"}\n` +
+        const m = (k.metadata ?? {}) as Record<string, any>;
+        const socials = (m.socials ?? {}) as Record<string, string>;
+        const socialsStr = Object.entries(socials).filter(([, v]) => !!v).map(([p, v]) => `${p}:${v}`).join(", ") || "—";
+        brandBlock = `\nActive Brand Kit 2.0 (MUST follow — apply to every asset):\n` +
+          `- Business name: ${m.businessName || k.name || "—"}\n` +
+          `- Tagline: ${m.tagline ?? "—"}\n` +
+          `- Description: ${m.description ?? "—"}\n` +
+          `- Mission: ${m.mission ?? "—"}\n` +
+          `- Vision: ${m.vision ?? "—"}\n` +
+          `- USP: ${m.usp ?? "—"}\n` +
+          `- Industry: ${m.industry ?? "—"}\n` +
+          `- Target audience: ${m.targetAudience ?? "—"}\n` +
+          `- Products: ${m.products ?? "—"} | Services: ${m.services ?? "—"}\n` +
           `- Voice/tone: ${k.brand_voice ?? "—"}\n` +
+          `- Writing style: ${m.writingStyle ?? "—"}\n` +
           `- Default CTA: ${k.default_cta ?? "—"}\n` +
-          `- Primary colour: ${k.primary_color ?? "—"} | Secondary: ${k.secondary_color ?? "—"}\n` +
+          `- Colors: primary=${k.primary_color ?? "—"}, secondary=${k.secondary_color ?? "—"}, accent=${m.accentColor ?? "—"}\n` +
           `- Fonts: heading=${k.font_primary ?? "—"}, body=${k.font_secondary ?? "—"}\n` +
           `- Keywords: ${(k.keywords ?? []).join(", ") || "—"}\n` +
+          `- Website: ${m.website ?? "—"} | Socials: ${socialsStr}\n` +
+          `- Competitors to differentiate from: ${(m.competitors ?? []).join(", ") || "—"}\n` +
           `- Watermark: ${k.watermark_url ? "apply" : "none"}\n` +
-          `- Default styles: ${JSON.stringify(styles)}\n`;
+          `- Default styles: ${JSON.stringify(styles)}\n` +
+          (Array.isArray(m.examplePosts) && m.examplePosts.length ? `- Example posts to match voice:\n${m.examplePosts.slice(0, 5).map((p: string) => `  • ${p}`).join("\n")}\n` : "");
       }
     } catch { /* ignore — brand kit is optional */ }
 
