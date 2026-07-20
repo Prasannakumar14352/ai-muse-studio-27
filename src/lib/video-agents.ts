@@ -2054,9 +2054,23 @@ export async function runRenderPhase(
     voiceover, subtitles, timeline, music, sfx,
   } = bundle;
 
+  // Gate: every planned shot must have a generated asset before we start
+  // rendering — otherwise the timeline has a hole and the export ends up
+  // showing a static placeholder for that beat.
+  const missing = job.shots.filter((s) => s.status !== "done" || !s.blobKey);
+  if (missing.length > 0) {
+    const msg = `Cannot render: ${missing.length} shot${missing.length === 1 ? "" : "s"} did not generate. Please retry generation.`;
+    job.phase = "failed"; job.error = msg;
+    await saveJob(job);
+    onEvent({ type: "phase", phase: "failed" });
+    onEvent({ type: "error", message: msg });
+    throw new Error(msg);
+  }
+
   job.phase = "rendering";
   await saveJob(job);
   onEvent({ type: "phase", phase: "rendering" });
+  console.info("[video-pipeline] rendering", { jobId, shots: job.shots.length, target: brief.duration });
 
   const visuals: VisualAsset[] = await Promise.all(job.shots.map(async (s, i) => {
     let url: string | null = null;
@@ -2073,6 +2087,24 @@ export async function runRenderPhase(
     onEvent({ type: "render", progress: p }),
   );
   job.renderProgress = 1;
+
+  // Validate the produced file before we mark the job complete. If the
+  // browser can't decode metadata or the file is empty, mark the job failed
+  // instead of returning a broken preview.
+  job.phase = "validating";
+  await saveJob(job);
+  onEvent({ type: "phase", phase: "validating" });
+  const { validateRenderedVideo } = await import("./video-validate");
+  const validation = await validateRenderedVideo(render.blob ?? null, brief.duration);
+  console.info("[video-pipeline] validation", validation);
+  if (!validation.ok) {
+    const msg = `Rendered video failed validation: ${validation.reason ?? "unknown"}`;
+    job.phase = "failed"; job.error = msg;
+    await saveJob(job);
+    onEvent({ type: "phase", phase: "failed" });
+    onEvent({ type: "error", message: msg });
+    throw new Error(msg);
+  }
 
   const thumbnail = await ThumbnailAgent.run(brief);
   const seo = await SeoAgent.run(brief, script, timeline);
