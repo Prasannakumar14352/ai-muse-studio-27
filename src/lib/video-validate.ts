@@ -25,14 +25,21 @@ function minReasonableBytes(durationSec: number): number {
  * Load a blob into a hidden <video> element to confirm the browser can
  * decode metadata (moov atom present, container valid). Resolves with the
  * detected duration or null on failure.
+ *
+ * MediaRecorder-produced WebM is streamed without a Duration element in
+ * SegmentInfo, so `video.duration` initially reports `Infinity`. The
+ * industry-standard workaround is to seek past the end — the browser then
+ * walks the file, computes the real duration, and fires `durationchange`
+ * with a finite value. We only fall back to null if that also fails.
  */
-export function probeVideoDuration(blob: Blob, timeoutMs = 8000): Promise<number | null> {
+export function probeVideoDuration(blob: Blob, timeoutMs = 20000): Promise<number | null> {
   return new Promise((resolve) => {
     if (typeof window === "undefined") { resolve(null); return; }
     const url = URL.createObjectURL(blob);
     const v = document.createElement("video");
     v.preload = "metadata";
     v.muted = true;
+    (v as HTMLVideoElement & { playsInline?: boolean }).playsInline = true;
     let settled = false;
     const cleanup = (val: number | null) => {
       if (settled) return;
@@ -41,12 +48,33 @@ export function probeVideoDuration(blob: Blob, timeoutMs = 8000): Promise<number
       URL.revokeObjectURL(url);
       resolve(val);
     };
-    v.onloadedmetadata = () => {
-      const d = Number.isFinite(v.duration) ? v.duration : null;
-      cleanup(d && d > 0 ? d : null);
+    const finalize = () => {
+      const d = v.duration;
+      if (typeof d === "number" && Number.isFinite(d) && d > 0) {
+        cleanup(d);
+      } else {
+        cleanup(null);
+      }
     };
-    v.onerror = () => cleanup(null);
-    setTimeout(() => cleanup(null), timeoutMs);
+    v.onloadedmetadata = () => {
+      const d = v.duration;
+      if (typeof d === "number" && Number.isFinite(d) && d > 0) {
+        cleanup(d);
+        return;
+      }
+      // Force browsers to compute the real duration for streamed WebM
+      // that has no Duration element in the container.
+      v.ondurationchange = () => {
+        const nd = v.duration;
+        if (typeof nd === "number" && Number.isFinite(nd) && nd > 0) {
+          try { v.currentTime = 0; } catch { /* noop */ }
+          cleanup(nd);
+        }
+      };
+      try { v.currentTime = 1e6; } catch { /* noop */ }
+    };
+    v.onerror = () => finalize();
+    setTimeout(() => finalize(), timeoutMs);
     v.src = url;
   });
 }
