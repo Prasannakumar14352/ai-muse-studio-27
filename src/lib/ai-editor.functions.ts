@@ -1,8 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeMiddleware } from "@/lib/credits-guard.server";
 
 export const editTextFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("ai_edit_text")])
   .inputValidator((i: {
     text: string;
     instruction: string;

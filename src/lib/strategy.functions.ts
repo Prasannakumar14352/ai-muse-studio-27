@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeMiddleware } from "@/lib/credits-guard.server";
 
 export type StrategyBrief = {
   promoting: string;
@@ -99,7 +100,7 @@ export function summarizeStrategyForPrompt(plan: StrategyPlan, brief?: Partial<S
 }
 
 export const generateStrategyFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("strategy")])
   .inputValidator((input: StrategyBrief & { projectId?: string | null }) => input)
   .handler(async ({ data, context }) => {
     const { gatewayChatJson } = await import("@/lib/ai-gateway.server");

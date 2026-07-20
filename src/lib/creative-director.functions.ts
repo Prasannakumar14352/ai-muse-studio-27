@@ -4,6 +4,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeMiddleware } from "@/lib/credits-guard.server";
 import { z } from "zod";
 import {
   buildAssetPlanHeuristic,
@@ -155,7 +156,7 @@ async function callLLM(prompt: string, surface: Surface, count: number, extras?:
 }
 
 export const runCreativeDirector = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("creative_director")])
   .inputValidator((v: unknown) => Input.parse(v))
   .handler(async ({ data }): Promise<AssetPlan> => {
     try {

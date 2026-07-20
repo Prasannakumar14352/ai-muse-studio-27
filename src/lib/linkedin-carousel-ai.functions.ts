@@ -1,6 +1,7 @@
 // LinkedIn document carousel AI generator (cover, N content slides, CTA).
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeMiddleware } from "@/lib/credits-guard.server";
 import { z } from "zod";
 
 export type LinkedinCarouselSlide = {
@@ -52,7 +53,7 @@ function demo(v: z.infer<typeof Input>): LinkedinCarouselContent {
 }
 
 export const generateLinkedinCarousel = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("linkedin_carousel")])
   .inputValidator((v: unknown) => Input.parse(v))
   .handler(async ({ data }): Promise<{ mode: "ai" | "demo"; content: LinkedinCarouselContent; safeError?: string }> => {
     const key = process.env.LOVABLE_API_KEY;
@@ -150,7 +151,7 @@ export type CarouselSlideTransform = {
 };
 
 export const transformCarouselSlide = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("linkedin_carousel_slide")])
   .inputValidator((v: unknown) => TransformInput.parse(v))
   .handler(async ({ data }): Promise<{ mode: "ai" | "demo"; slide: CarouselSlideTransform; safeError?: string }> => {
     const key = process.env.LOVABLE_API_KEY;

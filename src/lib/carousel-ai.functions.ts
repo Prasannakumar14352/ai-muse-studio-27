@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeMiddleware } from "@/lib/credits-guard.server";
 import { z } from "zod";
 import { parseStructuredJsonResponse } from "@/lib/video-json";
 import {
@@ -53,7 +54,7 @@ const SIZE_HINT: Record<string, string> = {
 };
 
 export const generateAiCarousel = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("carousel_plan")])
   .inputValidator((v: unknown) => Input.parse(v))
   .handler(async ({ data }): Promise<AiCarousel> => {
     const key = process.env.LOVABLE_API_KEY;

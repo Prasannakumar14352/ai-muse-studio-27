@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateCarousel } from "@/lib/generators";
 import { generateAiCarousel } from "@/lib/carousel-ai.functions";
 import { PLATFORMS, TONES, STYLES, NICHES, GENERATION_COST } from "@/lib/constants";
-import { deductUsage, getAccessInfo, canGenerate } from "@/lib/access";
+import { getAccessInfo, canGenerate } from "@/lib/access";
 import { saveOutput } from "@/lib/local-store";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Wand2, ArrowRight, Layers } from "lucide-react";
@@ -148,14 +148,9 @@ function CreateCarouselPage() {
         });
       }
 
-      const result = await deductUsage({
-        amount: GENERATION_COST,
-        projectId: project.id,
-        description: `Generated carousel: ${title}`,
-      });
-      if (!result.ok && result.error !== "not_authenticated") {
-        console.warn("Deduction failed:", result.error);
-      }
+      // Credit deduction is handled server-side inside generateAiCarousel
+      // (see chargeMiddleware in src/lib/credits-guard.server.ts).
+
 
       qc.invalidateQueries({ queryKey: ["access"] });
       qc.invalidateQueries({ queryKey: ["stats"] });

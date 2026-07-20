@@ -200,15 +200,27 @@ export const upsertNarrationVersionFn = createServerFn({ method: "POST" })
     };
     const client = context.supabase;
     if (data.id) {
+      // Post-generation edits (voice tweak, re-preview) are free.
       const { data: row, error } = await client
         .from("narration_versions").update(payload).eq("id", data.id).select("*").single();
       if (error) throw new Error(error.message);
       return row as unknown as NarrationVersion;
     }
-    const { data: row, error } = await client
-      .from("narration_versions").insert(payload).select("*").single();
-    if (error) throw new Error(error.message);
-    return row as unknown as NarrationVersion;
+    // Charge 1 credit only when a NEW narration version with an audio_url is
+    // being created (a real TTS render). Drafts without audio are free.
+    const shouldCharge = !!data.audioUrl && data.status === "ready";
+    const insert = async () => {
+      const { data: row, error } = await client
+        .from("narration_versions").insert(payload).select("*").single();
+      if (error) throw new Error(error.message);
+      return row as unknown as NarrationVersion;
+    };
+    if (!shouldCharge) return insert();
+    const { withCharge } = await import("@/lib/credits-guard.server");
+    return withCharge(
+      { userId: context.userId, action: "narration", description: "Narration generated" },
+      insert,
+    );
   });
 
 export const listNarrationVersionsFn = createServerFn({ method: "GET" })
@@ -321,15 +333,26 @@ export const upsertFinalVideoExportFn = createServerFn({ method: "POST" })
     };
     const client = context.supabase;
     if (data.id) {
+      // Updates (retries, metadata edits) are free.
       const { data: row, error } = await client
         .from("final_video_exports").update(payload).eq("id", data.id).select("*").single();
       if (error) throw new Error(error.message);
       return row as unknown as FinalVideoExport;
     }
-    const { data: row, error } = await client
-      .from("final_video_exports").insert(payload).select("*").single();
-    if (error) throw new Error(error.message);
-    return row as unknown as FinalVideoExport;
+    // Charge 1 credit when a new export is finalized with a video_url.
+    const shouldCharge = !!data.videoUrl && data.status === "ready";
+    const insert = async () => {
+      const { data: row, error } = await client
+        .from("final_video_exports").insert(payload).select("*").single();
+      if (error) throw new Error(error.message);
+      return row as unknown as FinalVideoExport;
+    };
+    if (!shouldCharge) return insert();
+    const { withCharge } = await import("@/lib/credits-guard.server");
+    return withCharge(
+      { userId: context.userId, action: "final_export", description: "Final video export" },
+      insert,
+    );
   });
 
 export const listFinalVideoExportsFn = createServerFn({ method: "GET" })

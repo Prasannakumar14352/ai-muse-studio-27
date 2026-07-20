@@ -12,7 +12,7 @@ import { generateProject, generateCarousel, generateCaptions, generateHashtags }
 import { generateAiCarousel } from "@/lib/carousel-ai.functions";
 import { generateAiVideoScript } from "@/lib/video-ai.functions";
 import { STYLES, GENERATION_COST } from "@/lib/constants";
-import { deductUsage, getAccessInfo, canGenerate } from "@/lib/access";
+import { getAccessInfo, canGenerate } from "@/lib/access";
 import { saveOutput } from "@/lib/local-store";
 import { useQueryClient } from "@tanstack/react-query";
 import { ProjectBriefForm, type ProjectBrief } from "@/components/project-brief-form";
@@ -214,14 +214,9 @@ function CreatePage() {
         }
       }
 
-      const result = await deductUsage({
-        amount: GENERATION_COST,
-        projectId: project.id,
-        description: `Generated ${form.content_type}: ${output.title}`,
-      });
-      if (!result.ok && result.error !== "not_authenticated") {
-        console.warn("Deduction failed:", result.error);
-      }
+      // Credit deduction is handled server-side inside planContentFn and
+      // the underlying generator server functions.
+
 
       qc.invalidateQueries({ queryKey: ["access"] });
       qc.invalidateQueries({ queryKey: ["stats"] });
