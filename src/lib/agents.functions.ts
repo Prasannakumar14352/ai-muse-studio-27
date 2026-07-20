@@ -1,8 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeMiddleware } from "@/lib/credits-guard.server";
 
 export const runAgentFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("agent_campaign", 2)])
   .inputValidator((i: { agentId: string; input: string; projectId?: string | null }) => {
     if (!i.input?.trim()) throw new Error("input required");
     return i;

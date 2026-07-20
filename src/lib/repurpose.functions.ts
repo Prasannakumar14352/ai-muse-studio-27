@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeMiddleware } from "@/lib/credits-guard.server";
 
 export type RepurposeFormat =
   | "shorts" | "reels" | "tiktok" | "linkedin" | "ig_carousel"
@@ -32,7 +33,7 @@ const FORMAT_PROMPTS: Record<RepurposeFormat, string> = {
 };
 
 export const repurposeFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("repurpose")])
   .inputValidator((i: { sourceProjectId?: string | null; source: string; formats: RepurposeFormat[] }) => {
     if (!i.source?.trim()) throw new Error("source content required");
     if (!i.formats?.length) throw new Error("select at least one format");

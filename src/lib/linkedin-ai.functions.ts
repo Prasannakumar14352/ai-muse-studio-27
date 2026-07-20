@@ -3,6 +3,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeMiddleware } from "@/lib/credits-guard.server";
 import { z } from "zod";
 
 // ---------- Types ----------
@@ -420,7 +421,7 @@ async function callGateway(sys: string, user: string, key: string): Promise<unkn
 // ---------- Primary generator ----------
 
 export const generateLinkedinPost = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("linkedin_generate")])
   .inputValidator((v: unknown) => Input.parse(v))
   .handler(async ({ data }): Promise<{ mode: "ai" | "demo"; content: LinkedinPostContent; safeError?: string }> => {
     const key = process.env.LOVABLE_API_KEY;
@@ -479,7 +480,7 @@ export type LinkedinRegenResult = {
 };
 
 export const regenerateLinkedinSection = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("linkedin_regen_section")])
   .inputValidator((v: unknown) => RegenInput.parse(v))
   .handler(async ({ data }): Promise<{ mode: "ai" | "demo"; result: LinkedinRegenResult; safeError?: string }> => {
     const key = process.env.LOVABLE_API_KEY;

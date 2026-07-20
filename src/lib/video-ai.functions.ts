@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeMiddleware } from "@/lib/credits-guard.server";
 import { z } from "zod";
 import { parseStructuredJsonResponse } from "@/lib/video-json";
 import { buildFallbackScenesFromScript, buildFallbackVideoScript } from "@/lib/video-fallback";
@@ -57,7 +58,7 @@ const Input = z.object({
 });
 
 export const generateAiVideoScript = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("video_script")])
   .inputValidator((v: unknown) => Input.parse(v))
   .handler(async ({ data }): Promise<AiVideoScript> => {
     const key = process.env.LOVABLE_API_KEY;
@@ -397,7 +398,7 @@ export type ScenesFromScript = {
 };
 
 export const generateScenesFromScript = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("video_scenes_plan")])
   .inputValidator((v: unknown) => FromScriptInput.parse(v))
   .handler(async ({ data }): Promise<ScenesFromScript> => {
     const key = process.env.LOVABLE_API_KEY;
@@ -563,7 +564,7 @@ export type AiVideoSeo = {
 };
 
 export const generateAiVideoSeo = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("video_seo")])
   .inputValidator((v: unknown) => SeoInput.parse(v))
   .handler(async ({ data }): Promise<AiVideoSeo> => {
     const key = process.env.LOVABLE_API_KEY;
@@ -779,7 +780,7 @@ export type VideoTitleVariants = {
 };
 
 export const generateVideoTitleVariants = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("video_title_variants")])
   .inputValidator((v: unknown) => TitleInput.parse(v))
   .handler(async ({ data }): Promise<VideoTitleVariants> => {
     const key = process.env.LOVABLE_API_KEY;
@@ -849,7 +850,7 @@ export type VideoHook = {
 };
 
 export const generateVideoHook = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("video_hook")])
   .inputValidator((v: unknown) => HookInput.parse(v))
   .handler(async ({ data }): Promise<VideoHook> => {
     const key = process.env.LOVABLE_API_KEY;
@@ -912,7 +913,7 @@ export type VideoChapters = {
 };
 
 export const generateVideoChapters = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("video_chapters")])
   .inputValidator((v: unknown) => ChapterInput.parse(v))
   .handler(async ({ data }): Promise<VideoChapters> => {
     const key = process.env.LOVABLE_API_KEY;

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeMiddleware } from "@/lib/credits-guard.server";
 
 // ---------- Types ----------
 
@@ -135,7 +136,7 @@ export function recommendationFromScore(score: number): ViralAnalysis["recommend
 // ---------- Server functions ----------
 
 export const runResearchFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("research")])
   .inputValidator((i: ResearchInputs & { projectId?: string | null }) => i)
   .handler(async ({ data, context }) => {
     const { gatewayChatJson } = await import("@/lib/ai-gateway.server");

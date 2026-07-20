@@ -7,6 +7,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeMiddleware } from "@/lib/credits-guard.server";
 import { z } from "zod";
 import { parseStructuredJsonResponse } from "@/lib/video-json";
 import {
@@ -98,7 +99,7 @@ async function callGatewayJson<T>(
 }
 
 export const generatePublishKit = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("publish_kit")])
   .inputValidator((v: unknown) => PublishKitInput.parse(v))
   .handler(async ({ data }): Promise<PublishKit> => {
     const key = process.env.LOVABLE_API_KEY;
@@ -262,7 +263,7 @@ const QualityInput = z.object({
 });
 
 export const reviewVideoQuality = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("publish_kit_review")])
   .inputValidator((v: unknown) => QualityInput.parse(v))
   .handler(async ({ data }): Promise<QualityReport> => {
     const key = process.env.LOVABLE_API_KEY;

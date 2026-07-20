@@ -2,6 +2,7 @@
 // Returns an editable JSON plan the wizard's PlanEditor renders as sections.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeMiddleware } from "@/lib/credits-guard.server";
 
 export type PlanModule =
   | "video"
@@ -85,7 +86,7 @@ function coerceValue(kind: PlanSection["kind"], raw: unknown): string | string[]
 }
 
 export const planContentFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("plan_content")])
   .inputValidator((i: { module: PlanModule; topic: string; context?: string; strategyContext?: string; projectId?: string | null }) => {
     if (!i.module) throw new Error("module required");
     if (!i.topic?.trim()) throw new Error("topic required");
@@ -174,7 +175,7 @@ export const planContentFn = createServerFn({ method: "POST" })
   });
 
 export const regeneratePlanSectionFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, chargeMiddleware("plan_regen_section")])
   .inputValidator((i: {
     module: PlanModule;
     topic: string;
