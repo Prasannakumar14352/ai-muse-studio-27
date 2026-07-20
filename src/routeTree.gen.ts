@@ -47,6 +47,7 @@ import { Route as AuthenticatedAgentsRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedLinkedinPostsIndexRouteImport } from './routes/_authenticated/linkedin-posts.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedStudioRawIdRouteImport } from './routes/_authenticated/studio.$rawId'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
 import { Route as AuthenticatedLinkedinPostsNewRouteImport } from './routes/_authenticated/linkedin-posts.new'
 import { Route as AuthenticatedLinkedinPostsIdRouteImport } from './routes/_authenticated/linkedin-posts.$id'
@@ -258,6 +259,12 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedStudioRawIdRoute =
+  AuthenticatedStudioRawIdRouteImport.update({
+    id: '/studio/$rawId',
+    path: '/studio/$rawId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedProjectsIdRoute = AuthenticatedProjectsIdRouteImport.update({
   id: '/projects/$id',
   path: '/projects/$id',
@@ -402,6 +409,7 @@ export interface FileRoutesByFullPath {
   '/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
   '/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/studio/$rawId': typeof AuthenticatedStudioRawIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/linkedin-posts/': typeof AuthenticatedLinkedinPostsIndexRoute
   '/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
@@ -455,6 +463,7 @@ export interface FileRoutesByTo {
   '/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
   '/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/studio/$rawId': typeof AuthenticatedStudioRawIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/linkedin-posts': typeof AuthenticatedLinkedinPostsIndexRoute
   '/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
@@ -512,6 +521,7 @@ export interface FileRoutesById {
   '/_authenticated/linkedin-posts/$id': typeof AuthenticatedLinkedinPostsIdRouteWithChildren
   '/_authenticated/linkedin-posts/new': typeof AuthenticatedLinkedinPostsNewRoute
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/_authenticated/studio/$rawId': typeof AuthenticatedStudioRawIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/linkedin-posts/': typeof AuthenticatedLinkedinPostsIndexRoute
   '/_authenticated/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
@@ -569,6 +579,7 @@ export interface FileRouteTypes {
     | '/linkedin-posts/$id'
     | '/linkedin-posts/new'
     | '/projects/$id'
+    | '/studio/$rawId'
     | '/admin/'
     | '/linkedin-posts/'
     | '/linkedin-posts/$id/edit'
@@ -622,6 +633,7 @@ export interface FileRouteTypes {
     | '/linkedin-posts/$id'
     | '/linkedin-posts/new'
     | '/projects/$id'
+    | '/studio/$rawId'
     | '/admin'
     | '/linkedin-posts'
     | '/linkedin-posts/$id/edit'
@@ -678,6 +690,7 @@ export interface FileRouteTypes {
     | '/_authenticated/linkedin-posts/$id'
     | '/_authenticated/linkedin-posts/new'
     | '/_authenticated/projects/$id'
+    | '/_authenticated/studio/$rawId'
     | '/_authenticated/admin/'
     | '/_authenticated/linkedin-posts/'
     | '/_authenticated/linkedin-posts/$id/edit'
@@ -971,6 +984,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/studio/$rawId': {
+      id: '/_authenticated/studio/$rawId'
+      path: '/studio/$rawId'
+      fullPath: '/studio/$rawId'
+      preLoaderRoute: typeof AuthenticatedStudioRawIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/projects/$id': {
       id: '/_authenticated/projects/$id'
       path: '/projects/$id'
@@ -1175,6 +1195,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedVideosRoute: typeof AuthenticatedVideosRoute
   AuthenticatedCreateCarouselRoute: typeof AuthenticatedCreateCarouselRoute
   AuthenticatedProjectsIdRoute: typeof AuthenticatedProjectsIdRoute
+  AuthenticatedStudioRawIdRoute: typeof AuthenticatedStudioRawIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -1205,6 +1226,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedVideosRoute: AuthenticatedVideosRoute,
   AuthenticatedCreateCarouselRoute: AuthenticatedCreateCarouselRoute,
   AuthenticatedProjectsIdRoute: AuthenticatedProjectsIdRoute,
+  AuthenticatedStudioRawIdRoute: AuthenticatedStudioRawIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
