@@ -573,6 +573,9 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   // broken. Patch the container so exported files have valid metadata.
   if (ext === "webm") {
     try {
+      const mod = await import("webm-duration-fix");
+      const fixWebmDuration = (mod as { default?: (b: Blob) => Promise<Blob> }).default
+        ?? (mod as unknown as (b: Blob) => Promise<Blob>);
       const fixed = await fixWebmDuration(blob);
       if (fixed && fixed.size > 0) {
         blob = fixed;
