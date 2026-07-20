@@ -844,6 +844,7 @@ export const RenderAgent = {
       sceneMedia: beatVisuals.map((v) => ({ kind: v.kind, url: v.url })),
       sceneAudio: beatAudio,
       fitToAudio: false, // durations already sized to the audio timeline
+      targetDurationSec: brief.duration, // hard cap — normalizes any drift
       onProgress,
     });
     return {
