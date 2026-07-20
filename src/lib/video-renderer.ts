@@ -2,8 +2,12 @@
 // MediaRecorder. Produces a real downloadable file (MP4 where the browser
 // supports it, WebM as fallback) — no server dependency required.
 
+import fixWebmDuration from "webm-duration-fix";
 import { getStyle } from "./constants";
 import { deductUsage } from "./access";
+
+const LOG = (...args: unknown[]) => console.info("[video-renderer]", ...args);
+const WARN = (...args: unknown[]) => console.warn("[video-renderer]", ...args);
 
 // Legacy 7 motions are kept as a subset; the Motion Director adds cinematic
 // variants (orbit, dolly, crane, macro, parallax, floating, spin, page-flip,
