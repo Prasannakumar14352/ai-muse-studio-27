@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { MUSIC_LIBRARY } from "@/lib/video-blueprint";
 import { SUBTITLE_STYLE_PRESETS, getStylePreset } from "@/lib/subtitle-style-presets";
