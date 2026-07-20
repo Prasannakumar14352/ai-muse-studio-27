@@ -4,11 +4,18 @@ import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
   Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug, Linkedin,
   ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target, Calendar as CalendarIcon, Library, Megaphone,
+  Bell, User as UserIcon, FolderKanban, Command as CommandIcon,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAccess, getAvailableCredits } from "@/lib/access";
 import { MODULE_CONTENT_TYPES, type ModuleId } from "@/lib/content-types";
+import { CommandPalette, openCommandPalette } from "@/components/command-palette";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { BrandLogo } from "@/components/brand-logo";
