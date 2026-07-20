@@ -9,6 +9,42 @@ export type BrandDefaultStyles = {
   captionTone?: string;
 };
 
+/**
+ * Brand Kit 2.0 extended fields persisted inside the existing `metadata`
+ * jsonb column — no schema migration required, backward compatible with
+ * existing rows (missing keys read as undefined).
+ */
+export type BrandKitMeta = {
+  businessName?: string;
+  tagline?: string;
+  mission?: string;
+  vision?: string;
+  usp?: string;
+  industry?: string;
+  targetAudience?: string;
+  products?: string;
+  services?: string;
+  writingStyle?: string;
+  description?: string;
+  accentColor?: string;
+  website?: string;
+  email?: string;
+  phone?: string;
+  socials?: {
+    instagram?: string;
+    youtube?: string;
+    tiktok?: string;
+    linkedin?: string;
+    twitter?: string;
+    facebook?: string;
+    pinterest?: string;
+  };
+  competitors?: string[];
+  referenceImages?: string[];
+  referenceDocs?: string[];
+  examplePosts?: string[];
+};
+
 export type BrandKit = {
   id: string;
   name: string;
@@ -24,6 +60,7 @@ export type BrandKit = {
   outro_url: string | null;
   keywords: string[] | null;
   default_styles: BrandDefaultStyles | null;
+  metadata: BrandKitMeta | null;
   is_default: boolean;
   created_at: string;
   updated_at: string;
@@ -72,6 +109,7 @@ export const upsertBrandKitFn = createServerFn({ method: "POST" })
       outro_url: data.outro_url ?? null,
       keywords: data.keywords ?? [],
       default_styles: data.default_styles ?? {},
+      metadata: data.metadata ?? {},
       is_default: !!data.is_default,
     };
     if (data.is_default) {
