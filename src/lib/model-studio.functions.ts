@@ -57,6 +57,8 @@ export const startModelGenerationFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const model = findModel(data.modelId);
     if (!model) throw new Error("Unknown model");
+    const { assertFeature } = await import("@/lib/plan-access.server");
+    await assertFeature(context.userId, `model:${model.id}`);
 
     // Validate options against what the model supports.
     const durationSec =

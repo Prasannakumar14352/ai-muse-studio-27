@@ -13,8 +13,11 @@ import {
   Loader2,
   Sparkles,
   AlertTriangle,
+  Lock,
 } from "lucide-react";
 import { MODEL_CATALOG, creditsFor, type ModelKind } from "@/lib/model-catalog";
+import { usePlanAccess, useUpgradeDialog } from "@/lib/use-plan-access";
+import { TIER_LABEL } from "@/lib/plan-access";
 import {
   getModelStudioStatusFn,
   listModelGenerationsFn,
@@ -56,6 +59,8 @@ const TABS: Array<{
 
 function ModelStudioPage() {
   const qc = useQueryClient();
+  const { canFeature } = usePlanAccess();
+  const openUpgrade = useUpgradeDialog();
   const [kind, setKind] = useState<ModelKind>("video");
   const models = useMemo(() => MODEL_CATALOG.filter((m) => m.kind === kind), [kind]);
   const [modelId, setModelId] = useState(models[0].id);
@@ -68,8 +73,9 @@ function ModelStudioPage() {
 
   // Reset per-model options when switching tabs/models.
   useEffect(() => {
-    setModelId(models[0].id);
-  }, [models]);
+    // Prefer the first model this plan can use.
+    setModelId((models.find((m) => canFeature(`model:${m.id}`).allowed) ?? models[0]).id);
+  }, [models, canFeature]);
   useEffect(() => {
     if (model.durations && !model.durations.includes(durationSec))
       setDurationSec(model.durations[0]);
@@ -143,6 +149,7 @@ function ModelStudioPage() {
 
   const tab = TABS.find((t) => t.kind === kind)!;
   const notConfigured = statusQ.data && !statusQ.data.configured;
+  const modelLock = canFeature(`model:${model.id}`);
   const tooLong = model.maxChars ? prompt.length > model.maxChars : prompt.length > 2000;
 
   return (
@@ -180,24 +187,37 @@ function ModelStudioPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {models.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => setModelId(m.id)}
-            className={`text-left rounded-xl p-4 border transition ${m.id === model.id ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "glass border-border hover:border-primary/50"}`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div className="font-medium">{m.label}</div>
-              {m.badge && (
-                <span className="text-[10px] uppercase tracking-wide rounded-full bg-primary/15 text-primary px-2 py-0.5">
-                  {m.badge}
-                </span>
-              )}
-            </div>
-            <div className="text-xs text-muted-foreground mt-0.5">{m.vendor}</div>
-            <div className="text-xs text-muted-foreground mt-2">{m.description}</div>
-          </button>
-        ))}
+        {models.map((m) => {
+          const lock = canFeature(`model:${m.id}`);
+          return (
+            <button
+              key={m.id}
+              onClick={() =>
+                lock.allowed
+                  ? setModelId(m.id)
+                  : openUpgrade({ label: m.label, required: lock.required })
+              }
+              className={`text-left rounded-xl p-4 border transition ${!lock.allowed ? "opacity-60 glass border-border" : m.id === model.id ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "glass border-border hover:border-primary/50"}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-medium">{m.label}</div>
+                {!lock.allowed ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide rounded-full bg-white/10 text-muted-foreground px-2 py-0.5">
+                    <Lock className="h-3 w-3" /> {TIER_LABEL[lock.required]}
+                  </span>
+                ) : (
+                  m.badge && (
+                    <span className="text-[10px] uppercase tracking-wide rounded-full bg-primary/15 text-primary px-2 py-0.5">
+                      {m.badge}
+                    </span>
+                  )
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5">{m.vendor}</div>
+              <div className="text-xs text-muted-foreground mt-2">{m.description}</div>
+            </button>
+          );
+        })}
       </div>
 
       <div className="glass rounded-xl border border-border p-5 space-y-4">
@@ -261,7 +281,13 @@ function ModelStudioPage() {
           </div>
           <button
             onClick={() => startM.mutate()}
-            disabled={startM.isPending || prompt.trim().length < 2 || tooLong || !!notConfigured}
+            disabled={
+              startM.isPending ||
+              prompt.trim().length < 2 ||
+              tooLong ||
+              !!notConfigured ||
+              !modelLock.allowed
+            }
             className="rounded-lg gradient-primary text-white px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2 shadow-[var(--shadow-glow)] disabled:opacity-60"
           >
             {startM.isPending ? (

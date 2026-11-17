@@ -105,6 +105,9 @@ function randomKey(): string {
 /** Reserve credits and return a handle that must be finalized or refunded. */
 export async function chargeCredits(opts: ChargeOptions): Promise<Reservation> {
   const amount = Math.max(0, Math.floor(opts.amount ?? ACTION_COSTS[opts.action as ChargeAction] ?? 1));
+  // Plan gate: actions that belong to a paid feature are refused before any credits move.
+  const { assertActionAllowed } = await import("@/lib/plan-access.server");
+  await assertActionAllowed(opts.userId, opts.action);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const idempotencyKey = opts.idempotencyKey ?? `${opts.userId}:${opts.action}:${randomKey()}`;
 

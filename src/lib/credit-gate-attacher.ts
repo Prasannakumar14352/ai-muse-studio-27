@@ -8,6 +8,7 @@
 import { createMiddleware } from "@tanstack/react-start";
 
 const PREFIX = "insufficient_credits:";
+const PLAN_PREFIX = "plan_required:";
 
 export const surfaceCreditGate = createMiddleware({ type: "function" }).client(async ({ next }) => {
   try {
@@ -36,6 +37,21 @@ export const surfaceCreditGate = createMiddleware({ type: "function" }).client(a
       // toast surface shows the same wording as the modal.
       const nice = new Error("You don't have enough credits for this generation.");
       (nice as { code?: string }).code = "insufficient_credits";
+      throw nice;
+    }
+    if (message.startsWith(PLAN_PREFIX)) {
+      // Server refused because the user's plan doesn't include this feature.
+      let label = "This feature";
+      let tier = "a higher";
+      try {
+        const p = JSON.parse(message.slice(PLAN_PREFIX.length)) as { feature?: string; required?: string };
+        if (p.feature) label = p.feature;
+        if (p.required) tier = `the ${p.required.charAt(0).toUpperCase()}${p.required.slice(1)}`;
+      } catch {
+        /* ignore parse failures */
+      }
+      const nice = new Error(`${label} needs ${tier} plan. Upgrade on the Pricing page to unlock it.`);
+      (nice as { code?: string }).code = "plan_required";
       throw nice;
     }
     throw err;
