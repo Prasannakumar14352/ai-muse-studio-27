@@ -15,6 +15,8 @@ export const Route = createFileRoute("/api/generate-video-clip")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const { getUserIdFromRequest, unauthorized } = await import("@/lib/route-auth.server");
+        if (!(await getUserIdFromRequest(request))) return unauthorized();
         const key = process.env.LOVABLE_API_KEY;
         if (!key) {
           return Response.json({ ok: false, reason: "Missing LOVABLE_API_KEY" }, { status: 200 });

@@ -19,6 +19,7 @@ import { PublishKitPanel } from "@/components/publish-kit-panel";
 import { generateAiCarousel } from "@/lib/carousel-ai.functions";
 import { generateCarousel, generateCaptions, generateHashtags } from "@/lib/generators";
 import { STYLES } from "@/lib/constants";
+import { authFetch } from "@/lib/auth-fetch";
 
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({ component: ProjectView });
@@ -803,7 +804,7 @@ function VideoPreview({
     try {
       if (audioElRef.current) { audioElRef.current.pause(); audioElRef.current = null; }
       setPlayingScene(i);
-      const res = await fetch("/api/tts", {
+      const res = await authFetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, voice: "alloy" }),

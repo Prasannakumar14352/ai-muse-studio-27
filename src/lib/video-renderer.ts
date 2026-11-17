@@ -8,6 +8,7 @@
 // which was crashing every route that pulled this module into its graph.
 import { getStyle } from "./constants";
 import { deductUsage } from "./access";
+import { authFetch } from "@/lib/auth-fetch";
 
 const LOG = (...args: unknown[]) => console.info("[video-renderer]", ...args);
 const WARN = (...args: unknown[]) => console.warn("[video-renderer]", ...args);
@@ -708,7 +709,7 @@ async function fetchSceneImage(prompt: string, style: string, ratio: string, pro
 
 async function fetchSceneAudio(text: string, voice: string, ctx: AudioContext): Promise<AudioBuffer | null> {
   try {
-    const res = await fetch("/api/tts", {
+    const res = await authFetch("/api/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, voice }),

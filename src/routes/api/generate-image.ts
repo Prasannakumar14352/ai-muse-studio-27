@@ -20,6 +20,8 @@ export const Route = createFileRoute("/api/generate-image")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const { getUserIdFromRequest, unauthorized } = await import("@/lib/route-auth.server");
+        if (!(await getUserIdFromRequest(request))) return unauthorized();
         const {
           prompt,
           style,

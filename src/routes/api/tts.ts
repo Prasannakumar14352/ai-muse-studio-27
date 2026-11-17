@@ -7,6 +7,8 @@ export const Route = createFileRoute("/api/tts")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const { getUserIdFromRequest, unauthorized } = await import("@/lib/route-auth.server");
+        if (!(await getUserIdFromRequest(request))) return unauthorized();
         const { text, voice } = (await request.json()) as {
           text: string;
           voice?: string;
