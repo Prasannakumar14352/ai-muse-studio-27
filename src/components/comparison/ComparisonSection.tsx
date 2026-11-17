@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
+import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 import { Link } from "@tanstack/react-router";
-import { ShieldCheck, Info, ChevronDown } from "lucide-react";
+import { ShieldCheck, Info } from "lucide-react";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
@@ -205,19 +206,12 @@ export function ComparisonSection() {
             <label className="block text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
               Choose a tool to compare
             </label>
-            <div className="relative">
-              <select
-                value={mobileCompetitor}
-                onChange={(e) => setMobileCompetitor(e.target.value)}
-                aria-label="Select competitor to compare"
-                className="w-full appearance-none rounded-lg bg-black/40 border border-white/15 pl-3 pr-9 py-2.5 text-sm outline-none focus:border-white/30"
-              >
-                {competitors.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground" />
-            </div>
+            <CreatorFlowSelect
+              value={mobileCompetitor}
+              onValueChange={setMobileCompetitor}
+              options={competitors.map((c) => ({ value: c.id, label: c.name }))}
+              ariaLabel="Select competitor to compare"
+            />
             <div className="flex items-center justify-between mt-3 gap-2">
               <button
                 onClick={() => {
