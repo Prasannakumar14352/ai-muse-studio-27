@@ -190,12 +190,28 @@ BACKGROUND:
 {BACKGROUND_DESCRIPTION}
 
 THUMBNAIL TEXT:
-Render the text "{THUMBNAIL_TEXT}" clearly, bold, high contrast, 2–4 impactful words, placed as described above and never covering the face.
+{TEXT_SECTION}
 
 QUALITY STANDARDS (non-negotiable):
 Photorealistic, HDR, DSLR quality, ultra-detailed, premium color grading, high contrast, viral YouTube thumbnail style, optimized for maximum click-through rate (CTR). Sharp focus, cinematic lighting, rich saturation.
 
 STRICT: Output MUST be in {ASPECT_RATIO} aspect ratio. No borders, no watermarks, no logos, no extra UI, no misspelled text.`;
+
+/** Non-Latin scripts image models can't spell (Indic, Arabic). Keep in sync with text-overlay.ts. */
+const OVERLAY_SCRIPT = /[\u0600-\u06FF\u0900-\u0D7F]/;
+
+function textSection(text: string): string {
+  if (!text) return "Do not add any text.";
+  if (OVERLAY_SCRIPT.test(text)) {
+    // The app draws this text afterwards with a real font; the model must not try.
+    return (
+      "Do NOT draw any text, letters, numbers, captions or logos anywhere in the image. " +
+      "Keep the top 18% and bottom 18% of the frame clean and uncluttered (simple background only, no faces or key objects there) " +
+      "so a text banner can be placed over them later."
+    );
+  }
+  return `Render the text "${text}" clearly, bold, high contrast, 2–4 impactful words, placed as described above and never covering the face.`;
+}
 
 const PRESERVE_CLAUSE =
   "- IMPORTANT: The uploaded reference image is the primary subject — preserve facial identity EXACTLY. Do not alter facial features, hairstyle, or skin tone. Additional uploaded images are references for objects, environments, or context only.";
@@ -215,6 +231,6 @@ export function buildUniversalThumbnailPrompt(
     .replace("{SUBJECT_ACTION}", fill(vars.SUBJECT_ACTION, "confident hero pose"))
     .replace("{SUBJECT_EXPRESSION}", fill(vars.SUBJECT_EXPRESSION, "intense, engaging expression"))
     .replace("{BACKGROUND_DESCRIPTION}", fill(vars.BACKGROUND_DESCRIPTION, "cinematic, on-topic environment with dramatic lighting"))
-    .replace("{THUMBNAIL_TEXT}", fill(vars.THUMBNAIL_TEXT, "").toUpperCase())
+    .replace("{TEXT_SECTION}", textSection(fill(vars.THUMBNAIL_TEXT, "").toUpperCase()))
     .replace("{PRESERVE_SUBJECT}", vars.hasUploadedSubject ? PRESERVE_CLAUSE : "");
 }

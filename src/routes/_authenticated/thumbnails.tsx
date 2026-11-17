@@ -32,6 +32,7 @@ import {
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
 import { HandoffBanner } from "@/components/handoff-banner";
 import { useAutogen } from "@/lib/use-autogen";
+import { composeTextOverlay, needsTextOverlay } from "@/lib/text-overlay";
 
 export const Route = createFileRoute("/_authenticated/thumbnails")({
   head: () => ({
@@ -50,10 +51,25 @@ type GeneratedItem = {
   ratio: string;
   createdAt: number;
   quality?: ThumbnailQualityReport;
+  /** Clean image without the overlaid text (regional scripts are drawn by the app, not the AI). */
+  baseImage?: string;
+  /** Text drawn on top of baseImage. */
+  overlayText?: string;
 };
 
 type Mode = "create" | "reverse";
 type Step = 1 | 2 | 3;
+
+/** If the text is in a regional script, draw it with a real font on top of the AI image. */
+async function withOverlay(image: string, text: string | undefined): Promise<Pick<GeneratedItem, "image" | "baseImage" | "overlayText">> {
+  if (!text || !needsTextOverlay(text)) return { image };
+  try {
+    return { image: await composeTextOverlay(image, text), baseImage: image, overlayText: text };
+  } catch (e) {
+    console.warn("text overlay failed", e);
+    return { image };
+  }
+}
 
 function ThumbnailsPage() {
   const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("thumbnail"));
@@ -164,7 +180,7 @@ function ThumbnailsPage() {
         if (image) {
           const item: GeneratedItem = {
             id: crypto.randomUUID(),
-            image,
+            ...(await withOverlay(image, plan.thumbnailText || brief.customText)),
             prompt: positive,
             ratio: format.ratio,
             createdAt: Date.now(),
@@ -192,7 +208,8 @@ function ThumbnailsPage() {
       quality: QUALITIES.find((x) => x.id === brief.quality)!.imageQuality,
     });
     if (image) {
-      setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, image, quality: undefined } : x));
+      const next = await withOverlay(image, item.overlayText);
+      setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, ...next, quality: undefined } : x));
       qc.invalidateQueries({ queryKey: ["access"] });
       toast.success("Regenerated");
     } else {
@@ -200,18 +217,30 @@ function ThumbnailsPage() {
     }
   }
 
-  async function editItem(item: GeneratedItem, instruction: string, label: string) {
+  async function editItem(item: GeneratedItem, instruction: string, label: string, newText?: string) {
+    // Regional-script text is drawn by the app: replacing it is a local redraw (free, always spelled right).
+    if (newText !== undefined && (needsTextOverlay(newText) || item.baseImage)) {
+      const base = item.baseImage ?? item.image;
+      const next = needsTextOverlay(newText)
+        ? await withOverlay(base, newText)
+        : { image: await composeTextOverlay(base, newText), baseImage: base, overlayText: newText };
+      setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, ...next, quality: undefined } : x));
+      toast.success("Text updated");
+      return;
+    }
     toast.loading(`${label}…`, { id: `edit-${item.id}` });
     const { image, error } = await fetchGeneratedImage({
       prompt: instruction,
-      image: item.image,
+      // Edit the clean image so the AI doesn't garble overlaid regional text; redraw it after.
+      image: item.baseImage ?? item.image,
       ratio: (item.ratio === "16:9" || item.ratio === "9:16" || item.ratio === "1:1" ? item.ratio : "1:1"),
       background: "opaque",
       quality: "high",
     });
     toast.dismiss(`edit-${item.id}`);
     if (image) {
-      setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, image, quality: undefined } : x));
+      const next = await withOverlay(image, item.overlayText);
+      setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, ...next, quality: undefined } : x));
       qc.invalidateQueries({ queryKey: ["access"] });
       toast.success(`${label} done`);
     } else {
@@ -700,7 +729,7 @@ function GenerationGrid(props: {
   onAnalyze: (item: GeneratedItem) => void;
   onDownload: (item: GeneratedItem, fmt: "png" | "jpg" | "webp") => void;
   onSave: (item: GeneratedItem) => void;
-  onEdit: (item: GeneratedItem, instruction: string, label: string) => void;
+  onEdit: (item: GeneratedItem, instruction: string, label: string, newText?: string) => void;
   onBack: () => void;
   selectedItem: GeneratedItem | null;
 }) {
@@ -768,7 +797,7 @@ function GenerationGrid(props: {
               <ActionButton icon={Wand} label="Replace Face"
                 onClick={() => { const v = prompt("Describe the new face/expression:"); if (v) props.onEdit(selectedItem, `Replace only the face with: ${v}. Preserve everything else.`, "Replace face"); }} />
               <ActionButton icon={Wand} label="Replace Text"
-                onClick={() => { const v = prompt("New overlay text:"); if (v) props.onEdit(selectedItem, `Replace the overlay text with "${v.toUpperCase()}" in the same style.`, "Replace text"); }} />
+                onClick={() => { const v = prompt("New overlay text (any language):"); if (v) props.onEdit(selectedItem, `Replace the overlay text with "${v.toUpperCase()}" in the same style.`, "Replace text", v.toUpperCase()); }} />
               <ActionButton icon={Wand} label="Replace BG"
                 onClick={() => { const v = prompt("Describe the new background:"); if (v) props.onEdit(selectedItem, `Replace only the background with: ${v}. Keep subject and text intact.`, "Replace background"); }} />
               <ActionButton icon={BarChart3} label="Analyze" onClick={() => props.onAnalyze(selectedItem)} />
