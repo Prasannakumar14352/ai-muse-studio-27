@@ -206,6 +206,8 @@ export type PlannedBrief = {
   positivePrompt: string;
   negativePrompt: string;
   thumbnailText: string;
+  /** True when the app draws the text (regional-language topic or text) instead of the image model. */
+  textOverlay?: boolean;
   composition: string;
   cameraAngle: string;
   lighting: string;

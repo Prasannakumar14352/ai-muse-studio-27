@@ -172,6 +172,8 @@ export type UniversalPromptVars = {
   ASPECT_RATIO: string;             // e.g. "16:9"
   /** Set when the user uploaded a primary subject image — adds preserve clause. */
   hasUploadedSubject?: boolean;
+  /** App draws the text itself (regional-language topic or text): the model must draw none. */
+  textOverlay?: boolean;
 };
 
 const UNIVERSAL_TEMPLATE = `Create a highly clickable thumbnail in EXACT {ASPECT_RATIO} aspect ratio for the topic "{TOPIC}".
@@ -200,9 +202,13 @@ STRICT: Output MUST be in {ASPECT_RATIO} aspect ratio. No borders, no watermarks
 /** Non-Latin scripts image models can't spell (Indic, Arabic). Keep in sync with text-overlay.ts. */
 const OVERLAY_SCRIPT = /[\u0600-\u06FF\u0900-\u0D7F]/;
 
-function textSection(text: string): string {
-  if (!text) return "Do not add any text.";
-  if (OVERLAY_SCRIPT.test(text)) {
+export function needsOverlayScript(s: string | null | undefined): boolean {
+  return !!s && OVERLAY_SCRIPT.test(s);
+}
+
+function textSection(text: string, overlay = false): string {
+  if (!text && !overlay) return "Do not add any text.";
+  if (overlay || OVERLAY_SCRIPT.test(text)) {
     // The app draws this text afterwards with a real font; the model must not try.
     return (
       "Do NOT draw any text, letters, numbers, captions or logos anywhere in the image. " +
@@ -231,6 +237,6 @@ export function buildUniversalThumbnailPrompt(
     .replace("{SUBJECT_ACTION}", fill(vars.SUBJECT_ACTION, "confident hero pose"))
     .replace("{SUBJECT_EXPRESSION}", fill(vars.SUBJECT_EXPRESSION, "intense, engaging expression"))
     .replace("{BACKGROUND_DESCRIPTION}", fill(vars.BACKGROUND_DESCRIPTION, "cinematic, on-topic environment with dramatic lighting"))
-    .replace("{TEXT_SECTION}", textSection(fill(vars.THUMBNAIL_TEXT, "").toUpperCase()))
+    .replace("{TEXT_SECTION}", textSection(fill(vars.THUMBNAIL_TEXT, "").toUpperCase(), vars.textOverlay))
     .replace("{PRESERVE_SUBJECT}", vars.hasUploadedSubject ? PRESERVE_CLAUSE : "");
 }

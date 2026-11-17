@@ -33,6 +33,7 @@ import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-pre
 import { HandoffBanner } from "@/components/handoff-banner";
 import { useAutogen } from "@/lib/use-autogen";
 import { composeTextOverlay, needsTextOverlay } from "@/lib/text-overlay";
+import { promptDialog } from "@/components/prompt-dialog";
 
 export const Route = createFileRoute("/_authenticated/thumbnails")({
   head: () => ({
@@ -61,8 +62,8 @@ type Mode = "create" | "reverse";
 type Step = 1 | 2 | 3;
 
 /** If the text is in a regional script, draw it with a real font on top of the AI image. */
-async function withOverlay(image: string, text: string | undefined): Promise<Pick<GeneratedItem, "image" | "baseImage" | "overlayText">> {
-  if (!text || !needsTextOverlay(text)) return { image };
+async function withOverlay(image: string, text: string | undefined, force = false): Promise<Pick<GeneratedItem, "image" | "baseImage" | "overlayText">> {
+  if (!text || (!force && !needsTextOverlay(text))) return { image };
   try {
     return { image: await composeTextOverlay(image, text), baseImage: image, overlayText: text };
   } catch (e) {
@@ -180,7 +181,7 @@ function ThumbnailsPage() {
         if (image) {
           const item: GeneratedItem = {
             id: crypto.randomUUID(),
-            ...(await withOverlay(image, plan.thumbnailText || brief.customText)),
+            ...(await withOverlay(image, plan.thumbnailText || brief.customText, plan.textOverlay)),
             prompt: positive,
             ratio: format.ratio,
             createdAt: Date.now(),
@@ -208,7 +209,7 @@ function ThumbnailsPage() {
       quality: QUALITIES.find((x) => x.id === brief.quality)!.imageQuality,
     });
     if (image) {
-      const next = await withOverlay(image, item.overlayText);
+      const next = await withOverlay(image, item.overlayText, !!item.baseImage);
       setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, ...next, quality: undefined } : x));
       qc.invalidateQueries({ queryKey: ["access"] });
       toast.success("Regenerated");
@@ -220,7 +221,25 @@ function ThumbnailsPage() {
   async function editItem(item: GeneratedItem, instruction: string, label: string, newText?: string) {
     // Regional-script text is drawn by the app: replacing it is a local redraw (free, always spelled right).
     if (newText !== undefined && (needsTextOverlay(newText) || item.baseImage)) {
-      const base = item.baseImage ?? item.image;
+      let base = item.baseImage;
+      if (!base) {
+        // Text was drawn by the AI into this image: erase it first so the new text isn't layered over garbled letters.
+        toast.loading("Removing old text…", { id: `edit-${item.id}` });
+        const cleaned = await fetchGeneratedImage({
+          prompt: "Remove ALL text, letters, numbers, captions and logos from this image. Fill those areas seamlessly with the surrounding background. Change nothing else.",
+          image: item.image,
+          ratio: (item.ratio === "16:9" || item.ratio === "9:16" || item.ratio === "1:1" ? item.ratio : "1:1"),
+          background: "opaque",
+          quality: "high",
+        });
+        toast.dismiss(`edit-${item.id}`);
+        if (!cleaned.image) {
+          toast.error(cleaned.error ?? "Could not remove the old text");
+          return;
+        }
+        base = cleaned.image;
+        qc.invalidateQueries({ queryKey: ["access"] });
+      }
       const next = needsTextOverlay(newText)
         ? await withOverlay(base, newText)
         : { image: await composeTextOverlay(base, newText), baseImage: base, overlayText: newText };
@@ -239,7 +258,7 @@ function ThumbnailsPage() {
     });
     toast.dismiss(`edit-${item.id}`);
     if (image) {
-      const next = await withOverlay(image, item.overlayText);
+      const next = await withOverlay(image, item.overlayText, !!item.baseImage);
       setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, ...next, quality: undefined } : x));
       qc.invalidateQueries({ queryKey: ["access"] });
       toast.success(`${label} done`);
@@ -793,13 +812,13 @@ function GenerationGrid(props: {
               <ActionButton icon={Eraser} label="Magic Eraser"
                 onClick={() => props.onEdit(selectedItem, "Cleanly remove any distracting objects, watermarks, or text artifacts. Fill in seamlessly.", "Magic eraser")} />
               <ActionButton icon={Wand} label="Replace Subject"
-                onClick={() => { const v = prompt("Describe the new subject:"); if (v) props.onEdit(selectedItem, `Replace the main subject with: ${v}. Match lighting and composition.`, "Replace subject"); }} />
+                onClick={async () => { const v = await promptDialog({ title: "Replace subject", description: "Describe who or what should be the main subject.", placeholder: "e.g. a young woman in a red saree, amazed expression", multiline: true, confirmText: "Replace subject" }); if (v) props.onEdit(selectedItem, `Replace the main subject with: ${v}. Match lighting and composition.`, "Replace subject"); }} />
               <ActionButton icon={Wand} label="Replace Face"
-                onClick={() => { const v = prompt("Describe the new face/expression:"); if (v) props.onEdit(selectedItem, `Replace only the face with: ${v}. Preserve everything else.`, "Replace face"); }} />
+                onClick={async () => { const v = await promptDialog({ title: "Replace face", description: "Describe the new face or expression.", placeholder: "e.g. shocked, mouth open, wide eyes", suggestions: ["Shocked", "Excited", "Curious", "Scared", "Laughing"], confirmText: "Replace face" }); if (v) props.onEdit(selectedItem, `Replace only the face with: ${v}. Preserve everything else.`, "Replace face"); }} />
               <ActionButton icon={Wand} label="Replace Text"
-                onClick={() => { const v = prompt("New overlay text (any language):"); if (v) props.onEdit(selectedItem, `Replace the overlay text with "${v.toUpperCase()}" in the same style.`, "Replace text", v.toUpperCase()); }} />
+                onClick={async () => { const v = await promptDialog({ title: "Replace text", description: "Type the thumbnail text in any language.", placeholder: "e.g. 2100లో THEATRE / ఇలా ఉంటుందా?", defaultValue: selectedItem.overlayText ?? "", hint: selectedItem.baseImage ? "Use \" / \" to split into a top and bottom line. Drawn with a proper font for any language — instant and free." : "Use \" / \" to split into a top and bottom line. The old AI-drawn text is erased first (one HD edit, 6 credits), then your text is drawn with a proper font.", confirmText: "Update text" }); if (v) props.onEdit(selectedItem, `Replace the overlay text with "${v.toUpperCase()}" in the same style.`, "Replace text", v.toUpperCase()); }} />
               <ActionButton icon={Wand} label="Replace BG"
-                onClick={() => { const v = prompt("Describe the new background:"); if (v) props.onEdit(selectedItem, `Replace only the background with: ${v}. Keep subject and text intact.`, "Replace background"); }} />
+                onClick={async () => { const v = await promptDialog({ title: "Replace background", description: "Describe the new background.", placeholder: "e.g. neon city street at night, rain reflections", multiline: true, confirmText: "Replace background" }); if (v) props.onEdit(selectedItem, `Replace only the background with: ${v}. Keep subject and text intact.`, "Replace background"); }} />
               <ActionButton icon={BarChart3} label="Analyze" onClick={() => props.onAnalyze(selectedItem)} />
               <ActionButton icon={Copy} label="Save to library" onClick={() => props.onSave(selectedItem)} />
               <ActionButton icon={Download} label="PNG" onClick={() => props.onDownload(selectedItem, "png")} primary />

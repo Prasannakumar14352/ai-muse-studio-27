@@ -32,6 +32,7 @@ import {
   exportDoc,
   exportPdf,
 } from "@/lib/linkedin-exports";
+import { promptDialog } from "@/components/prompt-dialog";
 
 export const Route = createFileRoute("/_authenticated/linkedin-posts/new")({
   component: NewLinkedinPostPage,
@@ -451,9 +452,9 @@ function NewLinkedinPostPage() {
             <div className="flex items-center justify-between">
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Brand voice</div>
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (!voiceDesc.trim()) return toast.error("Add a voice description first");
-                  const name = window.prompt("Name this brand voice") ?? "";
+                  const name = (await promptDialog({ title: "Save brand voice", placeholder: "e.g. Friendly founder", confirmText: "Save" })) ?? "";
                   if (!name.trim()) return;
                   const v = saveBrandVoice({ name: name.trim(), description: voiceDesc, writing_style: writingStyle, tone, emoji_level: emojiLevel });
                   setVoices((prev) => [...prev, v]);

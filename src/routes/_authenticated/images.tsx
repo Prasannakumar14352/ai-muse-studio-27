@@ -23,6 +23,7 @@ import type { GenerateImageRequest } from "@/lib/image-stream";
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
 import { HandoffBanner } from "@/components/handoff-banner";
 import { useAutogen } from "@/lib/use-autogen";
+import { promptDialog } from "@/components/prompt-dialog";
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 
@@ -729,15 +730,16 @@ function ImageCard({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  function askAndEdit(op: EditOp) {
+  async function askAndEdit(op: EditOp) {
     if (op === "inpaint" || op === "eraser") {
-      const hint = window.prompt(op === "inpaint"
-        ? "Describe what to change and what to replace it with:"
-        : "Describe what to erase from the image:");
+      const hint = await promptDialog(op === "inpaint"
+        ? { title: "Inpaint", description: "Describe what to change and what to replace it with.", placeholder: "e.g. replace the coffee cup with a glass of mango juice", multiline: true, confirmText: "Apply" }
+        : { title: "Magic eraser", description: "Describe what to erase from the image.", placeholder: "e.g. the person in the background on the left", multiline: true, confirmText: "Erase" });
       if (!hint) return;
       onEdit(op, { maskHint: hint });
     } else if (op === "outpaint") {
-      const dir = window.prompt("Direction to extend (left / right / top / bottom / all):", "all") ?? "all";
+      const dir = await promptDialog({ title: "Extend image", description: "Which side should the image be extended?", choices: ["all", "left", "right", "top", "bottom"], confirmText: "Extend" });
+      if (!dir) return;
       const valid = ["left", "right", "top", "bottom", "all"] as const;
       const direction = (valid as readonly string[]).includes(dir) ? (dir as (typeof valid)[number]) : "all";
       onEdit(op, { direction });

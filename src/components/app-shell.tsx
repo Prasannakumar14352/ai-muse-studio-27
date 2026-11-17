@@ -22,6 +22,7 @@ import {
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { BrandLogo } from "@/components/brand-logo";
 import { isHiddenPath } from "@/lib/hidden-features";
+import { PromptDialogHost } from "@/components/prompt-dialog";
 
 // Map a project's `content_type` to the top-level sidebar tab that should
 // show the "active" highlight while the user is editing that project at
@@ -482,6 +483,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="max-w-7xl mx-auto p-6 md:p-10">{children}</div>
       </main>
       <ConfirmDialogHost />
+      <PromptDialogHost />
       <CommandPalette />
     </div>
   );
