@@ -4,12 +4,14 @@ import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
   Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug, Linkedin,
   ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target, Calendar as CalendarIcon, Library, Megaphone,
-  Bell, User as UserIcon, FolderKanban, Command as CommandIcon, Clapperboard,
+  Bell, User as UserIcon, FolderKanban, Command as CommandIcon, Clapperboard, Lock,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAccess, getAvailableCredits } from "@/lib/access";
 import { MODULE_CONTENT_TYPES, type ModuleId } from "@/lib/content-types";
+import { usePlanAccess, useUpgradeDialog } from "@/lib/use-plan-access";
+import { TIER_LABEL } from "@/lib/plan-access";
 import { CommandPalette, openCommandPalette } from "@/components/command-palette";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
@@ -116,6 +118,7 @@ const SECTIONS: readonly NavSection[] = [
       { to: "/admin/integrations", label: "Social Publishing", icon: Plug },
       { to: "/admin/marketplace", label: "Marketplace CMS", icon: Store },
       { to: "/admin/readiness", label: "Feature Readiness", icon: Crown },
+      { to: "/admin/plan-access", label: "Plan Access", icon: Lock },
     ],
   },
   {
@@ -154,6 +157,8 @@ function useModuleCounts() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const { canPath } = usePlanAccess();
+  const openUpgrade = useUpgradeDialog();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
@@ -224,11 +229,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   function renderNavItem(n: NavItem, onClick?: () => void) {
     const active = isActive(n.to);
     const count = n.moduleId ? counts?.[n.moduleId] ?? 0 : null;
+    const lock = canPath(n.to);
     return (
       <Link
         key={`${n.to}-${n.label}`}
         to={n.to}
-        onClick={onClick}
+        onClick={(e) => {
+          if (!lock.allowed) {
+            e.preventDefault();
+            openUpgrade({ label: n.label, required: lock.required });
+            return;
+          }
+          onClick?.();
+        }}
         title={collapsed ? n.label : undefined}
         className={`group relative flex items-center ${collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2"} rounded-xl text-sm font-medium transition-all duration-200 ${
           active
@@ -240,7 +253,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="absolute -left-3 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-white/80" aria-hidden />
         )}
         <n.icon className={`w-4 h-4 shrink-0 transition-transform duration-200 ${!active ? "group-hover:scale-110" : ""}`} />
-        {!collapsed && <span className="flex-1 truncate">{n.label}</span>}
+        {!collapsed && <span className={`flex-1 truncate ${!lock.allowed ? "opacity-60" : ""}`}>{n.label}</span>}
+        {!lock.allowed && (collapsed ? (
+          <Lock className="absolute top-1 right-1 w-2.5 h-2.5 text-muted-foreground" aria-label="Locked" />
+        ) : (
+          <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-1.5 h-[20px] bg-white/[0.06] text-muted-foreground" title={`Requires ${TIER_LABEL[lock.required]}`}>
+            <Lock className="w-3 h-3" /> {TIER_LABEL[lock.required]}
+          </span>
+        ))}
         {!collapsed && count !== null && count > 0 && (
           <span className={`ml-auto inline-flex items-center justify-center min-w-[22px] h-[20px] px-1.5 text-[10px] font-semibold rounded-full ${
             active
@@ -387,17 +407,29 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {section.items.map((n) => {
                   const count = n.moduleId ? counts?.[n.moduleId] ?? 0 : null;
                   const active = isActive(n.to);
+                  const lock = canPath(n.to);
                   return (
                     <Link
                       key={`${n.to}-${n.label}`}
                       to={n.to}
-                      onClick={() => setOpen(false)}
+                      onClick={(e) => {
+                        setOpen(false);
+                        if (!lock.allowed) {
+                          e.preventDefault();
+                          openUpgrade({ label: n.label, required: lock.required });
+                        }
+                      }}
                       className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm ${
                         active ? "gradient-primary text-white" : "hover:bg-white/5"
                       }`}
                     >
                       <n.icon className="w-4 h-4" />
-                      <span className="flex-1">{n.label}</span>
+                      <span className={`flex-1 ${!lock.allowed ? "opacity-60" : ""}`}>{n.label}</span>
+                      {!lock.allowed && (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-muted-foreground">
+                          <Lock className="w-3 h-3" /> {TIER_LABEL[lock.required]}
+                        </span>
+                      )}
                       {count !== null && count > 0 && (
                         <span className={`text-[10px] px-2 py-0.5 rounded-full ${active ? "bg-white/25 text-white" : "bg-white/10 text-muted-foreground"}`}>{count}</span>
                       )}

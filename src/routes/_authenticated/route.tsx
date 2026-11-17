@@ -1,7 +1,8 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
 import { GlobalCreditGate } from "@/components/global-credit-gate";
+import { PlanGate, UpgradeDialogProvider } from "@/lib/use-plan-access";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -33,10 +34,19 @@ export const Route = createFileRoute("/_authenticated")({
     }
     return { user: session.user };
   },
-  component: () => (
-    <AppShell>
-      <Outlet />
-      <GlobalCreditGate />
-    </AppShell>
-  ),
+  component: AuthenticatedLayout,
 });
+
+function AuthenticatedLayout() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  return (
+    <UpgradeDialogProvider>
+      <AppShell>
+        <PlanGate pathname={pathname}>
+          <Outlet />
+        </PlanGate>
+        <GlobalCreditGate />
+      </AppShell>
+    </UpgradeDialogProvider>
+  );
+}

@@ -25,6 +25,8 @@ export type AccessInfo = {
   monthlyUsed: number;         // subscription.monthly_credits_used
   monthlyRemaining: number;
   renewsAt: string | null;
+  /** Subscription end; after this the plan no longer unlocks features. */
+  expiresAt: string | null;
 };
 
 export async function getAccessInfo(): Promise<AccessInfo | null> {
@@ -41,7 +43,7 @@ export async function getAccessInfo(): Promise<AccessInfo | null> {
   const sub = subRes.data as {
     plan_name?: string; plan_type?: string; lifetime_access?: boolean;
     monthly_credit_limit?: number; monthly_credits_used?: number;
-    unlimited_usage?: boolean; renews_at?: string | null;
+    unlimited_usage?: boolean; renews_at?: string | null; expires_at?: string | null;
   } | null;
 
   const emailIsAdmin = isAdminUser(user.email);
@@ -67,6 +69,7 @@ export async function getAccessInfo(): Promise<AccessInfo | null> {
     monthlyUsed: used,
     monthlyRemaining: Math.max(0, limit - used),
     renewsAt: sub?.renews_at ?? null,
+    expiresAt: sub?.expires_at ?? null,
   };
 }
 
