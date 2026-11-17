@@ -3,7 +3,7 @@
 // prices without a code change.
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
+import { useQuery, queryOptions } from "@tanstack/react-query";
 import { Check, Star, Infinity as InfinityIcon } from "lucide-react";
 import { listPricingPlans, type PricingPlan, type BillingCycle } from "@/lib/pricing.functions";
 
@@ -18,8 +18,11 @@ function usd(n: number) {
 }
 
 export function LandingPricingTabs() {
-  const { data } = useSuspenseQuery(plansQuery);
-  const plans = data.plans;
+  // Non-suspense on purpose: if the pricing fetch fails (DB down, missing
+  // env var) the rest of the landing page must still render. A suspense
+  // query here throws to the root error boundary and blanks the whole site.
+  const { data } = useQuery({ ...plansQuery, retry: 1 });
+  const plans = data?.plans ?? [];
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
 
   const list = cycle === "lifetime"
