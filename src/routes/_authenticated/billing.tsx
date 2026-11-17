@@ -187,7 +187,9 @@ function BillingPage() {
           </section>
 
           {/* Inline top-up packs — buy extra credits without leaving Billing */}
-          <TopUpPacks />
+          <div id="topup" className="scroll-mt-20">
+            <TopUpPacks />
+          </div>
 
           {/* Quick actions */}
           <section className="grid gap-4 md:grid-cols-2">

@@ -74,7 +74,9 @@ export async function getAccessInfo(): Promise<AccessInfo | null> {
 }
 
 export function useAccess() {
-  return useQuery({ queryKey: ["access"], queryFn: getAccessInfo, staleTime: 30_000 });
+  // Refetch every 20s: images and voice are charged on the server, so the
+  // header credit count must catch up without a page reload.
+  return useQuery({ queryKey: ["access"], queryFn: getAccessInfo, staleTime: 15_000, refetchInterval: 20_000 });
 }
 
 /** Total credits the user could still spend (monthly + top-up + lifetime). Admins return Infinity. */

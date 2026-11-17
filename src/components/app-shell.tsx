@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAccess, getAvailableCredits } from "@/lib/access";
 import { MODULE_CONTENT_TYPES, type ModuleId } from "@/lib/content-types";
-import { usePlanAccess, useUpgradeDialog } from "@/lib/use-plan-access";
+import { usePlanAccess, useUpgradeDialog, userTier } from "@/lib/use-plan-access";
 import { TIER_LABEL } from "@/lib/plan-access";
 import { CommandPalette, openCommandPalette } from "@/components/command-palette";
 import {
@@ -543,15 +543,41 @@ function CreditsChip() {
     );
   }
   const total = getAvailableCredits(access);
-  const low = total < 20;
+  // "Low" = under 25 credits or under 10% of the monthly allowance (one short reel ≈ 25).
+  const low = total < Math.max(25, Math.ceil(access.monthlyLimit * 0.1));
+  const empty = total <= 0;
+  const title = `Balance: ${access.balance.toLocaleString()} · Monthly left: ${access.monthlyRemaining.toLocaleString()} · Lifetime: ${access.lifetimeCredits.toLocaleString()}`;
+
+  // Out of / running low on credits: a highlighted "Buy credits" button that opens top-up packs.
+  if (low) {
+    return (
+      <Link
+        to="/billing"
+        hash="topup"
+        title={title}
+        className={`relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold text-white gradient-primary shadow-[var(--shadow-glow)] transition hover:brightness-110 ${empty ? "ring-2 ring-rose-400/70" : ""}`}>
+        <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500" />
+        </span>
+        <Zap className="w-3.5 h-3.5" />
+        {empty ? (
+          <span>Out of credits · Buy credits</span>
+        ) : (
+          <span>
+            {total.toLocaleString()} left<span className="hidden sm:inline"> · Buy credits</span>
+          </span>
+        )}
+      </Link>
+    );
+  }
+
   return (
     <Link
-      to="/pricing"
-      title={`Balance: ${access.balance.toLocaleString()} · Monthly left: ${access.monthlyRemaining.toLocaleString()}`}
-      className={`inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs font-medium border transition hover:bg-white/10 ${
-        low ? "border-rose-500/50 text-rose-200" : "border-[color:var(--neon-purple)]/40 text-foreground"
-      }`}>
-      <Zap className={`w-3.5 h-3.5 ${low ? "text-rose-300" : "text-[color:var(--neon-pink)]"}`} />
+      to="/billing"
+      title={title}
+      className="inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs font-medium border transition hover:bg-white/10 border-[color:var(--neon-purple)]/40 text-foreground">
+      <Zap className="w-3.5 h-3.5 text-[color:var(--neon-pink)]" />
       <span>{Number.isFinite(total) ? total.toLocaleString() : <InfinityIcon className="w-3.5 h-3.5" />}</span>
       <span className="text-muted-foreground hidden sm:inline">credits</span>
       <span className="text-muted-foreground">·</span>
@@ -564,7 +590,10 @@ function PlanPill() {
   const { data: access } = useAccess();
   if (!access) return null;
   const unlimited = access.unlimited;
-  const planName = unlimited ? "Unlimited Plan" : "Creator Plan";
+  const tier = userTier(access);
+  const planName = unlimited
+    ? access.isAdmin ? "Admin" : "Unlimited Plan"
+    : `${TIER_LABEL[tier]}${access.planType === "lifetime" ? " Lifetime" : access.planType === "yearly" ? " Yearly" : ""} Plan`;
   return (
     <Link
       to="/pricing"
