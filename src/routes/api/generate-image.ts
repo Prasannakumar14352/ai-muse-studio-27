@@ -1,20 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 /**
- * Streaming image-generation endpoint.
+ * Image generation / editing endpoint, served by fal.ai.
  *
- * The previous implementation buffered the entire upstream response before
- * responding, which regularly tripped Cloudflare's 100s origin timeout (524)
- * on high-quality `openai/gpt-image-2` renders. This version:
+ *   - Plain generation → fal-ai/nano-banana (Google Gemini image model,
+ *     the same family the app used through Lovable's gateway)
+ *   - Any input image or edit op (upscale, remove background, inpaint,
+ *     outpaint, eraser, references) → fal-ai/nano-banana/edit
  *
- *   1. Uses `google/gemini-3.1-flash-image` by default (much faster, still
- *      pro-tier quality), with an opt-in escape hatch for `openai/gpt-image-2`.
- *   2. Requests `stream: true` and pipes the upstream SSE body straight
- *      through to the browser — bytes start flowing within a couple seconds
- *      so Cloudflare never times out.
- *
- * The client parses the stream, keeps the latest partial for a live preview,
- * and treats the final `image_generation.completed` frame as the finished PNG.
+ * Returns JSON { image: <data URL> }; the client helper (image-stream.ts)
+ * already accepts this non-streaming shape. Requires FAL_KEY.
  */
 export const Route = createFileRoute("/api/generate-image")({
   server: {
@@ -58,20 +53,13 @@ export const Route = createFileRoute("/api/generate-image")({
           outpaintDirection?: "left" | "right" | "top" | "bottom" | "all";
         };
 
-        const key = process.env.LOVABLE_API_KEY;
+        const key = process.env.FAL_KEY;
         if (!key) {
-          return json({ error: "Missing LOVABLE_API_KEY" }, 500);
+          return json({ error: "Image generation is not configured (missing FAL_KEY)." }, 500);
         }
         if (!prompt || !prompt.trim()) {
           return json({ error: "Prompt required" }, 400);
         }
-
-        const size =
-          ratio === "9:16"
-            ? "1024x1536"
-            : ratio === "16:9"
-              ? "1536x1024"
-              : "1024x1024";
 
         const stylePrefix = style ? `${style} style. ` : "";
 
@@ -109,88 +97,60 @@ export const Route = createFileRoute("/api/generate-image")({
 
         const fullPrompt = `${opPrefix}${stylePrefix}${prompt}${negativeSuffix}${hintsLine}`;
 
-        const model = modelOverride ?? "google/gemini-3.1-flash-image";
-
         // Collect all attached images (edit source + refs + style refs).
         const allImages: string[] = [];
         if (image) allImages.push(image);
         if (referenceImages?.length) allImages.push(...referenceImages);
-        if (styleImages?.length) {
-          if (styleImages.length) {
-            allImages.push(...styleImages);
-          }
-        }
+        if (styleImages?.length) allImages.push(...styleImages);
 
-        // Build request body per model family (see ai-image-generation).
-        let body: Record<string, unknown>;
-        if (model.startsWith("openai/")) {
-          body = {
-            model,
-            prompt: fullPrompt,
-            size,
-            quality: quality ?? "medium",
-            n: 1,
-            stream: true,
-            partial_images: 1,
-          };
-          if (background === "transparent") body.background = "transparent";
-        } else {
-          // Gemini chat-completions image shape. Include any attached images.
-          const content: unknown = allImages.length
-            ? [
-                { type: "text", text: fullPrompt },
-                ...allImages.map((url) => ({ type: "image_url", image_url: { url } })),
-              ]
-            : fullPrompt;
-          body = {
-            model,
-            messages: [{ role: "user", content }],
-            modalities: ["image", "text"],
-            stream: true,
-          };
+        const isEdit = allImages.length > 0 || (!!operation && operation !== "generate");
+        if (isEdit && allImages.length === 0) {
+          return json({ error: "This edit needs an input image." }, 400);
         }
+        const endpoint = isEdit ? "fal-ai/nano-banana/edit" : "fal-ai/nano-banana";
+        const RATIOS = ["21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"];
+        const aspect = ratio && RATIOS.includes(ratio) ? ratio : isEdit ? "auto" : "1:1";
+
+        const input: Record<string, unknown> = {
+          prompt: fullPrompt,
+          num_images: 1,
+          aspect_ratio: aspect,
+          output_format: background === "transparent" || operation === "removeBg" ? "png" : "jpeg",
+          sync_mode: true,
+        };
+        if (isEdit) input.image_urls = allImages;
+        if (typeof seed === "number") input.seed = seed;
+        void quality; void modelOverride;
 
         let upstream: Response;
         try {
-          upstream = await fetch(
-            "https://ai.gateway.lovable.dev/v1/images/generations",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${key}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(body),
-            },
-          );
+          upstream = await fetch(`https://fal.run/${endpoint}`, {
+            method: "POST",
+            headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
+            body: JSON.stringify(input),
+          });
         } catch (error) {
-          return json(
-            {
-              error:
-                error instanceof Error
-                  ? error.message
-                  : "Image service unreachable",
-            },
-            502,
-          );
+          return json({ error: error instanceof Error ? error.message : "Image service unreachable" }, 502);
         }
 
-        if (!upstream.ok || !upstream.body) {
-          const text = await upstream.text().catch(() => "");
-          return json({ error: text || "Image generation failed" }, upstream.status);
+        const out = (await upstream.json().catch(() => ({}))) as {
+          images?: Array<{ url?: string; content_type?: string }>;
+          detail?: unknown;
+        };
+        if (!upstream.ok) {
+          const detail = typeof out.detail === "string" ? out.detail : JSON.stringify(out.detail ?? out);
+          return json({ error: `Image generation failed (${upstream.status}): ${detail.slice(0, 300)}` }, upstream.status);
         }
+        let url = out.images?.[0]?.url;
+        if (!url) return json({ error: "No image returned" }, 502);
 
-        // Pipe SSE straight to the client. Bytes flow immediately, so
-        // Cloudflare doesn't time out and the browser can render partials.
-        return new Response(upstream.body, {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-            "X-Accel-Buffering": "no",
-            "X-Image-Model": model,
-          },
-        });
+        // sync_mode returns a data URI; fall back to fetching a hosted URL.
+        if (!url.startsWith("data:")) {
+          const img = await fetch(url);
+          const buf = Buffer.from(await img.arrayBuffer());
+          url = `data:${img.headers.get("content-type") ?? "image/png"};base64,${buf.toString("base64")}`;
+        }
+        return json({ image: url, model: endpoint });
       },
     },
   },

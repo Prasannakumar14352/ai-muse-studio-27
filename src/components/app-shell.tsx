@@ -21,6 +21,7 @@ import {
 
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { BrandLogo } from "@/components/brand-logo";
+import { isHiddenPath } from "@/lib/hidden-features";
 
 // Map a project's `content_type` to the top-level sidebar tab that should
 // show the "active" highlight while the user is editing that project at
@@ -169,7 +170,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { data: access } = useAccess();
   const { data: counts } = useModuleCounts();
 
-  const sections = SECTIONS.filter((s) => !s.adminOnly || access?.isAdmin);
+  const sections = SECTIONS.filter((s) => !s.adminOnly || access?.isAdmin).map((s) => ({
+    ...s,
+    items: s.items.filter((n) => !isHiddenPath(n.to)),
+  }));
 
   function toggleCollapse() {
     setCollapsed((prev) => {

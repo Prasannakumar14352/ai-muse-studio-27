@@ -12,6 +12,7 @@ import {
   Palette as PaletteIcon, TrendingUp, Search, Bot, Command as CommandIcon,
   CheckCircle2, AlertCircle,
 } from "lucide-react";
+import { isHiddenPath } from "@/lib/hidden-features";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
 
@@ -124,7 +125,7 @@ function Dashboard() {
           <Link to="/create" className="text-sm text-[color:var(--neon-purple)] hover:underline">See all →</Link>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {QUICK_ACTIONS.map((q) => (
+          {QUICK_ACTIONS.filter((q) => !isHiddenPath(q.to)).map((q) => (
             <Link
               key={q.label}
               to={q.to}
@@ -222,9 +223,11 @@ function Dashboard() {
             <Link to="/research" className="glass rounded-xl p-2.5 text-xs flex items-center gap-2 hover:border-white/20 transition">
               <Search className="w-3.5 h-3.5 text-[color:var(--neon-pink)]" /> Research
             </Link>
-            <Link to="/agents" className="glass rounded-xl p-2.5 text-xs flex items-center gap-2 hover:border-white/20 transition">
-              <Bot className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" /> AI Agents
-            </Link>
+            {!isHiddenPath("/agents") && (
+              <Link to="/agents" className="glass rounded-xl p-2.5 text-xs flex items-center gap-2 hover:border-white/20 transition">
+                <Bot className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" /> AI Agents
+              </Link>
+            )}
           </div>
         </div>
       </section>

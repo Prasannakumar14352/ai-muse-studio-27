@@ -13,6 +13,7 @@ import {
   markManuallyPublished, schedulePost, PLATFORMS, type Platform, type PublishStatus,
 } from "@/lib/publishing.functions";
 import { copyText, downloadPlatformPackage, buildLinkedInPost } from "@/lib/downloads";
+import { isHiddenPath } from "@/lib/hidden-features";
 
 export type PublishActionsProps = {
   projectId?: string;
@@ -99,7 +100,7 @@ export function PublishActions(props: PublishActionsProps) {
       if (r.ok) {
         toast.warning("Queued — connect your account to complete publishing", {
           description: "For now the post is queued and can be finished manually.",
-          action: { label: "Connect", onClick: () => { window.location.href = "/connections"; } },
+          ...(isHiddenPath("/connections") ? {} : { action: { label: "Connect", onClick: () => { window.location.href = "/connections"; } } }),
         });
         setOpen(false);
       }
@@ -211,9 +212,11 @@ export function PublishActions(props: PublishActionsProps) {
                   </button>
                 ))}
               </div>
-              <Link to="/connections" className="text-xs text-[color:var(--neon-purple)] hover:underline inline-flex items-center gap-1">
-                Manage connected accounts <ExternalLink className="w-3 h-3" />
-              </Link>
+              {!isHiddenPath("/connections") && (
+                <Link to="/connections" className="text-xs text-[color:var(--neon-purple)] hover:underline inline-flex items-center gap-1">
+                  Manage connected accounts <ExternalLink className="w-3 h-3" />
+                </Link>
+              )}
             </div>
 
             {props.caption && (

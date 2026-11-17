@@ -13,6 +13,7 @@ import {
   Plug, Linkedin, Wallet, CreditCard, Receipt, Settings, BarChart3, Crown,
   Split, FolderKanban, Plus, LogOut,
 } from "lucide-react";
+import { isHiddenPath } from "@/lib/hidden-features";
 
 type Intent = {
   label: string;
@@ -104,7 +105,7 @@ export function CommandPalette() {
         <CommandEmpty>No results. Try “video”, “thumbnail”, “carousel”…</CommandEmpty>
 
         <CommandGroup heading="Create">
-          {CREATE.map((c) => (
+          {CREATE.filter((c) => !isHiddenPath(c.to)).map((c) => (
             <CommandItem key={c.label} value={`create ${c.label} ${c.keywords ?? ""}`} onSelect={() => go(c.to)}>
               <c.icon className="mr-2 h-4 w-4 text-[color:var(--brand-orange)]" />
               <span className="flex-1">{c.label}</span>
@@ -117,7 +118,7 @@ export function CommandPalette() {
         <CommandSeparator />
 
         <CommandGroup heading="Navigate">
-          {NAV.map((n) => (
+          {NAV.filter((n) => !isHiddenPath(n.to)).map((n) => (
             <CommandItem key={n.to + n.label} value={`go ${n.label} ${n.keywords ?? ""}`} onSelect={() => go(n.to)}>
               <n.icon className="mr-2 h-4 w-4" />
               <span>{n.label}</span>

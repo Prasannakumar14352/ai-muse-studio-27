@@ -31,26 +31,26 @@ export type ProviderConfig = {
 
 const REGISTRY: Record<Capability, ProviderConfig[]> = {
   image_generation: [
-    { provider: "lovable-gateway", model: "google/gemini-3.1-flash-image", envKey: "LOVABLE_API_KEY", enabled: true, production: true, timeoutMs: 60_000, maxRetries: 2 },
+    { provider: "fal", model: "fal-ai/nano-banana", envKey: "FAL_KEY", enabled: true, production: true, timeoutMs: 60_000, maxRetries: 2 },
   ],
   image_editing: [
-    { provider: "lovable-gateway", model: "google/gemini-3.1-flash-image", envKey: "LOVABLE_API_KEY", enabled: true, production: true, timeoutMs: 60_000, maxRetries: 2, notes: "Prompt-based edits, generative fill, extend, transform." },
+    { provider: "fal", model: "fal-ai/nano-banana", envKey: "FAL_KEY", enabled: true, production: true, timeoutMs: 60_000, maxRetries: 2, notes: "Prompt-based edits, generative fill, extend, transform." },
   ],
   background_removal: [
-    { provider: "lovable-gateway", model: "google/gemini-3.1-flash-image", envKey: "LOVABLE_API_KEY", enabled: true, production: true, timeoutMs: 60_000, maxRetries: 2, notes: "Best-effort via prompt; not a dedicated matte cutout." },
+    { provider: "fal", model: "fal-ai/nano-banana", envKey: "FAL_KEY", enabled: true, production: true, timeoutMs: 60_000, maxRetries: 2, notes: "Best-effort via prompt; not a dedicated matte cutout." },
   ],
   generative_fill: [
-    { provider: "lovable-gateway", model: "google/gemini-3.1-flash-image", envKey: "LOVABLE_API_KEY", enabled: true, production: true, timeoutMs: 60_000, maxRetries: 2 },
+    { provider: "fal", model: "fal-ai/nano-banana", envKey: "FAL_KEY", enabled: true, production: true, timeoutMs: 60_000, maxRetries: 2 },
   ],
   seo_writing: [
-    { provider: "lovable-gateway", model: "openai/gpt-5.5", envKey: "LOVABLE_API_KEY", enabled: true, production: true, timeoutMs: 60_000, maxRetries: 1 },
+    { provider: "openrouter", model: "google/gemini-2.5-flash", envKey: "OPENROUTER_API_KEY", enabled: true, production: true, timeoutMs: 60_000, maxRetries: 1 },
   ],
   video_generation: [
     // No production render provider is wired. Module stays Beta.
     { provider: "none", envKey: "VIDEO_RENDER_PROVIDER", enabled: false, production: false, timeoutMs: 0, maxRetries: 0, notes: "Requires hosted render worker (Shotstack / Remotion Lambda / self-hosted FFmpeg)." },
   ],
   voiceover_generation: [
-    { provider: "none", envKey: "TTS_PROVIDER", enabled: false, production: false, timeoutMs: 0, maxRetries: 0, notes: "Requires ElevenLabs / OpenAI TTS API key." },
+    { provider: "fal", model: "fal-ai/elevenlabs/tts/turbo-v2.5", envKey: "FAL_KEY", enabled: true, production: true, timeoutMs: 60_000, maxRetries: 1 },
   ],
   transcription: [
     { provider: "none", envKey: "STT_PROVIDER", enabled: false, production: false, timeoutMs: 0, maxRetries: 0 },

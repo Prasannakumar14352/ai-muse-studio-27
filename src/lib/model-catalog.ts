@@ -109,9 +109,8 @@ export const MODEL_CATALOG: CatalogModel[] = [
     description: "Very fast, low-cost images. Great for drafts and volume.",
     endpoint: "fal-ai/flux/schnell",
     badge: "Fastest",
-    estimate: true,
     aspectRatios: ["1:1", "9:16", "16:9"],
-    costUsd: (p) => 0.005 * (p.numImages ?? 1),
+    costUsd: (p) => 0.004 * (p.numImages ?? 1), // $0.003/MP, ~1MP + margin
   },
   {
     id: "flux-dev",
@@ -120,9 +119,8 @@ export const MODEL_CATALOG: CatalogModel[] = [
     vendor: "Black Forest Labs",
     description: "Higher-detail images with better prompt following.",
     endpoint: "fal-ai/flux/dev",
-    estimate: true,
     aspectRatios: ["1:1", "9:16", "16:9"],
-    costUsd: (p) => 0.03 * (p.numImages ?? 1),
+    costUsd: (p) => 0.03 * (p.numImages ?? 1), // $0.025/MP, ~1MP + margin
   },
 
   // ── Voice (all languages) ────────────────────────────────────────────
@@ -146,10 +144,9 @@ export const MODEL_CATALOG: CatalogModel[] = [
       "Most expressive voice model, 70+ languages. Test Telugu output before promising it.",
     endpoint: "fal-ai/elevenlabs/tts/eleven-v3",
     badge: "70+ languages",
-    estimate: true,
     voices: ELEVEN_VOICES,
     maxChars: 2500,
-    costUsd: (p) => (0.2 * Math.max(1, p.textLength ?? 0)) / 1000,
+    costUsd: (p) => (0.1 * Math.max(1, p.textLength ?? 0)) / 1000,
   },
 ];
 

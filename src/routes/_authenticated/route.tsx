@@ -1,8 +1,9 @@
-import { createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Navigate, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
 import { GlobalCreditGate } from "@/components/global-credit-gate";
 import { PlanGate, UpgradeDialogProvider } from "@/lib/use-plan-access";
+import { isHiddenPath } from "@/lib/hidden-features";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -39,6 +40,7 @@ export const Route = createFileRoute("/_authenticated")({
 
 function AuthenticatedLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  if (isHiddenPath(pathname)) return <Navigate to="/dashboard" replace />;
   return (
     <UpgradeDialogProvider>
       <AppShell>

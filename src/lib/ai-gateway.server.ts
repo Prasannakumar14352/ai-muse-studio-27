@@ -1,6 +1,7 @@
 // Small helper for calling Lovable AI Gateway with JSON output.
 // Kept server-only. Do NOT import from client-safe modules at module scope.
 
+import { aiChatFetch, aiKey, AI_NOT_CONFIGURED } from "@/lib/ai-provider";
 export type GatewayMessage = { role: "system" | "user" | "assistant"; content: string };
 
 export async function gatewayChatJson<T = unknown>(opts: {
@@ -9,9 +10,9 @@ export async function gatewayChatJson<T = unknown>(opts: {
   temperature?: number;
   maxTokens?: number;
 }): Promise<T> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("Missing LOVABLE_API_KEY");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const key = aiKey();
+  if (!key) throw new Error(AI_NOT_CONFIGURED);
+  const res = await aiChatFetch({
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
     body: JSON.stringify({
@@ -43,9 +44,9 @@ export async function gatewayChatText(opts: {
   temperature?: number;
   maxTokens?: number;
 }): Promise<string> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("Missing LOVABLE_API_KEY");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const key = aiKey();
+  if (!key) throw new Error(AI_NOT_CONFIGURED);
+  const res = await aiChatFetch({
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
     body: JSON.stringify({
