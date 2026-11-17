@@ -21,7 +21,7 @@ export function LandingPricingTabs() {
   // Non-suspense on purpose: if the pricing fetch fails (DB down, missing
   // env var) the rest of the landing page must still render. A suspense
   // query here throws to the root error boundary and blanks the whole site.
-  const { data } = useQuery({ ...plansQuery, retry: 1 });
+  const { data, error, isLoading } = useQuery({ ...plansQuery, retry: 1 });
   const plans = data?.plans ?? [];
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
 
@@ -74,6 +74,13 @@ export function LandingPricingTabs() {
         <div className={`grid gap-5 ${list.length >= 4 ? "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" : "md:grid-cols-2 lg:grid-cols-3"}`}>
           {list.map((p) => <LandingCard key={p.id} p={p} cycle={cycle} />)}
         </div>
+
+        {!isLoading && plans.length === 0 && (
+          <div className="mt-6 text-center text-sm text-muted-foreground">
+            Plans are temporarily unavailable.
+            {error && <div className="mt-1 text-xs opacity-70">({error.message})</div>}
+          </div>
+        )}
 
         <div className="mt-8 text-center">
           <Link to="/pricing" className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4">
