@@ -11,7 +11,7 @@ import {
   type ImagePromptHistoryEntry,
 } from "@/lib/image-prompt-history";
 
-import { deductUsage, useAccess, canGenerate } from "@/lib/access";
+import { useAccess, canGenerate } from "@/lib/access";
 import { supabase } from "@/integrations/supabase/client";
 import { useProjectDelete } from "@/hooks/use-project-delete";
 import {
@@ -215,9 +215,6 @@ function ImagesPage() {
           seed: baseReq.seed, cfg, styleStrength, batch: count,
         });
         setHistory(readPromptHistory());
-        for (let i = 0; i < ok.length; i++) {
-          await deductUsage({ amount: 1, description: `AI image generated (${styleLabel})` }).catch(() => {});
-        }
         const title = p.trim().slice(0, 80) || `AI image (${styleLabel})`;
         const rows = ok.map((res) => ({
           user_id: access.userId, title, content_type: "ai_image",
@@ -288,7 +285,6 @@ function ImagesPage() {
         outpaintDirection: opts?.direction,
       });
       if (!image) throw new Error(error || "Edit failed");
-      await deductUsage({ amount: 1, description: `Image ${op}` }).catch(() => {});
       const { error: pErr } = await supabase.from("projects").insert({
         user_id: access.userId,
         title: `${op}: ${row.prompt.slice(0, 60)}`,

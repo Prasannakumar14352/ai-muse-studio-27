@@ -3,8 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 /**
  * Image generation / editing endpoint, served by fal.ai.
  *
- *   - Plain generation → fal-ai/nano-banana (Google Gemini image model,
- *     the same family the app used through Lovable's gateway)
+ *   - Plain generation → fal-ai/flux/schnell (1 credit)
+ *   - quality "high" → fal-ai/nano-banana, Google's Gemini image model (HD credits)
  *   - Any input image or edit op (upscale, remove background, inpaint,
  *     outpaint, eraser, references) → fal-ai/nano-banana/edit
  *
@@ -16,7 +16,8 @@ export const Route = createFileRoute("/api/generate-image")({
     handlers: {
       POST: async ({ request }) => {
         const { getUserIdFromRequest, unauthorized } = await import("@/lib/route-auth.server");
-        if (!(await getUserIdFromRequest(request))) return unauthorized();
+        const userId = await getUserIdFromRequest(request);
+        if (!userId) return unauthorized();
         const {
           prompt,
           style,
@@ -107,20 +108,49 @@ export const Route = createFileRoute("/api/generate-image")({
         if (isEdit && allImages.length === 0) {
           return json({ error: "This edit needs an input image." }, 400);
         }
-        const endpoint = isEdit ? "fal-ai/nano-banana/edit" : "fal-ai/nano-banana";
+        // Standard renders use FLUX Schnell (~$0.003); HD ("high" quality) and every
+        // edit use Nano Banana (~$0.04), so they cost more credits.
+        const hd = isEdit || quality === "high";
+        const endpoint = isEdit ? "fal-ai/nano-banana/edit" : hd ? "fal-ai/nano-banana" : "fal-ai/flux/schnell";
+        const { ACTION_COSTS } = await import("@/lib/credits-guard.server");
+        const credits = hd ? ACTION_COSTS.image_hd : ACTION_COSTS.image;
         const RATIOS = ["21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"];
         const aspect = ratio && RATIOS.includes(ratio) ? ratio : isEdit ? "auto" : "1:1";
 
+        const FLUX_SIZE: Record<string, string> = {
+          "1:1": "square_hd", "9:16": "portrait_16_9", "16:9": "landscape_16_9",
+          "4:3": "landscape_4_3", "3:4": "portrait_4_3", "4:5": "portrait_4_3", "5:4": "landscape_4_3",
+        };
         const input: Record<string, unknown> = {
           prompt: fullPrompt,
           num_images: 1,
-          aspect_ratio: aspect,
+          ...(endpoint === "fal-ai/flux/schnell"
+            ? { image_size: FLUX_SIZE[aspect] ?? "square_hd", enable_safety_checker: true }
+            : { aspect_ratio: aspect }),
           output_format: background === "transparent" || operation === "removeBg" ? "png" : "jpeg",
           sync_mode: true,
         };
         if (isEdit) input.image_urls = allImages;
         if (typeof seed === "number") input.seed = seed;
-        void quality; void modelOverride;
+        void modelOverride;
+
+        // Reserve credits before calling the provider; refunded below on failure.
+        const { chargeCredits } = await import("@/lib/credits-guard.server");
+        let reservation: Awaited<ReturnType<typeof chargeCredits>>;
+        try {
+          reservation = await chargeCredits({
+            userId,
+            action: hd ? "image_hd" : "image",
+            amount: credits,
+            description: hd ? (isEdit ? `Image ${operation ?? "edit"} (HD)` : "AI image (HD)") : "AI image",
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (msg.startsWith("insufficient_credits:")) {
+            return json({ error: `Not enough credits: this image needs ${credits}.` }, 402);
+          }
+          return json({ error: msg }, 400);
+        }
 
         let upstream: Response;
         try {
@@ -130,6 +160,7 @@ export const Route = createFileRoute("/api/generate-image")({
             body: JSON.stringify(input),
           });
         } catch (error) {
+          await reservation.refund("provider_unreachable");
           return json({ error: error instanceof Error ? error.message : "Image service unreachable" }, 502);
         }
 
@@ -138,11 +169,15 @@ export const Route = createFileRoute("/api/generate-image")({
           detail?: unknown;
         };
         if (!upstream.ok) {
+          await reservation.refund(`provider_${upstream.status}`);
           const detail = typeof out.detail === "string" ? out.detail : JSON.stringify(out.detail ?? out);
           return json({ error: `Image generation failed (${upstream.status}): ${detail.slice(0, 300)}` }, upstream.status);
         }
         let url = out.images?.[0]?.url;
-        if (!url) return json({ error: "No image returned" }, 502);
+        if (!url) {
+          await reservation.refund("no_image");
+          return json({ error: "No image returned" }, 502);
+        }
 
         // sync_mode returns a data URI; fall back to fetching a hosted URL.
         if (!url.startsWith("data:")) {
@@ -150,7 +185,8 @@ export const Route = createFileRoute("/api/generate-image")({
           const buf = Buffer.from(await img.arrayBuffer());
           url = `data:${img.headers.get("content-type") ?? "image/png"};base64,${buf.toString("base64")}`;
         }
-        return json({ image: url, model: endpoint });
+        await reservation.finalize();
+        return json({ image: url, model: endpoint, credits });
       },
     },
   },

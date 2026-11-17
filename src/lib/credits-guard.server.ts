@@ -54,8 +54,8 @@ export const ACTION_COSTS = {
   video_hook: 1,
   video_chapters: 1,
 
-  // Post-generation studio
-  narration: 1,
+  // Post-generation studio (voice audio itself is charged per call in /api/tts)
+  narration: 0,
   final_export: 1,
 
   // Thumbnails
@@ -74,8 +74,14 @@ export const ACTION_COSTS = {
   // Repurpose
   repurpose: 1,
 
-  // Image / assets
+  // Image / assets — charged server-side in /api/generate-image
+  // Provider cost: FLUX Schnell ~$0.003, Nano Banana (HD/edits) ~$0.04.
+  // Cheapest credit sold is ~$0.0108, so these keep at least ~2x margin.
   image: 1,
+  image_hd: 6,
+  // Voice — charged per started 100 characters in /api/tts
+  // (ElevenLabs Turbo via fal: $0.05 per 1,000 chars = $0.005 per 100)
+  tts_per_100_chars: 1,
 } as const;
 
 export type ChargeAction = keyof typeof ACTION_COSTS;
