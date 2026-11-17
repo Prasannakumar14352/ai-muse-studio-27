@@ -20,7 +20,7 @@ import {
   BACKGROUNDS, LIGHTINGS, PALETTES, CTR_OPTIONS, QUALITIES,
   defaultBrief,
   type ThumbnailBrief, type PlannedBrief, type ThumbnailQualityReport,
-  type ConceptCount, type AspectRatioId,
+  type ConceptCount, type AspectRatioId, CONCEPT_COUNTS,
 } from "@/lib/thumbnail-presets";
 import {
   THUMBNAIL_FORMATS, getFormat, formatFromAspectRatio,
@@ -153,7 +153,7 @@ function ThumbnailsPage() {
 
   async function runGeneration() {
     if (!plan) return;
-    const count = brief.conceptCount;
+    const count = CONCEPT_COUNTS.includes(brief.conceptCount) ? brief.conceptCount : 4;
     // Matches server pricing in /api/generate-image: HD (Ultra) 6, otherwise 1.
     const costPer = QUALITIES.find((x) => x.id === brief.quality)?.imageQuality === "high" ? 6 : 1;
     if (access && !canGenerate(access, count * costPer)) {
@@ -198,7 +198,7 @@ function ThumbnailsPage() {
     }
     qc.invalidateQueries({ queryKey: ["access"] });
     setGenerating(false);
-    toast.success(`Generated ${count} concepts`);
+    toast.success(`Generated ${count} ${count === 1 ? "concept" : "concepts"}`);
   }
 
   async function regenerateItem(item: GeneratedItem) {
@@ -648,7 +648,7 @@ function PlanningWizard({ brief, update, onNext, planning }: {
         <div>
           <div className="text-xs text-muted-foreground mb-1.5">Number of concepts</div>
           <div className="flex gap-1.5">
-            {[4, 8, 12, 16].map((n) => (
+            {CONCEPT_COUNTS.map((n) => (
               <button key={n} onClick={() => update("conceptCount", n as ConceptCount)}
                 className={`px-3 py-1 rounded-full text-xs border ${brief.conceptCount === n ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>
                 {n}
@@ -712,7 +712,7 @@ function PlanReview({ plan, setPlan, brief, onBack, onGenerate }: {
       <div className="flex justify-end">
         <button onClick={onGenerate}
           className="rounded-lg gradient-primary text-white px-6 py-2.5 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)]">
-          <Wand2 className="w-4 h-4" /> Generate {brief.conceptCount} concepts
+          <Wand2 className="w-4 h-4" /> Generate {brief.conceptCount} {brief.conceptCount === 1 ? "concept" : "concepts"}
         </button>
       </div>
     </div>

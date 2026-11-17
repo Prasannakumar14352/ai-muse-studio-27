@@ -77,7 +77,7 @@ export function useProjectDelete() {
 
   return useCallback(
     async (project: DeletableProject): Promise<boolean> => {
-      const label = project.title?.trim() || "Untitled project";
+      const label = shortLabel(project.title);
 
       const ok = await confirmDialog({
         title: "Delete this project?",
@@ -133,4 +133,14 @@ export function useProjectDelete() {
     },
     [invalidateAll, optimisticHide, restore],
   );
+}
+
+/** Short, toast-friendly name: the title if it's short, else the first few words of the prompt. */
+export function shortLabel(title?: string | null, maxWords = 6, maxChars = 48): string {
+  const clean = (title ?? "").replace(/\s+/g, " ").trim();
+  if (!clean) return "Untitled project";
+  const words = clean.split(" ");
+  let out = words.slice(0, maxWords).join(" ");
+  if (out.length > maxChars) out = out.slice(0, maxChars).replace(/\s+\S*$/, "");
+  return out.length < clean.length ? `${out.replace(/[\s,.;:]+$/, "")}…` : out;
 }

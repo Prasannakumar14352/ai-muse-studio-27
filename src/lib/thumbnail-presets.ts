@@ -162,7 +162,8 @@ export const QUALITIES: { id: QualityId; label: string; imageQuality: "low" | "m
   { id: "ultra",    label: "Ultra",    imageQuality: "high"   },
 ];
 
-export type ConceptCount = 4 | 8 | 12 | 16;
+export type ConceptCount = 1 | 2 | 3 | 4 | 6 | 8;
+export const CONCEPT_COUNTS: ConceptCount[] = [1, 2, 3, 4, 6, 8];
 
 export type BrandKitOptions = {
   useLogo: boolean;
