@@ -1,5 +1,9 @@
 // Provider definitions for admin-managed OAuth (Meta, Google, LinkedIn).
 // Instagram + Facebook share a single "meta" provider config (same Client ID/Secret).
+/** Meta Graph API version used for login, profile lookups and publishing. */
+export const GRAPH_VERSION = "v23.0";
+export const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`;
+
 export type PlatformId = "instagram" | "facebook" | "youtube" | "linkedin";
 export type ProviderId = "meta" | "google" | "linkedin";
 
@@ -23,8 +27,8 @@ export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
   meta: {
     id: "meta",
     label: "Meta (Instagram + Facebook)",
-    authUrl: "https://www.facebook.com/v20.0/dialog/oauth",
-    tokenUrl: "https://graph.facebook.com/v20.0/oauth/access_token",
+    authUrl: `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth`,
+    tokenUrl: `${GRAPH}/oauth/access_token`,
     scopes: {
       instagram: [
         "instagram_basic",
@@ -111,6 +115,23 @@ export async function exchangeCode(args: {
   }
 }
 
+// Meta returns a ~1-hour user token. Swap it for a ~60-day one so scheduled
+// posts still work later; Page tokens derived from it don't expire.
+export async function exchangeMetaLongLivedToken(args: {
+  clientId: string; clientSecret: string; accessToken: string;
+}): Promise<{ access_token: string; expires_in?: number }> {
+  const q = new URLSearchParams({
+    grant_type: "fb_exchange_token",
+    client_id: args.clientId,
+    client_secret: args.clientSecret,
+    fb_exchange_token: args.accessToken,
+  });
+  const res = await fetch(`${GRAPH}/oauth/access_token?${q}`);
+  const j = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error?: { message?: string } };
+  if (!res.ok || !j.access_token) throw new Error(`Meta long-lived token exchange failed: ${j.error?.message ?? res.status}`);
+  return { access_token: j.access_token, expires_in: j.expires_in };
+}
+
 // Fetch profile / eligible destinations for a platform after token exchange.
 export async function fetchProfile(platform: PlatformId, accessToken: string): Promise<{
   accountId: string;
@@ -154,7 +175,7 @@ export async function fetchProfile(platform: PlatformId, accessToken: string): P
   }
   // Facebook / Instagram — list Pages, then optional IG business account per Page.
   const pagesRes = await fetch(
-    "https://graph.facebook.com/v20.0/me/accounts?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}",
+    `${GRAPH}/me/accounts?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   const pagesJ = await pagesRes.json();

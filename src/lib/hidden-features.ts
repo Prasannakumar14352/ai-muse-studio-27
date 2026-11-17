@@ -7,10 +7,16 @@
  *
  *   /marketplace  — no items to sell yet
  *   /agents       — thin wrapper over the same text AI as AI Strategy
- *   /connections  — needs your own Google/Meta/LinkedIn developer apps first
  *   /promo-videos — overlaps with Video studio and Model Studio
  */
-export const HIDDEN_PATHS: readonly string[] = ["/marketplace", "/agents", "/connections", "/promo-videos"];
+export const HIDDEN_PATHS: readonly string[] = ["/marketplace", "/agents", "/promo-videos"];
+
+/**
+ * Connected Accounts (/connections) shows in the sidebar only once an admin
+ * has set up at least one social app (Admin → Social Publishing). Admins
+ * always see it. The page itself stays reachable and explains what's missing.
+ */
+export const CONNECTIONS_PATH = "/connections";
 
 export function isHiddenPath(pathname: string): boolean {
   const p = pathname.replace(/\/+$/, "") || "/";

@@ -1,42 +1,36 @@
-// Cron hook: processes due scheduled_posts. Publish adapters are stubbed:
-// jobs are marked `manually_published` (user must post themselves) until
-// OAuth adapters are wired in a follow-up turn.
+// Cron hook: publishes due scheduled_posts with the users' connected accounts.
+// Called every 5 minutes by pg_cron (job "publish-scheduled-posts") with the
+// x-cron-secret header; the secret lives in Supabase Vault and is checked by
+// public.verify_publish_cron_secret(). PUBLISH_CRON_SECRET (env) also works.
 import { createFileRoute } from "@tanstack/react-router";
+
+async function authorized(request: Request): Promise<boolean> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const given = request.headers.get("x-cron-secret")
+    ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "")
+    ?? "";
+  if (!given) return false;
+  const envSecret = process.env.PUBLISH_CRON_SECRET;
+  if (envSecret && envSecret.length >= 16 && given === envSecret) return true;
+  const { data, error } = await supabaseAdmin.rpc("verify_publish_cron_secret" as never, { _secret: given } as never);
+  return !error && data === true;
+}
 
 export const Route = createFileRoute("/api/public/hooks/publish-scheduled")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        if (!(await authorized(request))) {
+          return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+        }
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const now = new Date().toISOString();
-        const { data: due, error } = await supabaseAdmin
-          .from("scheduled_posts")
-          .select("id, user_id, project_id, platform, scheduled_at, attempts")
-          .in("status", ["scheduled", "ready"])
-          .or(`scheduled_at.is.null,scheduled_at.lte.${now}`)
-          .limit(25);
-        if (error) {
-          return Response.json({ ok: false, error: error.message }, { status: 500 });
+        const { runDuePublishJobs } = await import("@/lib/social-publish.server");
+        try {
+          const r = await runDuePublishJobs(supabaseAdmin);
+          return Response.json({ ok: true, ...r });
+        } catch (e) {
+          return Response.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 });
         }
-        let processed = 0;
-        for (const job of due ?? []) {
-          // Publish adapter STUB — mark as manually_published with a note.
-          const errMsg = "Direct publishing not yet configured for this platform. Marked as manually published.";
-          await supabaseAdmin.from("scheduled_posts").update({
-            status: "manually_published",
-            attempts: (job.attempts as number ?? 0) + 1,
-            last_error: errMsg,
-            published_at: new Date().toISOString(),
-          } as never).eq("id", job.id as string);
-          if (job.project_id) {
-            await supabaseAdmin.from("projects").update({
-              publish_status: "manually_published",
-              manually_published_at: new Date().toISOString(),
-            } as never).eq("id", job.project_id as string);
-          }
-          processed++;
-        }
-        return Response.json({ ok: true, processed });
       },
     },
   },

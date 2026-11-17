@@ -15,6 +15,9 @@ import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack,
 import { ProjectBriefForm, DEFAULT_BRIEF, type ProjectBrief } from "@/components/project-brief-form";
 import { generateAiVideoScript } from "@/lib/video-ai.functions";
 import { PublishKitPanel } from "@/components/publish-kit-panel";
+import { PublishActions } from "@/components/publish-actions";
+import type { PublishKit } from "@/lib/publish-kit.functions";
+import type { Platform as PublishPlatform, PublishStatus } from "@/lib/publishing.functions";
 import { generateAiCarousel } from "@/lib/carousel-ai.functions";
 import { generateCarousel, generateCaptions, generateHashtags } from "@/lib/generators";
 import { STYLES } from "@/lib/constants";
@@ -407,6 +410,8 @@ function ProjectView() {
           existingVideoUrl={output?.video_url ?? null}
           existingDiagnostics={(output as { render_diagnostics?: unknown } | null)?.render_diagnostics ?? null}
           imagePrompts={prompts}
+          publishKit={(project as { distribution?: PublishKit | null }).distribution ?? null}
+          publishStatus={(project as { publish_status?: PublishStatus | null }).publish_status ?? null}
         />
       )}
 
@@ -537,7 +542,7 @@ type Scene = { n: number; visual: string; voiceover: string; duration: string; o
 
 function VideoPreview({
   scenes, title, styleImage, styleId, platform, contentType, music,
-  projectId, userId, outputId, existingVideoUrl, existingDiagnostics, imagePrompts,
+  projectId, userId, outputId, existingVideoUrl, existingDiagnostics, imagePrompts, publishKit, publishStatus,
 }: {
   scenes: Scene[]; title: string; styleImage: string;
   styleId?: string | null;
@@ -545,6 +550,8 @@ function VideoPreview({
   projectId: string; userId: string; outputId: string | null;
   existingVideoUrl: string | null; existingDiagnostics?: unknown;
   imagePrompts?: Array<{ n: number; prompt: string; style: string }>;
+  publishKit?: PublishKit | null;
+  publishStatus?: PublishStatus | null;
 }) {
   const qc = useQueryClient();
   const [idx, setIdx] = useState(0);
@@ -1063,6 +1070,22 @@ function VideoPreview({
           )}
         </div>
       </div>
+
+      {videoUrl && (
+        <PublishActions
+          className="mb-4"
+          projectId={projectId}
+          title={title}
+          postTitle={publishKit?.seo_title || title}
+          status={publishStatus}
+          defaultPlatform={platformForPublish(platform)}
+          caption={publishKit?.platforms?.[publishKit.primary_platform]?.caption ?? publishKit?.seo_description ?? ""}
+          hashtags={(publishKit?.platforms?.[publishKit.primary_platform]?.hashtags ?? []).join(" ")}
+          captions={captionsFromKit(publishKit)}
+          media={[{ url: videoUrl, kind: "video", name: "video.mp4" }]}
+          onDownload={() => forceDownloadUrl(videoUrl, `${(title || "video").replace(/[^\w]+/g, "-")}.mp4`)}
+        />
+      )}
 
       {/* --- Scene prep, script editor, per-scene preview -------------------- */}
       <div className="mb-4 rounded-xl border border-border bg-black/30">
@@ -1597,6 +1620,31 @@ type VideoDiagnostics = {
   codecSupport: Record<string, string> | null;
   retries?: RetryEntry[];
 };
+
+/** Map the project's platform to a publish destination. */
+function platformForPublish(platform?: string | null): PublishPlatform {
+  const p = (platform ?? "").toLowerCase();
+  if (p.includes("youtube")) return "youtube";
+  if (p.includes("linkedin")) return "linkedin";
+  if (p.includes("facebook")) return "facebook";
+  return "instagram";
+}
+
+/** Per-destination caption + hashtags from the Publish Kit. */
+function captionsFromKit(kit?: PublishKit | null): Partial<Record<PublishPlatform, { caption?: string; hashtags?: string }>> {
+  if (!kit?.platforms) return {};
+  const pick = (k: keyof PublishKit["platforms"]) => {
+    const v = kit.platforms[k];
+    return v ? { caption: v.caption, hashtags: (v.hashtags ?? []).join(" ") } : undefined;
+  };
+  const yt = pick("youtube_shorts");
+  return {
+    instagram: pick("instagram"),
+    facebook: pick("facebook"),
+    linkedin: pick("linkedin"),
+    youtube: yt ?? (kit.seo_description ? { caption: kit.seo_description, hashtags: (kit.keywords ?? []).map((k) => `#${k.replace(/\s+/g, "")}`).join(" ") } : undefined),
+  };
+}
 
 function emptyDiag(): VideoDiagnostics {
   return {
