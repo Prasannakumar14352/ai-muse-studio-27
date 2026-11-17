@@ -6,7 +6,7 @@
  *   credits = ceil(providerCostUsd × MARKUP / CREDIT_FLOOR_USD)
  *
  * CREDIT_FLOOR_USD is the LOWEST price a user ever pays for one credit across
- * all plans and packs (today: Pro monthly, $39 / 3000 = $0.013). Pricing
+ * all plans and packs (today: Pro yearly, $390 / 36,000 credits = $0.0108). Pricing
  * against the floor means even the cheapest credit still earns MARKUP× the
  * provider cost, so no plan can run the business at a loss on these models.
  *
@@ -19,7 +19,7 @@
  * high side on purpose.
  */
 
-export const CREDIT_FLOOR_USD = 0.013;
+export const CREDIT_FLOOR_USD = 0.0108;
 export const MARKUP = 2.0;
 
 export type ModelKind = "video" | "image" | "audio";
