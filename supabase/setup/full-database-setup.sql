@@ -2723,3 +2723,15 @@ UPDATE public.pricing_plans SET price_monthly_usd = 0,  price_yearly_usd = 0,   
 UPDATE public.pricing_plans SET price_monthly_usd = 0,  price_yearly_usd = 0,   price_lifetime_usd = 35  WHERE code = 'starter_life';
 UPDATE public.pricing_plans SET price_monthly_usd = 0,  price_yearly_usd = 0,   price_lifetime_usd = 79  WHERE code = 'creator_life';
 UPDATE public.pricing_plans SET price_monthly_usd = 0,  price_yearly_usd = 0,   price_lifetime_usd = 149 WHERE code = 'pro_life';
+
+-- Plan credits (Nov 2026): sized so each plan stays profitable at full use.
+UPDATE public.pricing_plans SET monthly_credits = 500,
+  features = '["500 credits / month","All content types","Standard visual styles","Priority queue"]'::jsonb WHERE code = 'starter';
+UPDATE public.pricing_plans SET monthly_credits = 1200,
+  features = '["1,200 credits / month","Premium styles","Voice selection","Priority support"]'::jsonb WHERE code = 'creator';
+UPDATE public.pricing_plans SET included_credits = 1500,
+  features = '["Lifetime account","All core modules","1,500 included credits","Commercial usage","Basic templates","Standard AI generation","Manual publishing","Download unlimited outputs","Buy additional credit packs","No recurring payments"]'::jsonb WHERE code = 'starter_life';
+UPDATE public.pricing_plans SET included_credits = 4000,
+  features = '["Everything in Starter Lifetime","4,000 included credits","More templates","Higher usage limits","Larger storage"]'::jsonb WHERE code = 'creator_life';
+UPDATE public.pricing_plans SET included_credits = 9000,
+  features = '["Everything in Creator Lifetime","9,000 included credits","Priority rendering","Premium templates","Priority support"]'::jsonb WHERE code = 'pro_life';
