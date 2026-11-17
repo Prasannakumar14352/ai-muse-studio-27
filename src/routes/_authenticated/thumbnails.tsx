@@ -8,7 +8,7 @@ import {
   Upload, Maximize2, Eraser, Scissors, X, Palette as PaletteIcon,
   Sliders, BarChart3, Rocket, ArrowLeft, Wand,
 } from "lucide-react";
-import { deductUsage, useAccess, canGenerate } from "@/lib/access";
+import { useAccess, canGenerate } from "@/lib/access";
 import { useQueryClient } from "@tanstack/react-query";
 import { fetchGeneratedImage } from "@/lib/image-stream";
 import {
@@ -137,7 +137,8 @@ function ThumbnailsPage() {
   async function runGeneration() {
     if (!plan) return;
     const count = brief.conceptCount;
-    const costPer = 2;
+    // Matches server pricing in /api/generate-image: HD (Ultra) 6, otherwise 1.
+    const costPer = QUALITIES.find((x) => x.id === brief.quality)?.imageQuality === "high" ? 6 : 1;
     if (access && !canGenerate(access, count * costPer)) {
       toast.error(`Not enough credits (~${count * costPer} required)`); return;
     }
@@ -177,7 +178,6 @@ function ThumbnailsPage() {
         console.warn(e);
       }
       setProgress({ done: i + 1, total: count });
-      await deductUsage({ amount: costPer, description: `Thumbnail concept ${i + 1}` }).catch(() => {});
     }
     qc.invalidateQueries({ queryKey: ["access"] });
     setGenerating(false);
@@ -193,7 +193,6 @@ function ThumbnailsPage() {
     });
     if (image) {
       setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, image, quality: undefined } : x));
-      await deductUsage({ amount: 2, description: "Thumbnail regenerated" }).catch(() => {});
       qc.invalidateQueries({ queryKey: ["access"] });
       toast.success("Regenerated");
     } else {
@@ -213,7 +212,6 @@ function ThumbnailsPage() {
     toast.dismiss(`edit-${item.id}`);
     if (image) {
       setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, image, quality: undefined } : x));
-      await deductUsage({ amount: 2, description: label }).catch(() => {});
       qc.invalidateQueries({ queryKey: ["access"] });
       toast.success(`${label} done`);
     } else {

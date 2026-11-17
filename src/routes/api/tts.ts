@@ -18,7 +18,8 @@ export const Route = createFileRoute("/api/tts")({
     handlers: {
       POST: async ({ request }) => {
         const { getUserIdFromRequest, unauthorized } = await import("@/lib/route-auth.server");
-        if (!(await getUserIdFromRequest(request))) return unauthorized();
+        const userId = await getUserIdFromRequest(request);
+        if (!userId) return unauthorized();
         const { text, voice } = (await request.json()) as { text: string; voice?: string };
 
         const key = process.env.FAL_KEY;
@@ -31,6 +32,16 @@ export const Route = createFileRoute("/api/tts")({
         const clipped = input.length > 800 ? input.slice(0, 800) : input;
         const elevenVoice = VOICE_MAP[(voice ?? "alloy").toLowerCase()] ?? voice ?? "Aria";
 
+        const { ACTION_COSTS, chargeCredits } = await import("@/lib/credits-guard.server");
+        const credits = Math.max(1, Math.ceil(clipped.length / 100)) * ACTION_COSTS.tts_per_100_chars;
+        let reservation: Awaited<ReturnType<typeof chargeCredits>>;
+        try {
+          reservation = await chargeCredits({ userId, action: "voiceover", amount: credits, description: "Voiceover" });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          return jsonError(msg.startsWith("insufficient_credits:") ? `Not enough credits: this voiceover needs ${credits}.` : msg, msg.startsWith("insufficient_credits:") ? 402 : 400);
+        }
+
         const upstream = await fetch("https://fal.run/fal-ai/elevenlabs/tts/turbo-v2.5", {
           method: "POST",
           headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
@@ -38,11 +49,16 @@ export const Route = createFileRoute("/api/tts")({
         });
         const out = (await upstream.json().catch(() => ({}))) as { audio?: { url?: string }; detail?: unknown };
         if (!upstream.ok || !out.audio?.url) {
+          await reservation.refund(`provider_${upstream.status}`);
           return jsonError(`TTS failed (${upstream.status}): ${JSON.stringify(out.detail ?? out).slice(0, 300)}`, upstream.status || 502);
         }
 
         const audio = await fetch(out.audio.url);
-        if (!audio.ok || !audio.body) return jsonError("Could not download generated audio", 502);
+        if (!audio.ok || !audio.body) {
+          await reservation.refund("download_failed");
+          return jsonError("Could not download generated audio", 502);
+        }
+        await reservation.finalize();
         return new Response(audio.body, {
           headers: { "Content-Type": "audio/mpeg", "Cache-Control": "no-store" },
         });

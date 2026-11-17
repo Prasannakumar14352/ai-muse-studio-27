@@ -12,14 +12,16 @@ export type CreditCostRow = {
 
 export const CREDIT_COSTS: CreditCostRow[] = [
   { id: "script",      label: "Script + captions + hashtags",     category: "Text",     credits: 1,        unit: "per project",     notes: "AI-written script, on-screen text, caption, and hashtag pack." },
-  { id: "image",       label: "AI image (single)",                category: "Image",    credits: 1,        unit: "per image",       notes: "One high-resolution AI image render at your chosen aspect ratio." },
+  { id: "image",       label: "AI image (standard)",              category: "Image",    credits: 1,        unit: "per image",       notes: "Fast, high-quality render (FLUX). Used for scene images, carousels and most thumbnails." },
+  { id: "image_hd",    label: "AI image (HD) or image edit",      category: "Image",    credits: 6,        unit: "per image",       notes: "Google Gemini image model: HD/Ultra renders, upscale, remove background, inpaint, outpaint, magic eraser, reference images." },
   { id: "image_regen", label: "Regenerate scene image",           category: "Image",    credits: 1,        unit: "per image",       notes: "Only re-renders the affected scene after you tweak its prompt." },
   { id: "carousel",    label: "Instagram-style carousel",         category: "Carousel", credits: "1 + N",  unit: "1 script + 1 per slide", notes: "1 credit for the AI copy, plus 1 credit per rendered slide image (N = slide count, 3–10)." },
-  { id: "short_reel",  label: "Short reel (≤ 60s)",               category: "Video",    credits: "1 + S",  unit: "1 script + 1 per scene image", notes: "1 credit for the script + 1 credit per scene image. Typical short reel: 6–12 credits." },
-  { id: "long_video",  label: "Long video (up to 30 min)",        category: "Video",    credits: "1 + S",  unit: "1 script + 1 per scene image", notes: "Scene count scales with duration (~1 scene per 8s). A 5-min video ≈ 38 credits, 15-min ≈ 113 credits." },
-  { id: "render",      label: "Final video render (in-browser)",  category: "Video",    credits: 0,        unit: "free",            notes: "Rendered client-side after images and voiceover are ready — no extra credits." },
-  { id: "voiceover",   label: "Voiceover (text-to-speech)",       category: "Audio",    credits: 1,        unit: "per scene batch", notes: "Generates spoken audio for every scene in the current project." },
+  { id: "voiceover",   label: "Voiceover (any language)",         category: "Audio",    credits: 1,        unit: "per 100 characters", notes: "ElevenLabs multilingual voice. A typical scene (1–2 sentences) is about 2 credits." },
+  { id: "short_reel",  label: "Short reel (≤ 60s)",               category: "Video",    credits: "1 + S + V", unit: "script + scene images + voice", notes: "1 for the script, 1 per scene image, voice per 100 characters. Typical 8-scene reel with voice: about 25 credits." },
+  { id: "long_video",  label: "Long video (up to 30 min)",        category: "Video",    credits: "1 + S + V", unit: "script + scene images + voice", notes: "About 1 scene per 8s. A 5-min video with voiceover is about 85 credits." },
+  { id: "render",      label: "Final video render (in-browser)",  category: "Video",    credits: 0,        unit: "free",            notes: "Rendered in your browser after images and voiceover are ready — no extra credits." },
   { id: "caption_only",label: "Caption pack only",                category: "Text",     credits: 1,        unit: "per pack",        notes: "Caption + hashtag bundle without images or video." },
+  { id: "model_studio",label: "Model Studio (Seedance, FLUX, ElevenLabs)", category: "Video", credits: "varies", unit: "shown before you generate", notes: "Priced per model from its real cost. Example: Seedance 2.0 Fast 5s ≈ 224 credits." },
 ];
 
 export const CREDIT_GUIDE_INTRO = [
@@ -31,10 +33,10 @@ export const CREDIT_GUIDE_INTRO = [
 // Per-asset credit costs used across the pricing page + estimator.
 // Kept in sync with CREDIT_COSTS above.
 export const ASSET_CREDIT_COST = {
-  image: 1,          // 1 credit per AI image
-  carousel: 5,       // 1 script + ~4 slides (avg 5)
-  shortReel: 9,      // 1 script + ~8 scene images
-  longVideo: 38,     // 5-minute video: 1 script + ~37 scene images
+  image: 1,          // 1 credit per standard AI image (HD/edits: 6)
+  carousel: 5,       // 1 script + ~4 slides
+  shortReel: 25,     // 1 script + ~8 scene images + ~16 voice credits
+  longVideo: 85,     // 5-minute video: 1 script + ~37 scene images + ~45 voice credits
 } as const;
 
 export type AssetKey = keyof typeof ASSET_CREDIT_COST;
@@ -42,8 +44,8 @@ export type AssetKey = keyof typeof ASSET_CREDIT_COST;
 export const ASSET_META: Record<AssetKey, { label: string; cost: number; unit: string }> = {
   image:     { label: "AI image",           cost: ASSET_CREDIT_COST.image,     unit: "per image" },
   carousel:  { label: "Carousel (5 slides)", cost: ASSET_CREDIT_COST.carousel,  unit: "per carousel" },
-  shortReel: { label: "Short reel (≤ 60s)",  cost: ASSET_CREDIT_COST.shortReel, unit: "per reel" },
-  longVideo: { label: "5-minute long video", cost: ASSET_CREDIT_COST.longVideo, unit: "per video" },
+  shortReel: { label: "Short reel with voice",  cost: ASSET_CREDIT_COST.shortReel, unit: "per reel" },
+  longVideo: { label: "5-min video with voice", cost: ASSET_CREDIT_COST.longVideo, unit: "per video" },
 };
 
 export function getPlanGenerationEstimate(credits: number): {

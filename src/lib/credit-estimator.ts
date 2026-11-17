@@ -40,14 +40,18 @@ export function estimateCost(action: CreditAction, p: EstimateParams = {}): numb
   const q = Math.max(1, Math.round(p.qualityMultiplier ?? 1));
   switch (action) {
     case "image":
-    case "image_edit":
       return Math.max(1, (p.batch ?? 1)) * q;
+    // HD renders and edits use the Gemini image model (6 credits each).
+    case "image_edit":
     case "upscale":
     case "bg_remove":
     case "inpaint":
     case "magic_eraser":
     case "thumbnail_quality":
+      return 6 * Math.max(1, p.batch ?? 1);
     case "voiceover":
+      return 2 * q; // ~1 per 100 characters; a typical scene is ~200
+
     case "linkedin":
     case "caption":
     case "strategy":
@@ -59,10 +63,11 @@ export function estimateCost(action: CreditAction, p: EstimateParams = {}): numb
       return Math.max(1, p.concepts ?? 4);
     case "carousel":
       return 1 + Math.max(1, p.slides ?? 5);
+    // script + 1 per scene image + ~2 voice credits per scene
     case "video_short":
-      return 1 + Math.max(1, p.scenes ?? 8);
+      return 1 + 3 * Math.max(1, p.scenes ?? 8);
     case "video_long":
-      return 1 + Math.max(1, Math.ceil((p.durationSec ?? 300) / 8));
+      return 1 + 3 * Math.max(1, Math.ceil((p.durationSec ?? 300) / 8));
     case "video_scene_regen":
       return 1;
     case "agent_campaign":

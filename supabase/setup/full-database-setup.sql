@@ -2723,3 +2723,55 @@ UPDATE public.pricing_plans SET price_monthly_usd = 0,  price_yearly_usd = 0,   
 UPDATE public.pricing_plans SET price_monthly_usd = 0,  price_yearly_usd = 0,   price_lifetime_usd = 35  WHERE code = 'starter_life';
 UPDATE public.pricing_plans SET price_monthly_usd = 0,  price_yearly_usd = 0,   price_lifetime_usd = 79  WHERE code = 'creator_life';
 UPDATE public.pricing_plans SET price_monthly_usd = 0,  price_yearly_usd = 0,   price_lifetime_usd = 149 WHERE code = 'pro_life';
+
+-- Plan credits (Nov 2026): sized so each plan stays profitable at full use.
+UPDATE public.pricing_plans SET monthly_credits = 500,
+  features = '["500 credits / month","All content types","Standard visual styles","Priority queue"]'::jsonb WHERE code = 'starter';
+UPDATE public.pricing_plans SET monthly_credits = 1200,
+  features = '["1,200 credits / month","Premium styles","Voice selection","Priority support"]'::jsonb WHERE code = 'creator';
+UPDATE public.pricing_plans SET included_credits = 1500,
+  features = '["Lifetime account","All core modules","1,500 included credits","Commercial usage","Basic templates","Standard AI generation","Manual publishing","Download unlimited outputs","Buy additional credit packs","No recurring payments"]'::jsonb WHERE code = 'starter_life';
+UPDATE public.pricing_plans SET included_credits = 4000,
+  features = '["Everything in Starter Lifetime","4,000 included credits","More templates","Higher usage limits","Larger storage"]'::jsonb WHERE code = 'creator_life';
+UPDATE public.pricing_plans SET included_credits = 9000,
+  features = '["Everything in Creator Lifetime","9,000 included credits","Priority rendering","Premium templates","Priority support"]'::jsonb WHERE code = 'pro_life';
+
+-- ---------------------------------------------------------------------
+-- Daily refill of monthly credits for yearly subscribers (needs pg_cron)
+-- ---------------------------------------------------------------------
+-- Monthly credit refill for yearly subscribers.
+-- Yearly plans store a monthly credit limit; this resets the used counter on
+-- the subscriber's monthly start day (clamped to month end, e.g. a sub started
+-- on the 31st refills on Feb 28/29). Monthly plans refill when they pay again.
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS last_credit_refill_at timestamptz;
+
+CREATE OR REPLACE FUNCTION public.refill_subscription_credits(_today date DEFAULT current_date)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE n integer;
+BEGIN
+  UPDATE public.subscriptions s
+     SET monthly_credits_used = 0,
+         last_credit_refill_at = now()
+   WHERE s.status = 'active'
+     AND s.plan_type = 'yearly'
+     AND COALESCE(s.lifetime_access, false) = false
+     AND (s.expires_at IS NULL OR s.expires_at > now())
+     AND s.started_at::date < _today
+     AND (s.last_credit_refill_at IS NULL OR s.last_credit_refill_at::date < _today)
+     AND LEAST(
+           EXTRACT(day FROM s.started_at)::int,
+           EXTRACT(day FROM (date_trunc('month', _today) + interval '1 month - 1 day'))::int
+         ) = EXTRACT(day FROM _today)::int;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END $$;
+
+REVOKE EXECUTE ON FUNCTION public.refill_subscription_credits(date) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.refill_subscription_credits(date) TO service_role;
+
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+SELECT cron.schedule('refill-yearly-credits', '30 0 * * *', $cron$SELECT public.refill_subscription_credits()$cron$);

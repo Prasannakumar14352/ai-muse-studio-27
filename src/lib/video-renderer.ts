@@ -7,7 +7,6 @@
 // browser bundles ("Class extends value undefined is not a constructor"),
 // which was crashing every route that pulled this module into its graph.
 import { getStyle } from "./constants";
-import { deductUsage } from "./access";
 import { authFetch } from "@/lib/auth-fetch";
 
 const LOG = (...args: unknown[]) => console.info("[video-renderer]", ...args);
@@ -703,7 +702,6 @@ async function fetchSceneImage(prompt: string, style: string, ratio: string, pro
   const { image } = await fetchGeneratedImage({ prompt, style, ratio });
   if (!image) return null;
   // Deduct 1 credit per successful scene image (admin bypass handled inside).
-  await deductUsage({ amount: 1, projectId: projectId ?? null, description: "Scene image generated" }).catch(() => {});
   return image;
 }
 
