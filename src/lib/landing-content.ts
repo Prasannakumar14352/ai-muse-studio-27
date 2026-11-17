@@ -52,9 +52,10 @@ export const VIDEO_TESTIMONIALS: Testimonial[] = [];
 
 // Short product walkthrough clips shown in a separate "See CreatorFlow AI in
 // Action" section — never presented as customer testimonials.
-import researchClip from "@/assets/demo/creatorflow-research-walkthrough.mp4.asset.json";
-import thumbnailsClip from "@/assets/demo/creatorflow-thumbnails-walkthrough.mp4.asset.json";
-import analyticsClip from "@/assets/demo/creatorflow-analytics-walkthrough.mp4.asset.json";
+// The original walkthrough clips live only on Lovable's asset storage
+// (/__l5e/...), which 404s on Vercel. Until the real clips are added to
+// /public/walkthroughs/, every card plays the main demo video.
+const WALKTHROUGH_FALLBACK = "/creatorflow-demo.mp4";
 const demoPoster = { url: "/brand/hero-poster.jpg" };
 
 export type ProductWalkthrough = {
@@ -71,25 +72,25 @@ export const PRODUCT_WALKTHROUGHS: ProductWalkthrough[] = [
     id: "pw1",
     title: "Viral Research Engine",
     caption: "Score a topic, get titles, hooks and one-click prefill into every studio.",
-    videoUrl: researchClip.url,
+    videoUrl: WALKTHROUGH_FALLBACK,
     poster: demoPoster.url,
-    duration: "0:15",
+    duration: "0:24",
   },
   {
     id: "pw2",
     title: "AI Thumbnail Studio",
     caption: "Guided brief → batch concepts → upscale, remove background, inpaint.",
-    videoUrl: thumbnailsClip.url,
+    videoUrl: WALKTHROUGH_FALLBACK,
     poster: demoPoster.url,
-    duration: "0:15",
+    duration: "0:24",
   },
   {
     id: "pw3",
     title: "Publishing & Analytics",
     caption: "Schedule to Instagram, YouTube, LinkedIn & more. Track CTR and revenue.",
-    videoUrl: analyticsClip.url,
+    videoUrl: WALKTHROUGH_FALLBACK,
     poster: demoPoster.url,
-    duration: "0:12",
+    duration: "0:24",
   },
 ];
 
