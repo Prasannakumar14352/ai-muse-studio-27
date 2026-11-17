@@ -21,6 +21,7 @@ import {
 } from "@/lib/thumbnail-presets";
 import {
   buildUniversalThumbnailPrompt,
+  needsOverlayScript,
   formatFromAspectRatio,
   getFormat,
 } from "@/lib/thumbnail-formats";
@@ -128,6 +129,14 @@ export const planThumbnailBrief = createServerFn({ method: "POST" })
         ? data.brief.expression
         : (optimized.subjectExpression || "confident, engaging");
 
+    // Image models garble Indic/Arabic scripts. If the topic or the text uses one,
+    // the app draws the text itself and the model is told to draw none — even when
+    // the hook text is English, the model tends to add regional text on its own.
+    const textOverlay =
+      !!thumbnailText &&
+      (needsOverlayScript(thumbnailText) ||
+        needsOverlayScript(`${data.brief.title ?? ""} ${data.brief.prompt ?? ""}`));
+
     // Build the FINAL image-generation prompt from the single universal template.
     const positivePrompt = buildUniversalThumbnailPrompt(format, {
       TOPIC: data.brief.title || data.brief.prompt || "",
@@ -137,6 +146,7 @@ export const planThumbnailBrief = createServerFn({ method: "POST" })
       THUMBNAIL_TEXT: thumbnailText,
       ASPECT_RATIO: format.ratio,
       hasUploadedSubject: Boolean(data.brief.subjectImage),
+      textOverlay,
     });
 
     return {
@@ -144,6 +154,7 @@ export const planThumbnailBrief = createServerFn({ method: "POST" })
       positivePrompt,
       negativePrompt:   String(optimized.negativePrompt   ?? "blurry, low quality, extra fingers, watermark, text artifacts, misspelled text, distorted face"),
       thumbnailText,
+      textOverlay,
       composition:      String(optimized.composition      ?? format.compositionRule),
       cameraAngle:      cameraAngle,
       lighting:         String(optimized.lighting         ?? ""),

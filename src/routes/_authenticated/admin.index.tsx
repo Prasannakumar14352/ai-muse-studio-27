@@ -7,6 +7,7 @@ import { useAccess } from "@/lib/access";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { CREDIT_COSTS, CREDIT_GUIDE_INTRO, ASSET_CREDIT_COST } from "@/lib/credit-costs";
 import { Crown, Users, Layers, Zap, Plus, Shield, ShieldOff, Ban, Loader2, ChevronDown, ChevronRight, Coins, FileText, FileDown, Printer, Image as ImageIcon, Film, Video } from "lucide-react";
+import { promptDialog } from "@/components/prompt-dialog";
 
 export const Route = createFileRoute("/_authenticated/admin/")({ component: AdminPanel });
 
@@ -46,7 +47,7 @@ function AdminPanel() {
   if (!access?.isAdmin) return <Navigate to="/dashboard" />;
 
   async function addCredits(userId: string) {
-    const raw = window.prompt("Add how many credits?", "100");
+    const raw = await promptDialog({ title: "Add credits", description: "How many credits should be added to this user's balance?", defaultValue: "100", suggestions: ["50", "100", "500", "1000"], confirmText: "Add credits" });
     const n = raw ? parseInt(raw, 10) : NaN;
     if (!Number.isFinite(n) || n <= 0) return;
     setBusy(userId);
