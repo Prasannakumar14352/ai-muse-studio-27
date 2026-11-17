@@ -38,13 +38,25 @@ export const markManuallyPublished = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// Schedule (or immediately queue) a publish job. Stubbed: on run the worker
-// will mark the project `manually_published` since no OAuth adapter is wired.
+const isVideoUrl = (u: string) => u.startsWith("data:video") || /\.(mp4|mov|m4v|webm)(\?|$)/i.test(u);
+
+/** Why this content can't go to this platform, or null when it can. */
+export function platformMediaProblem(platform: Platform, mediaUrls: string[]): string | null {
+  const hasVideo = mediaUrls.some(isVideoUrl);
+  if (platform === "youtube" && !hasVideo) return "YouTube needs a rendered video.";
+  if (platform === "instagram" && mediaUrls.length === 0) return "Instagram needs an image or a video.";
+  return null;
+}
+
+// Publish now, or schedule for later, with the user's connected account.
+// "Publish now" runs immediately and returns the result; scheduled posts are
+// picked up by the publish worker (pg_cron, every 5 minutes).
 export const schedulePost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
     projectId: z.string().uuid(),
     platform: platformSchema,
+    title: z.string().max(300).optional(),
     caption: z.string().optional(),
     hashtags: z.string().optional(),
     mediaUrls: z.array(z.string()).optional(),
@@ -52,22 +64,43 @@ export const schedulePost = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const media = data.mediaUrls ?? [];
+    const problem = platformMediaProblem(data.platform, media);
+    if (problem) throw new Error(problem);
+
+    const { data: conn } = await supabase.from("platform_connections")
+      .select("id, status, expires_at").eq("user_id", userId).eq("platform", data.platform)
+      .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+    if (!conn) throw new Error(`Connect your ${data.platform} account first (Connected Accounts).`);
+
     const scheduled = data.scheduledAt ?? null;
+    if (scheduled && new Date(scheduled).getTime() < Date.now() - 60_000) {
+      throw new Error("Pick a time in the future.");
+    }
     const { data: row, error } = await supabase.from("scheduled_posts").insert({
       user_id: userId,
       project_id: data.projectId,
       platform: data.platform,
+      connection_id: conn.id,
+      title: data.title ?? null,
       caption: data.caption ?? null,
       hashtags: data.hashtags ?? null,
-      media_urls: (data.mediaUrls ?? []) as never,
+      media_urls: media as never,
       scheduled_at: scheduled,
       status: scheduled ? "scheduled" : "ready",
     } as never).select("id").single();
     if (error) throw error;
-    await supabase.from("projects").update({
-      publish_status: scheduled ? "scheduled" : "ready",
-    } as never).eq("id", data.projectId).eq("user_id", userId);
-    return { ok: true, id: row.id as string };
+    const id = row.id as string;
+
+    if (scheduled) {
+      await supabase.from("projects").update({ publish_status: "scheduled" } as never)
+        .eq("id", data.projectId).eq("user_id", userId);
+      return { ok: true, id, status: "scheduled", url: null as string | null, error: null as string | null };
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { runPublishJob } = await import("./social-publish.server");
+    const r = await runPublishJob(supabaseAdmin, id);
+    return { ok: r.status === "published" || r.status === "publishing", id, ...r };
   });
 
 export const cancelScheduledPost = createServerFn({ method: "POST" })
@@ -128,7 +161,7 @@ export const updateScheduledPost = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// Move a scheduled post into immediate publishing queue (worker will pick it up).
+// Publish a queued/scheduled post right now.
 export const publishScheduledPostNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
@@ -138,9 +171,12 @@ export const publishScheduledPostNow = createServerFn({ method: "POST" })
       scheduled_at: null,
       attempts: 0,
       last_error: null,
-    } as never).eq("id", data.id).eq("user_id", context.userId);
+    } as never).eq("id", data.id).eq("user_id", context.userId).neq("status", "publishing");
     if (error) throw error;
-    return { ok: true };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { runPublishJob } = await import("./social-publish.server");
+    const r = await runPublishJob(supabaseAdmin, data.id);
+    return { ok: r.status === "published" || r.status === "publishing", ...r };
   });
 
 // Publishing analytics: counts by status + per-platform totals + 30d timeline.
@@ -198,8 +234,9 @@ export const getPlatformStatus = createServerFn({ method: "GET" })
       expires_at: string | null; updated_at: string | null;
     }>;
     return PLATFORMS.map((p) => {
-      const c = conns.find((x) => x.platform === p);
-      const expired = c?.expires_at ? new Date(c.expires_at).getTime() < Date.now() : false;
+      const c = conns.find((x) => x.platform === p && x.status !== "expired") ?? conns.find((x) => x.platform === p);
+      // YouTube tokens refresh automatically; others must be reconnected when expired.
+      const expired = p !== "youtube" && c?.expires_at ? new Date(c.expires_at).getTime() < Date.now() : false;
       return {
         platform: p,
         connected: !!c && c.status === "connected" && !expired,

@@ -1,7 +1,7 @@
 // OAuth callback: verify state, exchange code, fetch profile,
 // encrypt tokens, upsert platform_connections, redirect to /connections.
 import { createFileRoute } from "@tanstack/react-router";
-import { PROVIDERS, PLATFORM_TO_PROVIDER, callbackUrl, fetchProfile, exchangeCode, type PlatformId } from "@/lib/oauth-providers.server";
+import { PROVIDERS, PLATFORM_TO_PROVIDER, callbackUrl, fetchProfile, exchangeCode, exchangeMetaLongLivedToken, type PlatformId } from "@/lib/oauth-providers.server";
 
 export const Route = createFileRoute("/api/public/oauth/$platform/callback")({
   server: {
@@ -50,7 +50,7 @@ export const Route = createFileRoute("/api/public/oauth/$platform/callback")({
 
         try {
           const redirectUri = callbackUrl(origin, platform);
-          const token = await exchangeCode({
+          let token = await exchangeCode({
             provider: providerId,
             clientId: cfg.client_id as string,
             clientSecret,
@@ -58,6 +58,12 @@ export const Route = createFileRoute("/api/public/oauth/$platform/callback")({
             redirectUri,
           });
           if (!token.access_token) return back("No access token returned");
+          if (providerId === "meta") {
+            const long = await exchangeMetaLongLivedToken({
+              clientId: cfg.client_id as string, clientSecret, accessToken: token.access_token,
+            });
+            token = { ...token, access_token: long.access_token, expires_in: long.expires_in ?? 60 * 24 * 3600 };
+          }
 
           const profile = await fetchProfile(platform, token.access_token);
           const spec = PROVIDERS[providerId];
@@ -70,6 +76,9 @@ export const Route = createFileRoute("/api/public/oauth/$platform/callback")({
           const expiresAt = token.expires_in
             ? new Date(Date.now() + token.expires_in * 1000).toISOString() : null;
 
+          // One connection per platform: a reconnect replaces the old one.
+          await supabaseAdmin.from("platform_connections").delete()
+            .eq("user_id", stateRow.user_id as string).eq("platform", platform);
           await supabaseAdmin.from("platform_connections").upsert({
             user_id: stateRow.user_id as string,
             platform,

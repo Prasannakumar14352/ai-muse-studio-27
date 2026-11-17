@@ -1,8 +1,11 @@
 // Universal "Download / Publish / Schedule / Copy / Mark manually published"
 // action bar for any generated project (image, carousel, video, thumbnail).
-// Publishing opens a dialog that offers Direct Publish (stubbed → schedules
-// a job and asks the user to connect an account) or Manual Posting.
+// Publishing opens a dialog: pick a platform you've connected, then publish
+// now or schedule (the publish worker posts it at that time). Platforms that
+// aren't connected, or can't take this content, show why and link to
+// Connected Accounts. Download and manual posting always work.
 import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -10,7 +13,8 @@ import {
   Download, Send, Clock, Copy, CheckCircle2, ExternalLink, Loader2, Share2,
 } from "lucide-react";
 import {
-  markManuallyPublished, schedulePost, PLATFORMS, type Platform, type PublishStatus,
+  markManuallyPublished, schedulePost, getPlatformStatus, platformMediaProblem,
+  PLATFORMS, type Platform, type PublishStatus,
 } from "@/lib/publishing.functions";
 import { copyText, downloadPlatformPackage, buildLinkedInPost } from "@/lib/downloads";
 import { isHiddenPath } from "@/lib/hidden-features";
@@ -26,6 +30,12 @@ export type PublishActionsProps = {
   description?: string;
   tags?: string[];
   media?: Array<{ url: string; kind: "image" | "video" | "thumbnail"; name?: string }>;
+  /** Per-platform caption/hashtags (e.g. from the Publish Kit). Falls back to caption/hashtags. */
+  captions?: Partial<Record<Platform, { caption?: string; hashtags?: string }>>;
+  /** Title used for YouTube (and as the LinkedIn media title). Defaults to `title`. */
+  postTitle?: string;
+  /** Platform selected when the dialog opens. */
+  defaultPlatform?: Platform;
   /** Custom Download handler. If provided, replaces the default (which packages a per-platform ZIP). */
   onDownload?: () => void | Promise<void>;
   onEdit?: () => void;
@@ -59,10 +69,27 @@ const BADGE_COLORS: Record<PublishStatus, string> = {
 export function PublishActions(props: PublishActionsProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<null | "download" | "publish" | "schedule" | "manual">(null);
-  const [platform, setPlatform] = useState<Platform>("instagram");
+  const [platform, setPlatform] = useState<Platform>(props.defaultPlatform ?? "instagram");
   const [scheduleAt, setScheduleAt] = useState<string>("");
   const mark = useServerFn(markManuallyPublished);
   const schedule = useServerFn(schedulePost);
+  const statusFn = useServerFn(getPlatformStatus);
+  const qc = useQueryClient();
+  const platformStatus = useQuery({
+    queryKey: ["platform-status"],
+    queryFn: () => statusFn(),
+    enabled: open,
+    staleTime: 30_000,
+  });
+  const connected = (p: Platform) => platformStatus.data?.find((x) => x.platform === p)?.connected ?? false;
+  const accountName = (p: Platform) => platformStatus.data?.find((x) => x.platform === p)?.accountName ?? null;
+  const mediaUrls = (props.media ?? []).filter((m) => m.kind !== "thumbnail").map((m) => m.url);
+  const problem = platformMediaProblem(platform, mediaUrls);
+  const canPublish = connected(platform) && !problem;
+  const textFor = (p: Platform) => ({
+    caption: props.captions?.[p]?.caption ?? props.caption,
+    hashtags: props.captions?.[p]?.hashtags ?? props.hashtags,
+  });
 
   const status = props.status ?? "ready";
 
@@ -92,17 +119,32 @@ export function PublishActions(props: PublishActionsProps) {
     }
   }
 
+  function payload(scheduledAt?: string) {
+    const t = textFor(platform);
+    return {
+      projectId: props.projectId!, platform, title: props.postTitle ?? props.title,
+      caption: t.caption, hashtags: t.hashtags, mediaUrls, scheduledAt,
+    };
+  }
+
   async function handlePublishNow() {
     if (!props.projectId) return toast.error("Save the project first");
     setBusy("publish");
     try {
-      const r = await schedule({ data: { projectId: props.projectId, platform, caption: props.caption, hashtags: props.hashtags, mediaUrls: props.media?.map((m) => m.url) } });
-      if (r.ok) {
-        toast.warning("Queued — connect your account to complete publishing", {
-          description: "For now the post is queued and can be finished manually.",
-          ...(isHiddenPath("/connections") ? {} : { action: { label: "Connect", onClick: () => { window.location.href = "/connections"; } } }),
-        });
+      const r = await schedule({ data: payload() });
+      qc.invalidateQueries({ queryKey: ["scheduled_posts"] });
+      if (r.status === "published") {
+        toast.success(`Published to ${platform}`, r.url ? { action: { label: "View post", onClick: () => window.open(r.url!, "_blank") } } : undefined);
         setOpen(false);
+      } else if (r.status === "publishing") {
+        toast.success("Uploading — Instagram is processing the video", { description: "It goes live within a few minutes. Track it in Planner." });
+        setOpen(false);
+      } else if (r.status === "scheduled") {
+        toast.warning("Couldn't publish yet — will retry automatically", { description: r.error ?? undefined });
+        setOpen(false);
+      } else {
+        toast.error(r.status === "reconnect_required" ? "Reconnect your account" : "Publish failed", { description: r.error ?? undefined });
+        qc.invalidateQueries({ queryKey: ["platform-status"] });
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Publish failed");
@@ -117,9 +159,10 @@ export function PublishActions(props: PublishActionsProps) {
     setBusy("schedule");
     try {
       const iso = new Date(scheduleAt).toISOString();
-      const r = await schedule({ data: { projectId: props.projectId, platform, caption: props.caption, hashtags: props.hashtags, mediaUrls: props.media?.map((m) => m.url), scheduledAt: iso } });
+      const r = await schedule({ data: payload(iso) });
       if (r.ok) {
-        toast.success("Scheduled");
+        qc.invalidateQueries({ queryKey: ["scheduled_posts"] });
+        toast.success(`Scheduled for ${new Date(iso).toLocaleString()}`, { description: "It will be posted automatically. Track it in Planner." });
         setOpen(false);
       }
     } catch (e) {
@@ -207,10 +250,25 @@ export function PublishActions(props: PublishActionsProps) {
               <div className="flex flex-wrap gap-1.5">
                 {PLATFORMS.map((p) => (
                   <button key={p} onClick={() => setPlatform(p)}
-                    className={`px-3 py-1.5 rounded-full text-xs border capitalize ${platform === p ? "gradient-primary text-white border-transparent" : "border-white/10 hover:bg-white/5"}`}>
+                    className={`px-3 py-1.5 rounded-full text-xs border capitalize inline-flex items-center gap-1.5 ${platform === p ? "gradient-primary text-white border-transparent" : "border-white/10 hover:bg-white/5"}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${connected(p) ? "bg-emerald-400" : "bg-white/30"}`} />
                     {p}
                   </button>
                 ))}
+              </div>
+              <div className="text-xs">
+                {platformStatus.isLoading ? (
+                  <span className="text-muted-foreground">Checking connected accounts…</span>
+                ) : problem ? (
+                  <span className="text-amber-300">{problem}</span>
+                ) : connected(platform) ? (
+                  <span className="text-emerald-300">Posting as {accountName(platform) ?? "your connected account"}</span>
+                ) : (
+                  <span className="text-amber-300">
+                    <span className="capitalize">{platform}</span> isn't connected.{" "}
+                    {!isHiddenPath("/connections") && <Link to="/connections" className="underline">Connect it</Link>} to publish directly, or download and post manually.
+                  </span>
+                )}
               </div>
               {!isHiddenPath("/connections") && (
                 <Link to="/connections" className="text-xs text-[color:var(--neon-purple)] hover:underline inline-flex items-center gap-1">
@@ -219,16 +277,19 @@ export function PublishActions(props: PublishActionsProps) {
               )}
             </div>
 
-            {props.caption && (
+            {textFor(platform).caption && (
               <div>
                 <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Caption preview</div>
-                <div className="text-sm bg-black/30 rounded-lg p-3 max-h-32 overflow-auto whitespace-pre-wrap">{props.caption}</div>
+                <div className="text-sm bg-black/30 rounded-lg p-3 max-h-32 overflow-auto whitespace-pre-wrap">
+                  {textFor(platform).caption}
+                  {textFor(platform).hashtags ? `\n\n${textFor(platform).hashtags}` : ""}
+                </div>
               </div>
             )}
 
             <div className="flex flex-col gap-3 pt-2 border-t border-white/5">
               <div className="flex flex-wrap gap-2">
-                <button onClick={handlePublishNow} disabled={busy !== null}
+                <button onClick={handlePublishNow} disabled={busy !== null || !canPublish}
                   className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2 disabled:opacity-60">
                   {busy === "publish" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Publish now
@@ -242,15 +303,16 @@ export function PublishActions(props: PublishActionsProps) {
               <div className="flex flex-wrap items-center gap-2">
                 <Clock className="w-4 h-4 text-muted-foreground" />
                 <input type="datetime-local" value={scheduleAt} onChange={(e) => setScheduleAt(e.target.value)}
+                  min={new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16)}
                   className="bg-input/60 border border-border rounded-lg px-2 py-1.5 text-sm" />
-                <button onClick={handleSchedule} disabled={busy !== null || !scheduleAt}
+                <button onClick={handleSchedule} disabled={busy !== null || !scheduleAt || !canPublish}
                   className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-60">
                   {busy === "schedule" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
                   Schedule
                 </button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Direct publishing requires a connected account. If no account is connected the post is queued and can be downloaded and posted manually — download stays available at all times.
+                Publish now posts immediately. Scheduled posts go out automatically at that time (checked every 5 minutes). Already posted it yourself? Use "Mark as manually published".
               </p>
             </div>
           </div>

@@ -307,7 +307,14 @@ function PostsTable({
                 <td className="px-4 py-3"><div className="flex items-center gap-2"><Icon className="w-4 h-4" />{String(r.platform)}</div></td>
                 <td className="px-4 py-3 text-white/80 max-w-md truncate">{String(r.caption ?? "—")}</td>
                 <td className="px-4 py-3 text-white/60">{r.scheduled_at ? new Date(String(r.scheduled_at)).toLocaleString() : "—"}</td>
-                <td className="px-4 py-3"><StatusBadge status={String(r.status)} /></td>
+                <td className="px-4 py-3">
+                  <StatusBadge status={String(r.status)} />
+                  {r.external_post_url ? (
+                    <a href={String(r.external_post_url)} target="_blank" rel="noreferrer" className="block text-xs text-[color:var(--neon-purple)] hover:underline mt-1">View post</a>
+                  ) : r.last_error && r.status !== "published" ? (
+                    <div className="text-xs text-red-300/80 mt-1 max-w-xs truncate" title={String(r.last_error)}>{String(r.last_error)}</div>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-1">
                     {String(r.status) === "draft" && (
@@ -316,10 +323,20 @@ function PostsTable({
                         toast.success("Moved to queue"); onChange();
                       }}><Send className="w-3 h-3" /></Button>
                     )}
-                    {String(r.status) === "scheduled" && (
-                      <Button size="sm" variant="ghost" onClick={async () => {
-                        await publishNow({ data: { id: String(r.id) } });
-                        toast.success("Queued for immediate publishing"); onChange();
+                    {["scheduled", "ready", "failed", "reconnect_required"].includes(String(r.status)) && (
+                      <Button size="sm" variant="ghost" title="Publish now" onClick={async () => {
+                        const t = toast.loading("Publishing…");
+                        try {
+                          const res = await publishNow({ data: { id: String(r.id) } });
+                          toast.dismiss(t);
+                          if (res.status === "published") toast.success("Published", res.url ? { action: { label: "View", onClick: () => window.open(res.url!, "_blank") } } : undefined);
+                          else if (res.status === "publishing") toast.success("Uploading — Instagram is processing the video");
+                          else toast.error("Couldn't publish", { description: res.error ?? undefined });
+                        } catch (e) {
+                          toast.dismiss(t);
+                          toast.error(e instanceof Error ? e.message : "Couldn't publish");
+                        }
+                        onChange();
                       }}><Send className="w-3 h-3" /></Button>
                     )}
                     <Button size="sm" variant="ghost" onClick={async () => {

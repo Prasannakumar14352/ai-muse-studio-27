@@ -21,7 +21,8 @@ import {
 
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { BrandLogo } from "@/components/brand-logo";
-import { isHiddenPath } from "@/lib/hidden-features";
+import { isHiddenPath, CONNECTIONS_PATH } from "@/lib/hidden-features";
+import { useSocialPublishingAvailable } from "@/lib/use-social-publishing";
 import { PromptDialogHost } from "@/components/prompt-dialog";
 
 // Map a project's `content_type` to the top-level sidebar tab that should
@@ -171,9 +172,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { data: access } = useAccess();
   const { data: counts } = useModuleCounts();
 
+  const socialAvailable = useSocialPublishingAvailable();
   const sections = SECTIONS.filter((s) => !s.adminOnly || access?.isAdmin).map((s) => ({
     ...s,
-    items: s.items.filter((n) => !isHiddenPath(n.to)),
+    items: s.items.filter((n) => !isHiddenPath(n.to)
+      && (n.to !== CONNECTIONS_PATH || socialAvailable || access?.isAdmin)),
   }));
 
   function toggleCollapse() {
