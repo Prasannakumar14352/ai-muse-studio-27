@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/auth-fetch";
 /**
  * Client-side helper for the streaming `/api/generate-image` endpoint.
  *
@@ -61,7 +62,7 @@ export async function fetchGeneratedImage(
 
   let res: Response;
   try {
-    res = await fetch("/api/generate-image", {
+    res = await authFetch("/api/generate-image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

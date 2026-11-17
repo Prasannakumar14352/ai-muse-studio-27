@@ -14,9 +14,9 @@ Add to **Production**, **Preview**, and **Development**:
 
 | Name | Value |
 | ---- | ----- |
-| `VITE_SUPABASE_URL` | `https://rpxvanbwvzxtsdiujprs.supabase.co` |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_NEJQvokSgab1qbmK2JmFRQ_7SJ6RCjl` |
-| `VITE_SUPABASE_PROJECT_ID` | `rpxvanbwvzxtsdiujprs` |
+| `VITE_SUPABASE_URL` | `https://xjqbhktzhhivbpgnqwgm.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_rTmxuh-mF0wnGzqOV2VEQA_3zYCZMc_` |
+| `VITE_SUPABASE_PROJECT_ID` | `xjqbhktzhhivbpgnqwgm` |
 
 ### Server-side (server functions / API routes only — never prefix with `VITE_`)
 
@@ -55,7 +55,7 @@ http://localhost:8080                       ← for local dev
 your app URL:
 
 ```
-https://rpxvanbwvzxtsdiujprs.supabase.co/auth/v1/callback
+https://xjqbhktzhhivbpgnqwgm.supabase.co/auth/v1/callback
 ```
 
 Copy the **Client ID** and **Client Secret**.

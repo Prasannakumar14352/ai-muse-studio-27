@@ -29,6 +29,7 @@ import { Route as AuthenticatedSeoRouteImport } from './routes/_authenticated/se
 import { Route as AuthenticatedResearchRouteImport } from './routes/_authenticated/research'
 import { Route as AuthenticatedRepurposeRouteImport } from './routes/_authenticated/repurpose'
 import { Route as AuthenticatedPromoVideosRouteImport } from './routes/_authenticated/promo-videos'
+import { Route as AuthenticatedModelStudioRouteImport } from './routes/_authenticated/model-studio'
 import { Route as AuthenticatedMarketplaceRouteImport } from './routes/_authenticated/marketplace'
 import { Route as AuthenticatedLinkedinPostsRouteImport } from './routes/_authenticated/linkedin-posts'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
@@ -163,6 +164,12 @@ const AuthenticatedPromoVideosRoute =
   AuthenticatedPromoVideosRouteImport.update({
     id: '/promo-videos',
     path: '/promo-videos',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedModelStudioRoute =
+  AuthenticatedModelStudioRouteImport.update({
+    id: '/model-studio',
+    path: '/model-studio',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedMarketplaceRoute =
@@ -385,6 +392,7 @@ export interface FileRoutesByFullPath {
   '/library': typeof AuthenticatedLibraryRoute
   '/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
   '/marketplace': typeof AuthenticatedMarketplaceRoute
+  '/model-studio': typeof AuthenticatedModelStudioRoute
   '/promo-videos': typeof AuthenticatedPromoVideosRoute
   '/repurpose': typeof AuthenticatedRepurposeRoute
   '/research': typeof AuthenticatedResearchRoute
@@ -439,6 +447,7 @@ export interface FileRoutesByTo {
   '/invoices': typeof AuthenticatedInvoicesRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/marketplace': typeof AuthenticatedMarketplaceRoute
+  '/model-studio': typeof AuthenticatedModelStudioRoute
   '/promo-videos': typeof AuthenticatedPromoVideosRoute
   '/repurpose': typeof AuthenticatedRepurposeRoute
   '/research': typeof AuthenticatedResearchRoute
@@ -497,6 +506,7 @@ export interface FileRoutesById {
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/linkedin-posts': typeof AuthenticatedLinkedinPostsRouteWithChildren
   '/_authenticated/marketplace': typeof AuthenticatedMarketplaceRoute
+  '/_authenticated/model-studio': typeof AuthenticatedModelStudioRoute
   '/_authenticated/promo-videos': typeof AuthenticatedPromoVideosRoute
   '/_authenticated/repurpose': typeof AuthenticatedRepurposeRoute
   '/_authenticated/research': typeof AuthenticatedResearchRoute
@@ -555,6 +565,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/linkedin-posts'
     | '/marketplace'
+    | '/model-studio'
     | '/promo-videos'
     | '/repurpose'
     | '/research'
@@ -609,6 +620,7 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/library'
     | '/marketplace'
+    | '/model-studio'
     | '/promo-videos'
     | '/repurpose'
     | '/research'
@@ -666,6 +678,7 @@ export interface FileRouteTypes {
     | '/_authenticated/library'
     | '/_authenticated/linkedin-posts'
     | '/_authenticated/marketplace'
+    | '/_authenticated/model-studio'
     | '/_authenticated/promo-videos'
     | '/_authenticated/repurpose'
     | '/_authenticated/research'
@@ -856,6 +869,13 @@ declare module '@tanstack/react-router' {
       path: '/promo-videos'
       fullPath: '/promo-videos'
       preLoaderRoute: typeof AuthenticatedPromoVideosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/model-studio': {
+      id: '/_authenticated/model-studio'
+      path: '/model-studio'
+      fullPath: '/model-studio'
+      preLoaderRoute: typeof AuthenticatedModelStudioRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/marketplace': {
@@ -1184,6 +1204,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
   AuthenticatedLinkedinPostsRoute: typeof AuthenticatedLinkedinPostsRouteWithChildren
   AuthenticatedMarketplaceRoute: typeof AuthenticatedMarketplaceRoute
+  AuthenticatedModelStudioRoute: typeof AuthenticatedModelStudioRoute
   AuthenticatedPromoVideosRoute: typeof AuthenticatedPromoVideosRoute
   AuthenticatedRepurposeRoute: typeof AuthenticatedRepurposeRoute
   AuthenticatedResearchRoute: typeof AuthenticatedResearchRoute
@@ -1215,6 +1236,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
   AuthenticatedLinkedinPostsRoute: AuthenticatedLinkedinPostsRouteWithChildren,
   AuthenticatedMarketplaceRoute: AuthenticatedMarketplaceRoute,
+  AuthenticatedModelStudioRoute: AuthenticatedModelStudioRoute,
   AuthenticatedPromoVideosRoute: AuthenticatedPromoVideosRoute,
   AuthenticatedRepurposeRoute: AuthenticatedRepurposeRoute,
   AuthenticatedResearchRoute: AuthenticatedResearchRoute,

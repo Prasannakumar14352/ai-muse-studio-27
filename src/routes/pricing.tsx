@@ -36,7 +36,7 @@ export const Route = createFileRoute("/pricing")({
     ],
   }),
   loader: ({ context }) => context.queryClient.ensureQueryData(plansQuery),
-  errorComponent: ({ error }) => <div className="p-8 text-red-400">Pricing failed to load: {error.message}</div>,
+  errorComponent: ({ error }) => <div className="p-8 text-red-400">Pricing failed to load: {error instanceof Error ? error.message : String(error)}</div>,
   notFoundComponent: () => <div className="p-8">Pricing not found.</div>,
   component: PricingPage,
 });

@@ -32,6 +32,7 @@ import {
   type CharacterBible,
 } from "@/lib/character-bible";
 import { classifyTopic } from "@/lib/cinematic-engine";
+import { authFetch } from "@/lib/auth-fetch";
 
 // ---------- Beat expansion (documentary-style visual density) ----------
 //
@@ -727,7 +728,7 @@ async function fetchSceneImage(prompt: string, style: StyleId, ratio: AspectRati
 /** Try to generate a short AI video clip for a beat. Returns null on any failure. */
 async function fetchBeatClip(prompt: string, style: StyleId, ratio: AspectRatio, duration: number): Promise<string | null> {
   try {
-    const res = await fetch("/api/generate-video-clip", {
+    const res = await authFetch("/api/generate-video-clip", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -863,7 +864,7 @@ export const RenderAgent = {
 
 async function fetchSceneAudio(text: string, voice: VoiceId, ctx: AudioContext): Promise<{ blobUrl: string; buffer: AudioBuffer } | null> {
   try {
-    const res = await fetch("/api/tts", {
+    const res = await authFetch("/api/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, voice: VOICE_MAP[voice] }),

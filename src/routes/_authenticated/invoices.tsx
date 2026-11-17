@@ -11,7 +11,7 @@ export const Route = createFileRoute("/_authenticated/invoices")({
   errorComponent: ({ error, reset }) => (
     <div className="max-w-2xl mx-auto p-6 glass rounded-2xl mt-8">
       <h2 className="text-lg font-semibold text-red-400">Could not load invoices</h2>
-      <p className="text-sm text-muted-foreground mt-1">{error.message}</p>
+      <p className="text-sm text-muted-foreground mt-1">{error instanceof Error ? error.message : String(error)}</p>
       <button onClick={reset} className="mt-4 px-4 py-2 rounded-lg gradient-primary text-white text-sm">Retry</button>
     </div>
   ),

@@ -13,11 +13,11 @@ import {
   type Testimonial, type ProductWalkthrough,
 } from "@/lib/landing-content";
 import { listPublishedLandingMedia, type LandingMediaRow } from "@/lib/landing-media.functions";
-import demoAsset from "@/assets/demo/creatorflow-demo.mp4.asset.json";
-import demoPosterAsset from "@/assets/demo/creatorflow-demo-poster.jpg.asset.json";
 
-const BUILTIN_DEMO_VIDEO = demoAsset.url;
-const BUILTIN_DEMO_POSTER = demoPosterAsset.url;
+// Served from /public so they work on every host. The Lovable asset URLs
+// (/__l5e/...) only resolve on Lovable hosting and 404 on Vercel.
+const BUILTIN_DEMO_VIDEO = "/creatorflow-demo.mp4";
+const BUILTIN_DEMO_POSTER = "/brand/hero-poster.jpg";
 
 function landingRowToTestimonial(r: LandingMediaRow): Testimonial {
   return {

@@ -37,7 +37,7 @@ export const Route = createFileRoute("/_authenticated/calendar")({
     return (
       <div className="p-8 text-white">
         <h2 className="text-lg font-semibold mb-2">Calendar failed to load</h2>
-        <p className="text-sm text-white/60 mb-4">{error.message}</p>
+        <p className="text-sm text-white/60 mb-4">{error instanceof Error ? error.message : String(error)}</p>
         <Button onClick={() => { reset(); router.invalidate(); }}>Retry</Button>
       </div>
     );

@@ -55,7 +55,7 @@ export const VIDEO_TESTIMONIALS: Testimonial[] = [];
 import researchClip from "@/assets/demo/creatorflow-research-walkthrough.mp4.asset.json";
 import thumbnailsClip from "@/assets/demo/creatorflow-thumbnails-walkthrough.mp4.asset.json";
 import analyticsClip from "@/assets/demo/creatorflow-analytics-walkthrough.mp4.asset.json";
-import demoPoster from "@/assets/demo/creatorflow-demo-poster.jpg.asset.json";
+const demoPoster = { url: "/brand/hero-poster.jpg" };
 
 export type ProductWalkthrough = {
   id: string;
