@@ -18,6 +18,7 @@ import {
   type ThumbnailStrategy,
   type SlideType,
 } from "@/lib/creative-director";
+import { aiChatFetch, aiKey, AI_NOT_CONFIGURED } from "@/lib/ai-provider";
 
 const ContentIntentZ = z.enum([
   "digital_product","physical_product","educational","children_education",
@@ -133,9 +134,9 @@ RULES:
 }
 
 async function callLLM(prompt: string, surface: Surface, count: number, extras?: string) {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("Missing LOVABLE_API_KEY");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const key = aiKey();
+  if (!key) throw new Error(AI_NOT_CONFIGURED);
+  const res = await aiChatFetch({
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({

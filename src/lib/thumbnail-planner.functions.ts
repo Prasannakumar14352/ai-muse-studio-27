@@ -24,6 +24,7 @@ import {
   formatFromAspectRatio,
   getFormat,
 } from "@/lib/thumbnail-formats";
+import { aiChatFetch, aiKey, AI_NOT_CONFIGURED } from "@/lib/ai-provider";
 
 function lookup<T extends { id: string }>(arr: T[], id: string): T {
   return arr.find((x) => x.id === id) ?? arr[0];
@@ -156,9 +157,9 @@ export const planThumbnailBrief = createServerFn({ method: "POST" })
 export const analyzeThumbnailQuality = createServerFn({ method: "POST" })
   .inputValidator((data: { imageDataUrl: string; title: string; text: string }) => data)
   .handler(async ({ data }): Promise<ThumbnailQualityReport> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const key = aiKey();
+    if (!key) throw new Error(AI_NOT_CONFIGURED);
+    const res = await aiChatFetch({
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
       body: JSON.stringify({
@@ -207,9 +208,9 @@ export const analyzeThumbnailQuality = createServerFn({ method: "POST" })
 export const reverseEngineerThumbnail = createServerFn({ method: "POST" })
   .inputValidator((data: { imageDataUrl: string }) => data)
   .handler(async ({ data }): Promise<ReverseEngineered> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const key = aiKey();
+    if (!key) throw new Error(AI_NOT_CONFIGURED);
+    const res = await aiChatFetch({
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
       body: JSON.stringify({

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { parseStructuredJsonResponse } from "@/lib/video-json";
 import { buildFallbackScenesFromScript, buildFallbackVideoScript } from "@/lib/video-fallback";
 import { getDurationTargets, totalVoiceoverWords } from "@/lib/video-duration";
+import { aiChatFetch, aiKey, AI_NOT_CONFIGURED } from "@/lib/ai-provider";
 
 
 export type AiVideoScene = {
@@ -61,8 +62,8 @@ export const generateAiVideoScript = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("video_script")])
   .inputValidator((v: unknown) => Input.parse(v))
   .handler(async ({ data }): Promise<AiVideoScript> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+    const key = aiKey();
+    if (!key) throw new Error(AI_NOT_CONFIGURED);
 
     const isLong = data.contentType === "long_video";
     const defaultLen = isLong ? 75 : 35;
@@ -211,7 +212,7 @@ Return ONLY this JSON object shape with no prose:
       let raw = "";
       let receivedAiResponse = false;
       try {
-        const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const upstream = await aiChatFetch({
           method: "POST",
           headers: {
             Authorization: `Bearer ${key}`,
@@ -302,7 +303,7 @@ Return ONLY this JSON shape with no prose:
 { "scenes": [ { "n": ${startN}, "time_range": "", "role": "Beat", "voiceover": "...", "on_screen_text": "", "visual": "...", "image_prompt": "${data.styleLabel} style, ${ratio}, photorealistic, cinematic, premium commercial look, 8k, shallow depth of field. ...", "duration": "3s" } ] }`;
         const ExtSchema = z.object({ scenes: z.array(Schema.shape.scenes.element) });
         try {
-          const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          const upstream = await aiChatFetch({
             method: "POST",
             headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -401,8 +402,8 @@ export const generateScenesFromScript = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("video_scenes_plan")])
   .inputValidator((v: unknown) => FromScriptInput.parse(v))
   .handler(async ({ data }): Promise<ScenesFromScript> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+    const key = aiKey();
+    if (!key) throw new Error(AI_NOT_CONFIGURED);
 
     const isLong = data.contentType === "long_video";
     const defaultLen = isLong ? 75 : 35;
@@ -466,7 +467,7 @@ Return ONLY this JSON object shape with no prose:
       let raw = "";
       let receivedAiResponse = false;
       try {
-        const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const upstream = await aiChatFetch({
           method: "POST",
           headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -567,8 +568,8 @@ export const generateAiVideoSeo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("video_seo")])
   .inputValidator((v: unknown) => SeoInput.parse(v))
   .handler(async ({ data }): Promise<AiVideoSeo> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+    const key = aiKey();
+    if (!key) throw new Error(AI_NOT_CONFIGURED);
 
     const sys = `You are a YouTube SEO strategist. Return ONLY valid JSON. No
 markdown. No code fences. No prose outside the JSON.`;
@@ -646,7 +647,7 @@ Return ONLY this JSON shape:
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const upstream = await aiChatFetch({
           method: "POST",
           headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -746,7 +747,7 @@ function buildFallbackChapters(cumulative: Array<{ time: string; hint: string }>
 
 async function callGateway(key: string, sys: string, user: string, maxTokens = 2000): Promise<unknown | null> {
   try {
-    const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const upstream = await aiChatFetch({
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -783,8 +784,8 @@ export const generateVideoTitleVariants = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("video_title_variants")])
   .inputValidator((v: unknown) => TitleInput.parse(v))
   .handler(async ({ data }): Promise<VideoTitleVariants> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+    const key = aiKey();
+    if (!key) throw new Error(AI_NOT_CONFIGURED);
 
     const sys = `You are a YouTube CTR strategist. You write video titles that
 maximize click-through without lying. Return ONLY valid JSON — no prose, no code fences.`;
@@ -853,8 +854,8 @@ export const generateVideoHook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("video_hook")])
   .inputValidator((v: unknown) => HookInput.parse(v))
   .handler(async ({ data }): Promise<VideoHook> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+    const key = aiKey();
+    if (!key) throw new Error(AI_NOT_CONFIGURED);
 
     const sys = `You are a YouTube retention expert. You write 3-second video
 hooks (opening lines) that stop the scroll. Return ONLY valid JSON.`;
@@ -916,8 +917,8 @@ export const generateVideoChapters = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("video_chapters")])
   .inputValidator((v: unknown) => ChapterInput.parse(v))
   .handler(async ({ data }): Promise<VideoChapters> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+    const key = aiKey();
+    if (!key) throw new Error(AI_NOT_CONFIGURED);
 
     // Build cumulative timing hints so the model can align chapters to real scene starts.
     const cumulative: Array<{ time: string; hint: string; sec: number }> = [];

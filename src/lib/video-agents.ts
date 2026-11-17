@@ -33,6 +33,7 @@ import {
 } from "@/lib/character-bible";
 import { classifyTopic } from "@/lib/cinematic-engine";
 import { authFetch } from "@/lib/auth-fetch";
+import { AI_NOT_CONFIGURED } from "@/lib/ai-provider";
 
 // ---------- Beat expansion (documentary-style visual density) ----------
 //
@@ -1411,7 +1412,7 @@ function logScriptJsonDebug(script: AiVideoScript) {
 
 function isHardAiFailure(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return message.includes("AI gateway 402") || message.includes("AI gateway 429") || message.includes("Unauthorized") || message.includes("Missing LOVABLE_API_KEY");
+  return message.includes("AI gateway 402") || message.includes("AI gateway 429") || message.includes("Unauthorized") || message.includes(AI_NOT_CONFIGURED);
 }
 
 function vtt(sec: number): string {

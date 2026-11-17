@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
 import { HandoffBanner } from "@/components/handoff-banner";
+import { isHiddenPath } from "@/lib/hidden-features";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
   component: CalendarPage,
@@ -500,7 +501,7 @@ function PlatformsPanel({ data, loading }: { data: Awaited<ReturnType<typeof get
                 {p.status}
               </Badge>
             </div>
-            {!ok && (
+            {!ok && !isHiddenPath("/connections") && (
               <a href="/connections" className="mt-3 inline-flex items-center gap-2 text-sm text-pink-300 hover:text-pink-200">
                 <Plug className="w-3.5 h-3.5" /> Connect {p.platform}
               </a>

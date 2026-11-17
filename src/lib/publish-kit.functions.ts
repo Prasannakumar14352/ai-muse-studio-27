@@ -24,6 +24,7 @@ import {
   type HookArchetype,
   type Platform,
 } from "@/lib/short-video-engine";
+import { aiChatFetch, aiKey, AI_NOT_CONFIGURED } from "@/lib/ai-provider";
 
 // ---------- Publish Kit ----------
 
@@ -71,7 +72,7 @@ async function callGatewayJson<T>(
   schema: z.ZodType<T>,
   model = "google/gemini-2.5-flash",
 ): Promise<T> {
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const res = await aiChatFetch({
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -102,8 +103,8 @@ export const generatePublishKit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("publish_kit")])
   .inputValidator((v: unknown) => PublishKitInput.parse(v))
   .handler(async ({ data }): Promise<PublishKit> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+    const key = aiKey();
+    if (!key) throw new Error(AI_NOT_CONFIGURED);
 
     const bucket = classifyTopic(data.topic);
     const hook = pickHook(bucket);
@@ -266,8 +267,8 @@ export const reviewVideoQuality = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("publish_kit_review")])
   .inputValidator((v: unknown) => QualityInput.parse(v))
   .handler(async ({ data }): Promise<QualityReport> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+    const key = aiKey();
+    if (!key) throw new Error(AI_NOT_CONFIGURED);
 
     const bucket = classifyTopic(data.topic);
     const hedge = requiresFactualHedging(bucket);

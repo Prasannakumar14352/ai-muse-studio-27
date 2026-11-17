@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { chargeMiddleware } from "@/lib/credits-guard.server";
 import { z } from "zod";
+import { aiChatFetch, aiKey } from "@/lib/ai-provider";
 
 export type LinkedinCarouselSlide = {
   id: string;
@@ -56,7 +57,7 @@ export const generateLinkedinCarousel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("linkedin_carousel")])
   .inputValidator((v: unknown) => Input.parse(v))
   .handler(async ({ data }): Promise<{ mode: "ai" | "demo"; content: LinkedinCarouselContent; safeError?: string }> => {
-    const key = process.env.LOVABLE_API_KEY;
+    const key = aiKey();
     if (!key) return { mode: "demo", content: demo(data) };
 
     const sys = `You design LinkedIn document carousels ("PDF carousels") that get saves and shares.
@@ -94,7 +95,7 @@ Return JSON EXACTLY:
 }`;
 
     try {
-      const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const upstream = await aiChatFetch({
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -154,7 +155,7 @@ export const transformCarouselSlide = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("linkedin_carousel_slide")])
   .inputValidator((v: unknown) => TransformInput.parse(v))
   .handler(async ({ data }): Promise<{ mode: "ai" | "demo"; slide: CarouselSlideTransform; safeError?: string }> => {
-    const key = process.env.LOVABLE_API_KEY;
+    const key = aiKey();
     const fallback: CarouselSlideTransform = {
       title: data.title,
       body: data.body,
@@ -168,7 +169,7 @@ export const transformCarouselSlide = createServerFn({ method: "POST" })
     const sys = "You edit LinkedIn carousel slides. Return ONLY JSON: {\"title\":\"...\",\"body\":\"...\",\"bullets\":[\"...\"]}. No emojis, no fluff, no fabricated stats.";
     const user = `Topic: ${data.topic}\nTone: ${data.tone}\n${instruction}\n\nCurrent slide:\nTitle: ${data.title}\nBody: ${data.body}\nBullets: ${JSON.stringify(data.bullets)}`;
     try {
-      const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const upstream = await aiChatFetch({
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({

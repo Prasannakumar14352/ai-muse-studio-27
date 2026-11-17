@@ -5,6 +5,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { chargeMiddleware } from "@/lib/credits-guard.server";
 import { z } from "zod";
+import { aiChatFetch, aiKey } from "@/lib/ai-provider";
 
 // ---------- Types ----------
 
@@ -396,7 +397,7 @@ const OutSchema = z.object({
 
 async function callGateway(sys: string, user: string, key: string): Promise<unknown | null> {
   try {
-    const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const upstream = await aiChatFetch({
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -424,7 +425,7 @@ export const generateLinkedinPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("linkedin_generate")])
   .inputValidator((v: unknown) => Input.parse(v))
   .handler(async ({ data }): Promise<{ mode: "ai" | "demo"; content: LinkedinPostContent; safeError?: string }> => {
-    const key = process.env.LOVABLE_API_KEY;
+    const key = aiKey();
     if (!key) return { mode: "demo", content: demo(data) };
 
     const parsed = await callGateway(systemPrompt(data), userPrompt(data), key);
@@ -483,7 +484,7 @@ export const regenerateLinkedinSection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("linkedin_regen_section")])
   .inputValidator((v: unknown) => RegenInput.parse(v))
   .handler(async ({ data }): Promise<{ mode: "ai" | "demo"; result: LinkedinRegenResult; safeError?: string }> => {
-    const key = process.env.LOVABLE_API_KEY;
+    const key = aiKey();
 
     const fallback: LinkedinRegenResult = (() => {
       const t = data.topic || "your topic";
@@ -577,7 +578,7 @@ export const scoreLinkedinPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => ScoreInput.parse(v))
   .handler(async ({ data }): Promise<{ mode: "ai" | "demo"; scores: LinkedinScoreCard; improvements: string[]; safeError?: string }> => {
-    const key = process.env.LOVABLE_API_KEY;
+    const key = aiKey();
     const fallback = {
       scores: {
         engagement: 72, readability: 78, professional_tone: 80,

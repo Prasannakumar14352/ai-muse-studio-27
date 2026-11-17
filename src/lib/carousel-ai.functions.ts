@@ -18,6 +18,7 @@ import {
   LAYOUT_TEMPLATES,
   MARKETING_LAYOUT_RULES,
 } from "@/lib/layout-engine";
+import { aiChatFetch, aiKey, AI_NOT_CONFIGURED } from "@/lib/ai-provider";
 
 export type AiCarouselSlide = {
   n: number;
@@ -57,8 +58,8 @@ export const generateAiCarousel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("carousel_plan")])
   .inputValidator((v: unknown) => Input.parse(v))
   .handler(async ({ data }): Promise<AiCarousel> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+    const key = aiKey();
+    if (!key) throw new Error(AI_NOT_CONFIGURED);
 
     const sizeHint = SIZE_HINT[data.aspectRatio] ?? data.aspectRatio;
     const total = data.slideCount;
@@ -179,7 +180,7 @@ Return JSON EXACTLY:
 
     let upstream: Response;
     try {
-      upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      upstream = await aiChatFetch({
         method: "POST",
         headers: {
           Authorization: `Bearer ${key}`,

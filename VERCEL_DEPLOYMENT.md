@@ -28,7 +28,10 @@ Add to **Production**, **Preview**, and **Development**:
 | `RAZORPAY_KEY_ID` | Razorpay dashboard → API Keys |
 | `RAZORPAY_KEY_SECRET` | Razorpay dashboard → API Keys |
 | `RAZORPAY_WEBHOOK_SECRET` | Razorpay dashboard → Webhooks |
-| `LOVABLE_API_KEY` | Only if you use Lovable AI Gateway from server code |
+| `OPENROUTER_API_KEY` | **Required for all text AI** (captions, scripts, SEO, research, strategy…). openrouter.ai → Keys |
+| `FAL_KEY` | **Required for images, voice and Model Studio.** fal.ai → Dashboard → Keys |
+| `AI_MODEL_MAP` | Optional JSON to swap text models, e.g. `{"openai/gpt-5.5":"openai/gpt-5.5"}` |
+| `LOVABLE_API_KEY` | Not needed on Vercel. Only used as a fallback when hosted on Lovable |
 
 After adding/changing any variable, **redeploy** — Vercel does not hot-reload env.
 
