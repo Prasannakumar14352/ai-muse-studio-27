@@ -152,26 +152,52 @@ export const Route = createFileRoute("/api/generate-image")({
           return json({ error: msg }, 400);
         }
 
-        let upstream: Response;
-        try {
-          upstream = await fetch(`https://fal.run/${endpoint}`, {
+        type FalOut = { images?: Array<{ url?: string; content_type?: string }>; detail?: unknown };
+        const callFal = async (ep: string, body: Record<string, unknown>) => {
+          const res = await fetch(`https://fal.run/${ep}`, {
             method: "POST",
             headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
-            body: JSON.stringify(input),
+            body: JSON.stringify(body),
           });
+          return { res, out: (await res.json().catch(() => ({}))) as FalOut };
+        };
+        const isPolicyBlock = (o: FalOut) => JSON.stringify(o.detail ?? "").includes("content_policy_violation");
+
+        let upstream: Response;
+        let out: FalOut;
+        let usedModel = endpoint;
+        try {
+          ({ res: upstream, out } = await callFal(endpoint, input));
+          // Nano Banana (Gemini) refuses some edits on photos with people.
+          // Retry a single-image edit once on FLUX Kontext, which handles them.
+          if (!upstream.ok && isEdit && allImages.length === 1 && isPolicyBlock(out)) {
+            const KONTEXT_RATIOS = ["21:9", "16:9", "4:3", "3:2", "1:1", "2:3", "3:4", "9:16"];
+            usedModel = "fal-ai/flux-pro/kontext";
+            ({ res: upstream, out } = await callFal(usedModel, {
+              prompt: fullPrompt,
+              image_url: allImages[0],
+              num_images: 1,
+              ...(KONTEXT_RATIOS.includes(aspect) ? { aspect_ratio: aspect } : {}),
+              output_format: input.output_format,
+              safety_tolerance: "2",
+              sync_mode: true,
+              ...(typeof seed === "number" ? { seed } : {}),
+            }));
+          }
         } catch (error) {
           await reservation.refund("provider_unreachable");
           return json({ error: error instanceof Error ? error.message : "Image service unreachable" }, 502);
         }
 
-        const out = (await upstream.json().catch(() => ({}))) as {
-          images?: Array<{ url?: string; content_type?: string }>;
-          detail?: unknown;
-        };
         if (!upstream.ok) {
           await reservation.refund(`provider_${upstream.status}`);
+          if (isPolicyBlock(out)) {
+            return json({
+              error: "The AI safety filter declined this edit. Try rewording it (for example, describe exactly what to remove). Your credits were refunded.",
+            }, 422);
+          }
           const detail = typeof out.detail === "string" ? out.detail : JSON.stringify(out.detail ?? out);
-          return json({ error: `Image generation failed (${upstream.status}): ${detail.slice(0, 300)}` }, upstream.status);
+          return json({ error: `Image generation failed (${upstream.status}). Credits refunded. ${detail.slice(0, 160)}` }, upstream.status);
         }
         let url = out.images?.[0]?.url;
         if (!url) {
@@ -186,7 +212,7 @@ export const Route = createFileRoute("/api/generate-image")({
           url = `data:${img.headers.get("content-type") ?? "image/png"};base64,${buf.toString("base64")}`;
         }
         await reservation.finalize();
-        return json({ image: url, model: endpoint, credits });
+        return json({ image: url, model: usedModel, credits });
       },
     },
   },

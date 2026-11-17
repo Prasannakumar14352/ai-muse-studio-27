@@ -105,6 +105,13 @@
 
 @layer base {
   * { border-color: var(--color-border); }
+  /* Dark UI: native controls (scrollbars, date pickers, any <select> list)
+     render in dark mode instead of white-on-white. */
+  html { color-scheme: dark; }
+  select option, select optgroup {
+    background-color: var(--color-popover);
+    color: var(--color-popover-foreground);
+  }
   html, body {
     background-color: var(--color-background);
     color: var(--color-foreground);

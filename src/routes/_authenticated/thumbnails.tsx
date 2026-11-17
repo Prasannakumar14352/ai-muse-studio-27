@@ -810,7 +810,7 @@ function GenerationGrid(props: {
               <ActionButton icon={Scissors} label="Remove BG"
                 onClick={() => props.onEdit(selectedItem, "Remove the background entirely, keep only the main subject with clean edges on a transparent-looking white background.", "Remove background")} />
               <ActionButton icon={Eraser} label="Magic Eraser"
-                onClick={() => props.onEdit(selectedItem, "Cleanly remove any distracting objects, watermarks, or text artifacts. Fill in seamlessly.", "Magic eraser")} />
+                onClick={() => props.onEdit(selectedItem, "Clean up the image: remove small distracting background objects, clutter and stray marks. Keep every person, face and the main subject exactly the same. Fill removed areas naturally to match the surroundings.", "Magic eraser")} />
               <ActionButton icon={Wand} label="Replace Subject"
                 onClick={async () => { const v = await promptDialog({ title: "Replace subject", description: "Describe who or what should be the main subject.", placeholder: "e.g. a young woman in a red saree, amazed expression", multiline: true, confirmText: "Replace subject" }); if (v) props.onEdit(selectedItem, `Replace the main subject with: ${v}. Match lighting and composition.`, "Replace subject"); }} />
               <ActionButton icon={Wand} label="Replace Face"

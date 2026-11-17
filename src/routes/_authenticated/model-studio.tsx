@@ -1,5 +1,6 @@
 // Model Studio — run top third-party AI models (Seedance video, FLUX images,
 // ElevenLabs multilingual voice) from one place, paid for with credits.
+import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -256,22 +257,17 @@ function ModelStudioPage() {
             />
           )}
           {model.voices && (
-            <label className="block">
+            <div className="block max-w-xs">
               <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1.5">
                 Voice
               </div>
-              <select
+              <CreatorFlowSelect
                 value={voice}
-                onChange={(e) => setVoice(e.target.value)}
-                className="input-base"
-              >
-                {model.voices.map((v) => (
-                  <option key={v} value={v}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
+                onValueChange={setVoice}
+                options={model.voices}
+                ariaLabel="Voice"
+              />
+            </div>
           )}
         </div>
 
