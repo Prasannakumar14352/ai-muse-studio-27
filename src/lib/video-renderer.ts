@@ -8,6 +8,7 @@
 // which was crashing every route that pulled this module into its graph.
 import { getStyle } from "./constants";
 import { authFetch } from "@/lib/auth-fetch";
+import { fetchGeneratedImage } from "@/lib/image-stream";
 
 const LOG = (...args: unknown[]) => console.info("[video-renderer]", ...args);
 const WARN = (...args: unknown[]) => console.warn("[video-renderer]", ...args);
@@ -404,6 +405,9 @@ function wrapText(
 function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 
 export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
+  // Fetch the lazy WebM helper NOW, not after a long render: if the site is
+  // redeployed mid-render, the old build's chunk would no longer exist.
+  const webmFixModule = import("webm-duration-fix").catch(() => null);
   const style = getStyle(opts.styleId);
   const isVertical =
     opts.contentType === "short_reel" ||
@@ -633,7 +637,8 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   // broken. Patch the container so exported files have valid metadata.
   if (ext === "webm") {
     try {
-      const mod = await import("webm-duration-fix");
+      const mod = await webmFixModule;
+      if (!mod) throw new Error("webm-duration-fix unavailable");
       const fixWebmDuration = (mod as { default?: (b: Blob) => Promise<Blob> }).default
         ?? (mod as unknown as (b: Blob) => Promise<Blob>);
       const fixed = await fixWebmDuration(blob);
@@ -698,7 +703,6 @@ function throwIfAborted(signal?: AbortSignal) {
 }
 
 async function fetchSceneImage(prompt: string, style: string, ratio: string, projectId?: string | null): Promise<string | null> {
-  const { fetchGeneratedImage } = await import("@/lib/image-stream");
   const { image } = await fetchGeneratedImage({ prompt, style, ratio });
   if (!image) return null;
   // Deduct 1 credit per successful scene image (admin bypass handled inside).
