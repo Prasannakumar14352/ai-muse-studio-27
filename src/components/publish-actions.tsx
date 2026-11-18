@@ -11,7 +11,7 @@ import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
-  Download, Send, Clock, Copy, CheckCircle2, ExternalLink, Loader2, Share2,
+  Download, Send, Clock, Copy, CheckCircle2, ExternalLink, Loader2, Share2, Check,
 } from "lucide-react";
 import {
   markManuallyPublished, schedulePost, listPublishTargets, platformMediaProblem,
@@ -89,13 +89,10 @@ export function PublishActions(props: PublishActionsProps) {
   const selectedTargets = targets.filter((t) => selected.includes(t.id));
   const canPublish = selectedTargets.length > 0;
 
-  // Pre-select the first usable account on the project's main platform.
+  // Nothing is pre-selected: content is only published to accounts the user ticks.
   useEffect(() => {
-    if (!open || !targetsQ.data || selected.length > 0) return;
-    const first = targetsQ.data.find((t) => t.platform === platform && t.usable && !problemFor(t.platform));
-    if (first) setSelected([first.id]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, targetsQ.data]);
+    if (!open) setSelected([]);
+  }, [open]);
 
   function toggle(id: string, p: Platform) {
     setPlatform(p);
@@ -272,7 +269,9 @@ export function PublishActions(props: PublishActionsProps) {
             <div className="rounded-xl border border-white/10 p-3 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">Post to</div>
-                {selected.length > 0 && <div className="text-xs text-muted-foreground">{selected.length} selected</div>}
+                <div className={`text-xs ${selected.length ? "text-muted-foreground" : "text-amber-300"}`}>
+                  {selected.length ? `${selected.length} selected` : "Tick the accounts to post to"}
+                </div>
               </div>
               {targetsQ.isLoading ? (
                 <div className="text-xs text-muted-foreground">Checking connected accounts…</div>
@@ -298,10 +297,12 @@ export function PublishActions(props: PublishActionsProps) {
                               return (
                                 <button key={t.id} disabled={!t.usable} onClick={() => toggle(t.id, t.platform)}
                                   title={t.usable ? "" : "Session expired — reconnect in Connected Accounts"}
-                                  className={`pl-1 pr-3 py-1 rounded-full text-xs border inline-flex items-center gap-1.5 disabled:opacity-40 ${on ? "gradient-primary text-white border-transparent" : "border-white/10 hover:bg-white/5"}`}>
-                                  {t.avatarUrl
-                                    ? <img src={t.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
-                                    : <span className="w-5 h-5 rounded-full bg-white/10 inline-flex items-center justify-center">{on ? "✓" : ""}</span>}
+                                  role="checkbox" aria-checked={on}
+                                  className={`pl-1.5 pr-3 py-1 rounded-full text-xs border inline-flex items-center gap-1.5 disabled:opacity-40 ${on ? "border-[color:var(--brand-orange,#f97316)] bg-orange-500/15 text-white" : "border-white/10 hover:bg-white/5"}`}>
+                                  <span className={`w-4 h-4 rounded-[5px] border inline-flex items-center justify-center shrink-0 ${on ? "gradient-primary border-transparent" : "border-white/30"}`}>
+                                    {on && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                  </span>
+                                  {t.avatarUrl && <img src={t.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />}
                                   {t.label}
                                   {!t.usable && " · reconnect"}
                                 </button>
@@ -336,7 +337,7 @@ export function PublishActions(props: PublishActionsProps) {
                 <button onClick={handlePublishNow} disabled={busy !== null || !canPublish}
                   className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2 disabled:opacity-60">
                   {busy === "publish" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  {selected.length > 1 ? `Publish to ${selected.length} accounts` : "Publish now"}
+                  {selected.length === 0 ? "Select an account first" : selected.length > 1 ? `Publish to ${selected.length} accounts` : "Publish now"}
                 </button>
                 <button onClick={handleMarkPublished} disabled={busy !== null}
                   className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-60">
