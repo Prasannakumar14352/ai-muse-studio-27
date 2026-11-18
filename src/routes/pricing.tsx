@@ -17,6 +17,7 @@ import {
   Infinity as InfinityIcon, Star, Zap,
 } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
+import { UPDATES_POLICY, planUpdatesLine } from "@/lib/plan-updates";
 
 const plansQuery = queryOptions({
   queryKey: ["pricing-plans"],
@@ -260,6 +261,16 @@ function PricingCard({
             <span className="text-foreground/90 leading-snug">{f}</span>
           </li>
         ))}
+        {!plan.contactSales && (
+          <li className="flex items-start gap-2.5 text-sm" title={isFree ? UPDATES_POLICY.everyone : isLifetime ? UPDATES_POLICY.lifetime : UPDATES_POLICY.subscription}>
+            <span className={`mt-0.5 shrink-0 rounded-full w-4 h-4 flex items-center justify-center ${
+              recommended ? "bg-[color:var(--brand-orange)]/20" : "bg-white/10"
+            }`}>
+              <Check className={`w-2.5 h-2.5 ${recommended ? "text-[color:var(--brand-orange)]" : "text-foreground/80"}`} />
+            </span>
+            <span className="text-foreground/90 leading-snug">{planUpdatesLine({ planType: plan.planType, isFree, cycle })}</span>
+          </li>
+        )}
       </ul>
 
       <div className="mt-7">
@@ -299,7 +310,7 @@ function SubVsLifetimeCompare({ cycle, plans }: { cycle: BillingCycle; plans: Pr
     { label: "Included credits", sub: "Based on plan", life: lifetime ? `From ${(lifetime.includedCredits || lifetime.monthlyCredits).toLocaleString()} one-time` : "—" },
     { label: "Priority rendering", sub: "Higher plans", life: <YesIcon /> },
     { label: "Commercial usage", sub: <YesIcon />, life: <YesIcon /> },
-    { label: "Future updates", sub: <YesIcon />, life: <YesIcon /> },
+    { label: "Future updates", sub: "All updates while subscribed", life: "For life, at your plan level" },
   ];
   return (
     <section className="glass rounded-3xl p-6 md:p-8">
@@ -340,7 +351,8 @@ function NoIcon() {
 /* ---------- FAQ ---------- */
 const FAQ = [
   { q: "What's the difference between Monthly and Yearly?", a: "Yearly is the same plan billed once per year — you save about 17% compared to paying month-to-month, and you receive 12× the monthly credits upfront." },
-  { q: "What is the Lifetime plan?", a: "One payment, and CreatorFlow AI is yours forever. You keep receiving 1,000 AI credits every month, plus premium templates and priority support — no recurring charges." },
+  { q: "What is the Lifetime plan?", a: "One payment, no recurring charges. You get the plan's one-time credits, a monthly bonus allowance, and every future update for your plan level." },
+  { q: "Do I get future updates?", a: `Yes. ${UPDATES_POLICY.everyone} Monthly and yearly plans: ${UPDATES_POLICY.subscription.charAt(0).toLowerCase() + UPDATES_POLICY.subscription.slice(1)} Lifetime plans: ${UPDATES_POLICY.lifetime.charAt(0).toLowerCase() + UPDATES_POLICY.lifetime.slice(1)} ${UPDATES_POLICY.higherPlans}` },
   { q: "Do lifetime plans get monthly credits?", a: "Yes. Besides the one-time credits, lifetime plans get a monthly bonus (75, 150 or 300 credits) that refills on your purchase day each month. Bonus credits are used first and don't carry over to the next month; your one-time credits never expire." },
   { q: "Can I switch between Monthly, Yearly and Lifetime?", a: "Yes. Any credits already in your wallet stay put, and we deduct in the order: monthly → top-ups → lifetime, so nothing is wasted." },
   { q: "Can I buy additional credit packs?", a: "Yes. Any user can top up anytime — packs are added instantly and never expire." },
