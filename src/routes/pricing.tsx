@@ -104,7 +104,7 @@ function PricingPage() {
 
         {/* Pricing cards */}
         <section className={`grid gap-6 mx-auto w-full ${
-          visible.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" : "sm:grid-cols-2 lg:grid-cols-3"
+          visible.length >= 5 ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" : visible.length === 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2 lg:grid-cols-3"
         }`}>
           {visible.map((p) => (
             <PricingCard key={p.id} plan={p} cycle={cycle} isCurrent={access?.plan === p.code} onSelect={() => handleSelect(p)} />
