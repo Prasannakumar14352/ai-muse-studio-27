@@ -81,7 +81,7 @@ function HowItWorksPage() {
 
       <section className="max-w-4xl mx-auto px-6 py-16 text-center">
         <h2 className="text-3xl md:text-4xl font-bold">Try it — the free plan never expires.</h2>
-        <p className="mt-3 text-muted-foreground">5 credits every month, all engines unlocked.</p>
+        <p className="mt-3 text-muted-foreground">50 free credits on signup, all engines unlocked.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link to="/auth" className="rounded-xl gradient-primary px-7 py-3.5 text-sm font-semibold text-white shadow-[var(--shadow-glow)]">
             Start Creating Free <ArrowRight className="inline w-4 h-4" />

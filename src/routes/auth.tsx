@@ -180,7 +180,7 @@ function AuthPage() {
             {mode === "signin" ? "Welcome back" : "Create your account"}
           </h1>
           <p className="text-center text-sm text-muted-foreground mt-1">
-            {mode === "signin" ? "Sign in to keep creating" : "Free forever plan included"}
+            {mode === "signin" ? "Sign in to keep creating" : "50 free credits on signup"}
           </p>
 
           {authError && (
