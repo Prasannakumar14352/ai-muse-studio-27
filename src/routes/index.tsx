@@ -181,11 +181,13 @@ function Landing() {
             <BrandLogo alt="CreatorFlow AI" className="h-7 w-auto object-contain" />
             <span>© 2026 CreatorFlow AI · Digital Products Marketplace</span>
           </div>
-          <div className="flex items-center gap-5">
+          <div className="flex flex-wrap items-center justify-center gap-5">
             <a href="mailto:support@creatorflow.ai" className="hover:text-foreground inline-flex items-center gap-1.5">
               <Mail className="w-3.5 h-3.5" /> support@creatorflow.ai
             </a>
             <Link to="/contact" className="hover:text-foreground">Contact Us</Link>
+            <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+            <Link to="/terms" className="hover:text-foreground">Terms</Link>
           </div>
         </div>
       </footer>
