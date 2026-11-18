@@ -4,9 +4,14 @@
 // validation — so switching between "create" and "edit" never surprises users.
 
 import { useState } from "react";
+import { authFetch } from "@/lib/auth-fetch";
+import { toast } from "sonner";
+import { TimedSteps, CAROUSEL_STEPS, SCRIPT_STEPS } from "@/components/timed-steps";
+import { estimateProjectCredits } from "@/lib/credit-costs";
+import { creditsLabel } from "@/lib/credits-label";
 import { CONTENT_LANGUAGES } from "@/lib/content-language";
 import { CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, NICHES } from "@/lib/constants";
-import { Loader2, Wand2, ArrowRight } from "lucide-react";
+import { Loader2, Wand2, ArrowRight, Volume2, Square } from "lucide-react";
 
 export type ProjectBrief = {
   content_type: string;
@@ -202,14 +207,32 @@ export function ProjectBriefForm({
       <Section title="Voice">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
           {VOICES.map((v) => (
-            <Card key={v.id} active={form.voice === v.id} onClick={() => update("voice", v.id)} compact>
-              <span className="text-sm">{v.label}</span>
-            </Card>
+            <div key={v.id} className="relative">
+              <Card active={form.voice === v.id} onClick={() => update("voice", v.id)} compact>
+                <span className="text-sm pr-7">{v.label}</span>
+              </Card>
+              <VoicePreviewButton voiceId={v.id} label={v.label} />
+            </div>
           ))}
         </div>
       </Section>
 
-      <div className="flex justify-end pt-2">
+      <TimedSteps steps={form.content_type === "carousel" ? CAROUSEL_STEPS : SCRIPT_STEPS} active={loading} />
+
+      <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+        {(() => {
+          const est = estimateProjectCredits({
+            contentType: form.content_type,
+            lengthSec: form.content_type === "long_video" ? form.long_video_length_sec : form.reel_length_sec,
+            slideCount: form.slide_count,
+          });
+          return (
+            <div className="text-xs text-muted-foreground text-right" title={est.parts}>
+              Estimated cost: <span className="font-semibold text-foreground">≈ {creditsLabel(est.total)}</span>
+              <div className="text-[11px]">{est.parts}</div>
+            </div>
+          );
+        })()}
         <button type="submit" disabled={loading || !form.topic.trim()}
           className="rounded-xl gradient-primary text-white px-8 py-3.5 font-semibold shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon className="w-4 h-4" />}
@@ -237,5 +260,41 @@ function Card({ active, onClick, children, compact }: {
       className={`text-left rounded-xl border p-4 transition flex ${compact ? "items-center gap-2" : "flex-col"} ${
         active ? "border-[color:var(--neon-purple)] bg-[color:var(--neon-purple)]/10 shadow-[var(--shadow-glow)]" : "border-border hover:border-white/20 bg-white/[0.02]"
       }`}>{children}</button>
+  );
+}
+
+let previewAudio: HTMLAudioElement | null = null;
+
+function VoicePreviewButton({ voiceId, label }: { voiceId: string; label: string }) {
+  const [state, setState] = useState<"idle" | "loading" | "playing">("idle");
+  async function play(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (previewAudio) { previewAudio.pause(); previewAudio = null; }
+    if (state === "playing") { setState("idle"); return; }
+    setState("loading");
+    try {
+      const res = await authFetch(`/api/voice-sample?voice=${encodeURIComponent(voiceId)}`);
+      const j = (await res.json()) as { url?: string; error?: string };
+      if (!j.url) throw new Error(j.error ?? "Preview unavailable");
+      const a = new Audio(j.url);
+      previewAudio = a;
+      a.onended = () => setState("idle");
+      await a.play();
+      setState("playing");
+    } catch (err) {
+      setState("idle");
+      toast.error(err instanceof Error ? err.message : "Preview unavailable");
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={play}
+      aria-label={`Preview ${label} voice`}
+      title="Preview voice (free)"
+      className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full glass flex items-center justify-center hover:bg-white/10"
+    >
+      {state === "loading" ? <Loader2 className="w-3 h-3 animate-spin" /> : state === "playing" ? <Square className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+    </button>
   );
 }

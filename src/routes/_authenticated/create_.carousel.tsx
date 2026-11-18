@@ -1,4 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { TimedSteps, CAROUSEL_STEPS } from "@/components/timed-steps";
+import { estimateProjectCredits } from "@/lib/credit-costs";
+import { creditsLabel } from "@/lib/credits-label";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -296,8 +299,14 @@ function CreateCarouselPage() {
             </div>
           </Section>
 
-          <div className="flex justify-between items-center pt-4">
+          <TimedSteps steps={CAROUSEL_STEPS} active={loading} />
+
+          <div className="flex flex-wrap gap-3 justify-between items-center pt-4">
             <button onClick={() => setStep(1)} className="text-sm text-muted-foreground hover:text-foreground">← Back</button>
+            <div className="ml-auto text-xs text-muted-foreground text-right">
+              Estimated cost: <span className="font-semibold text-foreground">≈ {creditsLabel(estimateProjectCredits({ contentType: "carousel", slideCount: form.slide_count }).total)}</span>
+              <div className="text-[11px]">{estimateProjectCredits({ contentType: "carousel", slideCount: form.slide_count }).parts}</div>
+            </div>
             <button onClick={generate} disabled={loading}
               className="rounded-xl gradient-primary text-white px-8 py-3.5 font-semibold shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}

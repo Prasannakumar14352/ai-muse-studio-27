@@ -63,3 +63,23 @@ export function getPlanGenerationEstimate(credits: number): {
   };
 }
 
+
+/**
+ * Rough credit estimate shown before "Generate" (script + scene images +
+ * narration). Matches the per-unit prices above; actual use may differ a
+ * little with the final script length.
+ */
+export function estimateProjectCredits(opts: {
+  contentType: string;
+  lengthSec?: number;
+  slideCount?: number;
+}): { total: number; parts: string } {
+  if (opts.contentType === "carousel") {
+    const n = Math.max(3, Math.min(10, opts.slideCount ?? 7));
+    return { total: 1 + n, parts: `1 for the copy + ${n} slide images` };
+  }
+  const len = Math.max(15, opts.lengthSec ?? (opts.contentType === "long_video" ? 90 : 30));
+  const scenes = opts.contentType === "long_video" ? Math.ceil(len / 8) : Math.max(4, Math.ceil(len / 3.5));
+  const voice = Math.ceil((len * 2.5 * 6) / 100); // ~2.5 words/s, ~6 chars/word, 1 credit / 100 chars
+  return { total: 1 + scenes + voice, parts: `1 script + ${scenes} scene images + ~${voice} narration` };
+}
