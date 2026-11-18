@@ -128,7 +128,7 @@ function FeaturesPage() {
 
       <section className="max-w-4xl mx-auto px-6 py-16 text-center">
         <h2 className="text-3xl md:text-4xl font-bold">Ready to see it in action?</h2>
-        <p className="mt-3 text-muted-foreground">Free forever plan. 5 credits every month. No card required.</p>
+        <p className="mt-3 text-muted-foreground">Start free with 50 credits on signup. No card required.</p>
         <Link to="/auth" className="mt-6 inline-flex rounded-xl gradient-primary px-8 py-3.5 text-sm font-semibold text-white shadow-[var(--shadow-glow)]">
           Start Creating Free <Zap className="inline w-4 h-4 ml-1" />
         </Link>

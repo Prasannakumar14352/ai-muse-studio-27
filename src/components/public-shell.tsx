@@ -69,7 +69,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
           </div>
           <div>
             <div className="font-semibold mb-3 text-xs uppercase tracking-wider text-muted-foreground">Start free</div>
-            <p className="text-muted-foreground text-xs mb-3">5 free credits monthly. No card required.</p>
+            <p className="text-muted-foreground text-xs mb-3">50 free credits when you sign up. No card required.</p>
             <Link to="/auth" className="inline-flex rounded-lg gradient-primary text-white px-4 py-2 text-xs font-medium">
               Get Started
             </Link>

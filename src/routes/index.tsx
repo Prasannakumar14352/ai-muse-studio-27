@@ -34,7 +34,7 @@ const FAQ = [
   { q: "Do I need any editing experience?", a: "No. You describe the topic and pick a style. We generate the entire project blueprint." },
   { q: "Which platforms are supported?", a: "YouTube, Instagram, TikTok, Facebook and LinkedIn — with platform-specific tone and formatting." },
   { q: "Can I use my own brand style?", a: "Yes. Save brand presets in Settings, and every generation adapts to your defaults." },
-  { q: "Is there a free plan?", a: "Yes — 5 generations per month, forever free. Upgrade any time." },
+  { q: "Is there a free plan?", a: "Yes — you get 50 free credits once when you sign up. When they run out, buy a credit pack or pick a plan." },
   ...EXTRA_FAQ,
 ];
 
