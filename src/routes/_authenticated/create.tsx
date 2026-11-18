@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { generateProject, generateCarousel, generateCaptions, generateHashtags } from "@/lib/generators";
 import { generateAiCarousel } from "@/lib/carousel-ai.functions";
 import { generateAiVideoScript } from "@/lib/video-ai.functions";
 import { STYLES, GENERATION_COST } from "@/lib/constants";
@@ -74,36 +73,53 @@ function CreatePage() {
       }
 
       const isCarousel = form.content_type === "carousel";
+      const styleLabel = STYLES.find((s) => s.id === form.style)?.label ?? form.style;
 
+      // Ask the AI first. If it fails we stop here and offer a retry — we
+      // never save template filler as if it were the creator's real script.
       let aiCarousel: Awaited<ReturnType<typeof generateAiCarousel>> | null = null;
-      if (isCarousel) {
-        try {
-          const styleLabel = STYLES.find((s) => s.id === form.style)?.label ?? form.style;
+      let aiVideo: Awaited<ReturnType<typeof generateAiVideoScript>> | null = null;
+      try {
+        if (isCarousel) {
           aiCarousel = await generateAiCarousel({
             data: {
               topic: form.topic, tone: form.tone, platform: form.platform,
               styleLabel, slideCount: form.slide_count, aspectRatio: form.aspect_ratio,
+              language: form.language,
             },
           });
-        } catch (e) {
-          console.warn("AI carousel generation failed, using template:", e);
-          toast.warning("AI carousel generator unavailable — using template.");
+        } else {
+          aiVideo = await generateAiVideoScript({
+            data: {
+              topic: form.topic, tone: form.tone, platform: form.platform,
+              styleLabel, contentType: form.content_type, audience: form.audience,
+              language: form.language,
+              ...(form.content_type === "long_video"
+                ? { targetLengthSec: form.long_video_length_sec }
+                : form.content_type === "short_reel"
+                  ? { targetLengthSec: form.reel_length_sec }
+                  : {}),
+            },
+          });
         }
+      } catch (e) {
+        console.warn("[create] AI generation failed", e);
+        toast.error("The AI couldn't write this one. Nothing was saved and any credits used were refunded.", {
+          description: e instanceof Error ? e.message.slice(0, 160) : undefined,
+          duration: 12000,
+          action: { label: "Retry", onClick: () => void handleGenerate(form) },
+        });
+        qc.invalidateQueries({ queryKey: ["access"] });
+        return;
       }
 
-      const output = isCarousel
-        ? (aiCarousel ?? generateCarousel({
-            topic: form.topic, tone: form.tone, platform: form.platform, style: form.style,
-            slideCount: form.slide_count, aspectRatio: form.aspect_ratio,
-          }))
-        : generateProject({
-            topic: form.topic, tone: form.tone, platform: form.platform,
-            style: form.style, contentType: form.content_type,
-          });
+      const title = aiCarousel
+        ? aiCarousel.title
+        : (aiVideo!.reel_title || aiVideo!.title);
 
       const { data: project, error: pErr } = await supabase.from("projects").insert({
         user_id: access.userId,
-        title: output.title,
+        title,
         content_type: form.content_type,
         topic: form.topic,
         audience: form.audience,
@@ -116,102 +132,50 @@ function CreatePage() {
       }).select().single();
       if (pErr) throw pErr;
 
-      if (isCarousel) {
-        const styleLabel = STYLES.find((s) => s.id === form.style)?.label ?? form.style;
-        if (aiCarousel) {
-          const slides = aiCarousel.slides;
-          const script = slides.map((s) =>
-            `Slide ${s.n} — ${s.role} [${s.label}]\n${s.emoji ? s.emoji + " " : ""}${s.headline}\n\n${s.body}\n${(s.bullets ?? []).map((b) => `• ${b}`).join("\n")}\n\nKey takeaway: ${s.bottom_highlight}\nVisual: ${s.visual}`
-          ).join("\n\n---\n\n");
-          const captions = `${aiCarousel.title}\n\n${slides[0]?.headline ?? ""}\n${slides[0]?.body ?? ""}\n\nSave this — share with someone who needs it.`;
-          const hashtags = generateCarousel({
-            topic: form.topic, tone: form.tone, platform: form.platform, style: form.style,
-            slideCount: form.slide_count, aspectRatio: form.aspect_ratio,
-          }).hashtags;
-          await saveOutput(project.id, {
-            title: aiCarousel.title,
-            hook: slides[0]?.headline ?? "",
-            script,
-            captions,
-            hashtags,
-            scenes: [],
-            image_prompts: slides.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel })),
-            thumbnail_ideas: [],
-            carousel_slides: slides.map((s) => ({
-              n: s.n, role: s.role, headline: s.headline, body: s.body, visual: s.visual,
-              label: s.label, emoji: s.emoji, bullets: s.bullets, bottom_highlight: s.bottom_highlight,
-            })),
-            aspect_ratio: form.aspect_ratio,
-            slide_count: form.slide_count,
-          });
-        } else {
-          const c = output as ReturnType<typeof generateCarousel>;
-          await saveOutput(project.id, {
-            title: c.title,
-            hook: "",
-            script: c.script,
-            captions: c.captions,
-            hashtags: c.hashtags,
-            scenes: [],
-            image_prompts: c.image_prompts,
-            thumbnail_ideas: [],
-            carousel_slides: c.slides,
-            aspect_ratio: form.aspect_ratio,
-            slide_count: form.slide_count,
-          });
-        }
-      } else {
-        const styleLabel = STYLES.find((s) => s.id === form.style)?.label ?? form.style;
-        let aiVideo: Awaited<ReturnType<typeof generateAiVideoScript>> | null = null;
-        try {
-          aiVideo = await generateAiVideoScript({
-            data: {
-              topic: form.topic, tone: form.tone, platform: form.platform,
-              styleLabel, contentType: form.content_type, audience: form.audience,
-              ...(form.content_type === "long_video"
-                ? { targetLengthSec: form.long_video_length_sec }
-                : {}),
-            },
-          });
-        } catch (e) {
-          console.warn("AI video script failed, using template:", e);
-          toast.warning("AI script generator unavailable — using template.");
-        }
-
-        if (aiVideo) {
-          const scenes = aiVideo.scenes.map((s) => ({
-            n: s.n,
-            visual: s.visual,
-            voiceover: s.voiceover,
-            duration: s.duration || "3s",
-            on_screen_text: s.on_screen_text || "",
-          }));
-          const script = aiVideo.scenes.map((s) =>
-            `Scene ${s.n} (${s.time_range}) — ${s.role}\nVoiceover: ${s.voiceover}\n${s.on_screen_text ? `On-screen text: ${s.on_screen_text}\n` : ""}Visual: ${s.visual}`
-          ).join("\n\n---\n\n");
-          await saveOutput(project.id, {
-            title: aiVideo.reel_title || aiVideo.title,
-            hook: aiVideo.scenes[0]?.voiceover ?? "",
-            script,
-            captions: aiVideo.caption || generateCaptions(form.topic, form.platform, form.tone).join("\n\n---\n\n"),
-            hashtags: aiVideo.hashtags?.length ? aiVideo.hashtags : generateHashtags(form.topic, form.platform),
-            scenes,
-            image_prompts: aiVideo.scenes.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel })),
-            thumbnail_ideas: [],
-          });
-        } else {
-          const p = output as ReturnType<typeof generateProject>;
-          await saveOutput(project.id, {
-            title: p.title,
-            hook: p.hook,
-            script: p.script,
-            captions: p.captions,
-            hashtags: p.hashtags,
-            scenes: p.scenes,
-            image_prompts: p.image_prompts,
-            thumbnail_ideas: p.thumbnail_ideas,
-          });
-        }
+      if (aiCarousel) {
+        const slides = aiCarousel.slides;
+        const script = slides.map((s) =>
+          `Slide ${s.n} — ${s.role} [${s.label}]\n${s.emoji ? s.emoji + " " : ""}${s.headline}\n\n${s.body}\n${(s.bullets ?? []).map((b) => `• ${b}`).join("\n")}\n\nKey takeaway: ${s.bottom_highlight}\nVisual: ${s.visual}`
+        ).join("\n\n---\n\n");
+        const captions = aiCarousel.caption?.trim()
+          || `${aiCarousel.title}\n\n${slides[0]?.headline ?? ""}\n${slides[0]?.body ?? ""}`;
+        await saveOutput(project.id, {
+          title: aiCarousel.title,
+          hook: slides[0]?.headline ?? "",
+          script,
+          captions,
+          hashtags: aiCarousel.hashtags ?? [],
+          scenes: [],
+          image_prompts: slides.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel })),
+          thumbnail_ideas: [],
+          carousel_slides: slides.map((s) => ({
+            n: s.n, role: s.role, headline: s.headline, body: s.body, visual: s.visual,
+            label: s.label, emoji: s.emoji, bullets: s.bullets, bottom_highlight: s.bottom_highlight,
+          })),
+          aspect_ratio: form.aspect_ratio,
+          slide_count: form.slide_count,
+        });
+      } else if (aiVideo) {
+        const scenes = aiVideo.scenes.map((s) => ({
+          n: s.n,
+          visual: s.visual,
+          voiceover: s.voiceover,
+          duration: s.duration || "3s",
+          on_screen_text: s.on_screen_text || "",
+        }));
+        const script = aiVideo.scenes.map((s) =>
+          `Scene ${s.n} (${s.time_range}) — ${s.role}\nVoiceover: ${s.voiceover}\n${s.on_screen_text ? `On-screen text: ${s.on_screen_text}\n` : ""}Visual: ${s.visual}`
+        ).join("\n\n---\n\n");
+        await saveOutput(project.id, {
+          title,
+          hook: aiVideo.scenes[0]?.voiceover ?? "",
+          script,
+          captions: aiVideo.caption || "",
+          hashtags: aiVideo.hashtags ?? [],
+          scenes,
+          image_prompts: aiVideo.scenes.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel })),
+          thumbnail_ideas: [],
+        });
       }
 
       // Credit deduction is handled server-side inside planContentFn and
@@ -318,6 +282,7 @@ function CreatePage() {
       <ProjectBriefForm
         key={template?.slug ?? "no-template"}
         initial={initialBrief}
+        lockContentType
         loading={loading}
         onSubmit={handleGenerate}
         submitLabel="Generate & open editor"

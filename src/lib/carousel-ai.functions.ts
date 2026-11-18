@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { languageAndFidelityRules } from "@/lib/content-language";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { chargeMiddleware } from "@/lib/credits-guard.server";
 import { z } from "zod";
@@ -36,6 +37,9 @@ export type AiCarouselSlide = {
 export type AiCarousel = {
   title: string;
   slides: AiCarouselSlide[];
+  /** Post caption + topic-specific hashtags written by the model. */
+  caption?: string;
+  hashtags?: string[];
 };
 
 const Input = z.object({
@@ -45,6 +49,8 @@ const Input = z.object({
   styleLabel: z.string(),
   slideCount: z.number().int().min(3).max(10),
   aspectRatio: z.string(),
+  /** Output language ("auto" = same as the topic). */
+  language: z.string().optional().default("auto"),
 });
 
 const SIZE_HINT: Record<string, string> = {
@@ -108,6 +114,8 @@ PLATFORM: ${data.platform}
 VISUAL STYLE: ${data.styleLabel}
 ASPECT: ${data.aspectRatio} (${sizeHint})
 SLIDE COUNT: ${total} (Slide 1 = Hook, ${pointCount} content slides, last = CTA)
+
+${languageAndFidelityRules(data.language, data.topic)}
 
 For EACH slide, produce:
 - n: slide number (1..${total})
@@ -175,7 +183,9 @@ Return JSON EXACTLY:
   "title": "string (Instagram carousel title incl. platform)",
   "brand_lock": "One paragraph (80-140 words) locking the SHARED design system for ALL ${total} slides: brand name, exact HEX palette (bg + 3-4 accents + text + CTA), typography (font family + weights), photographic style, lighting, composition principles, decorative language. This is copied verbatim onto every slide.",
   "character_sheet": "One paragraph (80-140 words) locking the SAME HERO CHARACTER for every slide that features a person: gender, approximate age, ethnicity, exact hairstyle + color, eye color, face shape, distinguishing features, exact wardrobe (top, bottom, accessories, colors), and consistent expression tone. Say 'SAME PERSON, identical face and outfit across every slide — do not redesign, do not age, do not change wardrobe.' If the topic is purely product-only with no human, write a HERO PRODUCT SHEET instead with identical product details.",
-  "slides": [ { ...fields above... } ]
+  "slides": [ { ...fields above... } ],
+  "caption": "2-4 sentence post caption for this carousel (same language rule)",
+  "hashtags": ["10-15 hashtags specific to this topic, each starting with #"]
 }`;
 
     let upstream: Response;
@@ -229,6 +239,8 @@ Return JSON EXACTLY:
         visual: z.string(),
         image_prompt: z.string(),
       })),
+      caption: z.string().nullish().transform((v) => v ?? ""),
+      hashtags: z.array(z.string()).nullish().transform((v) => v ?? []),
     });
     const out = Schema.parse(parsed);
     // Prepend the shared brand-lock + character-sheet + Creative Director

@@ -4,6 +4,7 @@
 // validation — so switching between "create" and "edit" never surprises users.
 
 import { useState } from "react";
+import { CONTENT_LANGUAGES } from "@/lib/content-language";
 import { CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, NICHES } from "@/lib/constants";
 import { Loader2, Wand2, ArrowRight } from "lucide-react";
 
@@ -19,6 +20,10 @@ export type ProjectBrief = {
   aspect_ratio: "1:1" | "4:5" | "9:16" | "16:9";
   slide_count: number;
   long_video_length_sec: number;
+  /** Short reel length in seconds (15 / 30 / 60). */
+  reel_length_sec: number;
+  /** Script / caption / voice language ("auto" = same as the topic). */
+  language: string;
 };
 
 export const DEFAULT_BRIEF: ProjectBrief = {
@@ -33,6 +38,8 @@ export const DEFAULT_BRIEF: ProjectBrief = {
   aspect_ratio: "4:5",
   slide_count: 5,
   long_video_length_sec: 90,
+  reel_length_sec: 30,
+  language: "auto",
 };
 
 type Props = {
@@ -103,6 +110,27 @@ export function ProjectBriefForm({
         </Section>
       )}
 
+      {form.content_type === "short_reel" && (
+        <Section title="Reel length">
+          <div className="flex flex-wrap gap-2">
+            {[15, 30, 60].map((sec) => (
+              <button
+                key={sec}
+                type="button"
+                onClick={() => update("reel_length_sec", sec)}
+                className={`px-4 py-2 rounded-full text-sm border transition ${
+                  form.reel_length_sec === sec
+                    ? "gradient-primary text-white border-transparent shadow-lg"
+                    : "glass border-border hover:border-white/20"
+                }`}
+              >
+                {sec} seconds
+              </button>
+            ))}
+          </div>
+        </Section>
+      )}
+
       <Section title="Suggested niches (optional — auto-fills a trending topic)">
         <div className="flex flex-wrap gap-2">
           {NICHES.map((n) => (
@@ -122,6 +150,18 @@ export function ProjectBriefForm({
         <input value={form.audience} onChange={(e) => update("audience", e.target.value)}
           placeholder="Target audience (optional) — e.g. Gen Z fitness enthusiasts"
           className="mt-3 w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
+      </Section>
+
+      <Section title="Language">
+        <p className="text-xs text-muted-foreground mb-3">Script, on-screen text, caption and voiceover are written in this language.</p>
+        <div className="flex flex-wrap gap-2">
+          {CONTENT_LANGUAGES.map((l) => (
+            <button key={l.id} type="button" onClick={() => update("language", l.id)}
+              className={`px-3 py-1.5 rounded-full text-sm border transition ${
+                form.language === l.id ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-white/20"
+              }`}>{l.label}</button>
+          ))}
+        </div>
       </Section>
 
       <Section title="Platform & tone">

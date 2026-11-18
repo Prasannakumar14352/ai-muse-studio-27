@@ -5,11 +5,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client";
 import { getStyle, getStyleImage } from "@/lib/constants";
-import { generateProject } from "@/lib/generators";
 import { generateScenesFromScript } from "@/lib/video-ai.functions";
 import { renderVideo, renderUgcVideo, generateSceneImage, type UgcStage } from "@/lib/video-renderer";
 import { getOutput, saveOutput, type LocalOutput, type Scene as LocalScene, type Prompt as LocalPrompt } from "@/lib/local-store";
-import { isBlobKey, getDataURL } from "@/lib/blob-store";
+import { isBlobKey, getDataURL, putDataURL, getObjectURL } from "@/lib/blob-store";
 import { toast } from "sonner";
 import { Copy, Download, ArrowLeft, Loader2, Play, Pause, SkipForward, SkipBack, Film, RefreshCw, Video as VideoIcon, Sparkles, AlertTriangle, Bug, CheckCircle2, X, Package, Edit3, Save, Eye, EyeOff, ImageOff, Volume2, ChevronDown, ChevronRight, History, FileText, Wand2 } from "lucide-react";
 import { ProjectBriefForm, DEFAULT_BRIEF, type ProjectBrief } from "@/components/project-brief-form";
@@ -19,7 +18,6 @@ import { PublishActions } from "@/components/publish-actions";
 import type { PublishKit } from "@/lib/publish-kit.functions";
 import type { Platform as PublishPlatform, PublishStatus } from "@/lib/publishing.functions";
 import { generateAiCarousel } from "@/lib/carousel-ai.functions";
-import { generateCarousel, generateCaptions, generateHashtags } from "@/lib/generators";
 import { STYLES } from "@/lib/constants";
 import { authFetch } from "@/lib/auth-fetch";
 
@@ -211,27 +209,59 @@ function ProjectView() {
     if (!project) return;
     setRegenerating(part);
     try {
-      const fresh = generateProject({
-        topic: project.topic ?? project.title,
-        tone: project.tone ?? "Viral",
-        platform: project.platform ?? "instagram",
-        style: project.style ?? "cinematic",
-        contentType: project.content_type ?? "short_reel",
-      });
+      // Always the real AI writer — never the offline template (which only
+      // pastes the topic into stock sentences).
+      const topic = project.topic ?? project.title;
+      const tone = project.tone ?? "Viral";
+      const platform = project.platform ?? "instagram";
+      const style = project.style ?? "cinematic";
+      const styleLabel = STYLES.find((s) => s.id === style)?.label ?? style;
+      const contentType = project.content_type ?? "short_reel";
       const patch: Partial<LocalOutput> = {};
-      if (part === "all" || part === "script") { patch.script = fresh.script; patch.hook = fresh.hook; patch.title = fresh.title; }
-      if (part === "all" || part === "scenes") { patch.scenes = fresh.scenes; patch.thumbnail_ideas = fresh.thumbnail_ideas; }
-      if (part === "all" || part === "captions") { patch.captions = fresh.captions; patch.hashtags = fresh.hashtags; }
-      if (part === "all" || part === "images") { patch.image_prompts = fresh.image_prompts; }
+      let newTitle = "";
+      if (contentType === "carousel") {
+        const ai = await generateAiCarousel({
+          data: { topic, tone, platform, styleLabel,
+            slideCount: Math.max(3, Math.min(10, output?.slide_count ?? 7)),
+            aspectRatio: output?.aspect_ratio ?? "4:5" },
+        });
+        newTitle = ai.title;
+        patch.title = ai.title;
+        patch.captions = ai.caption || "";
+        patch.hashtags = ai.hashtags ?? [];
+        patch.image_prompts = ai.slides.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel }));
+        patch.carousel_slides = ai.slides.map((s) => ({ n: s.n, role: s.role, headline: s.headline, body: s.body, visual: s.visual, label: s.label, emoji: s.emoji, bullets: s.bullets, bottom_highlight: s.bottom_highlight }));
+      } else {
+        const ai = await generateAiVideoScript({
+          data: { topic, tone, platform, styleLabel, contentType, audience: project.audience ?? "" },
+        });
+        newTitle = ai.reel_title || ai.title;
+        if (part === "all" || part === "script") {
+          patch.title = newTitle;
+          patch.hook = ai.scenes[0]?.voiceover ?? "";
+          patch.script = ai.scenes.map((s) => `Scene ${s.n} (${s.time_range}) — ${s.role}\nVoiceover: ${s.voiceover}\n${s.on_screen_text ? `On-screen text: ${s.on_screen_text}\n` : ""}Visual: ${s.visual}`).join("\n\n---\n\n");
+        }
+        if (part === "all" || part === "scenes") {
+          patch.scenes = ai.scenes.map((s) => ({ n: s.n, visual: s.visual, voiceover: s.voiceover, duration: s.duration || "3s", on_screen_text: s.on_screen_text || "" }));
+        }
+        if (part === "all" || part === "captions") { patch.captions = ai.caption || ""; patch.hashtags = ai.hashtags ?? []; }
+        if (part === "all" || part === "images" || part === "scenes") {
+          patch.image_prompts = ai.scenes.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel }));
+        }
+      }
 
       await saveOutput(project.id, patch);
-      if (part === "all" || part === "script") {
-        await supabase.from("projects").update({ title: fresh.title }).eq("id", project.id);
+      if (newTitle && (part === "all" || part === "script")) {
+        await supabase.from("projects").update({ title: newTitle }).eq("id", project.id);
       }
       qc.invalidateQueries({ queryKey: ["project", id] });
+      qc.invalidateQueries({ queryKey: ["access"] });
       toast.success(`Regenerated ${part === "all" ? "everything" : part}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Regenerate failed");
+      toast.error("The AI couldn't regenerate this. Nothing was changed.", {
+        description: err instanceof Error ? err.message.slice(0, 160) : undefined,
+        action: { label: "Retry", onClick: () => void regenerate(part) },
+      });
     } finally {
       setRegenerating(null);
     }
@@ -372,7 +402,7 @@ function ProjectView() {
               <div className="font-semibold">Review before rendering</div>
               <div className="text-muted-foreground mt-0.5">
                 Check the full script, scene breakdown, image prompts and your brand handles below.
-                Edit anything you want, then scroll down and hit <span className="text-foreground font-medium">Re-generate UGC video</span> to render.
+                Edit anything you want, then scroll down and hit <span className="text-foreground font-medium">Render video</span>.
               </div>
             </div>
           </div>
@@ -465,15 +495,15 @@ function EditBriefPanel({ project, onSaved }: { project: { id: string; content_t
       if (contentType === "carousel") {
         const ai = await generateAiCarousel({
           data: { topic: form.topic, tone: form.tone, platform: form.platform,
-            styleLabel, slideCount: form.slide_count, aspectRatio: form.aspect_ratio },
+            styleLabel, slideCount: form.slide_count, aspectRatio: form.aspect_ratio,
+            language: form.language },
         });
         const slides = ai.slides;
         const script = slides.map((s) => `Slide ${s.n} — ${s.role} [${s.label}]\n${s.headline}\n\n${s.body}\nVisual: ${s.visual}`).join("\n\n---\n\n");
-        const hashtags = generateCarousel({ topic: form.topic, tone: form.tone, platform: form.platform, style: form.style, slideCount: form.slide_count, aspectRatio: form.aspect_ratio }).hashtags;
         await saveOutput(project.id, {
           title: ai.title, hook: slides[0]?.headline ?? "", script,
-          captions: `${ai.title}\n\n${slides[0]?.headline ?? ""}`,
-          hashtags, scenes: [],
+          captions: ai.caption || `${ai.title}\n\n${slides[0]?.headline ?? ""}`,
+          hashtags: ai.hashtags ?? [], scenes: [],
           image_prompts: slides.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel })),
           thumbnail_ideas: [],
           carousel_slides: slides.map((s) => ({ n: s.n, role: s.role, headline: s.headline, body: s.body, visual: s.visual, label: s.label, emoji: s.emoji, bullets: s.bullets, bottom_highlight: s.bottom_highlight })),
@@ -482,15 +512,16 @@ function EditBriefPanel({ project, onSaved }: { project: { id: string; content_t
       } else {
         const ai = await generateAiVideoScript({
           data: { topic: form.topic, tone: form.tone, platform: form.platform, styleLabel,
-            contentType, audience: form.audience,
-            ...(contentType === "long_video" ? { targetLengthSec: form.long_video_length_sec } : {}) },
+            contentType, audience: form.audience, language: form.language,
+            ...(contentType === "long_video" ? { targetLengthSec: form.long_video_length_sec }
+              : contentType === "short_reel" ? { targetLengthSec: form.reel_length_sec } : {}) },
         });
         const scenes = ai.scenes.map((s) => ({ n: s.n, visual: s.visual, voiceover: s.voiceover, duration: s.duration || "3s", on_screen_text: s.on_screen_text || "" }));
         const script = ai.scenes.map((s) => `Scene ${s.n} (${s.time_range}) — ${s.role}\nVoiceover: ${s.voiceover}\nVisual: ${s.visual}`).join("\n\n---\n\n");
         await saveOutput(project.id, {
           title: ai.reel_title || ai.title, hook: ai.scenes[0]?.voiceover ?? "",
-          script, captions: ai.caption || generateCaptions(form.topic, form.platform, form.tone).join("\n\n---\n\n"),
-          hashtags: ai.hashtags?.length ? ai.hashtags : generateHashtags(form.topic, form.platform),
+          script, captions: ai.caption || "",
+          hashtags: ai.hashtags ?? [],
           scenes, image_prompts: ai.scenes.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel })),
           thumbnail_ideas: [],
         });
@@ -585,6 +616,12 @@ function VideoPreview({
   const [imageErrors, setImageErrors] = useState<Array<string | null>>(() => scenes.map(() => null));
   const [imgBusy, setImgBusy] = useState<Set<number>>(new Set());
   const [validating, setValidating] = useState(false);
+  // Saved scene-image keys (blob store), restored on open so images aren't paid for twice.
+  const sceneKeysRef = useRef<Array<string | null>>([]);
+  const [imagesRestored, setImagesRestored] = useState(false);
+  const autoStartedRef = useRef(false);
+  const sceneImagesRef = useRef<Array<string | null>>([]);
+  sceneImagesRef.current = sceneImages;
   const [playingScene, setPlayingScene] = useState<number | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
 
@@ -619,6 +656,23 @@ function VideoPreview({
     setImageErrors((prev) => (prev.length === scenes.length ? prev : scenes.map(() => null)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenes.length]);
+
+  // Restore scene images saved on this device for this project.
+  useEffect(() => {
+    let alive = true;
+    setImagesRestored(false);
+    (async () => {
+      const out = await getOutput(projectId).catch(() => null);
+      const keys = (out?.scene_images ?? []).slice(0, scenes.length);
+      sceneKeysRef.current = scenes.map((_, i) => keys[i] ?? null);
+      const urls = await Promise.all(sceneKeysRef.current.map(async (k) => (k && isBlobKey(k) ? await getObjectURL(k) : null)));
+      if (!alive) return;
+      setSceneImages((prev) => scenes.map((_, i) => urls[i] ?? prev[i] ?? null));
+      setImagesRestored(true);
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, scenes.length]);
 
   // Autosave: debounce scene / prompt edits, save to output + push a version.
   useEffect(() => {
@@ -770,29 +824,62 @@ function VideoPreview({
     return (editedPrompts[i] ?? "").trim() || imagePrompts?.[i]?.prompt || effectiveScenes[i]?.visual || "";
   }
 
-  async function generateOne(i: number) {
-    if (imgBusy.has(i)) return;
+  async function generateOne(i: number): Promise<boolean> {
+    if (imgBusy.has(i)) return false;
     setImgBusy((s) => { const n = new Set(s); n.add(i); return n; });
     setImageErrors((prev) => { const n = [...prev]; n[i] = null; return n; });
     try {
-      const url = await generateSceneImage(promptForScene(i), styleForScene(i), ratio, projectId);
+      // One quiet retry: the first call after a cold start is the one that
+      // most often times out or gets rate-limited.
+      let url = await generateSceneImage(promptForScene(i), styleForScene(i), ratio, projectId).catch(() => null);
+      if (!url) {
+        await new Promise((r) => setTimeout(r, 1500));
+        url = await generateSceneImage(promptForScene(i), styleForScene(i), ratio, projectId);
+      }
       if (!url) throw new Error("Image service returned nothing");
       setSceneImages((prev) => { const n = [...prev]; n[i] = url; return n; });
+      { const r = [...sceneImagesRef.current]; r[i] = url; sceneImagesRef.current = r; }
+      // Save it so a reload doesn't lose (and re-charge) the image.
+      try {
+        const key = await putDataURL(`scene:${projectId}:${i}:${Date.now()}`, url);
+        const keys = [...sceneKeysRef.current];
+        while (keys.length < totalScenes) keys.push(null);
+        keys[i] = key;
+        sceneKeysRef.current = keys;
+        await saveOutput(projectId, { scene_images: keys });
+      } catch { /* storage full — image still shows this session */ }
+      return true;
     } catch (e) {
       setImageErrors((prev) => { const n = [...prev]; n[i] = e instanceof Error ? e.message : String(e); return n; });
+      return false;
     } finally {
       setImgBusy((s) => { const n = new Set(s); n.delete(i); return n; });
       qc.invalidateQueries({ queryKey: ["access"] });
     }
   }
 
+  /** Generate the given scenes, at most 4 at a time (12 at once trips rate limits). */
+  async function generateMany(indexes: number[]): Promise<number> {
+    let ok = 0;
+    let next = 0;
+    const worker = async () => {
+      while (next < indexes.length) {
+        const i = indexes[next++];
+        if (await generateOne(i)) ok += 1;
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, indexes.length) }, worker));
+    return ok;
+  }
+
   async function validateAllImages() {
     if (totalScenes === 0) return;
     setValidating(true);
     try {
-      await Promise.all(effectiveScenes.map((_, i) => (sceneImages[i] ? Promise.resolve() : generateOne(i))));
-      const remaining = sceneImages.filter((v, i) => !v && !imageErrors[i]).length;
-      toast.success(remaining === 0 ? "All scene images validated" : "Some scenes still failed — retry them below");
+      const todo = effectiveScenes.map((_, i) => i).filter((i) => !sceneImages[i]);
+      const ok = await generateMany(todo);
+      if (todo.length === 0 || ok === todo.length) toast.success("All scene images are ready");
+      else toast.warning(`${todo.length - ok} scene image${todo.length - ok === 1 ? "" : "s"} failed — retry them below`);
     } finally {
       setValidating(false);
     }
@@ -801,8 +888,19 @@ function VideoPreview({
   async function retryFailed() {
     const failed = effectiveScenes.map((_, i) => i).filter((i) => !sceneImages[i]);
     if (failed.length === 0) { toast.message("Nothing to retry"); return; }
-    await Promise.all(failed.map((i) => generateOne(i)));
+    setValidating(true);
+    try { await generateMany(failed); } finally { setValidating(false); }
   }
+
+  // New project: start generating scene images automatically, once.
+  useEffect(() => {
+    if (!imagesRestored || autoStartedRef.current) return;
+    if (totalScenes === 0 || videoUrl) return;
+    if (sceneImages.some(Boolean)) return; // not a fresh project
+    autoStartedRef.current = true;
+    void validateAllImages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imagesRestored, totalScenes]);
 
   async function playSceneVoiceover(i: number) {
     const text = (effectiveScenes[i]?.voiceover ?? "").trim();
@@ -921,11 +1019,17 @@ function VideoPreview({
 
   async function handleUgcRender(container?: "webm" | "mp4") {
     if (rendering || ugcRendering || totalScenes === 0) return;
-    // Validation gate: any missing image blocks the render until the user
-    // regenerates it (or explicitly skips via the "Retry failed" flow).
+    // Missing scene images: make them first, then render.
     if (missingImages > 0) {
-      toast.error(`${missingImages} scene image${missingImages === 1 ? "" : "s"} still missing — validate & retry above first.`);
-      return;
+      const todo = effectiveScenes.map((_, i) => i).filter((i) => !sceneImagesRef.current[i]);
+      toast.message(`Creating ${todo.length} missing scene image${todo.length === 1 ? "" : "s"} first…`);
+      setValidating(true);
+      try { await generateMany(todo); } finally { setValidating(false); }
+      const still = effectiveScenes.filter((_, i) => !sceneImagesRef.current[i]).length;
+      if (still > 0) {
+        toast.error(`${still} scene image${still === 1 ? "" : "s"} couldn't be created. Use "Retry failed" above, then render again.`);
+        return;
+      }
     }
     lastRenderKindRef.current = "ugc";
     lastContainerRef.current = container;
@@ -940,7 +1044,7 @@ function VideoPreview({
       const result = await renderUgcVideo({
         title, platform, contentType, styleId, scenes: effectiveScenes,
         imagePrompts,
-        preloadedImages: sceneImages,
+        preloadedImages: sceneImagesRef.current,
         projectId,
         showOnScreenText,
         voice: "alloy",
@@ -950,7 +1054,7 @@ function VideoPreview({
       });
       await uploadRender(result.blob, result.mimeType, result.extension, result.durationSec, container);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "UGC render failed";
+      const msg = err instanceof Error ? err.message : "Render failed";
       const isAbort = err instanceof Error && err.name === "AbortError";
       if (isAbort) setCanceled(true);
       const next = appendAttempt(diagnostics ?? emptyDiag(), {
@@ -1054,11 +1158,14 @@ function VideoPreview({
           </button>
           <button
             onClick={() => handleUgcRender()}
-            disabled={rendering || ugcRendering}
+            disabled={rendering || ugcRendering || validating}
+            title={missingImages > 0 ? `${missingImages} scene image${missingImages === 1 ? "" : "s"} will be created first` : undefined}
             className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)] disabled:opacity-60 flex items-center gap-2">
             {ugcRendering
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Rendering…</>
-              : <><Sparkles className="w-4 h-4" /> {videoUrl ? "Re-generate UGC video" : "Generate UGC video"}</>}
+              : validating
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating images…</>
+                : <><Sparkles className="w-4 h-4" /> {videoUrl ? "Render again" : missingImages > 0 ? `Create ${missingImages} image${missingImages === 1 ? "" : "s"} & render` : "Render video"}</>}
           </button>
           {(rendering || ugcRendering) && (
             <button
