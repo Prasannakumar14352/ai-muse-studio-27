@@ -3,6 +3,7 @@
 // and exposes render actions with credit estimates + pre-render validation.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { creditsLabel } from "@/lib/credits-label";
 import { toast } from "sonner";
 import {
   AlertTriangle, Check, Clock, Copy, Plus, RotateCcw, Save, Scissors,
@@ -237,7 +238,7 @@ export function VideoBlueprintEditor({
     }
     const cost = estimateCredits(bp, action);
     const label = ACTION_LABELS[action];
-    if (!confirm(`${label}\n\nEstimated cost: ${cost} credits.\n\nProceed?`)) return;
+    if (!confirm(`${label}\n\nEstimated cost: ${creditsLabel(cost)}.\n\nProceed?`)) return;
     await onRender?.(action, { blueprint: bp });
   };
 
@@ -688,7 +689,7 @@ function RenderBtn({
       onClick={() => void onClick(action)}
     >
       <span className="text-sm">{label}</span>
-      <span className="text-[10px] opacity-70">~{cost} credits</span>
+      <span className="text-[10px] opacity-70">~{creditsLabel(cost)}</span>
     </Button>
   );
 }

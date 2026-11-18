@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { creditsLabel } from "@/lib/credits-label";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getDashboardStatsFn } from "@/lib/analytics.functions";
@@ -43,7 +44,7 @@ function AnalyticsPage() {
       <section className="glass rounded-2xl p-6 border border-white/10">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Credit Usage (30 days)</h3>
-          <div className="text-xs text-muted-foreground">Total: {s.creditsUsed30d} credits</div>
+          <div className="text-xs text-muted-foreground">Total: {creditsLabel(s.creditsUsed30d)}</div>
         </div>
         <div className="flex items-end gap-1 h-32">
           {s.creditsSeries.map((p) => (

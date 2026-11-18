@@ -39,10 +39,10 @@ export const TONES = ["Professional", "Viral", "Emotional", "Funny", "Educationa
 
 export const STYLES = [
   { id: "3d", label: "3D", image: style3d, descriptor: "stylized 3D CGI render, vibrant colors, soft studio lighting, hero character portrait, Blender/Pixar-quality shading", accent: "#c026d3" },
-  { id: "ghibli", label: "Ghibli-inspired", image: styleGhibli, descriptor: "Studio Ghibli watercolor scene, hand-painted pastoral landscape with drifting clouds, Miyazaki nostalgia, warm afternoon light", accent: "#22c55e" },
+  { id: "ghibli", label: "Hand-painted anime", image: styleGhibli, descriptor: "Studio Ghibli watercolor scene, hand-painted pastoral landscape with drifting clouds, Miyazaki nostalgia, warm afternoon light", accent: "#22c55e" },
   { id: "anime", label: "Anime", image: styleAnime, descriptor: "modern anime illustration, cel-shaded character with expressive eyes, dynamic composition, saturated pop colors", accent: "#ec4899" },
   { id: "realistic", label: "Realistic", image: styleRealistic, descriptor: "photorealistic 8k render, natural window light, 85mm lens, magazine-grade sharpness, cinematic depth of field", accent: "#94a3b8" },
-  { id: "pixar", label: "Pixar-like", image: stylePixar, descriptor: "Pixar animated movie still, cute stylized character, warm family-movie lighting, expressive smile", accent: "#f97316" },
+  { id: "pixar", label: "3D family animation", image: stylePixar, descriptor: "Pixar animated movie still, cute stylized character, warm family-movie lighting, expressive smile", accent: "#f97316" },
   { id: "cinematic", label: "Cinematic", image: styleCinematic, descriptor: "cinematic movie still, teal-and-orange grade, anamorphic lens flare, moody wide shot, Hollywood atmosphere", accent: "#6366f1" },
   { id: "documentary", label: "Documentary", image: styleDocumentary, descriptor: "National Geographic documentary photography, candid moment, muted earthy tones, honest journalistic framing", accent: "#78716c" },
   { id: "dark", label: "Dark Mystery", image: styleDark, descriptor: "noir mystery scene, deep shadows with rim light, atmospheric fog, thriller mood, black and midnight-blue palette", accent: "#0ea5e9" },

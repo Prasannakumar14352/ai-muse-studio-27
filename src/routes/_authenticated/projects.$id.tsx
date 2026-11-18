@@ -54,6 +54,7 @@ function ProjectView() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
   const [regenerating, setRegenerating] = useState<null | "all" | "script" | "scenes" | "captions" | "images">(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [bundling, setBundling] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -270,20 +271,31 @@ function ProjectView() {
 
   const scenes = (output?.scenes as Array<{ n: number; visual: string; voiceover: string; duration: string; on_screen_text?: string }>) ?? [];
   const prompts = (output?.image_prompts as Array<{ n: number; prompt: string; style: string }>) ?? [];
-  const thumbs = (output?.thumbnail_ideas as string[]) ?? [];
+  // Fall back to the Publish Kit's thumbnail concept so the section isn't
+  // empty when the kit already has one.
+  const kitThumb = (project as { distribution?: PublishKit | null } | undefined)?.distribution?.thumbnail?.concept;
+  const thumbs = ((output?.thumbnail_ideas as string[]) ?? []).length
+    ? (output?.thumbnail_ideas as string[])
+    : (kitThumb ? [kitThumb] : []);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-96"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
   }
   if (!project) {
-    return <div className="glass rounded-2xl p-12 text-center">Project not found. <Link to="/dashboard" className="text-[color:var(--neon-purple)]">Back to dashboard</Link></div>;
+    return <div className="glass rounded-2xl p-12 text-center">Project not found. <Link to="/videos" className="text-[color:var(--neon-purple)]">Back to projects</Link></div>;
   }
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <Link to="/dashboard" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="w-4 h-4" /> Back to dashboard
-      </Link>
+      {project.content_type === "carousel" ? (
+        <Link to="/carousels" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="w-4 h-4" /> Back to carousels
+        </Link>
+      ) : (
+        <Link to="/videos" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="w-4 h-4" /> Back to projects
+        </Link>
+      )}
 
       {/* Header */}
       <div className="glass rounded-2xl p-6 md:p-8">
@@ -308,7 +320,6 @@ function ProjectView() {
           >
             <Copy className="w-4 h-4" /> Copy post text
           </button>
-          <button onClick={download} className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5"><Download className="w-4 h-4" /> Download JSON</button>
           <button
             data-testid="ready-to-post"
             onClick={readyToPost}
@@ -338,8 +349,18 @@ function ProjectView() {
           ))}
         </div>
 
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((v) => !v)}
+          aria-expanded={showAdvanced}
+          className="mt-4 text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+        >
+          {showAdvanced ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />} Advanced
+        </button>
+
         {/* Exact generator inputs — same inputs "Regenerate All" reuses */}
-        <div className="mt-4 rounded-lg border border-border bg-black/30 p-3">
+        {showAdvanced && (
+        <div className="mt-2 rounded-lg border border-border bg-black/30 p-3">
           <div className="flex items-center justify-between mb-2">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
               Exact inputs sent to the script / scenes / captions / hashtags generator
@@ -373,7 +394,9 @@ function ProjectView() {
           <div className="mt-2 text-[11px] text-muted-foreground">
             Click <span className="text-white">Regenerate All</span> to re-run the script, scenes, captions, hashtags, and image prompts using these exact inputs — no edits required.
           </div>
+          <button onClick={download} className="mt-3 rounded-lg glass px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-white/5"><Download className="w-3.5 h-3.5" /> Download JSON</button>
         </div>
+        )}
       </div>
 
       {/* Edit brief & regenerate — same <ProjectBriefForm/> used on /create,
@@ -442,6 +465,8 @@ function ProjectView() {
           imagePrompts={prompts}
           publishKit={(project as { distribution?: PublishKit | null }).distribution ?? null}
           publishStatus={(project as { publish_status?: PublishStatus | null }).publish_status ?? null}
+          fallbackCaption={output?.captions ?? ""}
+          fallbackHashtags={(output?.hashtags ?? []).map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ")}
         />
       )}
 
@@ -574,6 +599,7 @@ type Scene = { n: number; visual: string; voiceover: string; duration: string; o
 function VideoPreview({
   scenes, title, styleImage, styleId, platform, contentType, music,
   projectId, userId, outputId, existingVideoUrl, existingDiagnostics, imagePrompts, publishKit, publishStatus,
+  fallbackCaption, fallbackHashtags,
 }: {
   scenes: Scene[]; title: string; styleImage: string;
   styleId?: string | null;
@@ -583,6 +609,9 @@ function VideoPreview({
   imagePrompts?: Array<{ n: number; prompt: string; style: string }>;
   publishKit?: PublishKit | null;
   publishStatus?: PublishStatus | null;
+  /** The project's own AI caption / hashtags, used when there is no Publish Kit yet. */
+  fallbackCaption?: string;
+  fallbackHashtags?: string;
 }) {
   const qc = useQueryClient();
   const [idx, setIdx] = useState(0);
@@ -1186,8 +1215,8 @@ function VideoPreview({
           postTitle={publishKit?.seo_title || title}
           status={publishStatus}
           defaultPlatform={platformForPublish(platform)}
-          caption={publishKit?.platforms?.[publishKit.primary_platform]?.caption ?? publishKit?.seo_description ?? ""}
-          hashtags={(publishKit?.platforms?.[publishKit.primary_platform]?.hashtags ?? []).join(" ")}
+          caption={publishKit?.platforms?.[publishKit.primary_platform]?.caption || publishKit?.seo_description || fallbackCaption || ""}
+          hashtags={(publishKit?.platforms?.[publishKit.primary_platform]?.hashtags ?? []).join(" ") || fallbackHashtags || ""}
           captions={captionsFromKit(publishKit)}
           media={[{ url: videoUrl, kind: "video", name: "video.mp4" }]}
           onDownload={() => forceDownloadUrl(videoUrl, `${(title || "video").replace(/[^\w]+/g, "-")}.mp4`)}
@@ -1617,7 +1646,7 @@ function VideoPreview({
           </div>
 
           <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-3">
-            <button
+            <button aria-label="Previous scene"
               onClick={() => { setIdx((i) => (i - 1 + totalScenes) % totalScenes); setProgress(0); }}
               className="w-9 h-9 rounded-full bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center text-white">
               <SkipBack className="w-4 h-4" />
@@ -1627,7 +1656,7 @@ function VideoPreview({
               className="w-11 h-11 rounded-full gradient-primary text-white flex items-center justify-center shadow-lg">
               {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
             </button>
-            <button
+            <button aria-label="Next scene"
               onClick={() => { setIdx((i) => (i + 1) % totalScenes); setProgress(0); }}
               className="w-9 h-9 rounded-full bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center text-white">
               <SkipForward className="w-4 h-4" />
@@ -2357,7 +2386,7 @@ function EditableSections({
               <div className="text-xs text-[color:var(--neon-pink)] mb-1 flex items-center justify-between">
                 <span>Concept {i + 1}</span>
                 {editThumbs && (
-                  <button
+                  <button aria-label="Remove"
                     onClick={() => setThumbsDraft((arr) => arr.filter((_, idx) => idx !== i))}
                     className="text-muted-foreground hover:text-white"
                   ><X className="w-3 h-3" /></button>

@@ -345,7 +345,7 @@ function MultiImageUploader({ urls, onChange }: { urls: string[]; onChange: (u: 
         {urls.map((u, i) => (
           <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-white/10 bg-white/[0.02] group">
             <img src={u} alt="" className="w-full h-full object-cover" />
-            <button onClick={() => onChange(urls.filter((_, j) => j !== i))} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+            <button aria-label="Remove" onClick={() => onChange(urls.filter((_, j) => j !== i))} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
               <X className="w-3 h-3 text-white" />
             </button>
           </div>

@@ -215,8 +215,8 @@ function Dashboard() {
         <div className="glass rounded-2xl p-5">
           <div className="text-xs uppercase tracking-wider text-muted-foreground">Workspace</div>
           <div className="mt-3 grid grid-cols-3 gap-3">
-            <StatMini label="Projects" value={counts?.projects ?? 0} to="/videos" />
-            <StatMini label="Assets" value={counts?.assets ?? 0} to="/library" />
+            <StatMini label="All content" value={counts?.projects ?? 0} to="/videos" />
+            <StatMini label="Library items" value={counts?.assets ?? 0} to="/library" />
             <StatMini label="Scheduled" value={counts?.scheduled ?? 0} to="/calendar" />
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2">
@@ -262,7 +262,8 @@ function Dashboard() {
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  {new Date(u.created_at).toLocaleDateString()} · {u.source ?? "system"}
+                  {new Date(u.created_at).toLocaleDateString()}
+                  {SOURCE_LABEL[u.source ?? ""] ? ` · ${SOURCE_LABEL[u.source ?? ""]}` : ""}
                 </div>
               </div>
             )) : (
@@ -277,6 +278,16 @@ function Dashboard() {
     </div>
   );
 }
+
+/** Plain-language names for where a generation's credits came from. */
+const SOURCE_LABEL: Record<string, string> = {
+  subscription: "plan credits",
+  monthly: "plan credits",
+  wallet: "top-up credits",
+  topup: "top-up credits",
+  lifetime: "lifetime credits",
+  bonus: "bonus credits",
+};
 
 function BrandCheck({ ok, label }: { ok: boolean; label: string }) {
   return (

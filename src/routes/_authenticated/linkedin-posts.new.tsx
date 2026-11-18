@@ -673,7 +673,7 @@ function NewLinkedinPostPage() {
                     <li key={i} className="flex gap-2">
                       <span className="text-[color:var(--neon-pink)] w-5">→</span>
                       <span className="flex-1">{h}</span>
-                      <button onClick={() => copyToClipboard(h).then(() => toast.success("Copied"))} className="text-muted-foreground hover:text-foreground"><Copy className="w-3.5 h-3.5" /></button>
+                      <button aria-label="Copy" onClick={() => copyToClipboard(h).then(() => toast.success("Copied"))} className="text-muted-foreground hover:text-foreground"><Copy className="w-3.5 h-3.5" /></button>
                     </li>
                   ))}
                 </ul>
@@ -686,7 +686,7 @@ function NewLinkedinPostPage() {
                     <li key={i} className="flex gap-2">
                       <span className="text-muted-foreground w-5">{i + 1}.</span>
                       <span className="flex-1">{h}</span>
-                      <button onClick={() => copyToClipboard(h).then(() => toast.success("Copied"))} className="text-muted-foreground hover:text-foreground"><Copy className="w-3.5 h-3.5" /></button>
+                      <button aria-label="Copy" onClick={() => copyToClipboard(h).then(() => toast.success("Copied"))} className="text-muted-foreground hover:text-foreground"><Copy className="w-3.5 h-3.5" /></button>
                     </li>
                   ))}
                 </ul>
@@ -788,7 +788,7 @@ function NewLinkedinPostPage() {
                       {content.image_prompts!.map((p, i) => (
                         <div key={i} className="text-xs text-muted-foreground flex gap-2">
                           <span>{i + 1}.</span><span className="flex-1">{p}</span>
-                          <button onClick={() => copyToClipboard(p).then(() => toast.success("Copied"))} className="hover:text-foreground"><Copy className="w-3 h-3" /></button>
+                          <button aria-label="Copy" onClick={() => copyToClipboard(p).then(() => toast.success("Copied"))} className="hover:text-foreground"><Copy className="w-3 h-3" /></button>
                         </div>
                       ))}
                     </div>

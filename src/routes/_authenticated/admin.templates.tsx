@@ -191,7 +191,7 @@ function TemplateEditor({ initial, onClose, onSaved }: {
       <div className="glass rounded-2xl border border-border/60 w-full max-w-2xl p-6 my-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold">{initial.id ? "Edit template" : "New template"}</h2>
-          <button onClick={onClose} className="p-1.5 rounded hover:bg-white/10"><X className="w-4 h-4" /></button>
+          <button aria-label="Close" onClick={onClose} className="p-1.5 rounded hover:bg-white/10"><X className="w-4 h-4" /></button>
         </div>
         <div className="space-y-3 text-sm">
           <Field label="Name"><input value={f.name ?? ""} onChange={(e) => set("name", e.target.value)} className={input} /></Field>

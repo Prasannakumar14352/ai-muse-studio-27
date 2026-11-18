@@ -691,7 +691,7 @@ function BrandStep({
               <span key={i} className="inline-flex items-center gap-1 rounded-full border border-white/10 pl-1 pr-2 py-0.5 text-xs">
                 <span className="h-4 w-4 rounded-full border border-white/10" style={{ background: c }} />
                 {c}
-                <button className="opacity-70 hover:opacity-100" onClick={() => setDraft((d) => ({ ...d, brandColors: d.brandColors.filter((_, x) => x !== i) }))}>
+                <button aria-label="Remove" className="opacity-70 hover:opacity-100" onClick={() => setDraft((d) => ({ ...d, brandColors: d.brandColors.filter((_, x) => x !== i) }))}>
                   <X className="h-3 w-3" />
                 </button>
               </span>

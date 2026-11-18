@@ -27,6 +27,7 @@ import {
 } from "@/lib/publishing.functions";
 import { copyText, downloadPlatformPackage, buildLinkedInPost } from "@/lib/downloads";
 import { isHiddenPath } from "@/lib/hidden-features";
+import { listProviderAvailability } from "@/lib/oauth-user.functions";
 
 export type PublishMedia = { url: string; kind: "image" | "video" | "thumbnail"; name?: string };
 
@@ -100,6 +101,13 @@ export function PublishDialog({
     staleTime: 30_000,
   });
   const targets = targetsQ.data ?? [];
+  // Only offer platforms the admin has switched on (or ones already connected).
+  const availFn = useServerFn(listProviderAvailability);
+  const availQ = useQuery({ queryKey: ["provider-availability"], queryFn: () => availFn(), enabled: open, staleTime: 60_000 });
+  const shownPlatforms = PLATFORMS.filter((p) =>
+    targets.some((t) => t.platform === p) ||
+    (availQ.data ?? []).some((a) => a.platform === p && a.available),
+  );
 
   const [selected, setSelected] = useState<string[]>([]);
   const [focus, setFocus] = useState<Platform>(content.defaultPlatform ?? "instagram");
@@ -126,8 +134,9 @@ export function PublishDialog({
   const canPublish = selectedTargets.length > 0;
 
   const defaultText = (p: Platform) => {
-    const caption = content.captions?.[p]?.caption ?? content.caption ?? "";
-    const tags = content.captions?.[p]?.hashtags ?? content.hashtags ?? "";
+    // `||` (not `??`): an empty per-platform caption falls back to the main one.
+    const caption = content.captions?.[p]?.caption || content.caption || "";
+    const tags = content.captions?.[p]?.hashtags || content.hashtags || "";
     return tags ? `${caption}\n\n${tags}`.trim() : caption;
   };
   const textFor = (p: Platform) => edited[p] ?? defaultText(p);
@@ -271,7 +280,10 @@ export function PublishDialog({
             <div className="text-xs text-muted-foreground">Checking connected accounts…</div>
           ) : (
             <div className="space-y-2.5 max-h-64 overflow-auto pr-1">
-              {PLATFORMS.map((p) => {
+              {shownPlatforms.length === 0 && !availQ.isLoading && (
+                <div className="text-xs text-muted-foreground">No publishing platforms are set up yet. Download the file and post it manually.</div>
+              )}
+              {shownPlatforms.map((p) => {
                 const accts = targets.filter((t) => t.platform === p);
                 const problem = problemFor(p);
                 return (
@@ -320,7 +332,7 @@ export function PublishDialog({
           <div className="flex items-center justify-between mb-1">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Caption</div>
             <div className="flex gap-1">
-              {PLATFORMS.map((p) => (
+              {shownPlatforms.map((p) => (
                 <button key={p} onClick={() => setFocus(p)}
                   className={`px-2 py-0.5 rounded-full text-[11px] capitalize border ${focus === p ? "border-orange-500/70 text-white" : "border-white/10 text-muted-foreground hover:text-foreground"}`}>
                   {p}

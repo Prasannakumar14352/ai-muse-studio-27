@@ -38,9 +38,12 @@ function normalizePlatform(p: string | null | undefined): "instagram" | "tiktok"
 }
 
 function normalizeFormat(project: PanelProject): "short" | "long" {
+  // The content type is the source of truth: the stored `format` column
+  // defaults to "long", which labelled 9:16 reels as "16:9 Long".
   const ct = (project.content_type || "").toLowerCase();
+  if (ct.includes("reel") || ct.includes("short") || ct.includes("ugc") || ct.includes("carousel")) return "short";
+  if (ct.includes("long")) return "long";
   if (project.format === "short" || project.format === "long") return project.format;
-  if (ct.includes("reel") || ct.includes("short") || ct.includes("ugc")) return "short";
   return "long";
 }
 
@@ -266,7 +269,10 @@ export function PublishKitPanel({ project, output }: { project: PanelProject; ou
               return (
                 <div key={p} className="rounded-xl border border-white/10 p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium capitalize">{p.replace("_", " ")}</div>
+                    <div className="text-sm font-medium capitalize">
+                      {p.replace("_", " ")}
+                      {p === "tiktok" && <span className="ml-2 text-[11px] font-normal normal-case text-muted-foreground">copy &amp; post manually</span>}
+                    </div>
                     <button
                       onClick={() => copy(combined, p.replace("_", " ") + " post")}
                       className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
@@ -291,7 +297,7 @@ function KitField({ label, value, multiline, compact }: { label: string; value: 
     <div className={"flex items-start gap-3 " + (compact ? "" : "border-b border-white/5 pb-3")}>
       <div className="min-w-[140px] text-xs uppercase tracking-wide text-muted-foreground pt-1">{label}</div>
       <div className={"flex-1 text-sm " + (multiline ? "whitespace-pre-wrap" : "")}>{value}</div>
-      <button
+      <button aria-label="Copy"
         onClick={() => copy(value, label)}
         className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
       >

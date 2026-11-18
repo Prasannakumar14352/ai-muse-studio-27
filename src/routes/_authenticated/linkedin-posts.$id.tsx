@@ -193,7 +193,7 @@ function LinkedinPostViewPage() {
                     <li key={i} className="flex gap-2">
                       <span className="text-muted-foreground w-5">{i + 1}.</span>
                       <span className="flex-1">{h}</span>
-                      <button onClick={() => copy(h)} className="text-muted-foreground hover:text-foreground"><Copy className="w-3.5 h-3.5" /></button>
+                      <button aria-label="Copy" onClick={() => copy(h)} className="text-muted-foreground hover:text-foreground"><Copy className="w-3.5 h-3.5" /></button>
                     </li>
                   ))}
                 </ul>
@@ -207,7 +207,7 @@ function LinkedinPostViewPage() {
                     <li key={i} className="flex gap-2">
                       <span className="text-[color:var(--neon-pink)] w-5">→</span>
                       <span className="flex-1">{h}</span>
-                      <button onClick={() => copy(h)} className="text-muted-foreground hover:text-foreground"><Copy className="w-3.5 h-3.5" /></button>
+                      <button aria-label="Copy" onClick={() => copy(h)} className="text-muted-foreground hover:text-foreground"><Copy className="w-3.5 h-3.5" /></button>
                     </li>
                   ))}
                 </ul>

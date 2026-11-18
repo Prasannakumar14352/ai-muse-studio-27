@@ -920,7 +920,7 @@ function CarouselsPage() {
           className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setViewer(null)}
         >
-          <button
+          <button aria-label="Close"
             onClick={(e) => { e.stopPropagation(); setViewer(null); }}
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
           ><X className="w-5 h-5" /></button>
