@@ -84,26 +84,22 @@ export const disconnectPlatform = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    // Posts waiting for this account must not silently move to another account.
+    await context.supabase.from("scheduled_posts").update({
+      status: "failed",
+      last_error: "The account for this post was disconnected. Pick another account and publish again.",
+    } as never).eq("connection_id", data.id).eq("user_id", context.userId).in("status", ["scheduled", "ready"]);
     const { error } = await context.supabase
       .from("platform_connections").delete().eq("id", data.id).eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
-export const selectDestinationAccount = createServerFn({ method: "POST" })
+/** Per-platform connected-account counts and the plan's limit. */
+export const getAccountLimits = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({
-    id: z.string().uuid(),
-    accountId: z.string(),
-    accountLabel: z.string(),
-    avatarUrl: z.string().url().optional().nullable(),
-  }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("platform_connections").update({
-      account_id: data.accountId,
-      account_label: data.accountLabel,
-      avatar_url: data.avatarUrl ?? null,
-    } as never).eq("id", data.id).eq("user_id", context.userId);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+  .handler(async ({ context }) => {
+    const { maxAccountsPerPlatform } = await import("./plan-access.server");
+    const max = await maxAccountsPerPlatform(context.userId);
+    return { max: Number.isFinite(max) ? max : null };
   });

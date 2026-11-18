@@ -55,3 +55,11 @@ export async function assertActionAllowed(userId: string, action: string): Promi
   const featureId = ACTION_FEATURE[action];
   if (featureId) await assertFeature(userId, featureId);
 }
+
+/** Max connected accounts per platform for this user (Infinity for admins). */
+export async function maxAccountsPerPlatform(userId: string): Promise<number> {
+  const { tier, isAdmin } = await getUserTier(userId);
+  if (isAdmin) return Number.POSITIVE_INFINITY;
+  const { MAX_ACCOUNTS_PER_PLATFORM } = await import("./plan-access");
+  return MAX_ACCOUNTS_PER_PLATFORM[tier];
+}

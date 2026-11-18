@@ -76,16 +76,38 @@ export const Route = createFileRoute("/api/public/oauth/$platform/callback")({
           const expiresAt = token.expires_in
             ? new Date(Date.now() + token.expires_in * 1000).toISOString() : null;
 
-          // One connection per platform: a reconnect replaces the old one.
-          await supabaseAdmin.from("platform_connections").delete()
-            .eq("user_id", stateRow.user_id as string).eq("platform", platform);
-          await supabaseAdmin.from("platform_connections").upsert({
-            user_id: stateRow.user_id as string,
+          // Every account this login can post to becomes its own connection
+          // (e.g. several Facebook Pages, or another YouTube channel added later).
+          // Accounts already connected get fresh tokens; new ones count against
+          // the plan's per-platform limit.
+          const userId = stateRow.user_id as string;
+          const found = (profile.accounts && profile.accounts.length > 0)
+            ? profile.accounts
+            : [{ id: profile.accountId, label: profile.accountLabel, avatarUrl: profile.avatarUrl, kind: "account", profileUrl: profile.profileUrl }];
+
+          const { data: existing } = await supabaseAdmin.from("platform_connections")
+            .select("account_id").eq("user_id", userId).eq("platform", platform);
+          const existingIds = new Set((existing ?? []).map((r) => r.account_id as string));
+          const { maxAccountsPerPlatform } = await import("@/lib/plan-access.server");
+          const max = await maxAccountsPerPlatform(userId);
+          let room = Math.max(0, max - existingIds.size);
+          const toSave = found.filter((a) => {
+            if (existingIds.has(a.id)) return true;
+            if (room > 0) { room -= 1; return true; }
+            return false;
+          });
+          const skipped = found.length - toSave.length;
+          if (toSave.length === 0) {
+            return back(`Your plan allows ${max} ${platform} account${max === 1 ? "" : "s"}. Disconnect one or upgrade to add more.`);
+          }
+
+          const rows = toSave.map((a) => ({
+            user_id: userId,
             platform,
-            account_id: profile.accountId,
-            account_label: profile.accountLabel,
-            avatar_url: profile.avatarUrl ?? null,
-            profile_url: profile.profileUrl ?? null,
+            account_id: a.id,
+            account_label: a.label,
+            avatar_url: a.avatarUrl ?? null,
+            profile_url: a.profileUrl ?? null,
             scopes: spec.scopes[platform],
             status: "connected",
             expires_at: expiresAt,
@@ -93,11 +115,25 @@ export const Route = createFileRoute("/api/public/oauth/$platform/callback")({
             token_iv: accIv,
             refresh_token_encrypted: refresh.cipher,
             refresh_iv: refresh.iv,
-            metadata: { accounts: profile.accounts ?? [] },
+            metadata: { kind: a.kind, login_account_id: profile.accountId },
             last_error: null,
-          } as never, { onConflict: "user_id,platform,account_id" });
+          }));
+          // Google only returns a refresh token on some consents; keep the old one otherwise.
+          for (const row of rows) {
+            if (!row.refresh_token_encrypted) {
+              const { refresh_token_encrypted: _r, refresh_iv: _i, ...rest } = row;
+              const { data: upd } = await supabaseAdmin.from("platform_connections")
+                .update(rest as never).eq("user_id", userId).eq("platform", platform).eq("account_id", row.account_id).select("id");
+              if (upd && upd.length > 0) continue;
+            }
+            const { error: upErr } = await supabaseAdmin.from("platform_connections")
+              .upsert(row as never, { onConflict: "user_id,platform,account_id" });
+            if (upErr) return back(upErr.message);
+          }
 
-          return Response.redirect(`${origin}/connections?ok=${encodeURIComponent(platform)}`, 302);
+          const names = toSave.map((a) => a.label).join(", ");
+          const note = skipped > 0 ? ` (${skipped} more skipped: plan limit is ${max})` : "";
+          return Response.redirect(`${origin}/connections?ok=${encodeURIComponent(`${platform}: ${names}${note}`)}`, 302);
         } catch (e) {
           return back(e instanceof Error ? e.message : "OAuth failed");
         }
