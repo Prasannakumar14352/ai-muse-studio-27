@@ -6,10 +6,10 @@ import { toast } from "sonner";
 import { useAccess } from "@/lib/access";
 import {
   getAgentHq, saveAgentSettings, updateAgentTask, sendTaskReply, runAgentNow, createTelegramLinkCode,
-  type AgentTask, type TelegramMsg, type AgentRun,
+  type AgentTask, type TelegramMsg, type AgentRun, type InAppChatMsg,
 } from "@/lib/agent-hq.functions";
 import {
-  Bot, CheckCircle2, Inbox, Loader2, MessageCircle, Play, Send, Settings2, XCircle, ClipboardList, History,
+  Bot, CheckCircle2, Inbox, Loader2, MessageCircle, MessagesSquare, Play, Send, Settings2, XCircle, ClipboardList, History,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/agents")({
@@ -30,7 +30,7 @@ function AgentHqPage() {
   const { data: access, isLoading } = useAccess();
   const getFn = useServerFn(getAgentHq);
   const q = useQuery({ queryKey: ["agent-hq"], queryFn: () => getFn(), enabled: Boolean(access?.isAdmin), refetchInterval: 20_000 });
-  const [tab, setTab] = useState<"inbox" | "board" | "telegram" | "runs" | "settings">("inbox");
+  const [tab, setTab] = useState<"inbox" | "board" | "telegram" | "inapp" | "runs" | "settings">("inbox");
 
   if (isLoading) return <div className="p-8"><Loader2 className="w-5 h-5 animate-spin" /></div>;
   if (!access?.isAdmin) return <Navigate to="/dashboard" replace />;
@@ -65,6 +65,7 @@ function AgentHqPage() {
           ["inbox", `Approval inbox${waiting.length ? ` (${waiting.length})` : ""}`, Inbox],
           ["board", "Task board", ClipboardList],
           ["telegram", "Telegram log", MessageCircle],
+          ["inapp", "In-app chats", MessagesSquare],
           ["runs", "Agent runs", History],
           ["settings", "Settings", Settings2],
         ] as const).map(([id, label, Icon]) => (
@@ -79,6 +80,7 @@ function AgentHqPage() {
       {d && tab === "inbox" && <ApprovalInbox tasks={waiting} />}
       {d && tab === "board" && <TaskBoard tasks={d.tasks.filter((t) => t.status !== "waiting_approval" && t.status !== "rejected")} />}
       {d && tab === "telegram" && <TelegramLog messages={d.messages} />}
+      {d && tab === "inapp" && <InAppChats messages={d.inAppChats} />}
       {d && tab === "runs" && <RunsLog runs={d.runs} />}
       {d && tab === "settings" && <SettingsPanel s={d.settings} />}
     </div>
@@ -110,18 +112,18 @@ function ApprovalCard({ t }: { t: AgentTask }) {
       </div>
       <div className="font-semibold">{t.title}</div>
       <div className="text-sm text-muted-foreground whitespace-pre-wrap">{t.body}</div>
-      {t.source === "telegram" && (
+      {(t.source === "telegram" || t.source === "in_app") && (
         <>
-          <label className="text-xs text-muted-foreground block">Reply to post in the group</label>
+          <label className="text-xs text-muted-foreground block">{t.source === "in_app" ? "Reply to send in their in-app chat" : "Reply to post in the group"}</label>
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4}
             className="w-full text-sm bg-black/30 border border-white/10 rounded-lg p-3 focus:outline-none focus:border-orange-500/60" />
         </>
       )}
       <div className="flex flex-wrap gap-2">
-        {t.source === "telegram" && (
+        {(t.source === "telegram" || t.source === "in_app") && (
           <button disabled={busy || !text.trim()} onClick={async () => {
             setBusy(true);
-            try { await send({ data: { id: t.id, text, markDone: t.kind !== "bug" && t.kind !== "feature" } }); toast.success("Reply posted in Telegram"); refresh(); }
+            try { await send({ data: { id: t.id, text, markDone: t.kind !== "bug" && t.kind !== "feature" } }); toast.success(t.source === "in_app" ? "Reply sent to their chat" : "Reply posted in Telegram"); refresh(); }
             catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't send"); }
             finally { setBusy(false); }
           }} className="rounded-lg gradient-primary text-white px-3 py-1.5 text-sm inline-flex items-center gap-1.5 disabled:opacity-60">
@@ -155,7 +157,7 @@ function TaskBoard({ tasks }: { tasks: AgentTask[] }) {
                     <div className="flex items-center gap-1.5 text-[11px] mb-1">
                       <KindBadge kind={t.kind} />
                       {t.priority === 1 && <span className="text-rose-300">urgent</span>}
-                      <span className="text-muted-foreground ml-auto">{AGENT_LABEL[t.agent] ?? t.agent}</span>
+                      <span className="text-muted-foreground ml-auto">{t.source === "in_app" ? "In-app chat" : AGENT_LABEL[t.agent] ?? t.agent}</span>
                     </div>
                     <div className="text-sm font-medium">{t.title}</div>
                   </summary>
@@ -167,7 +169,7 @@ function TaskBoard({ tasks }: { tasks: AgentTask[] }) {
                     {c.id !== "done" && (
                       <button onClick={async () => { await update({ data: { id: t.id, status: "done" } }); refresh(); }} className="text-[11px] rounded glass border border-border px-2 py-1">Mark done</button>
                     )}
-                    {c.id !== "done" && t.source === "telegram" && t.kind === "bug" && (
+                    {c.id !== "done" && (t.source === "telegram" || t.source === "in_app") && t.kind === "bug" && (
                       <button onClick={async () => {
                         try {
                           await send({ data: { id: t.id, text: "Good news — this is fixed now. Please try again, and reply here if anything still looks wrong.", markDone: true } });
@@ -201,6 +203,40 @@ function TelegramLog({ messages }: { messages: TelegramMsg[] }) {
           </div>
           <div className="mt-1 whitespace-pre-wrap">{m.text}</div>
           {m.reply_text && <div className="mt-2 text-xs border-l-2 border-[color:var(--brand-orange)] pl-2 whitespace-pre-wrap text-muted-foreground">{m.reply_text}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InAppChats({ messages }: { messages: InAppChatMsg[] }) {
+  const [open, setOpen] = useState<string | null>(null);
+  if (!messages.length) return <Empty text="No in-app chats yet. Signed-in users can ask from the chat button at the bottom right." />;
+  const byUser = new Map<string, InAppChatMsg[]>();
+  for (const m of messages) byUser.set(m.user_id, [...(byUser.get(m.user_id) ?? []), m]);
+  const threads = [...byUser.entries()].map(([uid, ms]) => ({ uid, ms: [...ms].reverse(), last: ms[0] }));
+  return (
+    <div className="space-y-2">
+      {threads.map(({ uid, ms, last }) => (
+        <div key={uid} className="glass rounded-2xl border border-border">
+          <button onClick={() => setOpen(open === uid ? null : uid)} className="w-full text-left p-3 flex items-center gap-2 text-sm">
+            <span className="font-medium truncate">{last.email ?? uid.slice(0, 8)}</span>
+            {last.category && <KindBadge kind={last.category} />}
+            <span className="text-muted-foreground truncate flex-1">{last.text}</span>
+            <span className="text-xs text-muted-foreground shrink-0">{new Date(last.created_at).toLocaleString()}</span>
+          </button>
+          {open === uid && (
+            <div className="border-t border-white/5 p-3 space-y-2 max-h-[60vh] overflow-auto">
+              {ms.map((m) => (
+                <div key={m.id} className={`text-sm rounded-xl px-3 py-2 max-w-[85%] whitespace-pre-wrap ${m.role === "user" ? "bg-white/5" : m.role === "admin" ? "ml-auto bg-emerald-500/10 border border-emerald-500/20" : "ml-auto bg-orange-500/10 border border-orange-500/20"}`}>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">
+                    {m.role === "user" ? "User" : m.role === "admin" ? "You" : "Assistant"}{m.page ? ` · ${m.page}` : ""} · {new Date(m.created_at).toLocaleTimeString()}
+                  </div>
+                  {m.text}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>

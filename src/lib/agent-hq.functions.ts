@@ -19,13 +19,20 @@ export const getAgentHq = createServerFn({ method: "GET" })
     const core = await import("@/lib/agents/core.server");
     const db = await core.admin();
     const s = await core.getAgentSettings(db);
-    const [spent, tasks, messages, runs, adminLink] = await Promise.all([
+    const [spent, tasks, messages, runs, adminLink, chats] = await Promise.all([
       core.spentThisMonthUsd(db),
       db.from("agent_tasks").select("*").order("created_at", { ascending: false }).limit(200),
       db.from("telegram_messages").select("*").order("created_at", { ascending: false }).limit(100),
       db.from("agent_runs").select("id,agent,trigger,summary,ok,error,cost_usd,created_at").order("created_at", { ascending: false }).limit(100),
       db.from("telegram_links").select("telegram_user_id").eq("user_id", (context as unknown as Ctx).userId).maybeSingle(),
+      db.from("support_chat_messages").select("id,user_id,role,text,category,page,created_at").order("created_at", { ascending: false }).limit(300),
     ]);
+    const chatRows = (chats.data ?? []) as Array<Omit<InAppChatMsg, "email">>;
+    const ids = [...new Set(chatRows.map((m) => m.user_id))];
+    const { data: profs } = ids.length
+      ? await db.from("profiles").select("id,email").in("id", ids)
+      : { data: [] as Array<{ id: string; email: string | null }> };
+    const emailOf = new Map((profs ?? []).map((p: { id: string; email: string | null }) => [p.id, p.email]));
     return {
       settings: {
         telegramEnabled: s.telegram_enabled,
@@ -41,6 +48,7 @@ export const getAgentHq = createServerFn({ method: "GET" })
       tasks: (tasks.data ?? []) as AgentTask[],
       messages: (messages.data ?? []) as TelegramMsg[],
       runs: (runs.data ?? []) as AgentRun[],
+      inAppChats: chatRows.map((m) => ({ ...m, email: emailOf.get(m.user_id) ?? null })) as InAppChatMsg[],
     };
   });
 
@@ -51,6 +59,9 @@ export type AgentTask = {
 export type TelegramMsg = {
   id: string; chat_id: number; message_id: number; from_name: string | null; text: string; category: string | null;
   reply_text: string | null; handled_by: string | null; task_id: string | null; created_at: string;
+};
+export type InAppChatMsg = {
+  id: string; user_id: string; email: string | null; role: string; text: string; category: string | null; page: string | null; created_at: string;
 };
 export type AgentRun = { id: string; agent: string; trigger: string; summary: string; ok: boolean; error: string | null; cost_usd: number; created_at: string };
 
