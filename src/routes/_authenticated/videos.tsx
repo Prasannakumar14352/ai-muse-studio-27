@@ -755,6 +755,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
   const [style, setStyle] = useState<StyleId>("cinematic");
   const [voice, setVoice] = useState<VoiceId>("documentary_narrator");
   const [ratio, setRatio] = useState<AspectRatio>(initialRatio ?? "9:16");
+  const [sameCharacter, setSameCharacter] = useState(true);
 
   const autoFiredRef = useRef(false);
   useEffect(() => {
@@ -779,7 +780,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
     if (!title.trim()) return toast.error("Enter a video title or idea");
     if (isCustom && !customNiche.trim()) return toast.error("Describe your custom niche or topic area");
     onGenerate({
-      brief: { title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio },
+      brief: { title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio, sameCharacter },
       niche: isCustom ? customNiche.trim() : niche,
       topic: title.trim(),
     });
@@ -914,7 +915,25 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
         <ChipRow options={ASPECT_RATIOS.map((r) => ({ id: r, label: r }))} value={ratio} onChange={setRatio} />
       </Section>
 
-      {/* 9. Generate */}
+      {/* 9. Character consistency */}
+      <Section index={9} title="Main character">
+        <label className="flex items-start gap-3 cursor-pointer glass rounded-xl p-3 border border-border">
+          <input
+            type="checkbox"
+            checked={sameCharacter}
+            onChange={(e) => setSameCharacter(e.target.checked)}
+            className="mt-1 accent-[color:var(--brand-orange)]"
+          />
+          <span className="text-sm">
+            <span className="font-medium">Keep the same person in every scene</span>
+            <span className="block text-xs text-muted-foreground mt-0.5">
+              We create one portrait of your main character and use it for every scene they appear in. Those scenes use HD images (6 credits each instead of 1); scenery shots stay at 1 credit.
+            </span>
+          </span>
+        </label>
+      </Section>
+
+      {/* 10. Generate */}
       <div className="flex items-center justify-end pt-2">
         <button
           onClick={submit}

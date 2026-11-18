@@ -20,7 +20,7 @@ import {
   type JobRecord, type ShotRecord,
 } from "@/lib/video-job-store";
 import {
-  directBeatPrompt, buildContinuityCard,
+  directBeatPrompt, buildContinuityCard, STYLE_PRESETS,
   type ContinuityCard, type ShotType, type VDStyle,
 } from "@/lib/visual-director";
 import {
@@ -64,6 +64,8 @@ type Beat = {
   activity: DynamicActivity | null;
   /** Rich AI-video prompt when dynamic; null for static beats. */
   videoPrompt: string | null;
+  /** False for b-roll beats that show no person. */
+  hasCharacter: boolean;
 };
 
 /** Split a voiceover string into ~10-14-word visual chunks (sentence-aware). */
@@ -208,6 +210,7 @@ function expandScriptToBeats(
         sceneKind: detection.kind,
         activity: detection.activity,
         videoPrompt,
+        hasCharacter: directed.hasCharacter,
       });
       globalIdx += 1;
     });
@@ -246,6 +249,8 @@ export type VideoBrief = {
   style: StyleId;
   voice: VoiceId;
   aspectRatio: AspectRatio;
+  /** Keep the same person in every scene using a reference portrait (default on). */
+  sameCharacter?: boolean;
 };
 
 export type ResearchBrief = {
@@ -1513,6 +1518,82 @@ async function dataUrlToBlob(u: string): Promise<Blob> {
   return await res.blob();
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error ?? new Error("Could not read image"));
+    r.readAsDataURL(blob);
+  });
+}
+
+// ---------- Character consistency (one reference portrait per video) ----------
+//
+// Text-only prompts give a different face in every scene, however detailed
+// the character sheet. So each video gets ONE reference portrait of its main
+// character (made from the Character Bible), and every shot that shows the
+// character is rendered from that portrait with an image-reference model.
+// B-roll shots (no person) stay on the fast text-to-image model.
+
+const characterRefCache = new Map<string, Promise<string | null>>();
+
+/** Returns the job's character reference portrait (data URL), creating it once. */
+async function ensureCharacterReference(
+  job: JobRecord,
+  brief: VideoBrief,
+): Promise<string | null> {
+  if (brief.sameCharacter === false) return null;
+  if (!job.shots.some((s) => s.hasCharacter !== false)) return null;
+  const cached = characterRefCache.get(job.id);
+  if (cached) return cached;
+  const p = (async () => {
+    if (job.characterRefKey) {
+      const url = await loadShotObjectURL(job.characterRefKey);
+      if (url) {
+        try {
+          return await blobToDataUrl(await (await fetch(url)).blob());
+        } catch { /* fall through and recreate */ }
+      }
+    }
+    const cd = detectIntentHeuristic(brief.title);
+    const cb = buildBriefFromIntent(brief.title, cd.intent, cd.confidence);
+    const bible = defaultCharacterBibleFor(brief.title, cb.intent);
+    const preset = STYLE_PRESETS[brief.style as VDStyle];
+    const portraitPrompt = preset?.isIllustrated
+      ? `${preset.label} illustration style character design. ${bible.masterPortraitPrompt.replace(/ARRI Alexa quality, photorealistic 8K\./, "")}`
+      : `${STYLE_LABEL[brief.style]} look. ${bible.masterPortraitPrompt}`;
+    const { fetchGeneratedImage } = await import("@/lib/image-stream");
+    const { image, error } = await fetchGeneratedImage({ prompt: portraitPrompt, ratio: "1:1", quality: "high" });
+    if (!image) {
+      console.warn("[character-ref] could not create the reference portrait; scenes will use text prompts only", error);
+      return null;
+    }
+    const blob = await dataUrlToBlob(image);
+    job.characterRefKey = await saveShotBlob(job.id, "character", blob);
+    await saveJob(job);
+    return image;
+  })();
+  characterRefCache.set(job.id, p);
+  const out = await p;
+  if (!out) characterRefCache.delete(job.id); // allow a later retry
+  return out;
+}
+
+/** Render a shot that shows the main character, anchored to the reference portrait. */
+async function fetchSceneImageWithCharacter(prompt: string, reference: string, ratio: AspectRatio): Promise<string | null> {
+  const { fetchGeneratedImage } = await import("@/lib/image-stream");
+  const { image } = await fetchGeneratedImage({
+    prompt:
+      "Use the reference image ONLY for the person's identity: keep exactly the same face, " +
+      "hairstyle, skin tone, body type and outfit. Create a completely NEW frame as described " +
+      "below — new pose, action, camera angle, framing, location and lighting. Do not copy the " +
+      "reference photo's pose, framing or plain studio background.\n\n" + prompt,
+    ratio,
+    referenceImages: [reference],
+  });
+  return image;
+}
+
 function beatsFromShots(job: JobRecord, style: StyleId): Beat[] {
   return job.shots.map<Beat>((s) => ({
     sceneIndex: s.sceneIndex,
@@ -1527,6 +1608,7 @@ function beatsFromShots(job: JobRecord, style: StyleId): Beat[] {
     sceneKind: (s.sceneKind as SceneKind) || "static",
     activity: (s.activity as DynamicActivity | null) ?? null,
     videoPrompt: s.videoPrompt ?? null,
+    hasCharacter: s.hasCharacter !== false,
     // Note: buildBeatImagePrompt already applied when the shot was created.
     _styleHint: style,
   } as unknown as Beat));
@@ -1554,6 +1636,7 @@ function planShots(
     sceneKind: b.sceneKind,
     activity: b.activity,
     videoPrompt: b.videoPrompt,
+    hasCharacter: b.hasCharacter,
     status: "pending",
     kind: null,
     blobKey: null,
@@ -1568,6 +1651,7 @@ async function generateOneShot(
   brief: VideoBrief,
   jobId: string,
   signal: AbortSignal,
+  characterRef?: string | null,
 ): Promise<{ blobKey: string; kind: "clip" | "image"; mime: string; previewUrl: string }> {
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
 
@@ -1592,7 +1676,13 @@ async function generateOneShot(
       `[scene-detector] Dynamic beat ${shot.id} (${shot.activity}) fell back to still image — no video model available.`,
     );
   }
-  const img = await fetchSceneImage(shot.prompt, brief.style, brief.aspectRatio);
+  // Shots with the main character are anchored to the reference portrait so
+  // the face stays the same; if that render fails, fall back to text-only.
+  let img: string | null = null;
+  if (characterRef && shot.hasCharacter !== false) {
+    img = await fetchSceneImageWithCharacter(shot.prompt, characterRef, brief.aspectRatio);
+  }
+  if (!img) img = await fetchSceneImage(shot.prompt, brief.style, brief.aspectRatio);
   if (!img) throw new Error("Image generation failed");
   const blob = await dataUrlToBlob(img);
   const key = await saveShotBlob(jobId, shot.id, blob);
@@ -1672,12 +1762,16 @@ export async function runVideoJobPipeline(
   job.shotsDone = done; job.shotsFailed = 0;
 
   const pending = job.shots.filter((s) => s.status !== "done");
+  // One reference portrait keeps the main character's face the same in every scene.
+  const characterRef = pending.some((s) => s.hasCharacter !== false)
+    ? await ensureCharacterReference(job, brief)
+    : null;
   const poolJobs = pending.map((shot) => ({
     id: shot.id,
     run: async (sig: AbortSignal) => {
       shot.status = "running";
       shot.attempts += 1;
-      return await generateOneShot(shot, brief, job.id, sig);
+      return await generateOneShot(shot, brief, job.id, sig, characterRef);
     },
   }));
 
@@ -1919,12 +2013,16 @@ export async function runAssetGenerationPhase(
   job.shotsDone = done; job.shotsFailed = 0;
 
   const pending = job.shots.filter((s) => s.status !== "done");
+  // One reference portrait keeps the main character's face the same in every scene.
+  const characterRef = pending.some((s) => s.hasCharacter !== false)
+    ? await ensureCharacterReference(job, brief)
+    : null;
   const poolJobs = pending.map((shot) => ({
     id: shot.id,
     run: async (sig: AbortSignal) => {
       shot.status = "running";
       shot.attempts += 1;
-      return await generateOneShot(shot, brief, job.id, sig);
+      return await generateOneShot(shot, brief, job.id, sig, characterRef);
     },
   }));
 
@@ -1973,7 +2071,7 @@ export async function runAssetGenerationPhase(
       run: async (sig: AbortSignal) => {
         shot.status = "running";
         shot.attempts += 1;
-        return await generateOneShot(shot, brief, job.id, sig);
+        return await generateOneShot(shot, brief, job.id, sig, characterRef);
       },
     }));
     await runShotPool(retryJobs, {
@@ -2188,7 +2286,8 @@ export async function regenerateShot(
   const onAbort = () => controller.abort();
   signal?.addEventListener("abort", onAbort);
   try {
-    const out = await generateOneShot(shot, brief, job.id, controller.signal);
+    const characterRef = shot.hasCharacter !== false ? await ensureCharacterReference(job, brief) : null;
+    const out = await generateOneShot(shot, brief, job.id, controller.signal, characterRef);
     shot.status = "done";
     shot.kind = out.kind;
     shot.blobKey = out.blobKey;
@@ -2236,12 +2335,15 @@ export async function retryFailedShots(
   let failed = job.shotsFailed - failedShots.length; // will re-count as we go
   failedShots.forEach((s) => { s.status = "pending"; s.error = null; });
 
+  const characterRef = failedShots.some((s) => s.hasCharacter !== false)
+    ? await ensureCharacterReference(job, brief)
+    : null;
   const poolJobs = failedShots.map((shot) => ({
     id: shot.id,
     run: async (sig: AbortSignal) => {
       shot.status = "running";
       shot.attempts += 1;
-      return await generateOneShot(shot, brief, job.id, sig);
+      return await generateOneShot(shot, brief, job.id, sig, characterRef);
     },
   }));
 
