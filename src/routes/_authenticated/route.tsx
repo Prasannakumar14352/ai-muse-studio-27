@@ -2,6 +2,7 @@ import { createFileRoute, Navigate, Outlet, redirect, useRouterState } from "@ta
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
 import { SupportChatWidget } from "@/components/support-chat-widget";
+import { FunnelTracker } from "@/components/funnel-tracker";
 import { GlobalCreditGate } from "@/components/global-credit-gate";
 import { PlanGate, UpgradeDialogProvider } from "@/lib/use-plan-access";
 import { isHiddenPath } from "@/lib/hidden-features";
@@ -57,6 +58,7 @@ function AuthenticatedLayout() {
         <GlobalCreditGate />
       </AppShell>
       <SupportChatWidget />
+      <FunnelTracker />
     </UpgradeDialogProvider>
   );
 }
