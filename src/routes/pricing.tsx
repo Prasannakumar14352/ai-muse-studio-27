@@ -116,7 +116,7 @@ function PricingPage() {
         <PricingFAQ />
 
         <div className="text-center text-sm text-muted-foreground">
-          Need custom / team pricing?{" "}
+          Need a custom plan or bulk credits?{" "}
           <Link to="/contact" className="text-[color:var(--brand-orange)] hover:underline">Contact us</Link>
         </div>
 
