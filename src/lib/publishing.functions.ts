@@ -56,7 +56,8 @@ export const schedulePost = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     projectId: z.string().uuid(),
     platform: platformSchema,
-    connectionId: z.string().uuid().optional(),
+    // Required: posts only go to an account the user explicitly picked.
+    connectionId: z.string().uuid(),
     title: z.string().max(300).optional(),
     caption: z.string().optional(),
     hashtags: z.string().optional(),
@@ -69,11 +70,11 @@ export const schedulePost = createServerFn({ method: "POST" })
     const problem = platformMediaProblem(data.platform, media);
     if (problem) throw new Error(problem);
 
-    let connQ = supabase.from("platform_connections")
-      .select("id, status, expires_at, account_label").eq("user_id", userId).eq("platform", data.platform);
-    connQ = data.connectionId ? connQ.eq("id", data.connectionId) : connQ.order("updated_at", { ascending: false });
-    const { data: conn } = await connQ.limit(1).maybeSingle();
-    if (!conn) throw new Error(`Connect your ${data.platform} account first (Connected Accounts).`);
+    const { data: conn } = await supabase.from("platform_connections")
+      .select("id, status, expires_at, account_label")
+      .eq("user_id", userId).eq("platform", data.platform).eq("id", data.connectionId)
+      .maybeSingle();
+    if (!conn) throw new Error(`That ${data.platform} account isn't connected any more. Reconnect it in Connected Accounts.`);
 
     const scheduled = data.scheduledAt ?? null;
     if (scheduled && new Date(scheduled).getTime() < Date.now() - 60_000) {
