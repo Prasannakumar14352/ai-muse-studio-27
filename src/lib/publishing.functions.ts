@@ -48,13 +48,33 @@ export function platformMediaProblem(platform: Platform, mediaUrls: string[]): s
   return null;
 }
 
+// Upload an embedded (data:) image or video to storage so it can be published
+// by URL. Returns a signed URL; the publisher re-signs it when it runs.
+export const stagePublishMedia = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ dataUrl: z.string().startsWith("data:").max(6_000_000) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const m = data.dataUrl.match(/^data:((?:image|video)\/[\w.+-]+);base64,(.+)$/s);
+    if (!m) throw new Error("Unsupported media");
+    const mime = m[1];
+    const bytes = Buffer.from(m[2], "base64");
+    const ext = (mime.split("/")[1] ?? "bin").replace("jpeg", "jpg").replace("quicktime", "mov");
+    const path = `${context.userId}/publish/${crypto.randomUUID()}.${ext}`;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.storage.from("renders").upload(path, bytes, { contentType: mime, upsert: false });
+    if (error) throw new Error(`Upload failed: ${error.message}`);
+    const { data: signed, error: sErr } = await supabaseAdmin.storage.from("renders").createSignedUrl(path, 7 * 24 * 3600);
+    if (sErr || !signed) throw new Error("Upload failed");
+    return { url: signed.signedUrl };
+  });
+
 // Publish now, or schedule for later, with the user's connected account.
 // "Publish now" runs immediately and returns the result; scheduled posts are
 // picked up by the publish worker (pg_cron, every 5 minutes).
 export const schedulePost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
-    projectId: z.string().uuid(),
+    projectId: z.string().uuid().optional(),
     platform: platformSchema,
     // Required: posts only go to an account the user explicitly picked.
     connectionId: z.string().uuid(),
@@ -82,7 +102,7 @@ export const schedulePost = createServerFn({ method: "POST" })
     }
     const { data: row, error } = await supabase.from("scheduled_posts").insert({
       user_id: userId,
-      project_id: data.projectId,
+      project_id: data.projectId ?? null,
       platform: data.platform,
       connection_id: conn.id,
       title: data.title ?? null,
@@ -96,8 +116,10 @@ export const schedulePost = createServerFn({ method: "POST" })
     const id = row.id as string;
 
     if (scheduled) {
-      await supabase.from("projects").update({ publish_status: "scheduled" } as never)
-        .eq("id", data.projectId).eq("user_id", userId);
+      if (data.projectId) {
+        await supabase.from("projects").update({ publish_status: "scheduled" } as never)
+          .eq("id", data.projectId).eq("user_id", userId);
+      }
       return { ok: true, id, status: "scheduled", url: null as string | null, error: null as string | null };
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

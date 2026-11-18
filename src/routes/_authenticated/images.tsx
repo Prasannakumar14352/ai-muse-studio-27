@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PublishButton } from "@/components/publish-actions";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -670,11 +671,21 @@ function ImagesPage() {
               <div className="mb-1">{results[viewerIdx].style} · {results[viewerIdx].ratio} · {viewerIdx + 1}/{results.length}</div>
               <div className="line-clamp-2">{results[viewerIdx].prompt}</div>
             </div>
+            <div className="flex gap-2">
             <a href={results[viewerIdx].image} download={`creatorflow-${results[viewerIdx].id}.png`}
               onClick={(e) => e.stopPropagation()}
               className="rounded-lg gradient-primary text-white px-4 py-2 text-xs font-medium flex items-center gap-2">
               <Download className="w-3 h-3" /> Download
             </a>
+            <PublishButton
+              className="rounded-lg bg-white/10 hover:bg-white/20 text-white px-4 py-2 text-xs font-medium flex items-center gap-2"
+              content={{
+                projectId: results[viewerIdx].id,
+                title: results[viewerIdx].prompt.slice(0, 80) || "AI image",
+                media: [{ url: results[viewerIdx].image, kind: "image", name: "image.png" }],
+              }}
+            />
+            </div>
           </div>
         </div>
       )}

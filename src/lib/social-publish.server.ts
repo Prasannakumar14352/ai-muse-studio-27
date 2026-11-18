@@ -82,6 +82,16 @@ async function resolveMedia(admin: Admin, userId: string, raw: string): Promise<
     const { data, error } = await admin.storage.from(sp.bucket).createSignedUrl(sp.path, 3600);
     if (!error && data) return { kind, url: data.signedUrl, mime: kind === "video" ? "video/mp4" : "image/jpeg" };
   }
+  // No storage path and no telling extension (e.g. some AI provider links):
+  // ask the server what it is.
+  if (!/\.(mp4|mov|m4v|webm|jpe?g|png|webp|gif)(\?|$)/i.test(raw)) {
+    try {
+      const head = await fetch(raw, { method: "HEAD" });
+      const ct = head.headers.get("content-type") ?? "";
+      if (ct.startsWith("video/")) return { kind: "video", url: raw, mime: ct };
+      if (ct.startsWith("image/")) return { kind: "image", url: raw, mime: ct };
+    } catch { /* fall through to the extension guess */ }
+  }
   return { kind, url: raw, mime: kind === "video" ? "video/mp4" : "image/jpeg" };
 }
 
@@ -204,8 +214,22 @@ async function publishLinkedIn(conn: Conn, job: JobRow, media: Media[]): Promise
     "Content-Type": "application/json",
   };
   let mediaId: string | null = null;
+  const imageIds: string[] = [];
   const first = media[0];
-  if (first?.kind === "image") {
+  const images = media.filter((m) => m.kind === "image");
+  if (first?.kind === "image" && images.length > 1) {
+    // Several images → a LinkedIn multi-image post (up to 20).
+    for (const img of images.slice(0, 20)) {
+      const init = await jsonOrThrow(await fetch("https://api.linkedin.com/rest/images?action=initializeUpload", {
+        method: "POST", headers, body: JSON.stringify({ initializeUploadRequest: { owner: author } }),
+      }), "LinkedIn image init");
+      const v = init.value as { uploadUrl: string; image: string };
+      const { bytes, mime } = await fetchBytes(img);
+      const up = await fetch(v.uploadUrl, { method: "PUT", headers: { Authorization: `Bearer ${conn.accessToken}`, "Content-Type": mime }, body: bytes });
+      if (!up.ok) throw new PublishError(`LinkedIn image upload failed (${up.status})`, up.status >= 500);
+      imageIds.push(v.image);
+    }
+  } else if (first?.kind === "image") {
     const init = await jsonOrThrow(await fetch("https://api.linkedin.com/rest/images?action=initializeUpload", {
       method: "POST", headers, body: JSON.stringify({ initializeUploadRequest: { owner: author } }),
     }), "LinkedIn image init");
@@ -243,7 +267,8 @@ async function publishLinkedIn(conn: Conn, job: JobRow, media: Media[]): Promise
     lifecycleState: "PUBLISHED",
     isReshareDisabledByAuthor: false,
   };
-  if (mediaId) body.content = { media: { id: mediaId, ...(job.title ? { title: job.title.slice(0, 200) } : {}) } };
+  if (imageIds.length > 1) body.content = { multiImage: { images: imageIds.map((id) => ({ id })) } };
+  else if (mediaId) body.content = { media: { id: mediaId, ...(job.title ? { title: job.title.slice(0, 200) } : {}) } };
   const res = await fetch("https://api.linkedin.com/rest/posts", { method: "POST", headers, body: JSON.stringify(body) });
   if (!res.ok) await jsonOrThrow(res, "LinkedIn post");
   const urn = res.headers.get("x-restli-id") ?? res.headers.get("x-linkedin-id") ?? "";
@@ -387,7 +412,8 @@ async function publishYouTube(conn: Conn, job: JobRow, media: Media[]): Promise<
   const { bytes, mime } = await fetchBytes(video);
   const text = fullText(job);
   const title = (job.title?.trim() || text.split("\n")[0] || "New video").replace(/[<>]/g, "").slice(0, 100);
-  const tags = (job.hashtags ?? "").split(/\s+/).map((t) => t.replace(/^#/, "")).filter(Boolean).slice(0, 15);
+  const tagSource = `${job.hashtags ?? ""} ${(text.match(/#[\p{L}\p{M}\p{N}_]+/gu) ?? []).join(" ")}`;
+  const tags = [...new Set(tagSource.split(/\s+/).map((t) => t.replace(/^#/, "")).filter(Boolean))].slice(0, 15);
   const init = await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status", {
     method: "POST",
     headers: {

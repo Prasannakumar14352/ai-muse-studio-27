@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { PublishButton } from "@/components/publish-actions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -61,6 +62,8 @@ type CarouselRow = {
   slide_diagnostics: SlideDiagMap;
   saved_ratio: LayoutSettings["ratio"] | null;
   saved_slide_count: number | null;
+  caption: string;
+  hashtags: string;
 };
 
 const RATIOS: LayoutSettings["ratio"][] = ["1:1", "4:5", "9:16", "16:9"];
@@ -153,6 +156,8 @@ function CarouselsPage() {
           slide_diagnostics: (rd?.slide_diagnostics ?? {}) as SlideDiagMap,
           saved_ratio: (out?.aspect_ratio ?? null) as LayoutSettings["ratio"] | null,
           saved_slide_count: out?.slide_count ?? null,
+          caption: out?.captions ?? "",
+          hashtags: (out?.hashtags ?? []).map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" "),
         });
       }
       return rows;
@@ -813,6 +818,18 @@ function CarouselsPage() {
                         {exportingId === row.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Film className="w-3 h-3" />}
                         Export as Reel
                       </button>
+                      <PublishButton
+                        className="rounded-lg gradient-primary text-white px-3 py-1.5 text-xs font-medium flex items-center gap-1.5"
+                        content={{
+                          projectId: row.id,
+                          title: row.title,
+                          caption: row.caption,
+                          hashtags: row.hashtags,
+                          defaultPlatform: row.platform?.toLowerCase().includes("linkedin") ? "linkedin" : "instagram",
+                          mediaHint: { images: slides.filter(Boolean).length },
+                          loadMedia: async () => (await resolveSlideDataURLs(row)).map((url, i) => ({ url, kind: "image" as const, name: `slide-${i + 1}.png` })),
+                        }}
+                      />
                       {missingCount > 0 && (
                         <button
                           onClick={() => regenerateFailed(row)}

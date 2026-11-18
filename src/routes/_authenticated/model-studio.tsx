@@ -1,6 +1,7 @@
 // Model Studio — run top third-party AI models (Seedance video, FLUX images,
 // ElevenLabs multilingual voice) from one place, paid for with credits.
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
+import { PublishButton } from "@/components/publish-actions";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -373,14 +374,27 @@ function GenerationCard({ g }: { g: ModelGeneration }) {
             {model?.label ?? g.model_id} · {g.credits} credits
           </span>
           {g.status === "completed" && g.output_url && (
-            <a
-              href={g.output_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-primary hover:underline"
-            >
-              <Download className="h-3.5 w-3.5" /> Download
-            </a>
+            <span className="inline-flex items-center gap-3">
+              {(g.kind === "video" || g.kind === "image") && (
+                <PublishButton
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                  content={{
+                    title: g.prompt.slice(0, 80) || (model?.label ?? "AI generation"),
+                    caption: "",
+                    defaultPlatform: g.kind === "video" ? "youtube" : "instagram",
+                    media: [{ url: g.output_url, kind: g.kind, name: g.kind === "video" ? "video.mp4" : "image.jpg" }],
+                  }}
+                />
+              )}
+              <a
+                href={g.output_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <Download className="h-3.5 w-3.5" /> Download
+              </a>
+            </span>
           )}
         </div>
         <div className="text-sm line-clamp-2">{g.prompt}</div>
