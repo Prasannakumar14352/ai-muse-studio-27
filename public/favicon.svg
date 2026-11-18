@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF8A1F"/>
+      <stop offset="0.55" stop-color="#F8573A"/>
+      <stop offset="1" stop-color="#E9306E"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.22"/>
+      <stop offset="0.5" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#g)"/>
+  <rect width="512" height="512" rx="116" fill="url(#shine)"/>
+  <!-- C-shaped flow arc -->
+  <path d="M356 150 A150 150 0 1 0 356 362" fill="none" stroke="#fff" stroke-width="58" stroke-linecap="round"/>
+  <!-- play triangle -->
+  <path d="M226 196 L320 256 L226 316 Z" fill="#fff" stroke="#fff" stroke-width="22" stroke-linejoin="round"/>
+  <!-- AI sparkle -->
+  <path d="M398 92 Q404 122 430 128 Q404 134 398 164 Q392 134 366 128 Q392 122 398 92 Z" fill="#fff"/>
+</svg>
