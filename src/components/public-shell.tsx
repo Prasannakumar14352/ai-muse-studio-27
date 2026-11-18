@@ -63,7 +63,8 @@ export function PublicShell({ children }: { children: ReactNode }) {
             <div className="font-semibold mb-3 text-xs uppercase tracking-wider text-muted-foreground">Company</div>
             <ul className="space-y-2 text-muted-foreground">
               <li><Link to="/contact" className="hover:text-foreground">Contact</Link></li>
-              <li><Link to="/auth" className="hover:text-foreground">Sign in</Link></li>
+              <li><Link to="/privacy" className="hover:text-foreground">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="hover:text-foreground">Terms of Service</Link></li>
             </ul>
           </div>
           <div>
