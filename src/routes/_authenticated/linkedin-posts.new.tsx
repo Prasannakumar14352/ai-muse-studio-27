@@ -33,6 +33,13 @@ import {
   exportPdf,
 } from "@/lib/linkedin-exports";
 import { promptDialog } from "@/components/prompt-dialog";
+import { fetchGeneratedImage } from "@/lib/image-stream";
+import { LINKEDIN_SIZES, type LinkedinImageSize, type LinkedinImageState } from "@/components/linkedin-image-studio";
+import { CREDIT_COSTS } from "@/lib/credit-costs";
+import { ImagePlus, Trash2, Download, Loader2 } from "lucide-react";
+
+/** Credits for one HD image (what the image studio charges). */
+const IMAGE_CREDITS = CREDIT_COSTS.find((c) => c.id === "image_hd")?.credits ?? 6;
 
 export const Route = createFileRoute("/_authenticated/linkedin-posts/new")({
   component: NewLinkedinPostPage,
@@ -94,6 +101,11 @@ function NewLinkedinPostPage() {
   const [variationCount, setVariationCount] = useState(3);
   const [hashtagCount, setHashtagCount] = useState(6);
   const [includeImage, setIncludeImage] = useState(false);
+  const [imageSize, setImageSize] = useState<LinkedinImageSize["key"]>("square_1080");
+  const [postImage, setPostImage] = useState<string | null>(null);
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
   const [includeCarousel, setIncludeCarousel] = useState(false);
   const [includeHashtags, setIncludeHashtags] = useState(true);
   const [inputSource, setInputSource] = useState<(typeof INPUT_SOURCES)[number]["id"]>("topic");
@@ -172,6 +184,8 @@ function NewLinkedinPostPage() {
       setContent(res.content);
       setActiveVariationIdx(0);
       setStep(2);
+      // "Add an AI image" is on: render it once the text is ready (kept on "Regenerate all").
+      if (includeImage && !postImage) void makeImage(res.content.image_prompt || topic);
       if (res.mode === "demo") {
         toast.message("Showing draft content", { description: res.safeError ?? "AI is warming up — you can regenerate anytime." });
       } else {
@@ -181,6 +195,37 @@ function NewLinkedinPostPage() {
       toast.error("Couldn't generate — try again", { description: e instanceof Error ? e.message : undefined });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function makeImage(promptText: string) {
+    const subject = promptText.trim() || topic.trim();
+    if (!subject) return toast.error("Describe the image first");
+    const size = LINKEDIN_SIZES.find((x) => x.key === imageSize) ?? LINKEDIN_SIZES[1];
+    setImagePrompt(subject);
+    setImageBusy(true);
+    setImagePreview(null);
+    try {
+      const res = await fetchGeneratedImage({
+        prompt: [
+          `Editorial image for a LinkedIn post. Aspect ${size.ratio}.`,
+          `Subject: ${subject}.`,
+          "Professional, modern composition, natural lighting, high detail.",
+          "Absolutely NO text, NO letters, NO logos, NO watermarks.",
+        ].join(" "),
+        ratio: size.ratio,
+        quality: "high",
+        onPartial: (u) => setImagePreview(u),
+      });
+      if (res.error || !res.image) throw new Error(res.error ?? "No image");
+      setPostImage(res.image);
+      setIncludeImage(true);
+      toast.success("Image added to the post");
+    } catch (e) {
+      toast.error("Couldn't create the image", { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setImageBusy(false);
+      setImagePreview(null);
     }
   }
 
@@ -304,6 +349,20 @@ function NewLinkedinPostPage() {
             brand_voice_desc: voiceDesc,
             hashtag_count: hashtagCount,
             variation_count: variationCount,
+            ...(postImage
+              ? {
+                  linkedin_image: {
+                    size: imageSize,
+                    prompt: imagePrompt || content.image_prompt || topic,
+                    headline: "",
+                    subhead: "",
+                    brand: "",
+                    theme: "dark",
+                    overlayPos: "bottom",
+                    image: postImage,
+                  } satisfies LinkedinImageState,
+                }
+              : {}),
           },
         })
         .select("id")
@@ -500,10 +559,26 @@ function NewLinkedinPostPage() {
 
           <div className="flex flex-wrap gap-4 text-sm">
             <Toggle label="Include hashtags" value={includeHashtags} onChange={setIncludeHashtags} />
-            <Toggle label="Plan a LinkedIn image" value={includeImage} onChange={setIncludeImage} />
+            <Toggle label="Add an AI image to the post" value={includeImage} onChange={setIncludeImage} />
             <Toggle label="Plan a document carousel" value={includeCarousel} onChange={setIncludeCarousel} />
             <Toggle label="Use active strategy context" value={useStrategy} onChange={setUseStrategy} />
           </div>
+          {includeImage && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Image size:</span>
+              {LINKEDIN_SIZES.map((sz) => (
+                <button
+                  key={sz.key}
+                  type="button"
+                  onClick={() => setImageSize(sz.key)}
+                  className={`px-3 py-1.5 rounded-full border ${imageSize === sz.key ? "gradient-primary text-white border-transparent" : "glass border-border"}`}
+                >
+                  {sz.label}
+                </button>
+              ))}
+              <span className="text-muted-foreground">· {IMAGE_CREDITS} credits, created right after the text</span>
+            </div>
+          )}
           <p className="text-[11px] text-muted-foreground">
             Strategy context is <b>off by default</b> so posts about unrelated topics (kids education, personal projects, etc.) aren&apos;t contaminated with your business project context.
           </p>
@@ -656,9 +731,54 @@ function NewLinkedinPostPage() {
                 </div>
               </Section>
 
-              {/* Image + carousel briefs */}
-              {(includeImage || content.image_prompt || (content.image_prompts?.length ?? 0) > 0) && (
-                <Section title="LinkedIn image brief">
+              {/* Post image */}
+              <Section title="Post image">
+                {postImage || imagePreview ? (
+                  <div className="space-y-3">
+                    <div className="relative inline-block">
+                      <img src={postImage ?? imagePreview ?? ""} alt={content.accessibility_alt ?? ""} className="rounded-lg border border-border/40 max-h-80 w-auto" />
+                      {imageBusy && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg text-xs text-white gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" /> Creating image…
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => makeImage(imagePrompt || content.image_prompt || topic)} disabled={imageBusy}
+                        className="px-3 py-1.5 text-xs rounded-lg border border-border/60 hover:bg-white/5 inline-flex items-center gap-1 disabled:opacity-50">
+                        <RefreshCw className={`w-3.5 h-3.5 ${imageBusy ? "animate-spin" : ""}`} /> Regenerate ({IMAGE_CREDITS} credits)
+                      </button>
+                      {postImage && (
+                        <a href={postImage} download="linkedin-post-image.jpg"
+                          className="px-3 py-1.5 text-xs rounded-lg border border-border/60 hover:bg-white/5 inline-flex items-center gap-1">
+                          <Download className="w-3.5 h-3.5" /> Download
+                        </a>
+                      )}
+                      {postImage && (
+                        <button onClick={() => { setPostImage(null); setIncludeImage(false); }} disabled={imageBusy}
+                          className="px-3 py-1.5 text-xs rounded-lg border border-border/60 hover:bg-white/5 inline-flex items-center gap-1 disabled:opacity-50">
+                          <Trash2 className="w-3.5 h-3.5" /> Remove
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">This image is saved with the post and attached when you publish.</p>
+                  </div>
+                ) : imageBusy ? (
+                  <div className="text-sm text-muted-foreground inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Creating image…</div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">No image yet. Add one made from this post&apos;s image idea.</p>
+                    <button onClick={() => makeImage(content.image_prompt || topic)}
+                      className="px-3 py-1.5 text-xs rounded-lg gradient-primary text-white inline-flex items-center gap-1">
+                      <ImagePlus className="w-3.5 h-3.5" /> Add image ({IMAGE_CREDITS} credits)
+                    </button>
+                  </div>
+                )}
+              </Section>
+
+              {/* Image ideas */}
+              {(content.image_prompt || (content.image_prompts?.length ?? 0) > 0) && (
+                <Section title="Image ideas">
                   <p className="text-sm text-muted-foreground">{content.image_concept}</p>
                   <p className="text-xs text-muted-foreground/80 mt-2"><span className="font-medium text-foreground">Prompt:</span> {content.image_prompt}</p>
                   <p className="text-xs text-muted-foreground/80 mt-1"><span className="font-medium text-foreground">Alt:</span> {content.accessibility_alt}</p>
@@ -673,7 +793,9 @@ function NewLinkedinPostPage() {
                       ))}
                     </div>
                   )}
-                  <p className="text-[11px] text-muted-foreground mt-3">Save the post, then open the <span className="text-foreground">Image</span> tab to render the final 1200×627 / 1080×1080 / 1080×1350 asset.</p>
+                  {(content.image_prompts?.length ?? 0) > 0 && (
+                    <p className="text-[11px] text-muted-foreground mt-3">Prefer another idea? Copy it, then use it to regenerate the image.</p>
+                  )}
                 </Section>
               )}
 
@@ -715,7 +837,7 @@ function NewLinkedinPostPage() {
 
             {/* RIGHT — live preview + score */}
             <div className="space-y-4">
-              <LivePreview body={activeBody()} hashtags={content.hashtags} />
+              <LivePreview body={activeBody()} hashtags={content.hashtags} image={postImage ?? imagePreview} />
               <ScorePanel scores={content.scores} improvements={content.improvements} />
               <Section title="Engagement strategy">
                 <p className="text-sm whitespace-pre-wrap">{content.engagement_strategy}</p>
@@ -806,7 +928,7 @@ function MetaRow({ body }: { body: string }) {
   );
 }
 
-function LivePreview({ body, hashtags }: { body: string; hashtags: string[] }) {
+function LivePreview({ body, hashtags, image }: { body: string; hashtags: string[]; image?: string | null }) {
   const [expanded, setExpanded] = useState(true);
   const trimmed = expanded || body.length <= 400 ? body : body.slice(0, 400) + "…";
   return (
@@ -824,6 +946,7 @@ function LivePreview({ body, hashtags }: { body: string; hashtags: string[] }) {
         {hashtags.length > 0 && (
           <div className="mt-2 text-sm text-[#0A66C2]">{hashtags.join(" ")}</div>
         )}
+        {image && <img src={image} alt="" className="mt-3 rounded-lg border border-border/40 w-full" />}
         {body.length > 400 && (
           <button onClick={() => setExpanded((v) => !v)} className="mt-2 text-xs text-muted-foreground hover:text-foreground">
             {expanded ? "Show less" : "…see more"}

@@ -289,7 +289,12 @@ function LinkedinPostViewPage() {
               </div>
               <p className="text-sm whitespace-pre-wrap leading-relaxed">{meta.body}</p>
               {meta.linkedin_image?.image && (
-                <img src={meta.linkedin_image.image} alt={meta.accessibility_alt ?? ""} className="rounded-lg border border-border/40 max-h-96 w-auto" />
+                <div className="space-y-2">
+                  <img src={meta.linkedin_image.image} alt={meta.accessibility_alt ?? ""} className="rounded-lg border border-border/40 max-h-96 w-auto" />
+                  <a href={meta.linkedin_image.image} download="linkedin-post-image.jpg" className="inline-flex text-xs text-muted-foreground hover:text-foreground underline">
+                    Download image
+                  </a>
+                </div>
               )}
               {meta.carousel?.slides && meta.carousel.slides.length > 0 && (
                 <div className="text-xs text-muted-foreground">📎 Document carousel · {meta.carousel.slides.length} slides ready to export</div>
