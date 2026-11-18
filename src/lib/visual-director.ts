@@ -208,6 +208,15 @@ const SHOT_ROTATION: ShotType[] = [
   "tracking", "macro", "interior", "exterior",
 ];
 
+/**
+ * Shot types that show the place, objects or details rather than the
+ * protagonist. They keep a video from becoming 20 face close-ups in a row,
+ * and they don't need the character reference image (cheaper to render).
+ */
+export const CHARACTER_FREE_SHOTS: ReadonlySet<ShotType> = new Set<ShotType>([
+  "wide_establishing", "drone", "birds_eye", "macro", "exterior",
+]);
+
 const CAMERA_MOVE_ROTATION: CameraMove[] = [
   "push_in", "pan_right", "static", "tilt_up", "pull_out", "pan_left",
   "handheld", "dolly", "tilt_down", "crane",
@@ -321,6 +330,8 @@ export type DirectorOutput = {
   prompt: string;              // final, optimizer-ready cinematic prompt
   negativePrompt: string;      // comma-joined negatives (also folded into `prompt`)
   shotType: ShotType;
+  /** False for b-roll shots that show no person (see CHARACTER_FREE_SHOTS). */
+  hasCharacter: boolean;
   cameraMove: CameraMove;
   preset: StylePreset;
   meta: {
@@ -374,8 +385,30 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
   const beat = input.beatText.trim().replace(/\s+/g, " ");
   void input.continuity.subjectAnchor;
 
+  // B-roll shots show the place / objects, not the protagonist.
+  const hasCharacter = !CHARACTER_FREE_SHOTS.has(shotType);
+
   const compose = (retry: boolean): string => {
     const parts: string[] = [];
+    // What the frame IS comes first: image models weight the start of the
+    // prompt most, and the length cap trims from the end. Putting the long
+    // character sheet first used to turn every shot into a face close-up.
+    parts.push(
+      `Shot: ${SHOT_TYPE_PHRASES[shotType]} with ${CAMERA_MOVE_PHRASES[cameraMove]}, ` +
+      `composed on the rule of thirds with layered foreground, midground, and background`,
+    );
+    parts.push(
+      hasCharacter
+        ? `Subject: the protagonist described below, visualizing "${beat}" — show the action and setting, not just a portrait`
+        : `Subject: visualize "${beat}" through the place, objects and details — no close-up of any person's face`,
+    );
+    parts.push(`Environment: ${environment}`);
+    if (hasCharacter) {
+      parts.push(
+        `LOCKED CHARACTER SHEET (must match exactly in every image): ` +
+        `${input.continuity.characterSheet}`,
+      );
+    }
     if (input.brief) {
       parts.push(
         `CREATIVE DIRECTOR (obey strictly): intent=${input.brief.intent}; ` +
@@ -384,42 +417,28 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
         `palette=${input.brief.paletteHint}.`,
       );
     }
-    parts.push(
-      `LOCKED CHARACTER SHEET (must match exactly in every image): ` +
-      `${input.continuity.characterSheet}`,
-    );
-    if (input.masterReferenceUrl) {
-      parts.push(
-        `Master Character Reference Image: ${input.masterReferenceUrl} — ` +
-        `treat this portrait as the identity anchor. Match the exact face, ` +
-        `eyes, hair, wardrobe, and accessories from this reference.`,
-      );
-    }
-    // Shot rationale — tell the model WHY this framing.
-    parts.push(
-      `Shot: ${SHOT_TYPE_PHRASES[shotType]} with ${CAMERA_MOVE_PHRASES[cameraMove]}, ` +
-      `composed on the rule of thirds with layered foreground, midground, and background`,
-    );
-    parts.push(`Subject: the SAME locked character above, visualizing "${beat}"`);
-    parts.push(`Environment: ${environment}`);
     parts.push(`Environmental storytelling detail: ${storyDetail}`);
     parts.push(`Time of day: ${mood.timeOfDay}. Atmosphere: ${mood.weather}. Energy: ${mood.energy}`);
-    parts.push(`Camera: ${cameraKit.camera}, ${cameraKit.lens} at ${cameraKit.aperture}, shallow depth of field, sharp focus on subject eyes`);
+    parts.push(`Camera: ${cameraKit.camera}, ${cameraKit.lens} at ${cameraKit.aperture}, shallow depth of field, sharp focus on ${hasCharacter ? "subject eyes" : "the key detail"}`);
     parts.push(`Lighting: ${lighting}`);
     parts.push(`Color palette and grade: ${palette}`);
     parts.push(`Look: ${preset.look} — Netflix documentary / Apple commercial / National Geographic quality`);
     if (preset.extras.length) parts.push(preset.extras.join(", "));
-    parts.push(
-      `Continuity RULES: ${input.continuity.wardrobeAnchor}; ` +
-      `${input.continuity.locationAnchor}. ` +
-      `The protagonist's face, hairstyle, and outfit MUST be identical to previous shots — ` +
-      `do not redesign the character.`,
-    );
+    if (hasCharacter) {
+      parts.push(
+        `Continuity RULES: ${input.continuity.wardrobeAnchor}; ` +
+        `${input.continuity.locationAnchor}. ` +
+        `The protagonist's face, hairstyle, and outfit MUST be identical to previous shots — ` +
+        `do not redesign the character.`,
+      );
+    } else {
+      parts.push(`Continuity RULES: ${input.continuity.locationAnchor}`);
+    }
     parts.push(`Emotion driving the frame: ${emotion}${input.scenePurpose ? ` — ${input.scenePurpose}` : ""}`);
     if (input.chapterLabel) parts.push(`Chapter: ${input.chapterLabel}`);
     if (input.sceneNumber != null) parts.push(`Scene ${input.sceneNumber}`);
     parts.push(
-      "photorealistic, ultra realistic skin texture, HDR, 8K, premium color grading, " +
+      "photorealistic, ultra realistic texture, HDR, 8K, premium color grading, " +
       "subtle film grain, ARRI / Sony / RED cinema quality, ultra detailed, sharp focus, " +
       "professional cinematography — never stock-photo, never generic",
     );
@@ -430,7 +449,10 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
       );
     }
     const briefAvoid = input.brief?.avoid?.length ? `, ${input.brief.avoid.join(", ")}` : "";
-    parts.push(`Avoid: ${negativePrompt}, generic stock photography, single-word locations, different person, changed face, new character, wardrobe change, hairstyle change${briefAvoid}`);
+    const identityAvoid = hasCharacter
+      ? ", different person, changed face, new character, wardrobe change, hairstyle change"
+      : ", portrait, face close-up";
+    parts.push(`Avoid: ${negativePrompt}, generic stock photography, single-word locations${identityAvoid}${briefAvoid}`);
     return optimizePrompt(parts.join(". "), input.styleId);
   };
 
@@ -443,6 +465,7 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
     prompt,
     negativePrompt,
     shotType,
+    hasCharacter,
     cameraMove,
     preset,
     meta: {
@@ -476,12 +499,14 @@ export function optimizePrompt(raw: string, styleId: VDStyle): string {
       return true;
     })
     .join(". ");
+  // Hard cap so the image API doesn't reject overly long prompts. The most
+  // important parts (shot, subject, environment, character) come first.
+  const MAX = 2000;
+  if (s.length > MAX) s = s.slice(0, MAX - 1).replace(/,[^,]*$/, "") + "…";
+  // Added after the cap so it can never be trimmed away.
   if (!/no text|no watermark/i.test(s)) {
     s += ". No text, no watermark, no captions, no logos in the image.";
   }
-  // Hard cap so the image API doesn't reject overly long prompts.
-  const MAX = 1400;
-  if (s.length > MAX) s = s.slice(0, MAX - 1).replace(/,[^,]*$/, "") + "…";
   // Anchor illustrated styles so photorealism cues don't override them.
   if (STYLE_PRESETS[styleId].isIllustrated && !/illustration|animation|painting/i.test(s)) {
     s = `${STYLE_PRESETS[styleId].label} illustration. ${s}`;

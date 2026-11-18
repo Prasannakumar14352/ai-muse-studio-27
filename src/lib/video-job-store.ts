@@ -39,6 +39,8 @@ export type ShotRecord = {
   activity?: string | null;
   /** Rich AI-video prompt for dynamic beats (null for static). */
   videoPrompt?: string | null;
+  /** False for b-roll shots with no person (no character reference needed). Missing = true. */
+  hasCharacter?: boolean;
   status: ShotStatus;
   kind: ShotKind | null;
   blobKey: string | null;
@@ -62,6 +64,8 @@ export type JobRecord = {
   updatedAt: string;
   error: string | null;
   shots: ShotRecord[];
+  /** Blob key of the main character's reference portrait (same face in every scene). */
+  characterRefKey?: string | null;
 };
 
 let cachedUserId: string | null = null;
