@@ -17,4 +17,4 @@ Disallow: /settings
 Disallow: /connections
 Disallow: /admin
 
-Sitemap: https://ai-muse-studio-27.lovable.app/sitemap.xml
+Sitemap: https://creatorflowai.prodxstore.com/sitemap.xml

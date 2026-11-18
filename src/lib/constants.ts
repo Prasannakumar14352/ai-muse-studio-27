@@ -131,7 +131,7 @@ export const MUSIC = [
 export const GENERATION_COST = 1; // credits per project generation
 
 export const BRAND = "CreatorFlow AI";
-export const SUPPORT_EMAIL = "support@creatorflow.ai";
+export const SUPPORT_EMAIL = "prodxstoresupport@gmail.com";
 
 
 export type CreditPack = { id: string; label: string; credits: number; priceUSD: number; bonus?: string };

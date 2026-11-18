@@ -1,4 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { SUPPORT_EMAIL } from "@/lib/constants";
 import {
   Wand2, Video, Image as ImageIcon, Type, Mic, Music2,
   Zap, Layers, Rocket, Mail, ChevronRight, Star,
@@ -182,8 +183,8 @@ function Landing() {
             <span>© 2026 CreatorFlow AI · Digital Products Marketplace</span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-5">
-            <a href="mailto:support@creatorflow.ai" className="hover:text-foreground inline-flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5" /> support@creatorflow.ai
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-foreground inline-flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5" /> {SUPPORT_EMAIL}
             </a>
             <Link to="/contact" className="hover:text-foreground">Contact Us</Link>
             <Link to="/privacy" className="hover:text-foreground">Privacy</Link>

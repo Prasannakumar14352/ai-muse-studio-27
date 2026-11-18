@@ -967,7 +967,7 @@ function ReviewStep({
             <Button onClick={onRerender} variant="ghost" className="w-full gap-2">
               <RotateCcw className="h-4 w-4" /> Re-render with same plan
             </Button>
-            <Link to="/projects" className="block">
+            <Link to="/videos" className="block">
               <Button variant="outline" className="w-full gap-2">
                 <Play className="h-4 w-4" /> View in Projects
               </Button>
