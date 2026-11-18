@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { convertRenderToMp4 } from "@/lib/transcode-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -803,11 +804,21 @@ function VideoPreview({
       await persistDiagnostics({ ...next, uploadError: upErr.message, blobSize: blob.size, blobType: blob.type, mimeType });
       throw upErr;
     }
-    const { data: signed } = await supabase.storage.from("renders").createSignedUrl(path, 60 * 60 * 24 * 7);
+    // Convert to an upload-ready 1080p H.264 MP4 on the server (the browser
+    // records WebM at 720p with no duration header). Falls back to the
+    // original file if conversion isn't available.
+    setUgcStage({ kind: "upload" });
+    const mp4 = await convertRenderToMp4(path, isVertical ? "vertical" : "landscape", { deleteSource: true });
+    if (mp4) { mimeType = "video/mp4"; extension = "mp4"; }
+    const finalPath = mp4?.path ?? path;
+    const { data: signed } = mp4?.url
+      ? { data: { signedUrl: mp4.url } }
+      : await supabase.storage.from("renders").createSignedUrl(finalPath, 60 * 60 * 24 * 7);
     const url = signed?.signedUrl ?? null;
     if (url) {
       await saveOutput(projectId, { video_url: url });
     }
+    if (!mp4) toast.warning("Saved as WebM — MP4 conversion isn't available right now.");
 
     setVideoUrl(url);
     const base = diagnostics ?? emptyDiag();
