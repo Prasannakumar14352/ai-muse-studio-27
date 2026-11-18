@@ -47,6 +47,7 @@ import { Route as AuthenticatedThumbnailsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedVideosRouteImport } from './routes/_authenticated/videos'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as ApiGenerateVideoClipRouteImport } from './routes/api/generate-video-clip'
+import { Route as ApiTranscodeVideoRouteImport } from './routes/api/transcode-video'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedAdminCurrencyRouteImport } from './routes/_authenticated/admin.currency'
@@ -263,6 +264,11 @@ const ApiGenerateVideoClipRoute = ApiGenerateVideoClipRouteImport.update({
   path: '/api/generate-video-clip',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTranscodeVideoRoute = ApiTranscodeVideoRouteImport.update({
+  id: '/api/transcode-video',
+  path: '/api/transcode-video',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTtsRoute = ApiTtsRouteImport.update({
   id: '/api/tts',
   path: '/api/tts',
@@ -425,6 +431,7 @@ export interface FileRoutesByFullPath {
   '/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
+  '/api/transcode-video': typeof ApiTranscodeVideoRoute
   '/api/tts': typeof ApiTtsRoute
   '/admin/currency': typeof AuthenticatedAdminCurrencyRoute
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
@@ -483,6 +490,7 @@ export interface FileRoutesByTo {
   '/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
+  '/api/transcode-video': typeof ApiTranscodeVideoRoute
   '/api/tts': typeof ApiTtsRoute
   '/admin/currency': typeof AuthenticatedAdminCurrencyRoute
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
@@ -545,6 +553,7 @@ export interface FileRoutesById {
   '/_authenticated/videos': typeof AuthenticatedVideosRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
+  '/api/transcode-video': typeof ApiTranscodeVideoRoute
   '/api/tts': typeof ApiTtsRoute
   '/_authenticated/admin/currency': typeof AuthenticatedAdminCurrencyRoute
   '/_authenticated/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
@@ -607,6 +616,7 @@ export interface FileRouteTypes {
     | '/videos'
     | '/api/generate-image'
     | '/api/generate-video-clip'
+    | '/api/transcode-video'
     | '/api/tts'
     | '/admin/currency'
     | '/admin/integrations'
@@ -665,6 +675,7 @@ export interface FileRouteTypes {
     | '/videos'
     | '/api/generate-image'
     | '/api/generate-video-clip'
+    | '/api/transcode-video'
     | '/api/tts'
     | '/admin/currency'
     | '/admin/integrations'
@@ -726,6 +737,7 @@ export interface FileRouteTypes {
     | '/_authenticated/videos'
     | '/api/generate-image'
     | '/api/generate-video-clip'
+    | '/api/transcode-video'
     | '/api/tts'
     | '/_authenticated/admin/currency'
     | '/_authenticated/admin/integrations'
@@ -762,6 +774,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   ApiGenerateVideoClipRoute: typeof ApiGenerateVideoClipRoute
+  ApiTranscodeVideoRoute: typeof ApiTranscodeVideoRoute
   ApiTtsRoute: typeof ApiTtsRoute
   ApiPublicHooksPublishScheduledRoute: typeof ApiPublicHooksPublishScheduledRoute
   ApiPublicWebhooksRazorpayRoute: typeof ApiPublicWebhooksRazorpayRoute
@@ -1034,6 +1047,13 @@ declare module '@tanstack/react-router' {
       path: '/api/generate-video-clip'
       fullPath: '/api/generate-video-clip'
       preLoaderRoute: typeof ApiGenerateVideoClipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/transcode-video': {
+      id: '/api/transcode-video'
+      path: '/api/transcode-video'
+      fullPath: '/api/transcode-video'
+      preLoaderRoute: typeof ApiTranscodeVideoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tts': {
@@ -1329,6 +1349,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   ApiGenerateVideoClipRoute: ApiGenerateVideoClipRoute,
+  ApiTranscodeVideoRoute: ApiTranscodeVideoRoute,
   ApiTtsRoute: ApiTtsRoute,
   ApiPublicHooksPublishScheduledRoute: ApiPublicHooksPublishScheduledRoute,
   ApiPublicWebhooksRazorpayRoute: ApiPublicWebhooksRazorpayRoute,

@@ -38,6 +38,7 @@ import { authFetch } from "@/lib/auth-fetch";
 // ("Failed to fetch dynamically imported module"), which killed finished renders.
 import { fetchGeneratedImage } from "@/lib/image-stream";
 import { validateRenderedVideo } from "./video-validate";
+import { convertBlobToMp4 } from "@/lib/transcode-client";
 import { AI_NOT_CONFIGURED } from "@/lib/ai-provider";
 
 // ---------- Beat expansion (documentary-style visual density) ----------
@@ -2220,6 +2221,24 @@ export async function runRenderPhase(
     onEvent({ type: "phase", phase: "failed" });
     onEvent({ type: "error", message: msg });
     throw new Error(msg);
+  }
+
+  // Convert the browser recording (720p WebM, no duration header) into a
+  // 1080p H.264 MP4 on the server — what Instagram / Shorts expect. Keeps the
+  // original if conversion isn't available.
+  if (render.blob && render.blob.size > 0) {
+    const shape = brief.aspectRatio === "16:9" ? "landscape" : brief.aspectRatio === "1:1" ? "square" : "vertical";
+    const mp4 = await convertBlobToMp4(render.blob, shape).catch(() => null);
+    if (mp4 && mp4.size > 0) {
+      try { URL.revokeObjectURL(render.video_url); } catch { /* ignore */ }
+      render.blob = mp4;
+      render.video_url = URL.createObjectURL(mp4);
+      render.mime = "video/mp4";
+      render.extension = "mp4";
+      render.size_bytes = mp4.size;
+    } else {
+      console.warn("[video-pipeline] MP4 conversion unavailable; keeping the browser recording");
+    }
   }
 
   const thumbnail = await ThumbnailAgent.run(brief);
