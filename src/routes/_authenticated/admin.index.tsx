@@ -1,4 +1,5 @@
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
+import { SUPPORT_EMAIL } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -276,7 +277,7 @@ const TEAM_PLAN_DETAILS = {
     "Any brand-kit / style-guide requirements we should preload?",
   ],
   salesFlow: [
-    "1. Lead lands via /contact → arrives at support@creatorflow.ai",
+    `1. Lead lands via /contact → arrives at ${SUPPORT_EMAIL}`,
     "2. Reply within 1 business day with a 15-min discovery call link",
     "3. On the call, run the qualifying questions above",
     "4. Send a custom quote based on seats × credit pool × support tier",
@@ -328,8 +329,8 @@ function TeamPlanSalesCard() {
               {d.salesFlow.map((i) => <li key={i}>{i}</li>)}
             </ol>
             <div className="mt-3 flex flex-wrap gap-2">
-              <a href="mailto:support@creatorflow.ai" className="rounded-lg bg-[color:var(--brand-orange)] text-black text-xs px-3 py-1.5 font-medium">
-                Email support@creatorflow.ai
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="rounded-lg bg-[color:var(--brand-orange)] text-black text-xs px-3 py-1.5 font-medium">
+                Email {SUPPORT_EMAIL}
               </a>
             </div>
           </SalesBlock>

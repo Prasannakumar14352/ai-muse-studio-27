@@ -313,7 +313,7 @@ function MockVideoStudio() {
             "Hook: 'Stop making thumbnails one at a time.'",
             "Scene 1: split-screen — chaotic Figma vs. CreatorFlow grid",
             "Scene 2: 4 concepts generated in 6 seconds",
-            "CTA: 'Try free — creatorflow.ai'",
+            "CTA: 'Try free — creatorflowai.prodxstore.com'",
           ].map((s, i) => (
             <div key={i} className="rounded-lg bg-white/5 px-3 py-2">{s}</div>
           ))}

@@ -266,12 +266,12 @@ export function PublishActions(props: PublishActionsProps) {
                 ) : (
                   <span className="text-amber-300">
                     <span className="capitalize">{platform}</span> isn't connected.{" "}
-                    {!isHiddenPath("/connections") && <Link to="/connections" className="underline">Connect it</Link>} to publish directly, or download and post manually.
+                    {!isHiddenPath("/connections") && <Link to="/connections" search={{ ok: undefined, err: undefined }} className="underline">Connect it</Link>} to publish directly, or download and post manually.
                   </span>
                 )}
               </div>
               {!isHiddenPath("/connections") && (
-                <Link to="/connections" className="text-xs text-[color:var(--neon-purple)] hover:underline inline-flex items-center gap-1">
+                <Link to="/connections" search={{ ok: undefined, err: undefined }} className="text-xs text-[color:var(--neon-purple)] hover:underline inline-flex items-center gap-1">
                   Manage connected accounts <ExternalLink className="w-3 h-3" />
                 </Link>
               )}
