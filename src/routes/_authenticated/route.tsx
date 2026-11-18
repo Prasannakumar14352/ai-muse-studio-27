@@ -1,6 +1,7 @@
 import { createFileRoute, Navigate, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
+import { SupportChatWidget } from "@/components/support-chat-widget";
 import { GlobalCreditGate } from "@/components/global-credit-gate";
 import { PlanGate, UpgradeDialogProvider } from "@/lib/use-plan-access";
 import { isHiddenPath } from "@/lib/hidden-features";
@@ -55,6 +56,7 @@ function AuthenticatedLayout() {
         </PlanGate>
         <GlobalCreditGate />
       </AppShell>
+      <SupportChatWidget />
     </UpgradeDialogProvider>
   );
 }

@@ -56,7 +56,12 @@ function displayName(u?: TgUser): string {
 async function accountContext(db: any, telegramUserId: number): Promise<{ userId: string | null; text: string }> {
   const { data: link } = await db.from("telegram_links").select("user_id").eq("telegram_user_id", telegramUserId).maybeSingle();
   if (!link?.user_id) return { userId: null, text: "Not linked — no account details available. If account details are needed, ask them to link with /link (code from Settings → Telegram) or email support." };
-  const uid = link.user_id as string;
+  return { userId: link.user_id as string, text: await accountContextForUser(db, link.user_id as string) };
+}
+
+/** A user's plan, credits and last week's activity as compact JSON for the AI. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function accountContextForUser(db: any, uid: string): Promise<string> {
   const since = new Date(Date.now() - 7 * 864e5).toISOString();
   const [{ data: profile }, { data: sub }, { data: ledger }, { data: pays }, { data: gens }] = await Promise.all([
     db.from("profiles").select("plan,user_credits,lifetime_credits,created_at").eq("id", uid).maybeSingle(),
@@ -65,10 +70,7 @@ async function accountContext(db: any, telegramUserId: number): Promise<{ userId
     db.from("payments").select("status,credits,amount_cents,currency,created_at,pack_id").eq("user_id", uid).gte("created_at", since).order("created_at", { ascending: false }).limit(5),
     db.from("model_generations").select("model_id,status,error,created_at").eq("user_id", uid).gte("created_at", since).order("created_at", { ascending: false }).limit(5),
   ]);
-  return {
-    userId: uid,
-    text: JSON.stringify({ profile, subscription: sub, recent_credit_activity: ledger, recent_payments: pays, recent_model_studio: gens }).slice(0, 6000),
-  };
+  return JSON.stringify({ profile, subscription: sub, recent_credit_activity: ledger, recent_payments: pays, recent_model_studio: gens }).slice(0, 6000);
 }
 
 export async function handleTelegramUpdate(update: TgUpdate): Promise<void> {
@@ -224,12 +226,22 @@ export async function handleTelegramUpdate(update: TgUpdate): Promise<void> {
 /** Admin approved (and maybe edited) a drafted reply: post it in the thread. */
 export async function sendApprovedReply(taskId: string, text: string): Promise<void> {
   const db = await admin();
+  const { data: task } = await db.from("agent_tasks").select("source,source_ref,kind").eq("id", taskId).single();
+  const ref = (task?.source_ref ?? {}) as { chat_id?: number; message_id?: number; user_id?: string };
+  if (task?.source === "in_app" && ref.user_id) {
+    const { postAdminReplyToChat } = await import("@/lib/agents/in-app-support.server");
+    await postAdminReplyToChat(ref.user_id, taskId, text);
+    const keepOpen = task.kind === "bug" || task.kind === "feature";
+    await db.from("agent_tasks").update({
+      status: keepOpen ? "todo" : "done", draft_reply: text, updated_at: new Date().toISOString(),
+      resolved_at: keepOpen ? null : new Date().toISOString(),
+    }).eq("id", taskId);
+    return;
+  }
+  if (!ref.chat_id) throw new Error("This task didn't come from Telegram");
   const s = await getAgentSettings(db);
   const token = await botToken(s);
   if (!token) throw new Error("Telegram bot isn't set up");
-  const { data: task } = await db.from("agent_tasks").select("source_ref,kind").eq("id", taskId).single();
-  const ref = (task?.source_ref ?? {}) as { chat_id?: number; message_id?: number };
-  if (!ref.chat_id) throw new Error("This task didn't come from Telegram");
   const id = await tgSend(token, ref.chat_id, text, ref.message_id);
   await db.from("agent_tasks").update({
     status: task?.kind === "bug" || task?.kind === "feature" ? "todo" : "done",
