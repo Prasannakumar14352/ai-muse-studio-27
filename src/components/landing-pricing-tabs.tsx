@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, queryOptions } from "@tanstack/react-query";
 import { Check, Star, Infinity as InfinityIcon } from "lucide-react";
+import { planUpdatesLine } from "@/lib/plan-updates";
 import { listPricingPlans, type PricingPlan, type BillingCycle } from "@/lib/pricing.functions";
 
 const plansQuery = queryOptions({
@@ -133,6 +134,12 @@ function LandingCard({ p, cycle }: { p: PricingPlan; cycle: BillingCycle }) {
             <span>{f}</span>
           </li>
         ))}
+        {!p.contactSales && (
+          <li className="flex items-start gap-2 text-sm">
+            <Check className="w-4 h-4 mt-0.5 shrink-0 text-[color:var(--neon-purple)]" />
+            <span>{planUpdatesLine({ planType: p.planType, isFree, cycle })}</span>
+          </li>
+        )}
       </ul>
       <Link
         to={p.contactSales ? "/contact" : "/pricing"}
