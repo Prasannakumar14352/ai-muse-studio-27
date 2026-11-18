@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { generateCarousel } from "@/lib/generators";
+import { CONTENT_LANGUAGES } from "@/lib/content-language";
 import { generateAiCarousel } from "@/lib/carousel-ai.functions";
 import { PLATFORMS, TONES, STYLES, NICHES, GENERATION_COST } from "@/lib/constants";
 import { getAccessInfo, canGenerate } from "@/lib/access";
@@ -41,6 +41,7 @@ function CreateCarouselPage() {
     style: "minimal",
     aspect_ratio: ((handoff?.aspectRatio === "1:1" || handoff?.aspectRatio === "4:5" || handoff?.aspectRatio === "9:16" || handoff?.aspectRatio === "16:9") ? handoff.aspectRatio : "4:5") as (typeof RATIOS)[number],
     slide_count: handoff?.slideCount ?? 7,
+    language: "auto",
   });
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
@@ -75,25 +76,28 @@ function CreateCarouselPage() {
 
       const styleLabel = STYLES.find((s) => s.id === form.style)?.label ?? form.style;
 
-      let aiCarousel: Awaited<ReturnType<typeof generateAiCarousel>> | null = null;
+      let aiCarousel: Awaited<ReturnType<typeof generateAiCarousel>>;
       try {
         aiCarousel = await generateAiCarousel({
           data: {
             topic: form.topic, tone: form.tone, platform: form.platform,
             styleLabel, slideCount: form.slide_count, aspectRatio: form.aspect_ratio,
+            language: form.language ?? "auto",
           },
         });
       } catch (e) {
-        console.warn("AI carousel generation failed, using template:", e);
-        toast.warning("AI generator unavailable — using template.");
+        // Never save template filler as a real carousel — offer a retry.
+        console.warn("[carousel] AI generation failed", e);
+        toast.error("The AI couldn't write this carousel. Nothing was saved and any credits used were refunded.", {
+          description: e instanceof Error ? e.message.slice(0, 160) : undefined,
+          duration: 12000,
+          action: { label: "Retry", onClick: () => void generate() },
+        });
+        qc.invalidateQueries({ queryKey: ["access"] });
+        return;
       }
 
-      const fallback = generateCarousel({
-        topic: form.topic, tone: form.tone, platform: form.platform, style: form.style,
-        slideCount: form.slide_count, aspectRatio: form.aspect_ratio,
-      });
-
-      const title = aiCarousel?.title ?? fallback.title;
+      const title = aiCarousel.title;
 
       const { data: project, error: pErr } = await supabase.from("projects").insert({
         user_id: access.userId,
@@ -110,43 +114,28 @@ function CreateCarouselPage() {
       }).select().single();
       if (pErr) throw pErr;
 
-      if (aiCarousel) {
-        const slides = aiCarousel.slides;
-        const script = slides.map((s) =>
-          `Slide ${s.n} — ${s.role} [${s.label}]\n${s.emoji ? s.emoji + " " : ""}${s.headline}\n\n${s.body}\n${(s.bullets ?? []).map((b) => `• ${b}`).join("\n")}\n\nKey takeaway: ${s.bottom_highlight}\nVisual: ${s.visual}`
-        ).join("\n\n---\n\n");
-        const captions = `${title}\n\n${slides[0]?.headline ?? ""}\n${slides[0]?.body ?? ""}\n\nSave this — share with someone who needs it.`;
-        await saveOutput(project.id, {
-          title,
-          hook: slides[0]?.headline ?? "",
-          script,
-          captions,
-          hashtags: fallback.hashtags,
-          scenes: [],
-          image_prompts: slides.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel })),
-          thumbnail_ideas: [],
-          carousel_slides: slides.map((s) => ({
-            n: s.n, role: s.role, headline: s.headline, body: s.body, visual: s.visual,
-            label: s.label, emoji: s.emoji, bullets: s.bullets, bottom_highlight: s.bottom_highlight,
-          })),
-          aspect_ratio: form.aspect_ratio,
-          slide_count: form.slide_count,
-        });
-      } else {
-        await saveOutput(project.id, {
-          title: fallback.title,
-          hook: "",
-          script: fallback.script,
-          captions: fallback.captions,
-          hashtags: fallback.hashtags,
-          scenes: [],
-          image_prompts: fallback.image_prompts,
-          thumbnail_ideas: [],
-          carousel_slides: fallback.slides,
-          aspect_ratio: form.aspect_ratio,
-          slide_count: form.slide_count,
-        });
-      }
+      const slides = aiCarousel.slides;
+      const script = slides.map((s) =>
+        `Slide ${s.n} — ${s.role} [${s.label}]\n${s.emoji ? s.emoji + " " : ""}${s.headline}\n\n${s.body}\n${(s.bullets ?? []).map((b) => `• ${b}`).join("\n")}\n\nKey takeaway: ${s.bottom_highlight}\nVisual: ${s.visual}`
+      ).join("\n\n---\n\n");
+      const captions = aiCarousel.caption?.trim()
+        || `${title}\n\n${slides[0]?.headline ?? ""}\n${slides[0]?.body ?? ""}`;
+      await saveOutput(project.id, {
+        title,
+        hook: slides[0]?.headline ?? "",
+        script,
+        captions,
+        hashtags: aiCarousel.hashtags ?? [],
+        scenes: [],
+        image_prompts: slides.map((s) => ({ n: s.n, prompt: s.image_prompt, style: styleLabel })),
+        thumbnail_ideas: [],
+        carousel_slides: slides.map((s) => ({
+          n: s.n, role: s.role, headline: s.headline, body: s.body, visual: s.visual,
+          label: s.label, emoji: s.emoji, bullets: s.bullets, bottom_highlight: s.bottom_highlight,
+        })),
+        aspect_ratio: form.aspect_ratio,
+        slide_count: form.slide_count,
+      });
 
       // Credit deduction is handled server-side inside generateAiCarousel
       // (see chargeMiddleware in src/lib/credits-guard.server.ts).
@@ -156,7 +145,7 @@ function CreateCarouselPage() {
       qc.invalidateQueries({ queryKey: ["stats"] });
       qc.invalidateQueries({ queryKey: ["carousels"] });
       toast.success(access.isAdmin ? "Carousel generated (admin — no credits)" : "Carousel generated!");
-      navigate({ to: "/carousels" });
+      navigate({ to: "/carousels", search: { autogen: project.id } });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Generation failed");
     } finally {
@@ -199,12 +188,29 @@ function CreateCarouselPage() {
           </Section>
 
           <Section title="2. What's the carousel about?">
-            <input value={form.topic} onChange={(e) => set("topic", e.target.value)}
+            <input value={form.topic} onChange={(e) => {
+                const topic = e.target.value;
+                set("topic", topic);
+                // "7 free AI tools" → cover + 7 slides + CTA.
+                const m = topic.match(/\b([1-8])\s+(?!%)[^\d\s]/);
+                if (m) set("slide_count", Math.min(10, Number(m[1]) + 2));
+              }}
               placeholder="e.g. 3 things nobody tells you about why every creator needs a personal AI stack"
               className="w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
             <input value={form.audience} onChange={(e) => set("audience", e.target.value)}
               placeholder="Target audience (optional) — e.g. solo creators, indie founders"
               className="mt-3 w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
+            <div className="mt-4">
+              <div className="text-xs text-muted-foreground mb-2">Language (slide text and caption)</div>
+              <div className="flex flex-wrap gap-2">
+                {CONTENT_LANGUAGES.map((l) => (
+                  <button key={l.id} type="button" onClick={() => set("language", l.id)}
+                    className={`px-3 py-1.5 rounded-full text-xs border transition ${
+                      form.language === l.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"
+                    }`}>{l.label}</button>
+                ))}
+              </div>
+            </div>
           </Section>
 
           <Section title="3. Platform">
@@ -267,8 +273,9 @@ function CreateCarouselPage() {
               <div>
                 <div className="text-xs text-muted-foreground mb-2">Slides ({form.slide_count})</div>
                 <input type="range" min={3} max={10} value={form.slide_count}
+                  aria-label="Number of slides"
                   onChange={(e) => set("slide_count", parseInt(e.target.value))}
-                  className="w-full max-w-md" />
+                  className="w-full max-w-md accent-[color:var(--brand-orange)]" />
                 <div className="mt-2 text-[11px] text-muted-foreground">{structure}</div>
               </div>
             </div>

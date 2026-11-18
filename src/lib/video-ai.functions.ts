@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { languageAndFidelityRules } from "@/lib/content-language";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { chargeMiddleware } from "@/lib/credits-guard.server";
 import { z } from "zod";
@@ -56,6 +57,8 @@ const Input = z.object({
    * structured YouTube documentary.
    */
   retentionBrief: z.string().optional().default(""),
+  /** Output language ("auto" = same as the topic). */
+  language: z.string().optional().default("auto"),
 });
 
 export const generateAiVideoScript = createServerFn({ method: "POST" })
@@ -98,6 +101,8 @@ TONE: ${data.tone}
 AUDIENCE: ${data.audience || "general creators"}
 VISUAL STYLE: ${data.styleLabel}
 FORMAT: ${data.contentType} (${ratio})
+
+${languageAndFidelityRules(data.language, data.topic)}
 
 DURATION IS A HARD REQUIREMENT.
 - Total video length: ${targetLen} (${lenSec}s).

@@ -58,6 +58,8 @@ export type LocalOutput = {
   image_prompts: Prompt[];
   thumbnail_ideas: string[];
   carousel_images?: (string | null)[] | null;
+  /** Blob-store keys of the reel's scene images (saved on this device). */
+  scene_images?: (string | null)[] | null;
   carousel_slides?: CarouselSlide[] | null;
   slide_overlays?: Record<number, SlideOverlaySet> | null;
   aspect_ratio?: string | null;
@@ -127,6 +129,7 @@ export async function saveOutput(projectId: string, patch: Partial<LocalOutput>)
     image_prompts: existing?.image_prompts ?? [],
     thumbnail_ideas: existing?.thumbnail_ideas ?? [],
     carousel_images: existing?.carousel_images ?? null,
+    scene_images: existing?.scene_images ?? null,
     carousel_slides: existing?.carousel_slides ?? null,
     slide_overlays: existing?.slide_overlays ?? null,
     aspect_ratio: existing?.aspect_ratio ?? null,

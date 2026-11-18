@@ -1,7 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { PublishButton } from "@/components/publish-actions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import JSZip from "jszip";
 import { jsPDF } from "jspdf";
@@ -30,6 +30,9 @@ export const Route = createFileRoute("/_authenticated/carousels")({
       { property: "og:description", content: "Generate multi-slide Instagram carousels from your project prompts." },
     ],
   }),
+  // ?autogen=<projectId> — start making slide images right after creation.
+  validateSearch: (s: Record<string, unknown>): { autogen?: string } =>
+    typeof s.autogen === "string" ? { autogen: s.autogen } : {},
   component: CarouselsPage,
 });
 
@@ -165,6 +168,20 @@ function CarouselsPage() {
   });
 
 
+
+  // Freshly created carousel: generate its slides automatically, once.
+  const { autogen } = Route.useSearch();
+  const navigate = useNavigate();
+  const autoStartedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!autogen || !data || generatingId || autoStartedRef.current === autogen) return;
+    const row = data.find((r) => r.id === autogen);
+    if (!row) return;
+    autoStartedRef.current = autogen;
+    void navigate({ to: "/carousels", search: {}, replace: true });
+    if (!(row.carousel_images ?? []).some(Boolean)) void generateSlides(row);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autogen, data]);
 
   function getLayout(row: CarouselRow): LayoutSettings {
     return layout[row.id] ?? {
