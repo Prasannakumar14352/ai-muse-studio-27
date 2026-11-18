@@ -123,6 +123,7 @@ const SECTIONS: readonly NavSection[] = [
       { to: "/admin/readiness", label: "Feature Readiness", icon: Crown },
       { to: "/admin/plan-access", label: "Plan Access", icon: Lock },
       { to: "/admin/payments", label: "Payment Settings", icon: CreditCard },
+      { to: "/admin/agents", label: "Agent HQ", icon: Bot },
     ],
   },
   {

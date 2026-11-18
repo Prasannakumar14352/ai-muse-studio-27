@@ -51,6 +51,7 @@ import { Route as ApiTranscodeVideoRouteImport } from './routes/api/transcode-vi
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiVoiceSampleRouteImport } from './routes/api/voice-sample'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedAdminAgentsRouteImport } from './routes/_authenticated/admin.agents'
 import { Route as AuthenticatedAdminCurrencyRouteImport } from './routes/_authenticated/admin.currency'
 import { Route as AuthenticatedAdminIntegrationsRouteImport } from './routes/_authenticated/admin.integrations'
 import { Route as AuthenticatedAdminLandingRouteImport } from './routes/_authenticated/admin.landing'
@@ -67,7 +68,9 @@ import { Route as AuthenticatedLinkedinPostsNewRouteImport } from './routes/_aut
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
 import { Route as AuthenticatedStudioRawIdRouteImport } from './routes/_authenticated/studio.$rawId'
 import { Route as AuthenticatedLinkedinPostsIdEditRouteImport } from './routes/_authenticated/linkedin-posts.$id.edit'
+import { Route as ApiPublicHooksAgentsSchedulerRouteImport } from './routes/api/public/hooks/agents-scheduler'
 import { Route as ApiPublicHooksPublishScheduledRouteImport } from './routes/api/public/hooks/publish-scheduled'
+import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 import { Route as ApiPublicWebhooksRazorpayRouteImport } from './routes/api/public/webhooks/razorpay'
 import { Route as ApiPublicOauthPlatformCallbackRouteImport } from './routes/api/public/oauth/$platform.callback'
 
@@ -285,6 +288,12 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminAgentsRoute =
+  AuthenticatedAdminAgentsRouteImport.update({
+    id: '/agents',
+    path: '/agents',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminCurrencyRoute =
   AuthenticatedAdminCurrencyRouteImport.update({
     id: '/currency',
@@ -380,10 +389,22 @@ const AuthenticatedLinkedinPostsIdEditRoute =
     path: '/edit',
     getParentRoute: () => AuthenticatedLinkedinPostsIdRoute,
   } as any)
+const ApiPublicHooksAgentsSchedulerRoute =
+  ApiPublicHooksAgentsSchedulerRouteImport.update({
+    id: '/api/public/hooks/agents-scheduler',
+    path: '/api/public/hooks/agents-scheduler',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPublishScheduledRoute =
   ApiPublicHooksPublishScheduledRouteImport.update({
     id: '/api/public/hooks/publish-scheduled',
     path: '/api/public/hooks/publish-scheduled',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicTelegramWebhookRoute =
+  ApiPublicTelegramWebhookRouteImport.update({
+    id: '/api/public/telegram/webhook',
+    path: '/api/public/telegram/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicWebhooksRazorpayRoute =
@@ -440,6 +461,7 @@ export interface FileRoutesByFullPath {
   '/api/transcode-video': typeof ApiTranscodeVideoRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/voice-sample': typeof ApiVoiceSampleRoute
+  '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/currency': typeof AuthenticatedAdminCurrencyRoute
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/admin/landing': typeof AuthenticatedAdminLandingRoute
@@ -457,7 +479,9 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/linkedin-posts/': typeof AuthenticatedLinkedinPostsIndexRoute
   '/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
+  '/api/public/hooks/agents-scheduler': typeof ApiPublicHooksAgentsSchedulerRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
+  '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
   '/api/public/oauth/$platform/callback': typeof ApiPublicOauthPlatformCallbackRoute
 }
@@ -500,6 +524,7 @@ export interface FileRoutesByTo {
   '/api/transcode-video': typeof ApiTranscodeVideoRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/voice-sample': typeof ApiVoiceSampleRoute
+  '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/currency': typeof AuthenticatedAdminCurrencyRoute
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/admin/landing': typeof AuthenticatedAdminLandingRoute
@@ -517,7 +542,9 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/linkedin-posts': typeof AuthenticatedLinkedinPostsIndexRoute
   '/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
+  '/api/public/hooks/agents-scheduler': typeof ApiPublicHooksAgentsSchedulerRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
+  '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
   '/api/public/oauth/$platform/callback': typeof ApiPublicOauthPlatformCallbackRoute
 }
@@ -564,6 +591,7 @@ export interface FileRoutesById {
   '/api/transcode-video': typeof ApiTranscodeVideoRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/voice-sample': typeof ApiVoiceSampleRoute
+  '/_authenticated/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/_authenticated/admin/currency': typeof AuthenticatedAdminCurrencyRoute
   '/_authenticated/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/_authenticated/admin/landing': typeof AuthenticatedAdminLandingRoute
@@ -581,7 +609,9 @@ export interface FileRoutesById {
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/linkedin-posts/': typeof AuthenticatedLinkedinPostsIndexRoute
   '/_authenticated/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
+  '/api/public/hooks/agents-scheduler': typeof ApiPublicHooksAgentsSchedulerRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
+  '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
   '/api/public/oauth/$platform/callback': typeof ApiPublicOauthPlatformCallbackRoute
 }
@@ -628,6 +658,7 @@ export interface FileRouteTypes {
     | '/api/transcode-video'
     | '/api/tts'
     | '/api/voice-sample'
+    | '/admin/agents'
     | '/admin/currency'
     | '/admin/integrations'
     | '/admin/landing'
@@ -645,7 +676,9 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/linkedin-posts/'
     | '/linkedin-posts/$id/edit'
+    | '/api/public/hooks/agents-scheduler'
     | '/api/public/hooks/publish-scheduled'
+    | '/api/public/telegram/webhook'
     | '/api/public/webhooks/razorpay'
     | '/api/public/oauth/$platform/callback'
   fileRoutesByTo: FileRoutesByTo
@@ -688,6 +721,7 @@ export interface FileRouteTypes {
     | '/api/transcode-video'
     | '/api/tts'
     | '/api/voice-sample'
+    | '/admin/agents'
     | '/admin/currency'
     | '/admin/integrations'
     | '/admin/landing'
@@ -705,7 +739,9 @@ export interface FileRouteTypes {
     | '/admin'
     | '/linkedin-posts'
     | '/linkedin-posts/$id/edit'
+    | '/api/public/hooks/agents-scheduler'
     | '/api/public/hooks/publish-scheduled'
+    | '/api/public/telegram/webhook'
     | '/api/public/webhooks/razorpay'
     | '/api/public/oauth/$platform/callback'
   id:
@@ -751,6 +787,7 @@ export interface FileRouteTypes {
     | '/api/transcode-video'
     | '/api/tts'
     | '/api/voice-sample'
+    | '/_authenticated/admin/agents'
     | '/_authenticated/admin/currency'
     | '/_authenticated/admin/integrations'
     | '/_authenticated/admin/landing'
@@ -768,7 +805,9 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/'
     | '/_authenticated/linkedin-posts/'
     | '/_authenticated/linkedin-posts/$id/edit'
+    | '/api/public/hooks/agents-scheduler'
     | '/api/public/hooks/publish-scheduled'
+    | '/api/public/telegram/webhook'
     | '/api/public/webhooks/razorpay'
     | '/api/public/oauth/$platform/callback'
   fileRoutesById: FileRoutesById
@@ -789,7 +828,9 @@ export interface RootRouteChildren {
   ApiTranscodeVideoRoute: typeof ApiTranscodeVideoRoute
   ApiTtsRoute: typeof ApiTtsRoute
   ApiVoiceSampleRoute: typeof ApiVoiceSampleRoute
+  ApiPublicHooksAgentsSchedulerRoute: typeof ApiPublicHooksAgentsSchedulerRoute
   ApiPublicHooksPublishScheduledRoute: typeof ApiPublicHooksPublishScheduledRoute
+  ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
   ApiPublicWebhooksRazorpayRoute: typeof ApiPublicWebhooksRazorpayRoute
   ApiPublicOauthPlatformCallbackRoute: typeof ApiPublicOauthPlatformCallbackRoute
 }
@@ -1090,6 +1131,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/agents': {
+      id: '/_authenticated/admin/agents'
+      path: '/agents'
+      fullPath: '/admin/agents'
+      preLoaderRoute: typeof AuthenticatedAdminAgentsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/currency': {
       id: '/_authenticated/admin/currency'
       path: '/currency'
@@ -1202,11 +1250,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLinkedinPostsIdEditRouteImport
       parentRoute: typeof AuthenticatedLinkedinPostsIdRoute
     }
+    '/api/public/hooks/agents-scheduler': {
+      id: '/api/public/hooks/agents-scheduler'
+      path: '/api/public/hooks/agents-scheduler'
+      fullPath: '/api/public/hooks/agents-scheduler'
+      preLoaderRoute: typeof ApiPublicHooksAgentsSchedulerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/publish-scheduled': {
       id: '/api/public/hooks/publish-scheduled'
       path: '/api/public/hooks/publish-scheduled'
       fullPath: '/api/public/hooks/publish-scheduled'
       preLoaderRoute: typeof ApiPublicHooksPublishScheduledRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/telegram/webhook': {
+      id: '/api/public/telegram/webhook'
+      path: '/api/public/telegram/webhook'
+      fullPath: '/api/public/telegram/webhook'
+      preLoaderRoute: typeof ApiPublicTelegramWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/webhooks/razorpay': {
@@ -1227,6 +1289,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminAgentsRoute: typeof AuthenticatedAdminAgentsRoute
   AuthenticatedAdminCurrencyRoute: typeof AuthenticatedAdminCurrencyRoute
   AuthenticatedAdminIntegrationsRoute: typeof AuthenticatedAdminIntegrationsRoute
   AuthenticatedAdminLandingRoute: typeof AuthenticatedAdminLandingRoute
@@ -1240,6 +1303,7 @@ interface AuthenticatedAdminRouteChildren {
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminAgentsRoute: AuthenticatedAdminAgentsRoute,
   AuthenticatedAdminCurrencyRoute: AuthenticatedAdminCurrencyRoute,
   AuthenticatedAdminIntegrationsRoute: AuthenticatedAdminIntegrationsRoute,
   AuthenticatedAdminLandingRoute: AuthenticatedAdminLandingRoute,
@@ -1372,7 +1436,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTranscodeVideoRoute: ApiTranscodeVideoRoute,
   ApiTtsRoute: ApiTtsRoute,
   ApiVoiceSampleRoute: ApiVoiceSampleRoute,
+  ApiPublicHooksAgentsSchedulerRoute: ApiPublicHooksAgentsSchedulerRoute,
   ApiPublicHooksPublishScheduledRoute: ApiPublicHooksPublishScheduledRoute,
+  ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
   ApiPublicWebhooksRazorpayRoute: ApiPublicWebhooksRazorpayRoute,
   ApiPublicOauthPlatformCallbackRoute: ApiPublicOauthPlatformCallbackRoute,
 }

@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { createTelegramLinkCode } from "@/lib/agent-hq.functions";
 import { PLATFORMS, TONES, STYLES } from "@/lib/constants";
 import { Loader2, Download, Upload, Trash2, AlertTriangle } from "lucide-react";
 import { exportAll, importAll, clearAll, type LocalExportBundle } from "@/lib/local-store";
@@ -100,6 +102,8 @@ function SettingsPage() {
       </form>
 
       <DataAndCacheCard />
+
+      <TelegramLinkCard />
 
       <div className="glass rounded-2xl p-6">
         <h2 className="font-semibold">Account</h2>
@@ -245,4 +249,32 @@ function download(blob: Blob, name: string) {
 }
 function slug(s: string) {
   return (s || "project").toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function TelegramLinkCard() {
+  const linkCode = useServerFn(createTelegramLinkCode);
+  const [r, setR] = useState<{ code: string; botUsername: string | null; linkedAs: string | null } | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="glass rounded-2xl p-6 space-y-3">
+      <h2 className="font-semibold">Telegram support</h2>
+      <p className="text-sm text-muted-foreground">
+        Link your Telegram so our support assistant can check your account when you ask for help in the buyers' group. Your details are never posted in the group.
+      </p>
+      <button disabled={busy} onClick={async () => {
+        setBusy(true);
+        try { setR(await linkCode()); } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't create a code"); }
+        finally { setBusy(false); }
+      }} className="rounded-lg glass border border-border px-3 py-1.5 text-sm disabled:opacity-60">
+        {busy ? "Creating…" : "Get my link code"}
+      </button>
+      {r && (r.botUsername ? (
+        <p className="text-sm">
+          Open <a className="underline" href={`https://t.me/${r.botUsername}`} target="_blank" rel="noreferrer">@{r.botUsername}</a>, press Start, and send{" "}
+          <code className="px-1.5 py-0.5 rounded bg-black/40">/link {r.code}</code> (valid for 30 minutes).
+          {r.linkedAs && <span className="block text-xs text-muted-foreground mt-1">Already linked — sending a new code replaces the old link.</span>}
+        </p>
+      ) : <p className="text-sm text-muted-foreground">Telegram support isn't available yet.</p>)}
+    </div>
+  );
 }
