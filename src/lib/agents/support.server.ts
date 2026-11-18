@@ -106,17 +106,23 @@ export async function handleTelegramUpdate(update: TgUpdate): Promise<void> {
     // ---- Group: only the configured group(s); the first group the bot sees is adopted. ----
     if (s.telegram_group_ids.length === 0) {
       await db.from("agent_settings").update({ telegram_group_ids: [msg.chat.id], updated_at: new Date().toISOString() }).eq("id", 1);
-    } else if (!s.telegram_group_ids.includes(msg.chat.id)) {
+    } else if (!s.telegram_group_ids.map(Number).includes(Number(msg.chat.id))) {
       return;
     }
     if (text.startsWith("/")) return; // other bots' commands
   }
 
-  // Ignore admins talking in the group: they're answering people themselves.
-  const { data: senderLink } = await db.from("telegram_links").select("user_id").eq("telegram_user_id", msg.from.id).maybeSingle();
-  if (senderLink?.user_id) {
-    const { data: p } = await db.from("profiles").select("is_admin").eq("id", senderLink.user_id).maybeSingle();
-    if (p?.is_admin) return;
+  // When an admin *replies to someone else's message* in the group they're
+  // answering that person themselves, so the agent stays quiet. An admin's own
+  // new question is still handled (that's how you test the bot), and plain
+  // announcements are classified as "chat" and ignored by the triage step.
+  const replyTo = (msg as { reply_to_message?: { from?: { id?: number; is_bot?: boolean } } }).reply_to_message;
+  if (replyTo?.from?.id && replyTo.from.id !== msg.from.id && !replyTo.from.is_bot) {
+    const { data: senderLink } = await db.from("telegram_links").select("user_id").eq("telegram_user_id", msg.from.id).maybeSingle();
+    if (senderLink?.user_id) {
+      const { data: p } = await db.from("profiles").select("is_admin").eq("id", senderLink.user_id).maybeSingle();
+      if (p?.is_admin) return;
+    }
   }
 
   // Record (dedupes Telegram's retries).
