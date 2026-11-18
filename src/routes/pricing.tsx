@@ -234,7 +234,12 @@ function PricingCard({
           {plan.contactSales
             ? "Custom credit pool sized to your team."
             : plan.planType === "lifetime"
-              ? <>Includes <strong className="text-foreground">{(plan.includedCredits || plan.monthlyCredits).toLocaleString()}</strong> credits · one-time.</>
+              ? <>
+                  Includes <strong className="text-foreground">{(plan.includedCredits || plan.monthlyCredits).toLocaleString()}</strong> credits one-time
+                  {plan.includedCredits > 0 && plan.monthlyCredits > 0
+                    ? <> + <strong className="text-foreground">{plan.monthlyCredits.toLocaleString()}</strong> bonus credits every month.</>
+                    : "."}
+                </>
               : plan.monthlyCredits > 0
                 ? <>Includes <strong className="text-foreground">{plan.monthlyCredits.toLocaleString()}</strong> credits per month.</>
                 : plan.includedCredits > 0
@@ -289,8 +294,8 @@ function SubVsLifetimeCompare({ cycle, plans }: { cycle: BillingCycle; plans: Pr
   const rows: { label: string; sub: React.ReactNode; life: React.ReactNode }[] = [
     { label: "Billing", sub: cycle === "yearly" ? "Yearly" : "Monthly", life: "One-time" },
     { label: "Recurring charges", sub: <YesIcon />, life: <NoIcon /> },
-    { label: "Fresh monthly credits", sub: <YesIcon />, life: lifetime ? <YesIcon /> : <NoIcon /> },
-    { label: "Included credits", sub: "Based on plan", life: lifetime ? `${(lifetime.includedCredits || lifetime.monthlyCredits).toLocaleString()} / mo forever` : "—" },
+    { label: "Monthly credits", sub: "Full plan allowance", life: lifetime && lifetime.monthlyCredits > 0 ? `Bonus: from ${lifetime.monthlyCredits.toLocaleString()} / mo` : <NoIcon /> },
+    { label: "Included credits", sub: "Based on plan", life: lifetime ? `From ${(lifetime.includedCredits || lifetime.monthlyCredits).toLocaleString()} one-time` : "—" },
     { label: "Priority rendering", sub: "Higher plans", life: <YesIcon /> },
     { label: "Commercial usage", sub: <YesIcon />, life: <YesIcon /> },
     { label: "Future updates", sub: <YesIcon />, life: <YesIcon /> },
@@ -335,6 +340,7 @@ function NoIcon() {
 const FAQ = [
   { q: "What's the difference between Monthly and Yearly?", a: "Yearly is the same plan billed once per year — you save about 17% compared to paying month-to-month, and you receive 12× the monthly credits upfront." },
   { q: "What is the Lifetime plan?", a: "One payment, and CreatorFlow AI is yours forever. You keep receiving 1,000 AI credits every month, plus premium templates and priority support — no recurring charges." },
+  { q: "Do lifetime plans get monthly credits?", a: "Yes. Besides the one-time credits, lifetime plans get a monthly bonus (75, 150 or 300 credits) that refills on your purchase day each month. Bonus credits are used first and don't carry over to the next month; your one-time credits never expire." },
   { q: "Can I switch between Monthly, Yearly and Lifetime?", a: "Yes. Any credits already in your wallet stay put, and we deduct in the order: monthly → top-ups → lifetime, so nothing is wasted." },
   { q: "Can I buy additional credit packs?", a: "Yes. Any user can top up anytime — packs are added instantly and never expire." },
   { q: "Do failed generations cost credits?", a: "No. Credits are only deducted when a generation succeeds; failed runs are refunded automatically." },
@@ -502,7 +508,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
         <div className="glass rounded-xl p-4 mb-3 space-y-2 text-sm">
           <div className="flex justify-between"><span>Plan</span><span className="font-medium">{plan.name}</span></div>
           <div className="flex justify-between"><span>Billing</span><span className="font-medium capitalize">{effective}</span></div>
-          <div className="flex justify-between"><span>Credits</span><span className="font-medium">{credits.toLocaleString()}{effective === "lifetime" ? " (one-time + monthly refill)" : ""}</span></div>
+          <div className="flex justify-between"><span>Credits</span><span className="font-medium">{credits.toLocaleString()}{effective === "lifetime" ? (plan.monthlyCredits > 0 && plan.includedCredits > 0 ? ` one-time + ${plan.monthlyCredits.toLocaleString()} / month bonus` : " one-time") : ""}</span></div>
           <div className="flex justify-between"><span>Listed price</span><span className="font-medium">{usd(price)}<span className="text-xs text-muted-foreground ml-1">{suffixForCycle(effective)}</span></span></div>
           <div className="flex justify-between"><span>Exchange rate</span><span className="font-medium">{rate ? `1 USD = ₹${rate.toFixed(2)}` : "…"}</span></div>
           {rateInfo && (

@@ -31,7 +31,8 @@ function TermsPage() {
         <ul>
           <li>Generations use credits. The credit cost of each action is shown in the app before you run it.</li>
           <li>Monthly and yearly plans include a monthly credit allowance that resets each billing month; unused plan credits do not carry over. Yearly plans are billed once a year and refill monthly.</li>
-          <li>Lifetime plans include the credits stated at purchase. Top-up credits stay on your account until used while your account is active.</li>
+          <li>Lifetime plans include the one-time credits stated at purchase, which don't expire while your account is active. Lifetime plans also include a monthly bonus allowance (shown on the pricing page) that refills on your purchase day each month for as long as CreatorFlow operates. Bonus credits are used before your other credits, don't carry over to the next month, and the monthly amount may be adjusted with reasonable notice.</li>
+          <li>Top-up credits stay on your account until used while your account is active.</li>
           <li>Payments are processed by Razorpay. Prices are shown on the <Link to="/pricing">pricing page</Link> and may change for future purchases.</li>
           <li>If a generation fails, its credits are refunded to your balance automatically.</li>
         </ul>

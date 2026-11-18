@@ -164,7 +164,9 @@ function BillingPage() {
 
               <div className="rounded-xl bg-black/30 border border-border/50 p-4 md:col-span-2">
                 <div className="flex items-center justify-between">
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground">This month's usage</div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    {sub?.lifetime_access ? "Monthly bonus credits" : "This month's usage"}
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     {unlimited ? "No cap" : `${used.toLocaleString()} / ${limit.toLocaleString()}`}
                   </div>
@@ -178,6 +180,10 @@ function BillingPage() {
                 <div className="mt-2 text-xs text-muted-foreground">
                   {unlimited
                     ? "Your plan includes unlimited monthly usage."
+                    : sub?.lifetime_access
+                      ? limit > 0
+                        ? `${(limit - Math.min(used, limit)).toLocaleString()} bonus credits left · refills ${nextMonthlyRefill(sub.started_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}. Bonus credits are used first and don't carry over.`
+                        : "Your lifetime credits never expire."
                     : pct >= 90
                       ? "You're close to your monthly limit — consider upgrading or topping up."
                       : `${100 - pct}% of your monthly credits still available.`}
@@ -291,4 +297,13 @@ function StatusPill({ status }: { status: string }) {
   return <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">
     <Clock className="w-3 h-3" /> Pending
   </span>;
+}
+
+/** Next monthly refill date: the purchase day each month (clamped to month end). */
+function nextMonthlyRefill(startedAt: string): Date {
+  const day = new Date(startedAt).getDate();
+  const now = new Date();
+  const at = (y: number, m: number) => new Date(y, m, Math.min(day, new Date(y, m + 1, 0).getDate()));
+  const thisMonth = at(now.getFullYear(), now.getMonth());
+  return thisMonth > now ? thisMonth : at(now.getFullYear(), now.getMonth() + 1);
 }
