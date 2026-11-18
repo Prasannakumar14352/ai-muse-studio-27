@@ -7,6 +7,7 @@ import { Instagram, Facebook, Youtube, Linkedin, Plug, Clock, RefreshCw, Trash2,
 import { listScheduledPosts, retryScheduledPost, cancelScheduledPost } from "@/lib/publishing.functions";
 import { listProviderAvailability, startOAuth, listMyConnections, disconnectPlatform, getAccountLimits } from "@/lib/oauth-user.functions";
 import { confirmDialog } from "@/components/confirm-dialog";
+import { useAccess } from "@/lib/access";
 
 export const Route = createFileRoute("/_authenticated/connections")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/connections")({
   head: () => ({
     meta: [
       { title: "Connected Accounts — CreatorFlow AI" },
-      { name: "description", content: "Connect Instagram, Facebook, YouTube, and LinkedIn to publish directly, or download and post manually." },
+      { name: "description", content: "Connect your social accounts to publish directly, or download and post manually." },
     ],
   }),
   component: ConnectionsPage,
@@ -48,11 +49,20 @@ function ConnectionsPage() {
     if (search.err) toast.error(`Connection failed: ${search.err}`);
   }, [search.ok, search.err]);
 
-  const { data: avail = [] } = useQuery({ queryKey: ["provider-availability"], queryFn: () => availability() });
+  const { data: avail = [], isLoading: availLoading } = useQuery({ queryKey: ["provider-availability"], queryFn: () => availability() });
+  const { data: access } = useAccess();
+  const isAdmin = !!access?.isAdmin;
   const { data: connections = [] } = useQuery({ queryKey: ["platform_connections"], queryFn: () => myConns() });
   const { data: scheduled = [] } = useQuery({ queryKey: ["scheduled_posts"], queryFn: () => list(), refetchInterval: 15_000 });
   const { data: limits } = useQuery({ queryKey: ["account-limits"], queryFn: () => limitsFn() });
   const maxPer = limits?.max ?? null; // null = unlimited (admin)
+  // Users only see platforms the admin has configured and switched on (plus any
+  // they are still connected to, so they can disconnect). Admins see all four.
+  const visibleDefs = DEFS.filter((d) =>
+    isAdmin ||
+    avail.find((x) => x.platform === d.id)?.available ||
+    connections.some((c) => c.platform === d.id),
+  );
   const labelFor = (id: unknown) => connections.find((c) => c.id === id)?.account_label as string | undefined;
 
   async function handleConnect(platform: PlatformDef["id"]) {
@@ -73,13 +83,21 @@ function ConnectionsPage() {
           <h1 className="text-3xl md:text-4xl font-bold">Connected <span className="gradient-text">Accounts</span></h1>
           <p className="text-muted-foreground mt-1">Sign in with your social account. Downloads and manual posting always work — even without a connection.</p>
         </div>
-        <a href="/admin/integrations" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
-          <Settings className="w-3 h-3" /> Admin: configure providers
-        </a>
+        {isAdmin && (
+          <a href="/admin/integrations" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+            <Settings className="w-3 h-3" /> Admin: configure providers
+          </a>
+        )}
       </div>
 
+      {!availLoading && visibleDefs.length === 0 && (
+        <div className="glass rounded-2xl p-6 border border-white/10 text-sm text-muted-foreground">
+          Direct publishing isn't available yet. You can still download anything you create and post it manually.
+        </div>
+      )}
+
       <section className="grid md:grid-cols-2 gap-4">
-        {DEFS.map(({ id, label, Icon }) => {
+        {visibleDefs.map(({ id, label, Icon }) => {
           const a = avail.find((x) => x.platform === id);
           const accounts = connections.filter((c) => c.platform === id);
           const configured = a?.configured ?? false;
@@ -117,8 +135,8 @@ function ConnectionsPage() {
                 </button>
               </div>
 
-              {!configured && (
-                <p className="text-xs text-amber-400/80">OAuth credentials have not been configured by the administrator.</p>
+              {isAdmin && !canConnect && (
+                <p className="text-xs text-amber-400/80">Hidden from users until you configure and enable it in Admin → Social Publishing.</p>
               )}
 
               {accounts.length > 0 && (

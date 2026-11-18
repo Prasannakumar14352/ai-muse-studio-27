@@ -40,7 +40,7 @@ const STEPS = [
     icon: Download,
     n: "04",
     title: "Edit, export, publish",
-    body: "Real-time editors for slides, thumbnails and posts. Export as MP4, PDF, ZIP or PNG. Publish directly to LinkedIn, IG, FB, YT (or schedule).",
+    body: "Real-time editors for slides, thumbnails and posts. Export as MP4, PDF, ZIP or PNG. Publish directly to Instagram, Facebook and YouTube, or schedule for later.",
   },
 ];
 
