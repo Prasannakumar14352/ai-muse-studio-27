@@ -66,7 +66,7 @@ function ContactPage() {
         </div>
         <h1 className="text-3xl md:text-5xl font-bold">Get in <span className="gradient-text">touch</span></h1>
         <p className="text-muted-foreground mt-2 max-w-xl mx-auto">
-          Questions, feedback, team pricing or partnership? Reach the {BRAND} team directly.
+          Questions, feedback, custom plans or partnership? Reach the {BRAND} team directly.
         </p>
       </div>
 
@@ -123,7 +123,7 @@ function ContactPage() {
             <input
               value={form.subject}
               onChange={(e) => setForm({ ...form, subject: e.target.value })}
-              className="w-full rounded-lg bg-black/30 border border-border/60 px-3 py-2.5 text-sm outline-none focus:border-[color:var(--neon-purple)]/70 transition" placeholder="Team plan enquiry" maxLength={150} />
+              className="w-full rounded-lg bg-black/30 border border-border/60 px-3 py-2.5 text-sm outline-none focus:border-[color:var(--neon-purple)]/70 transition" placeholder="Custom plan enquiry" maxLength={150} />
           </Field>
           <Field label="Message" error={errors.message}>
             <textarea
