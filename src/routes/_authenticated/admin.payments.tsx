@@ -11,6 +11,7 @@ import {
 } from "@/lib/razorpay-settings.functions";
 import { ArrowLeft, CheckCircle2, Loader2, ShieldCheck, XCircle } from "lucide-react";
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
+import { refreshAutopayPlans } from "@/lib/razorpay-autopay.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/payments")({
   component: PaymentSettings,
@@ -331,6 +332,8 @@ function PaymentSettings() {
         )}
       </div>
 
+      <AutopayPlansPanel />
+
       <div className="glass rounded-2xl p-5 text-sm text-white/70 space-y-2">
         <div className="font-semibold text-white">Security</div>
         <ul className="list-disc pl-5 space-y-1">
@@ -351,5 +354,64 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {children}
       {hint && <div className="text-xs text-white/40">{hint}</div>}
     </label>
+  );
+}
+
+const AUTOPAY_EXPECTED = ["starter", "creator", "pro"].flatMap((c) =>
+  (["monthly", "yearly"] as const).map((cy) => ({ code: c, cycle: cy })));
+
+/** Shows which Razorpay plans (named "CreatorFlow <Plan> <Monthly|Yearly>") auto-debit will use. */
+function AutopayPlansPanel() {
+  const refresh = useServerFn(refreshAutopayPlans);
+  const [plans, setPlans] = useState<Array<{ planCode: string; cycle: string; razorpayPlanId: string; amountPaise: number; name: string }> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function load() {
+    setBusy(true);
+    setErr(null);
+    try {
+      setPlans(await refresh());
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't read plans from Razorpay");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="glass rounded-2xl p-5 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="font-semibold text-white">Auto-debit plans (Razorpay Subscriptions)</div>
+          <div className="text-xs text-white/50 mt-0.5">
+            Create plans in Razorpay named exactly "CreatorFlow Starter Monthly", "CreatorFlow Pro Yearly", etc. They're matched by name in the current environment's account.
+          </div>
+        </div>
+        <button onClick={load} disabled={busy}
+          className="rounded-lg bg-white/10 hover:bg-white/15 px-3 py-1.5 text-xs inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0">
+          {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {plans ? "Refresh" : "Check plans"}
+        </button>
+      </div>
+      {err && <div className="text-xs text-rose-300">{err}</div>}
+      {plans && (
+        <div className="grid sm:grid-cols-2 gap-2">
+          {AUTOPAY_EXPECTED.map(({ code, cycle }) => {
+            const p = plans.find((x) => x.planCode === code && x.cycle === cycle);
+            return (
+              <div key={`${code}-${cycle}`} className="rounded-lg border border-white/10 px-3 py-2 text-xs flex items-center gap-2">
+                {p ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> : <XCircle className="w-4 h-4 text-amber-400 shrink-0" />}
+                <div className="min-w-0">
+                  <div className="capitalize text-white">{code} {cycle}</div>
+                  <div className="text-white/50 truncate">
+                    {p ? `₹${(p.amountPaise / 100).toLocaleString("en-IN")} · ${p.razorpayPlanId}` : "Not found — checkout offers Pay once only"}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

@@ -7,8 +7,10 @@ import { createHmac, timingSafeEqual } from "crypto";
  *
  * Configure in Razorpay Dashboard → Webhooks:
  *   URL: https://<your-domain>/api/public/webhooks/razorpay
- *   Events: payment.captured, payment.failed, order.paid
- *   Secret: same value stored as RAZORPAY_WEBHOOK_SECRET
+ *   Events: payment.captured, payment.failed, order.paid, and for auto-debit
+ *     subscription.activated, subscription.charged, subscription.pending,
+ *     subscription.halted, subscription.cancelled, subscription.completed
+ *   Secret: same value as the webhook secret in Admin → Payment Settings
  */
 export const Route = createFileRoute("/api/public/webhooks/razorpay")({
   server: {
@@ -70,7 +72,10 @@ export const Route = createFileRoute("/api/public/webhooks/razorpay")({
 
         let payload: {
           event?: string;
-          payload?: { payment?: { entity?: { id?: string; order_id?: string; status?: string } } };
+          payload?: {
+            payment?: { entity?: { id?: string; order_id?: string; status?: string } };
+            subscription?: { entity?: { id?: string; status?: string; current_end?: number | null } };
+          };
         };
         try { payload = JSON.parse(body); } catch {
           await log({ status: 400, verified: true, error: "Bad JSON" });
@@ -78,6 +83,33 @@ export const Route = createFileRoute("/api/public/webhooks/razorpay")({
         }
 
         const event = payload.event ?? "";
+
+        // ── Auto-debit (Razorpay Subscriptions) ──
+        if (event.startsWith("subscription.")) {
+          const sub = payload.payload?.subscription?.entity;
+          const pay = payload.payload?.payment?.entity;
+          const subId = sub?.id ?? null;
+          if (!subId) {
+            await log({ status: 200, verified: true, event, payload, error: "Ignored (no subscription id)" });
+            return new Response("ok");
+          }
+          try {
+            const result = await handleSubscriptionEvent(supabaseAdmin, event, {
+              subscriptionId: subId,
+              status: sub?.status ?? null,
+              currentEnd: sub?.current_end ?? null,
+              paymentId: pay?.id ?? null,
+              orderId: pay?.order_id ?? null,
+            });
+            await log({ status: 200, verified: true, event, orderId: pay?.order_id ?? null, paymentId: pay?.id ?? null, payload, error: result });
+            return new Response("ok");
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            await log({ status: 500, verified: true, event, payload, error: msg });
+            return new Response("error", { status: 500 }); // Razorpay retries
+          }
+        }
+
         const payment = payload.payload?.payment?.entity;
         const orderId = payment?.order_id ?? null;
         const paymentId = payment?.id ?? null;
@@ -109,21 +141,24 @@ export const Route = createFileRoute("/api/public/webhooks/razorpay")({
           return new Response("ok");
         }
 
-        const { error: upErr } = await supabaseAdmin.from("payments")
+        // Claim it: only the first of checkout/webhook to flip it fulfils it.
+        const { data: claimed, error: upErr } = await supabaseAdmin.from("payments")
           .update({ status: "success", razorpay_payment_id: paymentId })
           .eq("id", row.id)
-          .eq("status", "pending");
+          .eq("status", "pending")
+          .select("id");
         if (upErr) {
           await log({ status: 500, verified: true, event, orderId, paymentId, payload, error: `update failed: ${upErr.message}` });
           return new Response("update failed", { status: 500 });
         }
+        if (!claimed || claimed.length === 0) {
+          await log({ status: 200, verified: true, event, orderId, paymentId, payload, error: "Already credited (idempotent)" });
+          return new Response("ok");
+        }
 
-        const { data: profile } = await supabaseAdmin
-          .from("profiles").select("user_credits").eq("id", row.user_id).maybeSingle();
-        const current = profile?.user_credits ?? 0;
-        await supabaseAdmin.from("profiles")
-          .update({ user_credits: current + row.credits })
-          .eq("id", row.user_id);
+        // Plan → activate it; credit pack → add credits (same as checkout).
+        const { fulfillOrderPayment } = await import("@/lib/billing.server");
+        await fulfillOrderPayment(supabaseAdmin, row as never);
 
         await log({ status: 200, verified: true, event, orderId, paymentId, payload });
         return new Response("ok");
@@ -131,3 +166,68 @@ export const Route = createFileRoute("/api/public/webhooks/razorpay")({
     },
   },
 });
+
+type Admin = (typeof import("@/integrations/supabase/client.server"))["supabaseAdmin"];
+
+/** Auto-debit lifecycle. Returns a short note for the webhook log. */
+async function handleSubscriptionEvent(admin: Admin, event: string, e: {
+  subscriptionId: string; status: string | null; currentEnd: number | null;
+  paymentId: string | null; orderId: string | null;
+}): Promise<string> {
+  const { data: rs } = await admin.from("razorpay_subscriptions" as never)
+    .select("user_id").eq("razorpay_subscription_id", e.subscriptionId).maybeSingle();
+  const userId = (rs as { user_id?: string } | null)?.user_id;
+  if (!userId) return "Ignored (subscription not created by this app)";
+  const now = new Date().toISOString();
+  const setRs = (status: string) => admin.from("razorpay_subscriptions" as never)
+    .update({ status, current_end: e.currentEnd ? new Date(e.currentEnd * 1000).toISOString() : null, updated_at: now } as never)
+    .eq("razorpay_subscription_id", e.subscriptionId);
+  const isCurrent = async () => {
+    const { data } = await admin.from("subscriptions").select("razorpay_subscription_id").eq("user_id", userId).maybeSingle();
+    return (data as { razorpay_subscription_id?: string | null } | null)?.razorpay_subscription_id === e.subscriptionId;
+  };
+
+  switch (event) {
+    case "subscription.charged": {
+      if (!e.paymentId) return "Ignored (no payment)";
+      const { applyAutopayCharge } = await import("@/lib/billing.server");
+      const r = await applyAutopayCharge(admin, { subscriptionId: e.subscriptionId, paymentId: e.paymentId, orderId: e.orderId, currentEnd: e.currentEnd });
+      return r.already ? "Charge already applied" : `Charge applied (+${r.credits} credits)`;
+    }
+    case "subscription.pending": {
+      // A renewal failed; Razorpay keeps retrying.
+      await setRs("pending");
+      if (await isCurrent()) {
+        await admin.from("subscriptions").update({ payment_issue: "retrying" } as never).eq("user_id", userId);
+      }
+      return "Renewal failed — retrying";
+    }
+    case "subscription.halted": {
+      // All retries failed: back to Free; Billing shows why.
+      await setRs("halted");
+      if (await isCurrent()) {
+        await admin.from("subscriptions").update({
+          plan_name: "free", plan_type: "free", monthly_credit_limit: 0, monthly_credits_used: 0,
+          renews_at: null, expires_at: null, auto_renew: false, razorpay_subscription_id: null,
+          payment_issue: "halted", started_at: now,
+        } as never).eq("user_id", userId);
+      }
+      return "Halted — user moved to Free";
+    }
+    case "subscription.cancelled":
+    case "subscription.completed": {
+      await setRs(event === "subscription.cancelled" ? "cancelled" : "completed");
+      if (await isCurrent()) {
+        const { data } = await admin.from("subscriptions").select("renews_at").eq("user_id", userId).maybeSingle();
+        const endsAt = (data as { renews_at?: string | null } | null)?.renews_at
+          ?? (e.currentEnd ? new Date(e.currentEnd * 1000).toISOString() : now);
+        // Keep the plan until the paid period ends; the daily job then moves it to Free.
+        await admin.from("subscriptions").update({ auto_renew: false, expires_at: endsAt } as never).eq("user_id", userId);
+      }
+      return "Auto-renew ended";
+    }
+    default:
+      await setRs(e.status ?? event.replace("subscription.", ""));
+      return "Status updated";
+  }
+}
