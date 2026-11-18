@@ -773,8 +773,21 @@ function CarouselsPage() {
                         return (
                           <div key={i} className={`shrink-0 w-40 snap-start ${ASPECT_CLASS[cfg.ratio]} relative rounded-lg overflow-hidden border ${failed ? "border-rose-500/60" : "border-border"}`}>
                             {src ? (
-                              <button onClick={() => setViewer({ images: slides, idx: i, title: row.title })} className="absolute inset-0">
+                              <button onClick={() => setViewer({ images: slides, idx: i, title: row.title })} className="absolute inset-0" aria-label={`Open slide ${i + 1}`}>
                                 <img src={src} alt={`Slide ${i + 1}`} className="absolute inset-0 w-full h-full object-cover" />
+                                {/* Slide copy over the image, as it will read on the post (skipped once edited in the slide editor). */}
+                                {row.carousel_slides?.[i] && !(row.slide_overlays[i]?.overlays?.length) && (
+                                  <span className="absolute inset-0 flex flex-col justify-between p-2 text-left pointer-events-none">
+                                    <span className="mt-5 text-[11px] leading-tight font-extrabold text-white [text-shadow:0_1px_4px_rgba(0,0,0,.9)] line-clamp-3">
+                                      {row.carousel_slides[i].headline}
+                                    </span>
+                                    {row.carousel_slides[i].bottom_highlight && (
+                                      <span className="text-[9px] leading-tight text-white bg-black/55 rounded px-1.5 py-1 line-clamp-2">
+                                        {row.carousel_slides[i].bottom_highlight}
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
                               </button>
                             ) : (
                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-rose-500/10 p-2 text-center">

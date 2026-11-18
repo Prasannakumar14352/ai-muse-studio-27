@@ -19,7 +19,7 @@ import { PublishActions } from "@/components/publish-actions";
 import type { PublishKit } from "@/lib/publish-kit.functions";
 import type { Platform as PublishPlatform, PublishStatus } from "@/lib/publishing.functions";
 import { generateAiCarousel } from "@/lib/carousel-ai.functions";
-import { STYLES } from "@/lib/constants";
+import { STYLES, ttsVoiceFor } from "@/lib/constants";
 import { authFetch } from "@/lib/auth-fetch";
 
 
@@ -466,6 +466,7 @@ function ProjectView() {
           imagePrompts={prompts}
           publishKit={(project as { distribution?: PublishKit | null }).distribution ?? null}
           publishStatus={(project as { publish_status?: PublishStatus | null }).publish_status ?? null}
+          voiceId={project.voice}
           fallbackCaption={output?.captions ?? ""}
           fallbackHashtags={(output?.hashtags ?? []).map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ")}
         />
@@ -600,7 +601,7 @@ type Scene = { n: number; visual: string; voiceover: string; duration: string; o
 function VideoPreview({
   scenes, title, styleImage, styleId, platform, contentType, music,
   projectId, userId, outputId, existingVideoUrl, existingDiagnostics, imagePrompts, publishKit, publishStatus,
-  fallbackCaption, fallbackHashtags,
+  fallbackCaption, fallbackHashtags, voiceId,
 }: {
   scenes: Scene[]; title: string; styleImage: string;
   styleId?: string | null;
@@ -613,6 +614,8 @@ function VideoPreview({
   /** The project's own AI caption / hashtags, used when there is no Publish Kit yet. */
   fallbackCaption?: string;
   fallbackHashtags?: string;
+  /** The brief's narrator choice (e.g. "calm_storyteller"). */
+  voiceId?: string | null;
 }) {
   const qc = useQueryClient();
   const [idx, setIdx] = useState(0);
@@ -951,7 +954,7 @@ function VideoPreview({
       const res = await authFetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: "alloy" }),
+        body: JSON.stringify({ text, voice: ttsVoiceFor(voiceId) }),
       });
       if (!res.ok) throw new Error(await res.text() || `TTS ${res.status}`);
       const blob = await res.blob();
@@ -994,7 +997,7 @@ function VideoPreview({
         image_prompts: editedPrompts.map((p, i) => ({ n: i + 1, prompt: p, style: styleForScene(i) })),
         captions: out?.captions ?? "",
         hashtags: out?.hashtags ?? [],
-        voice: "alloy",
+        voice: ttsVoiceFor(voiceId),
         video_url: videoUrl,
       }, null, 2));
       if (videoUrl) {
@@ -1087,7 +1090,7 @@ function VideoPreview({
         preloadedImages: sceneImagesRef.current,
         projectId,
         showOnScreenText,
-        voice: "alloy",
+        voice: ttsVoiceFor(voiceId),
         onStage: setUgcStage,
         signal: controller.signal,
         preferredContainer: container,

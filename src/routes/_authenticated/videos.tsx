@@ -1,4 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { estimateProjectCredits } from "@/lib/credit-costs";
+import { creditsLabel } from "@/lib/credits-label";
+import { CONTENT_LANGUAGES } from "@/lib/content-language";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
@@ -765,6 +768,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
   const [voice, setVoice] = useState<VoiceId>("documentary_narrator");
   const [ratio, setRatio] = useState<AspectRatio>(initialRatio ?? "9:16");
   const [sameCharacter, setSameCharacter] = useState(true);
+  const [language, setLanguage] = useState("auto");
 
   const autoFiredRef = useRef(false);
   useEffect(() => {
@@ -789,7 +793,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
     if (!title.trim()) return toast.error("Enter a video title or idea");
     if (isCustom && !customNiche.trim()) return toast.error("Describe your custom niche or topic area");
     onGenerate({
-      brief: { title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio, sameCharacter },
+      brief: { title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio, sameCharacter, language },
       niche: isCustom ? customNiche.trim() : niche,
       topic: title.trim(),
     });
@@ -924,8 +928,21 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
         <ChipRow options={ASPECT_RATIOS.map((r) => ({ id: r, label: r }))} value={ratio} onChange={setRatio} />
       </Section>
 
+      {/* Language */}
+      <Section index={9} title="Language">
+        <p className="text-xs text-muted-foreground mb-2">Script, subtitles and narration. "Same as topic" follows the language of your title.</p>
+        <div className="flex flex-wrap gap-2">
+          {CONTENT_LANGUAGES.map((l) => (
+            <button key={l.id} type="button" onClick={() => setLanguage(l.id)}
+              className={`px-3 py-1.5 rounded-full text-xs border transition ${language === l.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"}`}>
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </Section>
+
       {/* 9. Character consistency */}
-      <Section index={9} title="Main character">
+      <Section index={10} title="Main character">
         <label className="flex items-start gap-3 cursor-pointer glass rounded-xl p-3 border border-border">
           <input
             type="checkbox"
@@ -942,8 +959,20 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
         </label>
       </Section>
 
-      {/* 10. Generate */}
-      <div className="flex items-center justify-end pt-2">
+      {/* 11. Generate */}
+      <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+        {(() => {
+          const base = estimateProjectCredits({ contentType: duration > 90 ? "long_video" : "short_reel", lengthSec: duration });
+          const scenes = duration > 90 ? Math.ceil(duration / 8) : Math.max(4, Math.ceil(duration / 3.5));
+          // Same-character scenes use HD images (6 instead of 1) for ~70% of shots, plus one portrait.
+          const extra = sameCharacter ? Math.round(scenes * 0.7) * 5 + 6 : 0;
+          return (
+            <div className="text-xs text-muted-foreground text-right">
+              Estimated cost: <span className="font-semibold text-foreground">≈ {creditsLabel(base.total + extra)}</span>
+              <div className="text-[11px]">{base.parts}{extra ? ` + ${extra} for the same character` : ""}</div>
+            </div>
+          );
+        })()}
         <button
           onClick={submit}
           className="rounded-lg gradient-primary text-white px-6 py-3 text-sm font-semibold flex items-center gap-2"

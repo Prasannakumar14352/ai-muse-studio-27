@@ -115,14 +115,19 @@ export const NICHES = [
 ];
 
 export const VOICES = [
-  { id: "male_narrator", label: "Male Narrator" },
-  { id: "female_narrator", label: "Female Narrator" },
-  { id: "energetic_creator", label: "Energetic Creator" },
-  { id: "calm_storyteller", label: "Calm Storyteller" },
-  { id: "deep_documentary", label: "Deep Documentary" },
-  { id: "indian_english", label: "Indian English" },
-  { id: "us_english", label: "US English" },
+  { id: "male_narrator", label: "Male Narrator", tts: "Brian" },
+  { id: "female_narrator", label: "Female Narrator", tts: "Sarah" },
+  { id: "energetic_creator", label: "Energetic Creator", tts: "Liam" },
+  { id: "calm_storyteller", label: "Calm Storyteller", tts: "Lily" },
+  { id: "deep_documentary", label: "Deep Documentary", tts: "George" },
+  { id: "indian_english", label: "Indian English", tts: "Charlotte" },
+  { id: "us_english", label: "US English", tts: "Jessica" },
 ];
+
+/** ElevenLabs voice name for a brief's voice choice. */
+export function ttsVoiceFor(voiceId: string | null | undefined): string {
+  return VOICES.find((v) => v.id === voiceId)?.tts ?? "Aria";
+}
 
 export const MUSIC = [
   "Motivational", "Cinematic", "Emotional", "Corporate", "Luxury", "Suspense", "Chill", "No Music",

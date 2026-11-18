@@ -257,6 +257,8 @@ export type VideoBrief = {
   aspectRatio: AspectRatio;
   /** Keep the same person in every scene using a reference portrait (default on). */
   sameCharacter?: boolean;
+  /** Script / subtitle / narration language ("auto" = same as the title). */
+  language?: string;
 };
 
 export type ResearchBrief = {
@@ -682,6 +684,8 @@ export const ScriptAgent = {
             audience: research.audience,
             targetLengthSec: brief.duration,
             retentionBrief,
+            // Detect from the title when not chosen, so a Telugu title gets a Telugu script.
+            language: brief.language ?? "auto",
           },
         });
         logScriptJsonDebug(script);

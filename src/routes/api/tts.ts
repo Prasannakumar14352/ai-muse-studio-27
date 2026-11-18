@@ -33,7 +33,14 @@ export const Route = createFileRoute("/api/tts")({
         const elevenVoice = VOICE_MAP[(voice ?? "alloy").toLowerCase()] ?? voice ?? "Aria";
 
         const { ACTION_COSTS, chargeCredits } = await import("@/lib/credits-guard.server");
-        const credits = Math.max(1, Math.ceil(clipped.length / 100)) * ACTION_COSTS.tts_per_100_chars;
+        // Turbo v2.5 can't speak Telugu, Kannada, Malayalam, Bengali or
+        // Gujarati — those go to Eleven v3 (twice the provider price, so
+        // twice the credits).
+        const { detectTopicLanguage } = await import("@/lib/content-language");
+        const lang = detectTopicLanguage(clipped);
+        const V3_CODES: Record<string, string> = { Telugu: "te", Kannada: "kn", Malayalam: "ml", Bengali: "bn", Gujarati: "gu" };
+        const v3Code = V3_CODES[lang];
+        const credits = Math.max(1, Math.ceil(clipped.length / 100)) * ACTION_COSTS.tts_per_100_chars * (v3Code ? 2 : 1);
         let reservation: Awaited<ReturnType<typeof chargeCredits>>;
         try {
           reservation = await chargeCredits({ userId, action: "voiceover", amount: credits, description: "Voiceover" });
@@ -42,11 +49,16 @@ export const Route = createFileRoute("/api/tts")({
           return jsonError(msg.startsWith("insufficient_credits:") ? `Not enough credits: this voiceover needs ${credits}.` : msg, msg.startsWith("insufficient_credits:") ? 402 : 400);
         }
 
-        const upstream = await fetch("https://fal.run/fal-ai/elevenlabs/tts/turbo-v2.5", {
-          method: "POST",
-          headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ text: clipped, voice: elevenVoice }),
-        });
+        const upstream = await fetch(
+          v3Code ? "https://fal.run/fal-ai/elevenlabs/tts/eleven-v3" : "https://fal.run/fal-ai/elevenlabs/tts/turbo-v2.5",
+          {
+            method: "POST",
+            headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
+            body: JSON.stringify(v3Code
+              ? { text: clipped, voice: elevenVoice, language_code: v3Code }
+              : { text: clipped, voice: elevenVoice }),
+          },
+        );
         const out = (await upstream.json().catch(() => ({}))) as { audio?: { url?: string }; detail?: unknown };
         if (!upstream.ok || !out.audio?.url) {
           await reservation.refund(`provider_${upstream.status}`);

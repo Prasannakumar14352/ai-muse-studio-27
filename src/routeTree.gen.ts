@@ -49,6 +49,7 @@ import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-imag
 import { Route as ApiGenerateVideoClipRouteImport } from './routes/api/generate-video-clip'
 import { Route as ApiTranscodeVideoRouteImport } from './routes/api/transcode-video'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
+import { Route as ApiVoiceSampleRouteImport } from './routes/api/voice-sample'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedAdminCurrencyRouteImport } from './routes/_authenticated/admin.currency'
 import { Route as AuthenticatedAdminIntegrationsRouteImport } from './routes/_authenticated/admin.integrations'
@@ -274,6 +275,11 @@ const ApiTtsRoute = ApiTtsRouteImport.update({
   path: '/api/tts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiVoiceSampleRoute = ApiVoiceSampleRouteImport.update({
+  id: '/api/voice-sample',
+  path: '/api/voice-sample',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -433,6 +439,7 @@ export interface FileRoutesByFullPath {
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/transcode-video': typeof ApiTranscodeVideoRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/voice-sample': typeof ApiVoiceSampleRoute
   '/admin/currency': typeof AuthenticatedAdminCurrencyRoute
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/admin/landing': typeof AuthenticatedAdminLandingRoute
@@ -492,6 +499,7 @@ export interface FileRoutesByTo {
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/transcode-video': typeof ApiTranscodeVideoRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/voice-sample': typeof ApiVoiceSampleRoute
   '/admin/currency': typeof AuthenticatedAdminCurrencyRoute
   '/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/admin/landing': typeof AuthenticatedAdminLandingRoute
@@ -555,6 +563,7 @@ export interface FileRoutesById {
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/transcode-video': typeof ApiTranscodeVideoRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/voice-sample': typeof ApiVoiceSampleRoute
   '/_authenticated/admin/currency': typeof AuthenticatedAdminCurrencyRoute
   '/_authenticated/admin/integrations': typeof AuthenticatedAdminIntegrationsRoute
   '/_authenticated/admin/landing': typeof AuthenticatedAdminLandingRoute
@@ -618,6 +627,7 @@ export interface FileRouteTypes {
     | '/api/generate-video-clip'
     | '/api/transcode-video'
     | '/api/tts'
+    | '/api/voice-sample'
     | '/admin/currency'
     | '/admin/integrations'
     | '/admin/landing'
@@ -677,6 +687,7 @@ export interface FileRouteTypes {
     | '/api/generate-video-clip'
     | '/api/transcode-video'
     | '/api/tts'
+    | '/api/voice-sample'
     | '/admin/currency'
     | '/admin/integrations'
     | '/admin/landing'
@@ -739,6 +750,7 @@ export interface FileRouteTypes {
     | '/api/generate-video-clip'
     | '/api/transcode-video'
     | '/api/tts'
+    | '/api/voice-sample'
     | '/_authenticated/admin/currency'
     | '/_authenticated/admin/integrations'
     | '/_authenticated/admin/landing'
@@ -776,6 +788,7 @@ export interface RootRouteChildren {
   ApiGenerateVideoClipRoute: typeof ApiGenerateVideoClipRoute
   ApiTranscodeVideoRoute: typeof ApiTranscodeVideoRoute
   ApiTtsRoute: typeof ApiTtsRoute
+  ApiVoiceSampleRoute: typeof ApiVoiceSampleRoute
   ApiPublicHooksPublishScheduledRoute: typeof ApiPublicHooksPublishScheduledRoute
   ApiPublicWebhooksRazorpayRoute: typeof ApiPublicWebhooksRazorpayRoute
   ApiPublicOauthPlatformCallbackRoute: typeof ApiPublicOauthPlatformCallbackRoute
@@ -1061,6 +1074,13 @@ declare module '@tanstack/react-router' {
       path: '/api/tts'
       fullPath: '/api/tts'
       preLoaderRoute: typeof ApiTtsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/voice-sample': {
+      id: '/api/voice-sample'
+      path: '/api/voice-sample'
+      fullPath: '/api/voice-sample'
+      preLoaderRoute: typeof ApiVoiceSampleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/': {
@@ -1351,6 +1371,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGenerateVideoClipRoute: ApiGenerateVideoClipRoute,
   ApiTranscodeVideoRoute: ApiTranscodeVideoRoute,
   ApiTtsRoute: ApiTtsRoute,
+  ApiVoiceSampleRoute: ApiVoiceSampleRoute,
   ApiPublicHooksPublishScheduledRoute: ApiPublicHooksPublishScheduledRoute,
   ApiPublicWebhooksRazorpayRoute: ApiPublicWebhooksRazorpayRoute,
   ApiPublicOauthPlatformCallbackRoute: ApiPublicOauthPlatformCallbackRoute,
