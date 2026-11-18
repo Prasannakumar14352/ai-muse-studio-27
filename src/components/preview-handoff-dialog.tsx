@@ -25,7 +25,7 @@ export function PreviewHandoffDialog({
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Preview handoff</div>
             <div className="text-lg font-semibold">Send to {moduleLabel}</div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10"><X className="w-4 h-4" /></button>
+          <button aria-label="Close" onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10"><X className="w-4 h-4" /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-3 text-sm">
           <p className="text-xs text-muted-foreground">These fields will be prefilled in {moduleLabel}. You can still edit anything before generating.</p>

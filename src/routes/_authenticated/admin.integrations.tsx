@@ -109,7 +109,7 @@ function ProviderCard({ row, onChanged }: { row: ProviderRow; onChanged: () => v
         {callbacks.map((cb) => (
           <div key={cb} className="flex items-center gap-2 bg-black/30 rounded-lg px-3 py-2 text-xs font-mono">
             <span className="flex-1 truncate">{cb}</span>
-            <button onClick={() => { navigator.clipboard.writeText(cb); toast.success("Copied"); }}
+            <button aria-label="Copy" onClick={() => { navigator.clipboard.writeText(cb); toast.success("Copied"); }}
               className="text-muted-foreground hover:text-foreground"><Copy className="w-3.5 h-3.5" /></button>
           </div>
         ))}

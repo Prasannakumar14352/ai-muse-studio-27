@@ -141,7 +141,7 @@ export const MODEL_CATALOG: CatalogModel[] = [
     label: "ElevenLabs v3",
     vendor: "ElevenLabs",
     description:
-      "Most expressive voice model, 70+ languages. Test Telugu output before promising it.",
+      "Most expressive voice model, 70+ languages including Hindi and Tamil.",
     endpoint: "fal-ai/elevenlabs/tts/eleven-v3",
     badge: "70+ languages",
     voices: ELEVEN_VOICES,

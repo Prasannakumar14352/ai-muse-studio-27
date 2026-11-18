@@ -407,7 +407,7 @@ function ThumbnailsPage() {
                         <Download className="w-3 h-3" /> Download
                       </a>
                     )}
-                    <button onClick={async () => { await deleteGeneratedThumbnail(t.id); await refreshLibrary(); }}
+                    <button aria-label="Delete" onClick={async () => { await deleteGeneratedThumbnail(t.id); await refreshLibrary(); }}
                       className="rounded-lg glass border border-border hover:bg-rose-500/20 text-rose-300 py-1.5 px-2 text-xs">
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -974,7 +974,7 @@ function ReverseEngineerPanel({ onUseBrief }: { onUseBrief: (b: ThumbnailBrief) 
                 className="flex-1 rounded-lg gradient-primary text-white py-2 text-xs flex items-center justify-center gap-1">
                 <Sparkles className="w-3 h-3" /> Use this style
               </button>
-              <button onClick={() => { navigator.clipboard.writeText(result.prompt); toast.success("Prompt copied"); }}
+              <button aria-label="Copy" onClick={() => { navigator.clipboard.writeText(result.prompt); toast.success("Prompt copied"); }}
                 className="rounded-lg glass border border-border py-2 px-3 text-xs">
                 <Copy className="w-3 h-3" />
               </button>
@@ -1101,13 +1101,13 @@ function ReferenceUploader({ value, onChange }: { value: string[]; onChange: (v:
         {value.map((src, i) => (
           <div key={i} className="relative">
             <img src={src} alt={`ref-${i}`} className="w-14 h-14 rounded-lg object-cover border border-border" />
-            <button onClick={() => onChange(value.filter((_, j) => j !== i))}
+            <button aria-label="Remove" onClick={() => onChange(value.filter((_, j) => j !== i))}
               className="absolute -top-1 -right-1 bg-rose-500/80 text-white rounded-full p-0.5">
               <X className="w-3 h-3" />
             </button>
           </div>
         ))}
-        <button onClick={() => ref.current?.click()}
+        <button aria-label="Upload" onClick={() => ref.current?.click()}
           className="w-14 h-14 rounded-lg glass border border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-white/20">
           <Upload className="w-4 h-4" />
         </button>

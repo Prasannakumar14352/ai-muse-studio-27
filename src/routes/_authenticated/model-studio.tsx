@@ -1,6 +1,8 @@
 // Model Studio — run top third-party AI models (Seedance video, FLUX images,
 // ElevenLabs multilingual voice) from one place, paid for with credits.
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
+import { saveUrlToLibrary } from "@/lib/save-to-library";
+import { creditsLabel } from "@/lib/credits-label";
 import { PublishButton } from "@/components/publish-actions";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
@@ -16,6 +18,7 @@ import {
   Sparkles,
   AlertTriangle,
   Lock,
+  Library,
 } from "lucide-react";
 import { MODEL_CATALOG, creditsFor, type ModelKind } from "@/lib/model-catalog";
 import { usePlanAccess, useUpgradeDialog } from "@/lib/use-plan-access";
@@ -68,7 +71,10 @@ function ModelStudioPage() {
   const [modelId, setModelId] = useState(models[0].id);
   const model = MODEL_CATALOG.find((m) => m.id === modelId) ?? models[0];
 
-  const [prompt, setPrompt] = useState("");
+  // Each tab keeps its own prompt, so an image prompt doesn't follow you to Voice.
+  const [prompts, setPrompts] = useState<Record<ModelKind, string>>({} as Record<ModelKind, string>);
+  const prompt = prompts[kind] ?? "";
+  const setPrompt = (v: string) => setPrompts((p) => ({ ...p, [kind]: v }));
   const [durationSec, setDurationSec] = useState(5);
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [voice, setVoice] = useState("Aria");
@@ -139,7 +145,7 @@ function ModelStudioPage() {
       }),
     onSuccess: () => {
       toast.success("Generation started", {
-        description: `${model.label} · ${credits} credits reserved`,
+        description: `${model.label} · ${creditsLabel(credits)} reserved`,
       });
       qc.invalidateQueries({ queryKey: ["model-generations"] });
       qc.invalidateQueries({ queryKey: ["access"] });
@@ -274,7 +280,7 @@ function ModelStudioPage() {
 
         <div className="flex items-center justify-between gap-4 pt-2">
           <div className="text-sm text-muted-foreground">
-            Cost: <span className="font-semibold text-foreground">{credits} credits</span>
+            Cost: <span className="font-semibold text-foreground">{creditsLabel(credits)}</span>
           </div>
           <button
             onClick={() => startM.mutate()}
@@ -298,15 +304,15 @@ function ModelStudioPage() {
       </div>
 
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold">Your generations</h2>
+        <h2 className="text-lg font-semibold">Your {tab.label.toLowerCase()} generations</h2>
         {listQ.isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
-        {listQ.data?.length === 0 && (
+        {listQ.data && listQ.data.filter((g) => g.kind === kind).length === 0 && (
           <div className="text-sm text-muted-foreground">
             Nothing yet — your results will appear here.
           </div>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
-          {listQ.data?.map((g) => (
+          {listQ.data?.filter((g) => g.kind === kind).map((g) => (
             <GenerationCard key={g.id} g={g} />
           ))}
         </div>
@@ -371,7 +377,7 @@ function GenerationCard({ g }: { g: ModelGeneration }) {
       <div className="p-3 space-y-1">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            {model?.label ?? g.model_id} · {g.credits} credits
+            {model?.label ?? g.model_id} · {creditsLabel(g.credits)}
           </span>
           {g.status === "completed" && g.output_url && (
             <span className="inline-flex items-center gap-3">
@@ -386,6 +392,7 @@ function GenerationCard({ g }: { g: ModelGeneration }) {
                   }}
                 />
               )}
+              <SaveToLibraryButton g={g} title={g.prompt.slice(0, 80) || (model?.label ?? "AI generation")} />
               <a
                 href={g.output_url}
                 target="_blank"
@@ -400,5 +407,32 @@ function GenerationCard({ g }: { g: ModelGeneration }) {
         <div className="text-sm line-clamp-2">{g.prompt}</div>
       </div>
     </div>
+  );
+}
+
+function SaveToLibraryButton({ g, title }: { g: ModelGeneration; title: string }) {
+  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
+  if (!g.output_url) return null;
+  const kind = g.kind === "audio" ? "voiceover" : g.kind === "video" ? "video" : "image";
+  return (
+    <button
+      type="button"
+      disabled={state !== "idle"}
+      onClick={async () => {
+        setState("saving");
+        try {
+          await saveUrlToLibrary({ url: g.output_url!, kind, title, tags: ["model-studio"], metadata: { model: g.model_id } });
+          setState("saved");
+          toast.success("Saved to Media Library");
+        } catch (e) {
+          setState("idle");
+          toast.error(e instanceof Error ? e.message : "Couldn't save");
+        }
+      }}
+      className="inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-60 disabled:no-underline"
+    >
+      {state === "saving" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Library className="h-3.5 w-3.5" />}
+      {state === "saved" ? "In Library" : "Save to Library"}
+    </button>
   );
 }

@@ -720,7 +720,7 @@ function UploadPanel({
           {images.map((src, i) => (
             <div key={i} className="relative aspect-square rounded overflow-hidden border border-border">
               <img src={src} alt="" className="w-full h-full object-cover" />
-              <button onClick={() => onRemove(i)}
+              <button aria-label="Remove" onClick={() => onRemove(i)}
                 className="absolute top-1 right-1 w-5 h-5 rounded bg-black/70 text-white flex items-center justify-center hover:bg-rose-500/80">
                 <X className="w-3 h-3" />
               </button>

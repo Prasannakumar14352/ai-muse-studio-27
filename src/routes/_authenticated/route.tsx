@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { GlobalCreditGate } from "@/components/global-credit-gate";
 import { PlanGate, UpgradeDialogProvider } from "@/lib/use-plan-access";
 import { isHiddenPath } from "@/lib/hidden-features";
+import { AppSplash } from "@/components/app-splash";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -35,6 +36,11 @@ export const Route = createFileRoute("/_authenticated")({
     }
     return { user: session.user };
   },
+  // Shown (also in the server HTML, since this route is client-only) while
+  // the app bundle and the sign-in session load — instead of a black screen.
+  pendingComponent: AppSplash,
+  pendingMs: 0,
+  pendingMinMs: 0,
   component: AuthenticatedLayout,
 });
 

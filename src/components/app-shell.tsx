@@ -197,8 +197,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     : undefined;
   const derivedNav = projectId
     ? (projectData?.project?.content_type
-        ? (CONTENT_TYPE_TO_NAV[projectData.project.content_type] ?? "/dashboard")
-        : "/dashboard")
+        ? (CONTENT_TYPE_TO_NAV[projectData.project.content_type] ?? "/videos")
+        : "/videos")
     : null;
 
   async function signOut() {

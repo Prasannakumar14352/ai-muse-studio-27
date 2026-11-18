@@ -242,7 +242,7 @@ export function SlideEditor(props: SlideEditorProps) {
               <div className="text-sm font-semibold truncate">{props.title}</div>
               <div className="text-[11px] text-muted-foreground">Slide {props.slideNumber} · {props.ratio}</div>
             </div>
-            <button onClick={props.onClose} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
+            <button aria-label="Close" onClick={props.onClose} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
               <X className="w-4 h-4" />
             </button>
           </div>

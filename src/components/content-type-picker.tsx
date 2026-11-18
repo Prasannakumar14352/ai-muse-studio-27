@@ -5,6 +5,9 @@ import { Link } from "@tanstack/react-router";
 import { CONTENT_TYPES, type ContentTypeId } from "@/lib/content-types";
 import { ArrowRight } from "lucide-react";
 
+/** Content types whose module is hidden for now (see hidden-features.ts). */
+const HIDDEN_CONTENT_TYPES = new Set<ContentTypeId>(["promo_video"]);
+
 type Props = {
   /** Optional currently-selected id (for edit flows). */
   value?: ContentTypeId | null;
@@ -15,7 +18,7 @@ type Props = {
 export function ContentTypePicker({ value, onSelect }: Props) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      {CONTENT_TYPES.map((c) => {
+      {CONTENT_TYPES.filter((c) => !HIDDEN_CONTENT_TYPES.has(c.id)).map((c) => {
         const Icon = c.icon;
         const selected = value === c.id;
         const inner = (

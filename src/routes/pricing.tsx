@@ -565,7 +565,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div className="glass rounded-2xl p-8 max-w-md w-full relative max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 p-1 rounded hover:bg-white/10">
+        <button aria-label="Close" onClick={onClose} className="absolute top-4 right-4 p-1 rounded hover:bg-white/10">
           <X className="w-4 h-4" />
         </button>
         <div className="flex items-center gap-3 mb-4">

@@ -236,10 +236,10 @@ const NICHES: Niche[] = [
 type StyleCard = { id: StyleId; label: string; image: string };
 const STYLE_CARDS: StyleCard[] = [
   { id: "3d", label: "3D", image: style3d },
-  { id: "ghibli", label: "Ghibli-inspired", image: styleGhibli },
+  { id: "ghibli", label: "Hand-painted anime", image: styleGhibli },
   { id: "anime", label: "Anime", image: styleAnime },
   { id: "realistic", label: "Realistic", image: styleRealistic },
-  { id: "pixar", label: "Pixar-like", image: stylePixar },
+  { id: "pixar", label: "3D family animation", image: stylePixar },
   { id: "cinematic", label: "Cinematic", image: styleCinematic },
   { id: "documentary", label: "Documentary", image: styleDocumentary },
   { id: "dark_mystery", label: "Dark Mystery", image: styleDark },
@@ -1557,7 +1557,7 @@ function SceneLightbox({
           >
             <Maximize2 className="w-3.5 h-3.5" /> {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
           </button>
-          <button
+          <button aria-label="Close"
             onClick={onClose}
             className="rounded-lg bg-white/10 hover:bg-white/20 text-white p-1.5"
           >
@@ -1569,7 +1569,7 @@ function SceneLightbox({
       {/* Main stage */}
       <div className="flex-1 flex items-center justify-center px-2 pb-2 relative overflow-hidden">
         {hasPrev && (
-          <button
+          <button aria-label="Previous"
             onClick={(e) => { e.stopPropagation(); onPrev(); }}
             className="absolute left-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/60 hover:bg-black/80 text-white p-2"
           >
@@ -1593,7 +1593,7 @@ function SceneLightbox({
           />
         )}
         {hasNext && (
-          <button
+          <button aria-label="Next"
             onClick={(e) => { e.stopPropagation(); onNext(); }}
             className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/60 hover:bg-black/80 text-white p-2"
           >
