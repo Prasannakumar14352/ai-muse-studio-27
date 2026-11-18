@@ -305,89 +305,22 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       return { ok: true, alreadyCredited: true, credits: payment.credits };
     }
 
-    const { error: upErr } = await supabaseAdmin
+    // Claim the payment: only the first of checkout/webhook to flip it fulfils it.
+    const { data: claimed, error: upErr } = await supabaseAdmin
       .from("payments")
       .update({ status: "success", razorpay_payment_id: data.razorpay_payment_id })
       .eq("id", payment.id)
-      .eq("status", "pending");
+      .eq("status", "pending")
+      .select("id");
     if (upErr) throw new Error("Could not update payment");
-
-    const packId = payment.pack_id ?? "";
-    let dbPlan: Record<string, unknown> | null = null;
-    let cycle: "monthly" | "yearly" | "lifetime" | null = null;
-    if (packId.startsWith("plan_")) {
-      const rest = packId.slice(5);
-      const m = rest.match(/^(.+)_(monthly|yearly|lifetime)$/);
-      if (m) {
-        const code = m[1];
-        cycle = m[2] as "monthly" | "yearly" | "lifetime";
-        const { data: pr } = await supabaseAdmin.from("pricing_plans").select("*").eq("code", code).maybeSingle();
-        dbPlan = (pr as Record<string, unknown> | null) ?? null;
-      }
+    if (!claimed || claimed.length === 0) {
+      return { ok: true, alreadyCredited: true, credits: payment.credits };
     }
 
-    if (dbPlan && cycle === "lifetime") {
-      const included = payment.credits;
-      const { data: profile } = await supabaseAdmin
-        .from("profiles").select("lifetime_credits").eq("id", context.userId).maybeSingle();
-      const currentLife = (profile as { lifetime_credits?: number } | null)?.lifetime_credits ?? 0;
-      const { error: credErr } = await supabaseAdmin
-        .from("profiles").update({ lifetime_credits: currentLife + included }).eq("id", context.userId);
-      if (credErr) throw new Error("Could not credit lifetime account");
-      await supabaseAdmin.from("subscriptions").update({ status: "canceled" })
-        .eq("user_id", context.userId).eq("status", "active");
-      await supabaseAdmin.from("subscriptions").insert({
-        user_id: context.userId,
-        plan_name: String(dbPlan.code),
-        plan_type: "lifetime",
-        lifetime_access: true,
-        included_credits: included,
-        monthly_credit_limit: Number(dbPlan.monthly_credits ?? 0),
-        monthly_credits_used: 0,
-        unlimited_usage: false,
-        status: "active",
-        started_at: new Date().toISOString(),
-        expires_at: null,
-        renews_at: null,
-      });
-      return { ok: true, credits: included, lifetime: true, planId: String(dbPlan.code) };
-    }
-
-    if (dbPlan && (cycle === "monthly" || cycle === "yearly")) {
-      const monthlyLimit = Number(dbPlan.monthly_credits ?? 0);
-      const now = new Date();
-      const renew = new Date(now);
-      if (cycle === "yearly") renew.setFullYear(renew.getFullYear() + 1);
-      else renew.setMonth(renew.getMonth() + 1);
-      await supabaseAdmin.from("subscriptions").update({ status: "canceled" })
-        .eq("user_id", context.userId).eq("status", "active");
-      await supabaseAdmin.from("subscriptions").insert({
-        user_id: context.userId,
-        plan_name: String(dbPlan.code),
-        plan_type: cycle,
-        lifetime_access: false,
-        included_credits: 0,
-        monthly_credit_limit: monthlyLimit,
-        monthly_credits_used: 0,
-        unlimited_usage: false,
-        status: "active",
-        started_at: now.toISOString(),
-        renews_at: renew.toISOString(),
-      });
-      return { ok: true, credits: payment.credits, subscription: true, planId: String(dbPlan.code) };
-    }
-
-    // Otherwise: top-up credit pack → wallet balance.
-    const { data: profile } = await supabaseAdmin
-      .from("profiles").select("user_credits").eq("id", context.userId).maybeSingle();
-    const current = profile?.user_credits ?? 0;
-    const { error: credErr } = await supabaseAdmin
-      .from("profiles")
-      .update({ user_credits: current + payment.credits })
-      .eq("id", context.userId);
-    if (credErr) throw new Error("Could not credit account");
-
-    return { ok: true, credits: payment.credits, newBalance: current + payment.credits };
+    // Activate the plan or add the credit pack (shared with the webhook).
+    const { fulfillOrderPayment } = await import("./billing.server");
+    const result = await fulfillOrderPayment(supabaseAdmin, payment as never);
+    return { ok: true, ...result };
   });
 
 /** List the current user's payments (for the invoices page). */
@@ -410,7 +343,7 @@ export const getMySubscription = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data: sub } = await context.supabase
       .from("subscriptions")
-      .select("id, plan_name, plan_type, lifetime_access, included_credits, status, started_at, expires_at, renews_at, monthly_credit_limit, monthly_credits_used, unlimited_usage")
+      .select("id, plan_name, plan_type, lifetime_access, included_credits, status, started_at, expires_at, renews_at, monthly_credit_limit, monthly_credits_used, unlimited_usage, auto_renew, payment_issue, razorpay_subscription_id")
       .eq("user_id", context.userId)
       .eq("status", "active")
       .order("started_at", { ascending: false })

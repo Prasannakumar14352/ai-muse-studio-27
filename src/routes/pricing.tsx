@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
-import { useSuspenseQuery, useQueryClient, queryOptions } from "@tanstack/react-query";
+import { useSuspenseQuery, useQuery, useQueryClient, queryOptions } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   listPricingPlans,
@@ -8,6 +8,7 @@ import {
   type BillingCycle,
 } from "@/lib/pricing.functions";
 import { createRazorpayOrder, verifyRazorpayPayment, createRazorpayPlanOrder, getUsdInrRate } from "@/lib/razorpay.functions";
+import { getAutopayOptions, createAutopaySubscription, verifyAutopaySubscription } from "@/lib/razorpay-autopay.functions";
 import { CREDIT_PACKS, type CreditPack } from "@/lib/constants";
 import { useAccess } from "@/lib/access";
 import { toast } from "sonner";
@@ -409,6 +410,15 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
   const [paying, setPaying] = useState(false);
   const [lastError, setLastError] = useState<{ code?: string; description?: string; source?: string; reason?: string } | null>(null);
   const [rateInfo, setRateInfo] = useState<{ rate: number; source: string; status: string; updatedAt: string | null; warning: string | null } | null>(null);
+  const autopayFn = useServerFn(getAutopayOptions);
+  const createSub = useServerFn(createAutopaySubscription);
+  const verifySub = useServerFn(verifyAutopaySubscription);
+  const autopayQ = useQuery({ queryKey: ["autopay-options"], queryFn: () => autopayFn(), staleTime: 10 * 60_000 });
+  const autopay = effective === "lifetime"
+    ? null
+    : (autopayQ.data ?? []).find((o) => o.planCode === plan.code && o.cycle === effective) ?? null;
+  const [mode, setMode] = useState<"autopay" | "once">("autopay");
+  const useAutopay = !!autopay && mode === "autopay";
   const credits = effective === "lifetime"
     ? (plan.includedCredits || plan.monthlyCredits)
     : effective === "yearly"
@@ -426,12 +436,60 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
 
   const inrPreview = rate ? Math.round(price * rate) : null;
 
+  async function finishPurchase(message: string) {
+    toast.success(message);
+    await qc.invalidateQueries({ queryKey: ["access"] });
+    await qc.invalidateQueries({ queryKey: ["my-payments"] });
+    await qc.invalidateQueries({ queryKey: ["my-subscription"] });
+    onClose();
+    navigate({ to: "/billing" });
+  }
+
+  /** Auto-renew: Razorpay subscription — the user approves a UPI AutoPay / card mandate once. */
+  async function handleAutopay() {
+    const sub = await createSub({ data: { planCode: plan.code, cycle: effective as "monthly" | "yearly" } });
+    await new Promise<void>((resolve, reject) => {
+      const rzp = new window.Razorpay!({
+        key: sub.keyId,
+        subscription_id: sub.subscriptionId,
+        name: "CreatorFlow AI",
+        description: `${plan.name} — auto-renews ${effective === "yearly" ? "yearly" : "monthly"}`,
+        prefill: access?.email ? { email: access.email } : {},
+        theme: { color: "#ff6b35" },
+        handler: async (resp: { razorpay_payment_id: string; razorpay_subscription_id: string; razorpay_signature: string }) => {
+          try {
+            const r = await verifySub({ data: resp });
+            await finishPurchase(`${plan.name} is active · ${r.credits.toLocaleString()} credits added · auto-renew on`);
+            resolve();
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : "Verification failed";
+            setLastError({ description: `${msg}. If you were charged, your plan activates automatically within a few minutes.`, source: "verification" });
+            toast.error(msg);
+            reject(e);
+          }
+        },
+        modal: { ondismiss: () => { setPaying(false); resolve(); } },
+      }) as { open: () => void; on?: (event: string, cb: (payload: unknown) => void) => void };
+      if (typeof rzp.on === "function") {
+        rzp.on("payment.failed", (payload: unknown) => {
+          const err = (payload as { error?: { code?: string; description?: string; source?: string; reason?: string } })?.error;
+          setLastError({ code: err?.code, description: err?.description ?? "Payment failed", source: err?.source, reason: err?.reason });
+        });
+      }
+      rzp.open();
+    });
+  }
+
   async function handlePay() {
     setPaying(true);
     setLastError(null);
     try {
       const ok = await loadRazorpayScript();
       if (!ok || !window.Razorpay) throw new Error("Could not load Razorpay checkout");
+      if (useAutopay) {
+        await handleAutopay();
+        return;
+      }
       const order = await createOrder({ data: { planId: plan.id, billingCycle: effective } });
       await new Promise<void>((resolve, reject) => {
         const rzp = new window.Razorpay!({
@@ -532,16 +590,37 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
           )}
           <div className="flex justify-between text-base pt-2 border-t border-border/40">
             <span className="font-semibold">Payable today</span>
-            <span className="font-bold gradient-text">{inrPreview !== null ? inr(inrPreview) : "…"}</span>
+            <span className="font-bold gradient-text">
+              {useAutopay ? inr(autopay!.amountPaise / 100) : inrPreview !== null ? inr(inrPreview) : "…"}
+            </span>
           </div>
         </div>
+        {autopay && (
+          <div className="mb-3 space-y-2" role="radiogroup" aria-label="Payment type">
+            {([
+              { id: "autopay" as const, title: `Auto-renew · ${inr(autopay.amountPaise / 100)} / ${effective === "yearly" ? "year" : "month"}`, desc: "Approve UPI AutoPay or card once — renews automatically. Cancel anytime from Billing." },
+              { id: "once" as const, title: `Pay once · ${inrPreview !== null ? inr(inrPreview) : "…"}`, desc: `One ${effective === "yearly" ? "year" : "month"}, no auto-renew. Works with international cards.` },
+            ]).map((o) => (
+              <button key={o.id} type="button" role="radio" aria-checked={mode === o.id} onClick={() => setMode(o.id)}
+                className={`w-full text-left rounded-xl border p-3 transition ${mode === o.id ? "border-[color:var(--brand-orange)] bg-[color:var(--brand-orange)]/10" : "border-border/60 hover:bg-white/5"}`}>
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <span className={`w-3.5 h-3.5 rounded-full border-2 ${mode === o.id ? "border-[color:var(--brand-orange)] bg-[color:var(--brand-orange)]" : "border-white/40"}`} />
+                  {o.title}
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-1 pl-5">{o.desc}</div>
+              </button>
+            ))}
+          </div>
+        )}
         <button
           onClick={handlePay}
-          disabled={paying || !rate}
+          disabled={paying || (!rate && !useAutopay)}
           className="w-full rounded-lg gradient-primary text-white py-3 font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {paying && <Loader2 className="w-4 h-4 animate-spin" />}
-          {paying ? "Opening checkout…" : lastError ? "Retry payment" : inrPreview !== null ? `Pay ${inr(inrPreview)}` : "Loading…"}
+          {paying ? "Opening checkout…" : lastError ? "Retry payment"
+            : useAutopay ? `Subscribe · ${inr(autopay!.amountPaise / 100)} / ${effective === "yearly" ? "year" : "month"}`
+            : inrPreview !== null ? `Pay ${inr(inrPreview)}` : "Loading…"}
         </button>
         {lastError && (
           <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-100 p-3 text-xs">

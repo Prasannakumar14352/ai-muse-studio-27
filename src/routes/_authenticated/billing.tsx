@@ -2,6 +2,10 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMySubscription } from "@/lib/razorpay.functions";
+import { cancelAutopay } from "@/lib/razorpay-autopay.functions";
+import { confirmDialog } from "@/components/confirm-dialog";
+import { toast } from "sonner";
+import { useState } from "react";
 import { PLANS } from "@/lib/constants";
 import { TopUpPacks } from "@/components/topup-packs";
 import {
@@ -44,6 +48,9 @@ type Sub = {
   monthly_credit_limit: number;
   monthly_credits_used: number;
   unlimited_usage: boolean;
+  auto_renew?: boolean | null;
+  payment_issue?: string | null;
+  razorpay_subscription_id?: string | null;
 } | null;
 
 type Pay = {
@@ -80,6 +87,32 @@ function BillingPage() {
   const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
 
   const lastPending = payments.find((p) => p.status === "pending");
+  const cancelFn = useServerFn(cancelAutopay);
+  const [cancelling, setCancelling] = useState(false);
+  const fmtDate = (d: string) => new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+
+  async function handleCancelAutopay() {
+    const ok = await confirmDialog({
+      title: "Cancel auto-renew?",
+      description: sub?.renews_at
+        ? `You won't be charged again. Your plan and credits stay active until ${fmtDate(sub.renews_at)}, then you move to Free.`
+        : "You won't be charged again.",
+      confirmText: "Cancel auto-renew",
+      cancelText: "Keep auto-renew",
+      tone: "destructive",
+    });
+    if (!ok) return;
+    setCancelling(true);
+    try {
+      await cancelFn();
+      toast.success("Auto-renew cancelled");
+      await refetch();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't cancel auto-renew");
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12">
@@ -104,6 +137,24 @@ function BillingPage() {
         <div className="glass rounded-2xl p-12 text-center text-muted-foreground">Loading your billing details…</div>
       ) : (
         <>
+          {sub?.payment_issue && (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold">
+                  {sub.payment_issue === "halted" ? "Your plan was paused — renewal payment failed" : "Your last renewal payment failed"}
+                </div>
+                <div className="text-xs opacity-80 mt-0.5">
+                  {sub.payment_issue === "halted"
+                    ? "Razorpay couldn't charge your UPI / card after several tries, so you're on Free now. Subscribe again to restore your plan."
+                    : "Razorpay will retry automatically over the next few days. Make sure your UPI AutoPay mandate or card is active and has enough balance."}
+                </div>
+              </div>
+              {sub.payment_issue === "halted" && (
+                <Link to="/pricing" className="rounded-lg gradient-primary text-white px-3 py-1.5 text-xs font-medium">Subscribe again</Link>
+              )}
+            </div>
+          )}
+
           {/* Current Plan */}
           <section className="glass rounded-2xl p-6 relative overflow-hidden">
             <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full gradient-primary opacity-10 blur-3xl pointer-events-none" />
@@ -129,11 +180,25 @@ function BillingPage() {
                 <div className="mt-2 text-sm text-muted-foreground">
                   {isAdmin ? "Full access to all features." : `${planDef.price} ${planDef.period ?? ""}`.trim()}
                 </div>
-                {sub?.renews_at && (
-                  <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Calendar className="w-3.5 h-3.5" /> Renews {new Date(sub.renews_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                {sub?.auto_renew && sub.renews_at ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5" /> Auto-renews {fmtDate(sub.renews_at)} · charged automatically via Razorpay
+                    </span>
+                    <button onClick={handleCancelAutopay} disabled={cancelling}
+                      className="underline hover:text-foreground disabled:opacity-50">
+                      {cancelling ? "Cancelling…" : "Cancel auto-renew"}
+                    </button>
                   </div>
-                )}
+                ) : sub?.expires_at ? (
+                  <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-amber-300">
+                    <Calendar className="w-3.5 h-3.5" /> Auto-renew off · plan ends {fmtDate(sub.expires_at)}
+                  </div>
+                ) : sub?.renews_at ? (
+                  <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Calendar className="w-3.5 h-3.5" /> Paid until {fmtDate(sub.renews_at)} · renew from Pricing
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2">
