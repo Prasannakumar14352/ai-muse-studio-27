@@ -22,6 +22,19 @@ export const TIER_LABEL: Record<Tier, string> = {
 
 export const PLAN_ACCESS_SETTINGS_KEY = "plan_access";
 
+/**
+ * How many accounts a user may connect per social platform (e.g. 3 YouTube
+ * channels + 3 Instagram accounts on Pro). Admins are unlimited.
+ * Connections itself needs the Creator plan, so lower tiers get 0.
+ */
+export const MAX_ACCOUNTS_PER_PLATFORM: Record<Tier, number> = {
+  free: 0,
+  starter: 0,
+  creator: 2,
+  pro: 5,
+  team: 15,
+};
+
 /** Plan codes (pricing_plans.code / subscriptions.plan_name) → tier. Yearly and lifetime match their tier. */
 const PLAN_TIER: Record<string, Tier> = {
   free: "free",

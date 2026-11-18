@@ -1,10 +1,11 @@
 // Universal "Download / Publish / Schedule / Copy / Mark manually published"
 // action bar for any generated project (image, carousel, video, thumbnail).
-// Publishing opens a dialog: pick a platform you've connected, then publish
-// now or schedule (the publish worker posts it at that time). Platforms that
-// aren't connected, or can't take this content, show why and link to
-// Connected Accounts. Download and manual posting always work.
-import { useState } from "react";
+// Publishing opens a dialog: tick one or more connected accounts (several
+// YouTube channels, Instagram accounts, Pages… at once), then publish now or
+// schedule. Each account gets its own post, with that platform's caption.
+// Platforms that aren't connected, or can't take this content, show why and
+// link to Connected Accounts. Download and manual posting always work.
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -13,7 +14,7 @@ import {
   Download, Send, Clock, Copy, CheckCircle2, ExternalLink, Loader2, Share2,
 } from "lucide-react";
 import {
-  markManuallyPublished, schedulePost, getPlatformStatus, platformMediaProblem,
+  markManuallyPublished, schedulePost, listPublishTargets, platformMediaProblem,
   PLATFORMS, type Platform, type PublishStatus,
 } from "@/lib/publishing.functions";
 import { copyText, downloadPlatformPackage, buildLinkedInPost } from "@/lib/downloads";
@@ -73,19 +74,33 @@ export function PublishActions(props: PublishActionsProps) {
   const [scheduleAt, setScheduleAt] = useState<string>("");
   const mark = useServerFn(markManuallyPublished);
   const schedule = useServerFn(schedulePost);
-  const statusFn = useServerFn(getPlatformStatus);
+  const targetsFn = useServerFn(listPublishTargets);
   const qc = useQueryClient();
-  const platformStatus = useQuery({
-    queryKey: ["platform-status"],
-    queryFn: () => statusFn(),
+  const targetsQ = useQuery({
+    queryKey: ["publish-targets"],
+    queryFn: () => targetsFn(),
     enabled: open,
     staleTime: 30_000,
   });
-  const connected = (p: Platform) => platformStatus.data?.find((x) => x.platform === p)?.connected ?? false;
-  const accountName = (p: Platform) => platformStatus.data?.find((x) => x.platform === p)?.accountName ?? null;
+  const targets = targetsQ.data ?? [];
+  const [selected, setSelected] = useState<string[]>([]);
   const mediaUrls = (props.media ?? []).filter((m) => m.kind !== "thumbnail").map((m) => m.url);
-  const problem = platformMediaProblem(platform, mediaUrls);
-  const canPublish = connected(platform) && !problem;
+  const problemFor = (p: Platform) => platformMediaProblem(p, mediaUrls);
+  const selectedTargets = targets.filter((t) => selected.includes(t.id));
+  const canPublish = selectedTargets.length > 0;
+
+  // Pre-select the first usable account on the project's main platform.
+  useEffect(() => {
+    if (!open || !targetsQ.data || selected.length > 0) return;
+    const first = targetsQ.data.find((t) => t.platform === platform && t.usable && !problemFor(t.platform));
+    if (first) setSelected([first.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, targetsQ.data]);
+
+  function toggle(id: string, p: Platform) {
+    setPlatform(p);
+    setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  }
   const textFor = (p: Platform) => ({
     caption: props.captions?.[p]?.caption ?? props.caption,
     hashtags: props.captions?.[p]?.hashtags ?? props.hashtags,
@@ -119,58 +134,67 @@ export function PublishActions(props: PublishActionsProps) {
     }
   }
 
-  function payload(scheduledAt?: string) {
-    const t = textFor(platform);
+  function payloadFor(t: { id: string; platform: Platform }, scheduledAt?: string) {
+    const txt = textFor(t.platform);
     return {
-      projectId: props.projectId!, platform, title: props.postTitle ?? props.title,
-      caption: t.caption, hashtags: t.hashtags, mediaUrls, scheduledAt,
+      projectId: props.projectId!, platform: t.platform, connectionId: t.id,
+      title: props.postTitle ?? props.title,
+      caption: txt.caption, hashtags: txt.hashtags, mediaUrls, scheduledAt,
     };
   }
 
-  async function handlePublishNow() {
+  /** Publish/schedule to every ticked account; one post per account. */
+  async function runAll(kind: "publish" | "schedule") {
     if (!props.projectId) return toast.error("Save the project first");
-    setBusy("publish");
-    try {
-      const r = await schedule({ data: payload() });
-      qc.invalidateQueries({ queryKey: ["scheduled_posts"] });
-      if (r.status === "published") {
-        toast.success(`Published to ${platform}`, r.url ? { action: { label: "View post", onClick: () => window.open(r.url!, "_blank") } } : undefined);
-        setOpen(false);
-      } else if (r.status === "publishing") {
-        toast.success("Uploading — Instagram is processing the video", { description: "It goes live within a few minutes. Track it in Planner." });
-        setOpen(false);
-      } else if (r.status === "scheduled") {
-        toast.warning("Couldn't publish yet — will retry automatically", { description: r.error ?? undefined });
-        setOpen(false);
-      } else {
-        toast.error(r.status === "reconnect_required" ? "Reconnect your account" : "Publish failed", { description: r.error ?? undefined });
-        qc.invalidateQueries({ queryKey: ["platform-status"] });
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Publish failed");
-    } finally {
-      setBusy(null);
+    if (kind === "schedule" && !scheduleAt) return toast.error("Pick a date & time");
+    const list = selectedTargets;
+    if (list.length === 0) return toast.error("Pick at least one account");
+    setBusy(kind);
+    const iso = kind === "schedule" ? new Date(scheduleAt).toISOString() : undefined;
+    const toastId = toast.loading(
+      kind === "publish" ? `Publishing to ${list.length} account${list.length > 1 ? "s" : ""}…` : "Scheduling…",
+    );
+    const results = await Promise.allSettled(list.map((t) => schedule({ data: payloadFor(t, iso) })));
+    toast.dismiss(toastId);
+    qc.invalidateQueries({ queryKey: ["scheduled_posts"] });
+
+    const done: Array<{ label: string; url: string | null }> = [];
+    const pending: string[] = [];
+    const failed: string[] = [];
+    results.forEach((r, i) => {
+      const t = list[i];
+      const name = `${t.label} (${t.platform})`;
+      if (r.status === "rejected") { failed.push(`${name}: ${r.reason instanceof Error ? r.reason.message : "failed"}`); return; }
+      const v = r.value;
+      if (v.status === "published") done.push({ label: name, url: v.url });
+      else if (v.status === "scheduled" && kind === "schedule") done.push({ label: name, url: null });
+      else if (v.status === "publishing" || v.status === "scheduled") pending.push(name);
+      else failed.push(`${name}: ${v.error ?? v.status}`);
+    });
+
+    if (done.length) {
+      const first = done.find((d) => d.url);
+      toast.success(
+        kind === "publish"
+          ? `Published to ${done.length} account${done.length > 1 ? "s" : ""}`
+          : `Scheduled for ${new Date(iso!).toLocaleString()} on ${done.length} account${done.length > 1 ? "s" : ""}`,
+        {
+          description: done.map((d) => d.label).join(", "),
+          ...(first?.url ? { action: { label: "View post", onClick: () => window.open(first.url!, "_blank") } } : {}),
+        },
+      );
     }
+    if (pending.length) toast.message("Still processing — goes live within a few minutes", { description: pending.join(", ") });
+    if (failed.length) {
+      toast.error(`Couldn't publish to ${failed.length} account${failed.length > 1 ? "s" : ""}`, { description: failed.join("\n") });
+      qc.invalidateQueries({ queryKey: ["publish-targets"] });
+    }
+    if (!failed.length) setOpen(false);
+    setBusy(null);
   }
 
-  async function handleSchedule() {
-    if (!props.projectId) return toast.error("Save the project first");
-    if (!scheduleAt) return toast.error("Pick a date & time");
-    setBusy("schedule");
-    try {
-      const iso = new Date(scheduleAt).toISOString();
-      const r = await schedule({ data: payload(iso) });
-      if (r.ok) {
-        qc.invalidateQueries({ queryKey: ["scheduled_posts"] });
-        toast.success(`Scheduled for ${new Date(iso).toLocaleString()}`, { description: "It will be posted automatically. Track it in Planner." });
-        setOpen(false);
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Schedule failed");
-    } finally {
-      setBusy(null);
-    }
-  }
+  const handlePublishNow = () => runAll("publish");
+  const handleSchedule = () => runAll("schedule");
 
   async function handleMarkPublished() {
     if (!props.projectId) return toast.error("Save the project first");
@@ -245,31 +269,51 @@ export function PublishActions(props: PublishActionsProps) {
               <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">×</button>
             </div>
 
-            <div className="rounded-xl border border-white/10 p-3 space-y-2">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">Destination</div>
-              <div className="flex flex-wrap gap-1.5">
-                {PLATFORMS.map((p) => (
-                  <button key={p} onClick={() => setPlatform(p)}
-                    className={`px-3 py-1.5 rounded-full text-xs border capitalize inline-flex items-center gap-1.5 ${platform === p ? "gradient-primary text-white border-transparent" : "border-white/10 hover:bg-white/5"}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${connected(p) ? "bg-emerald-400" : "bg-white/30"}`} />
-                    {p}
-                  </button>
-                ))}
+            <div className="rounded-xl border border-white/10 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">Post to</div>
+                {selected.length > 0 && <div className="text-xs text-muted-foreground">{selected.length} selected</div>}
               </div>
-              <div className="text-xs">
-                {platformStatus.isLoading ? (
-                  <span className="text-muted-foreground">Checking connected accounts…</span>
-                ) : problem ? (
-                  <span className="text-amber-300">{problem}</span>
-                ) : connected(platform) ? (
-                  <span className="text-emerald-300">Posting as {accountName(platform) ?? "your connected account"}</span>
-                ) : (
-                  <span className="text-amber-300">
-                    <span className="capitalize">{platform}</span> isn't connected.{" "}
-                    {!isHiddenPath("/connections") && <Link to="/connections" search={{ ok: undefined, err: undefined }} className="underline">Connect it</Link>} to publish directly, or download and post manually.
-                  </span>
-                )}
-              </div>
+              {targetsQ.isLoading ? (
+                <div className="text-xs text-muted-foreground">Checking connected accounts…</div>
+              ) : (
+                <div className="space-y-2.5 max-h-64 overflow-auto pr-1">
+                  {PLATFORMS.map((p) => {
+                    const accts = targets.filter((t) => t.platform === p);
+                    const problem = problemFor(p);
+                    return (
+                      <div key={p}>
+                        <div className="text-[11px] uppercase tracking-wide text-muted-foreground capitalize mb-1">{p}</div>
+                        {accts.length === 0 ? (
+                          <div className="text-xs text-muted-foreground">
+                            Not connected.{" "}
+                            {!isHiddenPath("/connections") && <Link to="/connections" search={{ ok: undefined, err: undefined }} className="underline">Connect</Link>}
+                          </div>
+                        ) : problem ? (
+                          <div className="text-xs text-amber-300">{problem}</div>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5">
+                            {accts.map((t) => {
+                              const on = selected.includes(t.id);
+                              return (
+                                <button key={t.id} disabled={!t.usable} onClick={() => toggle(t.id, t.platform)}
+                                  title={t.usable ? "" : "Session expired — reconnect in Connected Accounts"}
+                                  className={`pl-1 pr-3 py-1 rounded-full text-xs border inline-flex items-center gap-1.5 disabled:opacity-40 ${on ? "gradient-primary text-white border-transparent" : "border-white/10 hover:bg-white/5"}`}>
+                                  {t.avatarUrl
+                                    ? <img src={t.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                    : <span className="w-5 h-5 rounded-full bg-white/10 inline-flex items-center justify-center">{on ? "✓" : ""}</span>}
+                                  {t.label}
+                                  {!t.usable && " · reconnect"}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               {!isHiddenPath("/connections") && (
                 <Link to="/connections" search={{ ok: undefined, err: undefined }} className="text-xs text-[color:var(--neon-purple)] hover:underline inline-flex items-center gap-1">
                   Manage connected accounts <ExternalLink className="w-3 h-3" />
@@ -279,7 +323,7 @@ export function PublishActions(props: PublishActionsProps) {
 
             {textFor(platform).caption && (
               <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Caption preview</div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Caption preview · <span className="capitalize">{platform}</span></div>
                 <div className="text-sm bg-black/30 rounded-lg p-3 max-h-32 overflow-auto whitespace-pre-wrap">
                   {textFor(platform).caption}
                   {textFor(platform).hashtags ? `\n\n${textFor(platform).hashtags}` : ""}
@@ -292,7 +336,7 @@ export function PublishActions(props: PublishActionsProps) {
                 <button onClick={handlePublishNow} disabled={busy !== null || !canPublish}
                   className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2 disabled:opacity-60">
                   {busy === "publish" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  Publish now
+                  {selected.length > 1 ? `Publish to ${selected.length} accounts` : "Publish now"}
                 </button>
                 <button onClick={handleMarkPublished} disabled={busy !== null}
                   className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-60">
@@ -312,7 +356,7 @@ export function PublishActions(props: PublishActionsProps) {
                 </button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Publish now posts immediately. Scheduled posts go out automatically at that time (checked every 5 minutes). Already posted it yourself? Use "Mark as manually published".
+                Each selected account gets its own post with that platform's caption. Publish now posts immediately; scheduled posts go out automatically at that time (checked every 5 minutes). Already posted it yourself? Use "Mark as manually published".
               </p>
             </div>
           </div>

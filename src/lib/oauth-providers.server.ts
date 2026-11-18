@@ -62,7 +62,7 @@ export const PROVIDERS: Record<ProviderId, ProviderSpec> = {
       ],
       instagram: [], facebook: [], linkedin: [],
     },
-    extraAuth: { access_type: "offline", prompt: "consent", include_granted_scopes: "true" },
+    extraAuth: { access_type: "offline", prompt: "consent select_account", include_granted_scopes: "true" },
   },
   linkedin: {
     id: "linkedin",
@@ -138,7 +138,7 @@ export async function fetchProfile(platform: PlatformId, accessToken: string): P
   accountLabel: string;
   avatarUrl?: string;
   profileUrl?: string;
-  accounts?: Array<{ id: string; label: string; avatarUrl?: string; kind: string }>;
+  accounts?: Array<{ id: string; label: string; avatarUrl?: string; kind: string; profileUrl?: string }>;
 }> {
   if (platform === "youtube") {
     const r = await fetch(
@@ -158,6 +158,7 @@ export async function fetchProfile(platform: PlatformId, accessToken: string): P
       accounts: items.map((c) => ({
         id: c.id, label: c.snippet.title,
         avatarUrl: c.snippet.thumbnails?.default?.url, kind: "channel",
+        profileUrl: `https://www.youtube.com/channel/${c.id}`,
       })),
     };
   }
@@ -170,7 +171,7 @@ export async function fetchProfile(platform: PlatformId, accessToken: string): P
       accountLabel: j.name ?? j.email ?? "LinkedIn member",
       avatarUrl: j.picture,
       profileUrl: undefined,
-      accounts: [{ id: j.sub, label: j.name ?? j.email ?? "LinkedIn member", avatarUrl: j.picture, kind: "person" }],
+      accounts: [{ id: j.sub, label: j.name ?? j.email ?? "LinkedIn member", avatarUrl: j.picture, kind: "person", profileUrl: undefined }],
     };
   }
   // Facebook / Instagram — list Pages, then optional IG business account per Page.
@@ -193,7 +194,7 @@ export async function fetchProfile(platform: PlatformId, accessToken: string): P
       accountLabel: p.name,
       avatarUrl: p.picture?.data?.url,
       profileUrl: `https://facebook.com/${p.id}`,
-      accounts: pages.map((pg) => ({ id: pg.id, label: pg.name, avatarUrl: pg.picture?.data?.url, kind: "page" })),
+      accounts: pages.map((pg) => ({ id: pg.id, label: pg.name, avatarUrl: pg.picture?.data?.url, kind: "page", profileUrl: `https://facebook.com/${pg.id}` })),
     };
   }
   // instagram
@@ -202,6 +203,7 @@ export async function fetchProfile(platform: PlatformId, accessToken: string): P
     label: p.instagram_business_account!.username ?? p.instagram_business_account!.name ?? p.name,
     avatarUrl: p.instagram_business_account!.profile_picture_url,
     kind: "instagram_business",
+    profileUrl: p.instagram_business_account!.username ? `https://instagram.com/${p.instagram_business_account!.username}` : undefined,
   }));
   if (igs.length === 0) throw new Error("No Instagram Business account linked to your Facebook Pages.");
   return {

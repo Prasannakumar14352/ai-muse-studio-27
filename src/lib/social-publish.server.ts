@@ -22,6 +22,7 @@ export type JobRow = {
   user_id: string;
   project_id: string | null;
   platform: string;
+  connection_id: string | null;
   caption: string | null;
   hashtags: string | null;
   title: string | null;
@@ -121,13 +122,20 @@ type Conn = {
   accessToken: string; metadata: Record<string, unknown>;
 };
 
-async function loadConnection(admin: Admin, userId: string, platform: PlatformId): Promise<Conn> {
-  const { data: row } = await admin.from("platform_connections")
+async function loadConnection(admin: Admin, userId: string, platform: PlatformId, connectionId: string | null): Promise<Conn> {
+  let q = admin.from("platform_connections")
     .select("id, account_id, account_label, status, expires_at, access_token_encrypted, token_iv, refresh_token_encrypted, refresh_iv, metadata")
-    .eq("user_id", userId).eq("platform", platform)
-    .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+    .eq("user_id", userId).eq("platform", platform);
+  // A post targets one specific account; older posts fall back to the newest one.
+  q = connectionId ? q.eq("id", connectionId) : q.order("updated_at", { ascending: false });
+  const { data: row } = await q.limit(1).maybeSingle();
   if (!row || !row.access_token_encrypted || !row.token_iv) {
-    throw new PublishError(`No ${platform} account connected. Connect it in Connected Accounts.`, false, true);
+    throw new PublishError(
+      connectionId
+        ? `The ${platform} account for this post was disconnected. Reconnect it in Connected Accounts.`
+        : `No ${platform} account connected. Connect it in Connected Accounts.`,
+      false, true,
+    );
   }
   const { decryptSecret, encryptSecret } = await import("./oauth-crypto.server");
   let accessToken = await decryptSecret(row.access_token_encrypted as string, row.token_iv as string);
@@ -407,7 +415,7 @@ async function publishYouTube(conn: Conn, job: JobRow, media: Media[]): Promise<
 async function publish(admin: Admin, job: JobRow): Promise<Outcome> {
   const platform = job.platform as PlatformId;
   if (!(platform in PLATFORM_TO_PROVIDER)) throw new PublishError(`Unsupported platform: ${job.platform}`);
-  const conn = await loadConnection(admin, job.user_id, platform);
+  const conn = await loadConnection(admin, job.user_id, platform, job.connection_id);
   const urls = Array.isArray(job.media_urls) ? (job.media_urls as unknown[]).filter((u): u is string => typeof u === "string" && !!u) : [];
   const media = job.provider_state?.ig_container ? [] : await Promise.all(urls.map((u) => resolveMedia(admin, job.user_id, u)));
   switch (platform) {
@@ -418,7 +426,7 @@ async function publish(admin: Admin, job: JobRow): Promise<Outcome> {
   }
 }
 
-const JOB_COLUMNS = "id, user_id, project_id, platform, caption, hashtags, title, media_urls, attempts, status, provider_state";
+const JOB_COLUMNS = "id, user_id, project_id, platform, connection_id, caption, hashtags, title, media_urls, attempts, status, provider_state";
 
 /**
  * Claim and publish one job. Safe to call from the worker and from

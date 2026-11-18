@@ -56,6 +56,7 @@ export const schedulePost = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     projectId: z.string().uuid(),
     platform: platformSchema,
+    connectionId: z.string().uuid().optional(),
     title: z.string().max(300).optional(),
     caption: z.string().optional(),
     hashtags: z.string().optional(),
@@ -68,9 +69,10 @@ export const schedulePost = createServerFn({ method: "POST" })
     const problem = platformMediaProblem(data.platform, media);
     if (problem) throw new Error(problem);
 
-    const { data: conn } = await supabase.from("platform_connections")
-      .select("id, status, expires_at").eq("user_id", userId).eq("platform", data.platform)
-      .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+    let connQ = supabase.from("platform_connections")
+      .select("id, status, expires_at, account_label").eq("user_id", userId).eq("platform", data.platform);
+    connQ = data.connectionId ? connQ.eq("id", data.connectionId) : connQ.order("updated_at", { ascending: false });
+    const { data: conn } = await connQ.limit(1).maybeSingle();
     if (!conn) throw new Error(`Connect your ${data.platform} account first (Connected Accounts).`);
 
     const scheduled = data.scheduledAt ?? null;
@@ -239,11 +241,36 @@ export const getPlatformStatus = createServerFn({ method: "GET" })
       const expired = p !== "youtube" && c?.expires_at ? new Date(c.expires_at).getTime() < Date.now() : false;
       return {
         platform: p,
+        accounts: conns.filter((x) => x.platform === p).length,
         connected: !!c && c.status === "connected" && !expired,
         status: expired ? "expired" : (c?.status ?? "disconnected"),
         accountName: c?.account_label ?? null,
         expiresAt: c?.expires_at ?? null,
         updatedAt: c?.updated_at ?? null,
+      };
+    });
+  });
+
+// Every connected account the user can publish to, grouped client-side by platform.
+export const listPublishTargets = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("platform_connections")
+      .select("id, platform, account_id, account_label, avatar_url, status, expires_at")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((c) => {
+      const platform = c.platform as Platform;
+      const expired = platform !== "youtube" && c.expires_at ? new Date(c.expires_at as string).getTime() < Date.now() : false;
+      return {
+        id: c.id as string,
+        platform,
+        label: (c.account_label as string | null) ?? (c.account_id as string | null) ?? platform,
+        avatarUrl: (c.avatar_url as string | null) ?? null,
+        usable: c.status === "connected" && !expired,
+        status: expired ? "expired" : ((c.status as string | null) ?? "unknown"),
       };
     });
   });

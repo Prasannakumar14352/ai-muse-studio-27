@@ -3,9 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Instagram, Facebook, Youtube, Linkedin, Plug, Clock, RefreshCw, Trash2, AlertCircle, ExternalLink, Loader2, Settings } from "lucide-react";
+import { Instagram, Facebook, Youtube, Linkedin, Plug, Clock, RefreshCw, Trash2, AlertCircle, ExternalLink, Loader2, Settings, Plus } from "lucide-react";
 import { listScheduledPosts, retryScheduledPost, cancelScheduledPost } from "@/lib/publishing.functions";
-import { listProviderAvailability, startOAuth, listMyConnections, disconnectPlatform, selectDestinationAccount } from "@/lib/oauth-user.functions";
+import { listProviderAvailability, startOAuth, listMyConnections, disconnectPlatform, getAccountLimits } from "@/lib/oauth-user.functions";
+import { confirmDialog } from "@/components/confirm-dialog";
 
 export const Route = createFileRoute("/_authenticated/connections")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -39,7 +40,7 @@ function ConnectionsPage() {
   const myConns = useServerFn(listMyConnections);
   const start = useServerFn(startOAuth);
   const disconnect = useServerFn(disconnectPlatform);
-  const selectDest = useServerFn(selectDestinationAccount);
+  const limitsFn = useServerFn(getAccountLimits);
   const [starting, setStarting] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,6 +51,9 @@ function ConnectionsPage() {
   const { data: avail = [] } = useQuery({ queryKey: ["provider-availability"], queryFn: () => availability() });
   const { data: connections = [] } = useQuery({ queryKey: ["platform_connections"], queryFn: () => myConns() });
   const { data: scheduled = [] } = useQuery({ queryKey: ["scheduled_posts"], queryFn: () => list(), refetchInterval: 15_000 });
+  const { data: limits } = useQuery({ queryKey: ["account-limits"], queryFn: () => limitsFn() });
+  const maxPer = limits?.max ?? null; // null = unlimited (admin)
+  const labelFor = (id: unknown) => connections.find((c) => c.id === id)?.account_label as string | undefined;
 
   async function handleConnect(platform: PlatformDef["id"]) {
     setStarting(platform);
@@ -77,90 +81,101 @@ function ConnectionsPage() {
       <section className="grid md:grid-cols-2 gap-4">
         {DEFS.map(({ id, label, Icon }) => {
           const a = avail.find((x) => x.platform === id);
-          const conn = connections.find((c) => c.platform === id);
+          const accounts = connections.filter((c) => c.platform === id);
           const configured = a?.configured ?? false;
           const enabled = a?.enabled ?? false;
           const canConnect = configured && enabled;
-          const accounts = (conn?.metadata as { accounts?: Array<{ id: string; label: string; avatarUrl?: string }> } | null)?.accounts ?? [];
-          const expired = conn?.expires_at && new Date(conn.expires_at as string) < new Date();
+          const atLimit = maxPer !== null && accounts.length >= maxPer;
+          const hint = id === "youtube"
+            ? "To add another channel, click Add account and pick that channel's Google account or Brand Account."
+            : id === "linkedin"
+              ? "Each LinkedIn login adds one personal profile."
+              : "Every Page / Instagram business account you allow during login is added.";
 
           return (
             <div key={id} className="glass rounded-2xl p-5 border border-white/10 space-y-3">
               <div className="flex items-center gap-3">
-                {conn?.avatar_url ? (
-                  <img src={conn.avatar_url as string} alt="" className="w-10 h-10 rounded-full object-cover" />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center"><Icon className="w-5 h-5" /></div>
-                )}
-                <div className="flex-1">
+                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center"><Icon className="w-5 h-5" /></div>
+                <div className="flex-1 min-w-0">
                   <div className="font-semibold">{label}</div>
                   <div className="text-xs text-muted-foreground">
-                    {conn ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${expired ? "bg-amber-400" : "bg-emerald-400"}`} />
-                        {conn.account_label ?? conn.account_id ?? "Connected"}
-                        {expired && " · session expired"}
-                      </span>
-                    ) : canConnect ? "Not connected" : configured ? "Disabled by admin" : "Not configured by admin"}
+                    {!canConnect
+                      ? (configured ? "Disabled by admin" : "Not configured by admin")
+                      : accounts.length === 0
+                        ? "Not connected"
+                        : `${accounts.length} account${accounts.length === 1 ? "" : "s"}${maxPer !== null ? ` of ${maxPer} on your plan` : ""}`}
                   </div>
                 </div>
-                {conn ? (
-                  <>
-                    <button onClick={() => handleConnect(id)} disabled={!canConnect || starting === id}
-                      className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-40">
-                      {starting === id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                      Reconnect
-                    </button>
-                    <button
-                      onClick={async () => {
-                        await disconnect({ data: { id: conn.id as string } });
-                        qc.invalidateQueries({ queryKey: ["platform_connections"] });
-                        toast.success("Disconnected");
-                      }}
-                      className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-xs flex items-center gap-1.5">
-                      <Trash2 className="w-3.5 h-3.5" /> Disconnect
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => handleConnect(id)}
-                    disabled={!canConnect || starting === id}
-                    title={!configured ? "OAuth credentials have not been configured by the administrator." : !enabled ? "This provider is currently disabled by the administrator." : ""}
-                    className="rounded-lg gradient-primary text-white px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {starting === id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plug className="w-3.5 h-3.5" />}
-                    Connect
-                  </button>
-                )}
+                <button
+                  onClick={() => handleConnect(id)}
+                  disabled={!canConnect || atLimit || starting === id}
+                  title={!configured ? "OAuth credentials have not been configured by the administrator." : !enabled ? "This provider is currently disabled by the administrator." : atLimit ? "Plan limit reached — disconnect one or upgrade." : ""}
+                  className={`rounded-lg px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${accounts.length ? "bg-white/5 hover:bg-white/10 border border-white/10" : "gradient-primary text-white"}`}
+                >
+                  {starting === id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : accounts.length ? <Plus className="w-3.5 h-3.5" /> : <Plug className="w-3.5 h-3.5" />}
+                  {accounts.length ? "Add account" : "Connect"}
+                </button>
               </div>
 
               {!configured && (
                 <p className="text-xs text-amber-400/80">OAuth credentials have not been configured by the administrator.</p>
               )}
-              {conn?.scopes && (conn.scopes as string[]).length > 0 && (
-                <div className="text-xs text-muted-foreground">
-                  <span className="uppercase text-[10px] tracking-wide">Permissions granted:</span>{" "}
-                  {(conn.scopes as string[]).join(", ")}
-                </div>
+
+              {accounts.length > 0 && (
+                <ul className="divide-y divide-white/5 rounded-xl border border-white/5 bg-white/[0.02]">
+                  {accounts.map((conn) => {
+                    const expired = id !== "youtube" && conn.expires_at && new Date(conn.expires_at as string) < new Date();
+                    const bad = expired || conn.status !== "connected";
+                    return (
+                      <li key={conn.id as string} className="flex items-center gap-3 px-3 py-2.5">
+                        {conn.avatar_url ? (
+                          <img src={conn.avatar_url as string} alt="" className="w-8 h-8 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center"><Icon className="w-4 h-4" /></div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm truncate">
+                            {conn.profile_url ? (
+                              <a href={conn.profile_url as string} target="_blank" rel="noreferrer" className="hover:underline">{(conn.account_label as string) ?? conn.account_id}</a>
+                            ) : ((conn.account_label as string) ?? conn.account_id)}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${bad ? "bg-amber-400" : "bg-emerald-400"}`} />
+                            {expired ? "Session expired — reconnect" : bad ? (conn.last_error as string) ?? "Needs reconnect" : "Connected"}
+                          </div>
+                        </div>
+                        {bad && (
+                          <button onClick={() => handleConnect(id)} disabled={!canConnect || starting === id} title="Reconnect"
+                            className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 p-1.5 disabled:opacity-40">
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          title="Disconnect"
+                          onClick={async () => {
+                            const ok = await confirmDialog({
+                              title: `Disconnect ${(conn.account_label as string) ?? label}?`,
+                              description: "Scheduled posts for this account will be stopped. You can connect it again any time.",
+                              confirmText: "Disconnect",
+                              tone: "destructive",
+                            });
+                            if (!ok) return;
+                            await disconnect({ data: { id: conn.id as string } });
+                            qc.invalidateQueries({ queryKey: ["platform_connections"] });
+                            qc.invalidateQueries({ queryKey: ["scheduled_posts"] });
+                            qc.invalidateQueries({ queryKey: ["publish-targets"] });
+                            toast.success("Disconnected");
+                          }}
+                          className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 p-1.5">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
 
-              {conn && accounts.length > 1 && (
-                <div className="text-xs space-y-1">
-                  <div className="uppercase text-[10px] tracking-wide text-muted-foreground">Destination</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {accounts.map((a2) => (
-                      <button key={a2.id}
-                        onClick={async () => {
-                          await selectDest({ data: { id: conn.id as string, accountId: a2.id, accountLabel: a2.label, avatarUrl: a2.avatarUrl } });
-                          qc.invalidateQueries({ queryKey: ["platform_connections"] });
-                        }}
-                        className={`px-2 py-1 rounded-full border ${conn.account_id === a2.id ? "gradient-primary text-white border-transparent" : "border-white/10 hover:bg-white/5"}`}>
-                        {a2.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {canConnect && <p className="text-[11px] text-muted-foreground">{hint}</p>}
             </div>
           );
         })}
@@ -177,7 +192,9 @@ function ConnectionsPage() {
           <div className="divide-y divide-white/5">
             {scheduled.map((p) => (
               <div key={p.id} className="py-3 flex flex-wrap items-center gap-3 text-sm">
-                <span className="capitalize px-2 py-0.5 rounded-full bg-white/5 text-xs">{p.platform}</span>
+                <span className="capitalize px-2 py-0.5 rounded-full bg-white/5 text-xs">
+                  {p.platform}{labelFor(p.connection_id) ? ` · ${labelFor(p.connection_id)}` : ""}
+                </span>
                 <span className="px-2 py-0.5 rounded-full bg-white/5 text-xs">{p.status}</span>
                 <span className="text-muted-foreground text-xs">
                   {p.scheduled_at ? new Date(p.scheduled_at as string).toLocaleString() : "immediate"}
