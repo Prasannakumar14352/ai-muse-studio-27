@@ -53,6 +53,15 @@ import styleAncient from "@/assets/style-ancient.jpg";
 import styleCyberpunk from "@/assets/style-cyberpunk.jpg";
 import styleMinimal from "@/assets/style-minimal.jpg";
 
+/** Turn low-level failures into something a creator can act on. */
+function friendlyVideoError(e: unknown, fallback: string): string {
+  const raw = e instanceof Error ? e.message : "";
+  if (/dynamically imported module|Importing a module script failed|error loading dynamically imported/i.test(raw)) {
+    return "CreatorFlow was updated while this video was being made. Reload the page, then open this video from your in-progress list to finish it — your generated scenes are saved.";
+  }
+  return raw || fallback;
+}
+
 export const Route = createFileRoute("/_authenticated/videos")({
   head: () => ({
     meta: [
@@ -375,7 +384,7 @@ function VideosPage() {
         await refreshInProgress();
         return;
       }
-      const msg = e instanceof Error ? e.message : "Planning failed";
+      const msg = friendlyVideoError(e, "Planning failed");
       setError(msg);
       toast.error(msg);
     }
@@ -415,7 +424,7 @@ function VideosPage() {
         await refreshInProgress();
         return;
       }
-      const msg = e instanceof Error ? e.message : "Pipeline failed";
+      const msg = friendlyVideoError(e, "Pipeline failed");
       setError(msg);
       toast.error(msg);
     }
@@ -476,7 +485,7 @@ function VideosPage() {
         setView("asset_review");
         return;
       }
-      const msg = e instanceof Error ? e.message : "Render failed";
+      const msg = friendlyVideoError(e, "Render failed");
       setError(msg);
       toast.error(msg);
     }

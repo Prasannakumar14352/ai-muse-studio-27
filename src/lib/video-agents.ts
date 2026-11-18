@@ -33,6 +33,11 @@ import {
 } from "@/lib/character-bible";
 import { classifyTopic } from "@/lib/cinematic-engine";
 import { authFetch } from "@/lib/auth-fetch";
+// Static (not lazy) imports on purpose: a long render can outlive a deploy,
+// and a lazily-loaded chunk from the old build no longer exists afterwards
+// ("Failed to fetch dynamically imported module"), which killed finished renders.
+import { fetchGeneratedImage } from "@/lib/image-stream";
+import { validateRenderedVideo } from "./video-validate";
 import { AI_NOT_CONFIGURED } from "@/lib/ai-provider";
 
 // ---------- Beat expansion (documentary-style visual density) ----------
@@ -726,7 +731,6 @@ async function fetchSceneImage(prompt: string, style: StyleId, ratio: AspectRati
   // (subject, camera, lens, lighting, grade, negatives, continuity). Do NOT
   // pre/post-fix it with another style descriptor — that would fight the
   // Director's shot type + continuity anchor and produce generic images.
-  const { fetchGeneratedImage } = await import("@/lib/image-stream");
   const { image } = await fetchGeneratedImage({ prompt, ratio });
   return image;
 }
@@ -1562,7 +1566,6 @@ async function ensureCharacterReference(
     const portraitPrompt = preset?.isIllustrated
       ? `${preset.label} illustration style character design. ${bible.masterPortraitPrompt.replace(/ARRI Alexa quality, photorealistic 8K\./, "")}`
       : `${STYLE_LABEL[brief.style]} look. ${bible.masterPortraitPrompt}`;
-    const { fetchGeneratedImage } = await import("@/lib/image-stream");
     const { image, error } = await fetchGeneratedImage({ prompt: portraitPrompt, ratio: "1:1", quality: "high" });
     if (!image) {
       console.warn("[character-ref] could not create the reference portrait; scenes will use text prompts only", error);
@@ -1581,7 +1584,6 @@ async function ensureCharacterReference(
 
 /** Render a shot that shows the main character, anchored to the reference portrait. */
 async function fetchSceneImageWithCharacter(prompt: string, reference: string, ratio: AspectRatio): Promise<string | null> {
-  const { fetchGeneratedImage } = await import("@/lib/image-stream");
   const { image } = await fetchGeneratedImage({
     prompt:
       "Use the reference image ONLY for the person's identity: keep exactly the same face, " +
@@ -2195,8 +2197,21 @@ export async function runRenderPhase(
   job.phase = "validating";
   await saveJob(job);
   onEvent({ type: "phase", phase: "validating" });
-  const { validateRenderedVideo } = await import("./video-validate");
-  const validation = await validateRenderedVideo(render.blob ?? null, brief.duration);
+  // A crash inside the checker itself must not throw away a finished render;
+  // only a real "this file is broken" verdict fails the job.
+  let validation: Awaited<ReturnType<typeof validateRenderedVideo>>;
+  try {
+    validation = await validateRenderedVideo(render.blob ?? null, brief.duration);
+  } catch (e) {
+    console.warn("[video-pipeline] validation could not run; keeping the render", e);
+    validation = {
+      ok: !!render.blob && render.blob.size > 0,
+      reason: render.blob && render.blob.size > 0 ? null : "empty file",
+      detectedDuration: null,
+      size: render.blob?.size ?? 0,
+      mime: render.blob?.type ?? "",
+    };
+  }
   console.info("[video-pipeline] validation", validation);
   if (!validation.ok) {
     const msg = `Rendered video failed validation: ${validation.reason ?? "unknown"}`;
