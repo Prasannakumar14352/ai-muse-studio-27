@@ -122,6 +122,7 @@ const SECTIONS: readonly NavSection[] = [
       { to: "/admin/marketplace", label: "Marketplace CMS", icon: Store },
       { to: "/admin/readiness", label: "Feature Readiness", icon: Crown },
       { to: "/admin/plan-access", label: "Plan Access", icon: Lock },
+      { to: "/admin/payments", label: "Payment Settings", icon: CreditCard },
     ],
   },
   {
