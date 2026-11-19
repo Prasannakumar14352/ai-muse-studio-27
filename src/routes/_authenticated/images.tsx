@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { STYLES } from "@/lib/constants";
+import { AS_DESCRIBED_STYLE, promptNeedsHd, detectPromptStyle, styleClashes } from "@/lib/image-prompt-hints";
 import { pushImageGenLog, listImageGenLogs } from "@/lib/local-store";
 import {
   readPromptHistory,
@@ -25,6 +26,9 @@ import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-pre
 import { HandoffBanner } from "@/components/handoff-banner";
 import { useAutogen } from "@/lib/use-autogen";
 import { promptDialog } from "@/components/prompt-dialog";
+
+/** Matches ACTION_COSTS.image_hd on the server. */
+const HD_CREDITS = 6;
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 
@@ -59,6 +63,7 @@ function ImagesPage() {
   const [prompt, setPrompt] = useState(handoff?.imagePrompt ?? handoff?.topic ?? "");
   const [negativePrompt, setNegativePrompt] = useState(handoff?.negativePrompt ?? "");
   const [style, setStyle] = useState(handoff?.style ?? "cinematic");
+  const [quality, setQuality] = useState<"standard" | "hd">("standard");
   const [ratio, setRatio] = useState(handoff?.aspectRatio ?? "1:1");
   const [batch, setBatch] = useState(4);
   const [seed, setSeed] = useState<number | "">("");
@@ -66,6 +71,13 @@ function ImagesPage() {
   const [styleStrength, setStyleStrength] = useState(70);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const [styleImages, setStyleImages] = useState<string[]>([]);
+  // HD (Nano Banana) also runs whenever reference/style images are attached.
+  const usesHdModel = quality === "hd" || referenceImages.length > 0 || styleImages.length > 0;
+  const perImageCredits = usesHdModel ? HD_CREDITS : 1;
+  const hdHint = useMemo(() => promptNeedsHd(prompt), [prompt]);
+  const promptStyle = useMemo(() => detectPromptStyle(prompt), [prompt]);
+  const styleClash = styleClashes(style, promptStyle?.id ?? null);
+  const selectedStyleLabel = STYLES.find((x) => x.id === style)?.label ?? style;
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<ImagePromptHistoryEntry[]>([]);
@@ -127,11 +139,12 @@ function ImagesPage() {
         const s = JSON.parse(raw) as Partial<{
           prompt: string; negativePrompt: string; style: string; ratio: string;
           batch: number; seed: number | ""; cfg: number; styleStrength: number;
-          lastRun: typeof lastRun; debug: DebugInfo | null;
+          lastRun: typeof lastRun; debug: DebugInfo | null; quality: "standard" | "hd";
         }>;
         if (s.prompt) setPrompt(s.prompt);
         if (s.negativePrompt) setNegativePrompt(s.negativePrompt);
         if (s.style) setStyle(s.style);
+        if (s.quality === "hd" || s.quality === "standard") setQuality(s.quality);
         if (s.ratio) setRatio(s.ratio);
         if (s.batch) setBatch(s.batch);
         if (s.seed !== undefined) setSeed(s.seed);
@@ -149,10 +162,10 @@ function ImagesPage() {
     if (!hydrated) return;
     try {
       localStorage.setItem(LS_STATE, JSON.stringify({
-        prompt, negativePrompt, style, ratio, batch, seed, cfg, styleStrength, lastRun, debug,
+        prompt, negativePrompt, style, ratio, batch, seed, cfg, styleStrength, lastRun, debug, quality,
       }));
     } catch { /* ignore */ }
-  }, [prompt, negativePrompt, style, ratio, batch, seed, cfg, styleStrength, lastRun, debug, hydrated]);
+  }, [prompt, negativePrompt, style, ratio, batch, seed, cfg, styleStrength, lastRun, debug, quality, hydrated]);
 
   async function addUploads(kind: "ref" | "style", files: FileList | null) {
     if (!files || !files.length) return;
@@ -166,22 +179,25 @@ function ImagesPage() {
   }
 
   async function runGeneration(p: string, s: string, r: string, count: number) {
-    if (access && !canGenerate(access, count)) {
+    const required = count * perImageCredits;
+    if (access && !canGenerate(access, required)) {
       const available = access.unlimited ? Number.POSITIVE_INFINITY : (access.monthlyRemaining + access.balance + access.lifetimeCredits);
       const { fireCreditGate } = await import("@/components/global-credit-gate");
-      fireCreditGate({ required: count, available, shortage: Math.max(0, count - available), planType: access.planType });
+      fireCreditGate({ required, available, shortage: Math.max(0, required - available), planType: access.planType });
       return;
     }
     if (!access?.userId) { toast.error("Sign in required"); return; }
 
     setLoading(true);
-    const styleLabel = STYLES.find((x) => x.id === s)?.label ?? s;
+    // "As described" adds no style prefix — the prompt's own style wins.
+    const styleLabel = s === AS_DESCRIBED_STYLE ? "" : (STYLES.find((x) => x.id === s)?.label ?? s);
     const startedAt = Date.now();
     const errors: string[] = [];
     const baseReq: GenerateImageRequest = {
       prompt: p,
-      style: styleLabel,
+      style: styleLabel || undefined,
       ratio: r,
+      quality: quality === "hd" ? "high" : undefined,
       negativePrompt: negativePrompt.trim() || undefined,
       seed: seed === "" ? undefined : Number(seed),
       cfg,
@@ -217,7 +233,7 @@ function ImagesPage() {
           seed: baseReq.seed, cfg, styleStrength, batch: count,
         });
         setHistory(readPromptHistory());
-        const title = p.trim().slice(0, 80) || `AI image (${styleLabel})`;
+        const title = p.trim().slice(0, 80) || `AI image (${styleLabel || "custom"})`;
         const rows = ok.map((res) => ({
           user_id: access.userId, title, content_type: "ai_image",
           topic: p, style: s, status: "generated", thumbnail_url: res.image, aspect_ratio: r,
@@ -247,7 +263,7 @@ function ImagesPage() {
       setDebug(info);
       await pushImageGenLog({
         prompt: p, style: s, ratio: r,
-        full_prompt: `${styleLabel} style. ${p}`,
+        full_prompt: `${styleLabel ? `${styleLabel} style. ` : ""}${p}`,
         request: info.request as Record<string, unknown>,
         response: {},
         errors: info.errors, success_count: info.successCount,
@@ -360,8 +376,8 @@ function ImagesPage() {
   const aspectClass: Record<string, string> = {
     "1:1": "aspect-square", "9:16": "aspect-[9/16]", "16:9": "aspect-video", "4:5": "aspect-[4/5]",
   };
-  const styleLabelPreview = STYLES.find((s) => s.id === style)?.label ?? style;
-  const previewFullPrompt = prompt ? `${styleLabelPreview} style. ${prompt}${negativePrompt.trim() ? ` Avoid: ${negativePrompt.trim()}.` : ""}` : "";
+  const styleLabelPreview = style === AS_DESCRIBED_STYLE ? "" : (STYLES.find((s) => s.id === style)?.label ?? style);
+  const previewFullPrompt = prompt ? `${styleLabelPreview ? `${styleLabelPreview} style. ` : ""}${prompt}${negativePrompt.trim() ? ` Avoid: ${negativePrompt.trim()}.` : ""}` : "";
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -449,6 +465,11 @@ function ImagesPage() {
             <div>
               <div className="text-sm text-muted-foreground mb-2">Style</div>
               <div className="flex flex-wrap gap-2">
+                <button onClick={() => setStyle(AS_DESCRIBED_STYLE)}
+                  title="Use only the style written in your prompt"
+                  className={`px-3 py-1.5 rounded-full text-xs border transition ${style === AS_DESCRIBED_STYLE ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"}`}>
+                  As described
+                </button>
                 {STYLES.map((s) => (
                   <button key={s.id} onClick={() => setStyle(s.id)}
                     className={`px-3 py-1.5 rounded-full text-xs border transition ${style === s.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"}`}>
@@ -456,6 +477,17 @@ function ImagesPage() {
                   </button>
                 ))}
               </div>
+              {styleClash && promptStyle && (
+                <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 flex flex-wrap items-center gap-2">
+                  <span>Your prompt asks for a <strong>{promptStyle.phrase}</strong> look, but the <strong>{selectedStyleLabel}</strong> style is selected — the AI gets mixed instructions.</span>
+                  <button onClick={() => setStyle(promptStyle.id)} className="rounded-md bg-amber-500/20 hover:bg-amber-500/30 px-2 py-1 font-medium">
+                    Use {STYLES.find((x) => x.id === promptStyle.id)?.label ?? promptStyle.phrase}
+                  </button>
+                  <button onClick={() => setStyle(AS_DESCRIBED_STYLE)} className="rounded-md bg-white/10 hover:bg-white/15 px-2 py-1 font-medium">
+                    Use "As described"
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-3 justify-between">
@@ -467,6 +499,15 @@ function ImagesPage() {
                       <button key={r} onClick={() => setRatio(r)}
                         className={`px-3 py-1.5 rounded-lg text-xs border ${ratio === r ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>{r}</button>
                     ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Quality</div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setQuality("standard")} title="Fast draft model — best for scenes without text. 1 credit per image."
+                      className={`px-3 py-1.5 rounded-lg text-xs border ${quality === "standard" ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>Standard</button>
+                    <button onClick={() => setQuality("hd")} title={`Accurate text, several characters, detailed scenes. ${HD_CREDITS} credits per image.`}
+                      className={`px-3 py-1.5 rounded-lg text-xs border ${quality === "hd" ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>HD</button>
                   </div>
                 </div>
                 <div>
@@ -490,11 +531,20 @@ function ImagesPage() {
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
                   Generate {batch}
                   <span className="ml-1 inline-flex items-center rounded-full bg-white/15 border border-white/20 px-1.5 py-0.5 text-[10px] font-semibold">
-                    {batch} credit{batch === 1 ? "" : "s"}
+                    {batch * perImageCredits} credit{batch * perImageCredits === 1 ? "" : "s"}
                   </span>
                 </button>
               </div>
             </div>
+
+            {hdHint.needs && !usesHdModel && (
+              <div className="rounded-lg border border-[color:var(--neon-purple)]/40 bg-[color:var(--neon-purple)]/10 px-3 py-2 text-xs flex flex-wrap items-center gap-2">
+                <span>{hdHint.reason} Standard often misspells words or drops people and props.</span>
+                <button onClick={() => setQuality("hd")} className="rounded-md gradient-primary text-white px-2 py-1 font-medium">
+                  Switch to HD ({HD_CREDITS} credits each)
+                </button>
+              </div>
+            )}
 
             {/* Advanced */}
             <button onClick={() => setShowAdvanced((v) => !v)}
@@ -672,7 +722,7 @@ function ImagesPage() {
             <img src={results[viewerIdx].image} alt={results[viewerIdx].prompt}
               className="max-w-[92vw] max-h-[80vh] object-contain rounded-lg shadow-2xl" />
             <div className="text-xs text-white/70 text-center max-w-2xl">
-              <div className="mb-1">{results[viewerIdx].style} · {results[viewerIdx].ratio} · {viewerIdx + 1}/{results.length}</div>
+              <div className="mb-1">{results[viewerIdx].style === AS_DESCRIBED_STYLE ? "as described" : results[viewerIdx].style} · {results[viewerIdx].ratio} · {viewerIdx + 1}/{results.length}</div>
               <div className="line-clamp-2">{results[viewerIdx].prompt}</div>
             </div>
             <div className="flex gap-2">
@@ -772,7 +822,7 @@ function ImageCard({
         <img src={row.image} alt={row.prompt} loading="lazy"
           className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-        <span className="relative text-white text-xs glass px-2 py-1 rounded">{row.style} · {row.ratio}</span>
+        <span className="relative text-white text-xs glass px-2 py-1 rounded">{row.style === AS_DESCRIBED_STYLE ? "as described" : row.style} · {row.ratio}</span>
         <span className="absolute top-2 right-2 rounded-md bg-black/60 backdrop-blur p-1.5 opacity-0 group-hover:opacity-100 transition">
           <Maximize2 className="w-3.5 h-3.5 text-white" />
         </span>
