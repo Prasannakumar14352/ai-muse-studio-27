@@ -6,6 +6,7 @@
 // transitive deps (ts-ebml / node streams) explode at module init in some
 // browser bundles ("Class extends value undefined is not a constructor"),
 // which was crashing every route that pulled this module into its graph.
+import { computeRenderTimeline } from "@/lib/render-timeline";
 import { getStyle } from "./constants";
 import { ttsFetch } from "@/lib/tts-client";
 import { fetchGeneratedImage } from "@/lib/image-stream";
@@ -483,22 +484,16 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   });
   const rawTotal = rawDurations.reduce((a, b) => a + b, 0);
 
-  // Timeline normalization — user-requested duration is the SINGLE source of
-  // truth. If narration/scene sums drift, scale scenes proportionally so the
-  // final render matches the target within ±0.01s. Audio playbackRate is
-  // adjusted (clamped) to keep narration synced without extending runtime.
-  const target = opts.targetDurationSec && opts.targetDurationSec > 0
-    ? opts.targetDurationSec
-    : rawTotal;
-  const timelineScale = rawTotal > 0 ? target / rawTotal : 1;
-  const durations = opts.targetDurationSec
-    ? rawDurations.map((d) => d * timelineScale)
-    : rawDurations;
+  // Timeline: picture follows the narration so voices never overlap. The
+  // requested length is a target — narration may speed up to 1.15× to meet
+  // it; past that the video runs slightly long instead of overlapping clips.
+  const { durations, rate: audioPlaybackRate } = computeRenderTimeline(
+    rawDurations,
+    (opts.sceneAudio ?? []).map((b) => b?.duration ?? null),
+    opts.targetDurationSec ?? null,
+  );
   const totalDuration = durations.reduce((a, b) => a + b, 0);
-  // Audio must play faster/slower to match compressed/expanded visual timeline
-  // so lip-sync and beat boundaries stay aligned. Clamp to a musical range —
-  // anything past this and the pipeline should have shortened the script.
-  const audioPlaybackRate = Math.max(0.9, Math.min(1.15, 1 / (timelineScale || 1)));
+  const timelineScale = rawTotal > 0 ? totalDuration / rawTotal : 1;
 
   // Structured timeline log — one row per scene + summary.
   const totalNarration = (opts.sceneAudio ?? []).reduce(
