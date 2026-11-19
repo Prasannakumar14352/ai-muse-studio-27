@@ -95,6 +95,9 @@ export async function saveGeneratedVideo(input: SaveVideoInput): Promise<LocalVi
   const id = crypto.randomUUID();
   const videoKey = `video:${uid}:${id}`;
   await putBlob(videoKey, input.video_blob);
+  void import("@/lib/cloud-sync").then(({ recordLibraryAsset }) => recordLibraryAsset({
+    rawKey: videoKey, blob: input.video_blob, kind: "video", title: input.title || "AI video", tags: ["video"],
+  })).catch(() => {});
 
   let thumbKey: string | null = null;
   if (input.thumbnail) {

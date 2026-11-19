@@ -225,5 +225,9 @@ export async function clearAll(): Promise<void> {
     const k = localStorage.key(i);
     if (k && k.startsWith(prefix)) toDelete.push(k);
   }
-  toDelete.forEach((k) => localStorage.removeItem(k));
+  // Only this browser's copy is cleared — the account copy stays, and comes
+  // back on the next load.
+  const { withoutCloudSync } = await import("@/lib/cloud-sync");
+  await withoutCloudSync(() => toDelete.forEach((k) => localStorage.removeItem(k)));
+  try { localStorage.removeItem(`cvsync:hydrated:${uid}`); } catch { /* ignore */ }
 }

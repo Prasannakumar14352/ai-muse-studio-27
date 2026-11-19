@@ -50,7 +50,15 @@ function rawKey(k: string): string {
 export async function putBlob(key: string, blob: Blob): Promise<string> {
   const raw = rawKey(key);
   await tx("readwrite", (s) => s.put(blob, raw));
+  // Mirror to the user's account in the background so it survives a new
+  // device or a cleared browser.
+  void import("@/lib/cloud-sync").then((m) => m.uploadBlob(raw, blob)).catch(() => {});
   return makeBlobKey(raw);
+}
+
+export async function listBlobKeys(): Promise<string[]> {
+  const keys = await tx<IDBValidKey[]>("readonly", (s) => s.getAllKeys());
+  return keys.map(String);
 }
 
 export async function putDataURL(key: string, dataURL: string): Promise<string> {
@@ -77,10 +85,20 @@ export async function putDataURL(key: string, dataURL: string): Promise<string> 
   return putBlob(key, blob);
 }
 
-export async function getBlob(key: string): Promise<Blob | null> {
+export async function getBlob(key: string, opts?: { localOnly?: boolean }): Promise<Blob | null> {
   const raw = rawKey(key);
   const v = await tx<Blob | undefined>("readonly", (s) => s.get(raw));
-  return v ?? null;
+  if (v || opts?.localOnly) return v ?? null;
+  // Not on this device — fetch the account copy and keep it locally.
+  try {
+    const { downloadBlob } = await import("@/lib/cloud-sync");
+    const remote = await downloadBlob(raw);
+    if (remote) {
+      await tx("readwrite", (s) => s.put(remote, raw));
+      return remote;
+    }
+  } catch { /* offline or not signed in */ }
+  return null;
 }
 
 const urlCache = new Map<string, string>();

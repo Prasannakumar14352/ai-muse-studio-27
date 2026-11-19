@@ -1,5 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useAccess } from "@/lib/access";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ import JSZip from "jszip";
 export const Route = createFileRoute("/_authenticated/settings")({ component: SettingsPage });
 
 function SettingsPage() {
+  const { data: access } = useAccess();
   const { data: profile, refetch } = useQuery({
     queryKey: ["profile"],
     queryFn: async () => {
@@ -108,7 +110,8 @@ function SettingsPage() {
       <div className="glass rounded-2xl p-6">
         <h2 className="font-semibold">Account</h2>
         <p className="text-sm text-muted-foreground mt-1">Signed in as <span className="text-foreground">{profile?.email}</span></p>
-        <p className="text-sm text-muted-foreground mt-1">Plan: <span className="text-foreground capitalize">{profile?.plan ?? "free"}</span></p>
+        <p className="text-sm text-muted-foreground mt-1">Plan: <span className="text-foreground capitalize">{access?.isAdmin ? "Admin — unlimited" : (access?.plan ?? "free")}</span>{" "}
+          <Link to="/billing" className="underline text-xs ml-1">Billing</Link></p>
       </div>
     </div>
   );
@@ -187,8 +190,8 @@ function DataAndCacheCard() {
       <div>
         <h2 className="font-semibold">Data & local cache</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Generations live in <span className="text-foreground">this browser only</span>. Export a bundle to move them
-          to another device, then import here.
+          Your generations are <span className="text-foreground">saved to your account</span> and synced across devices —
+          sign in anywhere and they're there. This browser also keeps a fast local copy. You can still export a backup bundle.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -208,7 +211,7 @@ function DataAndCacheCard() {
           onChange={(e) => { const f = e.target.files?.[0]; if (f) doImport(f); }} />
         <button disabled={!!busy} onClick={() => setConfirmClear(true)}
           className="rounded-lg border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 px-3 py-2 text-sm flex items-center gap-2 disabled:opacity-50">
-          <Trash2 className="w-4 h-4" /> Clear local cache
+          <Trash2 className="w-4 h-4" /> Clear this browser's copy
         </button>
       </div>
 
@@ -219,10 +222,10 @@ function DataAndCacheCard() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-semibold">Clear local cache?</h3>
+                <h3 className="font-semibold">Clear this browser's copy?</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  This wipes every generation, script, carousel image, and diagnostic log stored in this browser for your
-                  account. Projects saved on the server remain but their local previews will be empty. This cannot be undone.
+                  This removes the local copy of your generations, scripts and images from this browser only.
+                  Everything stays in your account and is restored the next time you open the app.
                 </p>
               </div>
             </div>

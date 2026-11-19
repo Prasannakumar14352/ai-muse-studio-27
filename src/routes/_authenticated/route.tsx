@@ -36,6 +36,18 @@ export const Route = createFileRoute("/_authenticated")({
       const next = `${location.pathname}${location.searchStr || ""}${location.hash || ""}`;
       throw redirect({ to: "/auth", search: { next } });
     }
+    // Saved work lives in the account: mirror this browser's copy, and on a
+    // new device (or after clearing the browser) restore it before the app
+    // renders. The splash stays up meanwhile (max ~8s).
+    const { installCloudSync, hydrateFromCloud, hasHydrated } = await import("@/lib/cloud-sync");
+    installCloudSync(session.user.id);
+    const hydrate = hydrateFromCloud(session.user.id).catch((e) => {
+      console.warn("[cloud-sync] restore failed", e);
+      return null;
+    });
+    if (!hasHydrated(session.user.id)) {
+      await Promise.race([hydrate, new Promise((r) => setTimeout(r, 8000))]);
+    }
     return { user: session.user };
   },
   // Shown (also in the server HTML, since this route is client-only) while

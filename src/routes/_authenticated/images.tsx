@@ -88,7 +88,7 @@ function ImagesPage() {
     queryFn: async (): Promise<ResultItem[]> => {
       const { data, error } = await supabase
         .from("projects")
-        .select("id, topic, style, thumbnail_url, created_at")
+        .select("id, topic, style, thumbnail_url, aspect_ratio, created_at")
         .eq("user_id", access!.userId)
         .eq("content_type", "ai_image")
         .not("thumbnail_url", "is", null)
@@ -101,7 +101,7 @@ function ImagesPage() {
           id: r.id as string,
           prompt: (r.topic as string) ?? "",
           style: (r.style as string) ?? "cinematic",
-          ratio: "1:1",
+          ratio: (r.aspect_ratio as string | null) ?? "1:1",
           image: r.thumbnail_url as string,
         }));
     },
@@ -220,8 +220,12 @@ function ImagesPage() {
         const title = p.trim().slice(0, 80) || `AI image (${styleLabel})`;
         const rows = ok.map((res) => ({
           user_id: access.userId, title, content_type: "ai_image",
-          topic: p, style: s, status: "generated", thumbnail_url: res.image,
+          topic: p, style: s, status: "generated", thumbnail_url: res.image, aspect_ratio: r,
         }));
+        // Keep a copy in the Media Library (account storage), not just here.
+        void import("@/lib/save-to-library").then(({ saveUrlToLibrary }) => Promise.all(ok.map((res) =>
+          saveUrlToLibrary({ url: res.image, kind: "image", title, tags: ["image", r], metadata: { ratio: r, style: s } })
+            .catch((e) => console.warn("[library] image save failed", e)))));
         const { error: pErr } = await supabase.from("projects").insert(rows);
         if (pErr) toast.error("Saved images could not be persisted");
         qc.invalidateQueries({ queryKey: ["images-library"] });
@@ -547,7 +551,7 @@ function ImagesPage() {
               <div className="rounded-lg border border-border bg-black/30 p-3">
                 <div className="flex items-center justify-between mb-1">
                   <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                    Exact prompt sent to /api/generate-image
+                    Full prompt the AI receives
                   </div>
                   <button onClick={() => { navigator.clipboard.writeText(previewFullPrompt); toast.success("Prompt copied"); }}
                     className="text-xs text-muted-foreground hover:text-white flex items-center gap-1">

@@ -69,19 +69,26 @@ function rowToJob(row: unknown): GenerationJob {
 export const createGenerationJobFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => createSchema.parse(v))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }) => createGenerationJobAdmin(context.userId, data));
+
+/**
+ * Server-side job creation for use INSIDE other server functions. Calling
+ * createGenerationJobFn from a server function fails in production builds
+ * ("Server function info not found"), so server code must call this instead.
+ */
+export async function createGenerationJobAdmin(userId: string, data: z.infer<typeof createSchema>): Promise<{ job: GenerationJob; reused: boolean }> {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: existing } = await supabaseAdmin
       .from("generation_jobs")
       .select("*")
-      .eq("user_id", context.userId)
+      .eq("user_id", userId)
       .eq("idempotency_key", data.idempotencyKey)
       .maybeSingle();
     if (existing) return { job: rowToJob(existing), reused: true } as { job: GenerationJob; reused: boolean };
 
     const insertRow = {
-      user_id: context.userId,
+      user_id: userId,
       project_id: data.projectId ?? null,
       module_type: data.moduleType,
       job_type: data.jobType,
@@ -101,7 +108,7 @@ export const createGenerationJobFn = createServerFn({ method: "POST" })
 
     if (data.creditsEstimated > 0) {
       const { data: res, error: rpcErr } = await supabaseAdmin.rpc("reserve_credits", {
-        _user_id: context.userId,
+        _user_id: userId,
         _amount: data.creditsEstimated,
         _action: `${data.moduleType}:${data.jobType}`,
         _project_id: (data.projectId ?? null) as unknown as string,
@@ -145,7 +152,7 @@ export const createGenerationJobFn = createServerFn({ method: "POST" })
     const { data: fresh } = await supabaseAdmin
       .from("generation_jobs").select("*").eq("id", inserted.id).single();
     return { job: rowToJob(fresh), reused: false } as { job: GenerationJob; reused: boolean };
-  });
+}
 
 export const getGenerationJobFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
