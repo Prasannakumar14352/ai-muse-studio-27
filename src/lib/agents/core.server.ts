@@ -18,6 +18,7 @@ export type AgentSettings = {
   reply_in_group: boolean;
   monthly_budget_usd: number;
   scheduled_agents_enabled: boolean;
+  buyers_group_invite_url: string | null;
 };
 
 export async function admin(): Promise<Admin> {
@@ -39,6 +40,7 @@ export async function getAgentSettings(db?: Admin): Promise<AgentSettings> {
     reply_in_group: data?.reply_in_group ?? true,
     monthly_budget_usd: Number(data?.monthly_budget_usd ?? 10),
     scheduled_agents_enabled: data?.scheduled_agents_enabled ?? true,
+    buyers_group_invite_url: (data as { buyers_group_invite_url?: string | null } | null)?.buyers_group_invite_url ?? null,
   };
 }
 

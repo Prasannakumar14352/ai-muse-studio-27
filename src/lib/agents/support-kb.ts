@@ -17,6 +17,7 @@ ACCOUNT & CREDITS
 - If a generation fails, its credits are refunded automatically within a minute. Users can check Billing → history.
 - Extra credits: Pricing → Credit packs, or Billing → Top up. Payments are by Razorpay (UPI, cards, netbanking).
 - Auto-renew can be turned off any time in Billing; the plan stays active until the period ends.
+- Paid plan users (Starter, Creator, Pro, lifetime) get a link to the private buyers' Telegram group on their Billing page. Free users and credit-pack-only buyers don't — tell them it's included with any paid plan. Never post or share the invite link yourself.
 
 HOW TO
 - Short reel: AI Studio → Short reel → enter topic, pick language, length (15/30/60s), style and voice → Generate. Scene images start automatically; then press "Render video". The download is a 1080×1920 MP4.

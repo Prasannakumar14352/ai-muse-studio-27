@@ -454,7 +454,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
     await qc.invalidateQueries({ queryKey: ["my-payments"] });
     await qc.invalidateQueries({ queryKey: ["my-subscription"] });
     onClose();
-    navigate({ to: "/billing" });
+    navigate({ to: "/billing", search: { welcome: 1 } });
   }
 
   /** Auto-renew: Razorpay subscription — the user approves a UPI AutoPay / card mandate once. */
@@ -521,7 +521,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
               await qc.invalidateQueries({ queryKey: ["my-payments"] });
               await qc.invalidateQueries({ queryKey: ["my-subscription"] });
               onClose();
-              navigate({ to: "/invoices" });
+              navigate({ to: "/billing", search: { welcome: 1 } });
               resolve();
             } catch (e) {
               const msg = e instanceof Error ? e.message : "Verification failed";

@@ -43,6 +43,7 @@ export const getAgentHq = createServerFn({ method: "GET" })
         monthlyBudgetUsd: s.monthly_budget_usd,
         scheduledAgentsEnabled: s.scheduled_agents_enabled,
         adminTelegramLinked: Boolean(adminLink.data),
+        buyersGroupInviteUrl: s.buyers_group_invite_url,
       },
       spentUsd: spent,
       tasks: (tasks.data ?? []) as AgentTask[],
@@ -74,6 +75,10 @@ export const saveAgentSettings = createServerFn({ method: "POST" })
     monthlyBudgetUsd: z.number().min(0).max(1000).optional(),
     scheduledAgentsEnabled: z.boolean().optional(),
     resetGroup: z.boolean().optional(),
+    // "" clears it. Telegram invite links look like https://t.me/+AbC… or https://t.me/joinchat/…
+    buyersGroupInviteUrl: z.string().trim().max(200)
+      .refine((v) => v === "" || /^https:\/\/(t\.me|telegram\.me)\/(\+|joinchat\/)?[\w-]+\/?$/.test(v), "Paste a Telegram invite link like https://t.me/+AbCdEf…")
+      .optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     await assertAdmin(context as unknown as Ctx);
@@ -99,6 +104,7 @@ export const saveAgentSettings = createServerFn({ method: "POST" })
     if (data.monthlyBudgetUsd !== undefined) patch.monthly_budget_usd = data.monthlyBudgetUsd;
     if (data.scheduledAgentsEnabled !== undefined) patch.scheduled_agents_enabled = data.scheduledAgentsEnabled;
     if (data.resetGroup) patch.telegram_group_ids = [];
+    if (data.buyersGroupInviteUrl !== undefined) patch.buyers_group_invite_url = data.buyersGroupInviteUrl || null;
     const { error } = await db.from("agent_settings").update(patch).eq("id", 1);
     if (error) throw new Error(error.message);
     return { ok: true, botUsername: username };

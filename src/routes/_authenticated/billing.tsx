@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { PLANS } from "@/lib/constants";
 import { TopUpPacks } from "@/components/topup-packs";
+import { BuyersGroupCard } from "@/components/buyers-group-card";
 import {
   Wallet, Crown, CheckCircle2, Clock, XCircle, ArrowRight,
   Receipt, RefreshCw, Calendar, Sparkles,
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/_authenticated/billing")({
   head: () => ({
     meta: [{ title: "Billing — CreatorFlow AI" }],
   }),
+  validateSearch: (s: Record<string, unknown>): { welcome?: number } => (s.welcome ? { welcome: 1 } : {}),
   component: BillingPage,
   errorComponent: ({ error, reset }) => {
     const router = useRouter();
@@ -74,6 +76,7 @@ function BillingPage() {
     queryFn: () => fn(),
   });
 
+  const { welcome } = Route.useSearch();
   const sub = (data?.subscription ?? null) as Sub;
   const balance = data?.balance ?? 0;
   const isAdmin = !!data?.isAdmin;
@@ -154,6 +157,8 @@ function BillingPage() {
               )}
             </div>
           )}
+
+          <BuyersGroupCard highlight={Boolean(welcome)} />
 
           {/* Current Plan */}
           <section className="glass rounded-2xl p-6 relative overflow-hidden">

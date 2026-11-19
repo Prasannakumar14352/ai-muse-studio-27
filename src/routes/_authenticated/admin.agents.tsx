@@ -285,6 +285,7 @@ function SettingsPanel({ s }: { s: HqSettings }) {
   const refresh = useRefresh();
   const [token, setToken] = useState("");
   const [budget, setBudget] = useState(String(s.monthlyBudgetUsd));
+  const [invite, setInvite] = useState(s.buyersGroupInviteUrl ?? "");
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState<string | null>(null);
 
@@ -319,6 +320,25 @@ function SettingsPanel({ s }: { s: HqSettings }) {
         </div>
         <Toggle label="Support agent is on" value={s.telegramEnabled} onChange={(v) => apply({ telegramEnabled: v }, v ? "Support agent on" : "Support agent paused")} />
         <Toggle label="Answer simple questions automatically (billing and unsure answers always wait for you)" value={s.autoReply} onChange={(v) => apply({ autoReply: v }, "Saved")} />
+      </div>
+
+      <div className="glass rounded-2xl p-5 border border-border space-y-3">
+        <h2 className="font-semibold">Buyers' group invite link</h2>
+        <p className="text-sm text-muted-foreground">
+          Shown only to users with an active paid plan (Starter, Creator, Pro, lifetime) — on their Billing page and right after they buy a plan.
+          Free users and credit-pack-only buyers see a locked "included with paid plans" card. Leave empty to hide it everywhere.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          In Telegram: open the group → tap its name → Invite Links (or Add Members → Invite via link) → copy. Tip: turn on "Approve new members" for that link so you can check each join request.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <input value={invite} onChange={(e) => setInvite(e.target.value)} placeholder="https://t.me/+AbCdEf…" inputMode="url" aria-label="Buyers' group invite link"
+            className="flex-1 min-w-[260px] bg-input/50 border border-border rounded-lg px-3 py-2 text-sm" />
+          <button disabled={busy || invite.trim() === (s.buyersGroupInviteUrl ?? "")}
+            onClick={() => apply({ buyersGroupInviteUrl: invite.trim() }, invite.trim() ? "Invite link saved — paid users can see it now" : "Invite link removed")}
+            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm disabled:opacity-60">Save</button>
+        </div>
+        {s.buyersGroupInviteUrl && <p className="text-xs text-emerald-300">Live — paid users see a "Join on Telegram" button.</p>}
       </div>
 
       <div className="glass rounded-2xl p-5 border border-border space-y-3">
@@ -376,8 +396,9 @@ function Empty({ text }: { text: string }) {
 type HqSettings = {
   telegramEnabled: boolean; hasBotToken: boolean; botUsername: string | null; groupIds: number[];
   autoReply: boolean; monthlyBudgetUsd: number; scheduledAgentsEnabled: boolean; adminTelegramLinked: boolean;
+  buyersGroupInviteUrl: string | null;
 };
 type SettingsPatch = {
   botToken?: string; telegramEnabled?: boolean; autoReply?: boolean; monthlyBudgetUsd?: number;
-  scheduledAgentsEnabled?: boolean; resetGroup?: boolean;
+  scheduledAgentsEnabled?: boolean; resetGroup?: boolean; buyersGroupInviteUrl?: string;
 };
