@@ -8,8 +8,9 @@ import {
   getAgentHq, saveAgentSettings, updateAgentTask, sendTaskReply, runAgentNow, createTelegramLinkCode,
   type AgentTask, type TelegramMsg, type AgentRun, type InAppChatMsg,
 } from "@/lib/agent-hq.functions";
+import { MarketingPanel } from "@/components/agent-marketing-panel";
 import {
-  Bot, CheckCircle2, Inbox, Loader2, MessageCircle, MessagesSquare, Play, Send, Settings2, XCircle, ClipboardList, History,
+  Megaphone, Bot, CheckCircle2, Inbox, Loader2, MessageCircle, MessagesSquare, Play, Send, Settings2, XCircle, ClipboardList, History,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/agents")({
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/_authenticated/admin/agents")({
 
 const AGENT_LABEL: Record<string, string> = {
   support: "Support (Telegram)", product_manager: "Product manager", qa: "QA health check", ops: "Ops & finance",
+  social_media_manager: "Social media manager", post_creator: "Post creator", app_promoter: "App promoter",
 };
 const COLUMNS: Array<{ id: string; label: string }> = [
   { id: "todo", label: "To do" },
@@ -30,19 +32,21 @@ function AgentHqPage() {
   const { data: access, isLoading } = useAccess();
   const getFn = useServerFn(getAgentHq);
   const q = useQuery({ queryKey: ["agent-hq"], queryFn: () => getFn(), enabled: Boolean(access?.isAdmin), refetchInterval: 20_000 });
-  const [tab, setTab] = useState<"inbox" | "board" | "telegram" | "inapp" | "runs" | "settings">("inbox");
+  const [tab, setTab] = useState<"inbox" | "marketing" | "board" | "telegram" | "inapp" | "runs" | "settings">("inbox");
 
   if (isLoading) return <div className="p-8"><Loader2 className="w-5 h-5 animate-spin" /></div>;
   if (!access?.isAdmin) return <Navigate to="/dashboard" replace />;
   const d = q.data;
-  const waiting = (d?.tasks ?? []).filter((t) => t.status === "waiting_approval");
+  const isMarketing = (t: AgentTask) => t.kind === "social_post" || t.kind === "promo";
+  const waiting = (d?.tasks ?? []).filter((t) => t.status === "waiting_approval" && !isMarketing(t));
+  const marketingWaiting = (d?.tasks ?? []).filter((t) => t.status === "waiting_approval" && isMarketing(t)).length;
 
   return (
     <div className="space-y-6 max-w-6xl">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2"><Bot className="w-7 h-7 text-[color:var(--brand-orange)]" /> Agent HQ</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Your AI team: Telegram support, daily QA and ops checks, and the weekly product plan. Anything about money waits for you.</p>
+          <p className="text-muted-foreground mt-1 text-sm">Your AI team: Telegram support, daily QA and ops checks, the weekly product plan, and marketing (social posts + promotion). Anything about money, and every post, waits for you.</p>
         </div>
         {d && (
           <div className="text-xs text-muted-foreground text-right">
@@ -63,6 +67,7 @@ function AgentHqPage() {
       <div className="flex flex-wrap gap-2" role="tablist">
         {([
           ["inbox", `Approval inbox${waiting.length ? ` (${waiting.length})` : ""}`, Inbox],
+          ["marketing", `Marketing${marketingWaiting ? ` (${marketingWaiting})` : ""}`, Megaphone],
           ["board", "Task board", ClipboardList],
           ["telegram", "Telegram log", MessageCircle],
           ["inapp", "In-app chats", MessagesSquare],
@@ -78,7 +83,8 @@ function AgentHqPage() {
 
       {q.isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
       {d && tab === "inbox" && <ApprovalInbox tasks={waiting} />}
-      {d && tab === "board" && <TaskBoard tasks={d.tasks.filter((t) => t.status !== "waiting_approval" && t.status !== "rejected")} />}
+      {d && tab === "marketing" && <MarketingPanel tasks={d.tasks} />}
+      {d && tab === "board" && <TaskBoard tasks={d.tasks.filter((t) => t.status !== "waiting_approval" && t.status !== "rejected" && !isMarketing(t))} />}
       {d && tab === "telegram" && <TelegramLog messages={d.messages} />}
       {d && tab === "inapp" && <InAppChats messages={d.inAppChats} />}
       {d && tab === "runs" && <RunsLog runs={d.runs} />}
