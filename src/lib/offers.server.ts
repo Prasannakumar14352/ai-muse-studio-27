@@ -37,7 +37,8 @@ export type OfferQuote = {
 const MIN_PAISE = 100; // Razorpay minimum for INR is ₹1.00
 
 export function normalizeCode(code: string): string {
-  return code.trim().toUpperCase().replace(/\s+/g, "");
+  // Codes are letters, digits, - and _ only (enforced in admin), stored uppercase.
+  return code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
 }
 
 export function offerLabel(o: Pick<OfferRow, "discount_type" | "discount_value">): string {
@@ -91,9 +92,11 @@ export async function quoteOffer(admin: Admin, args: {
   credits: number;
 }): Promise<OfferQuote | null> {
   const code = args.code ? normalizeCode(args.code) : "";
+  if (args.code && !code) throw new OfferError("That code isn't valid.");
   let candidates: OfferRow[];
   if (code) {
-    const { data } = await admin.from("offers").select("*").ilike("code", code).maybeSingle();
+    // Exact match only — never a pattern, so "%" can't reveal another code.
+    const { data } = await admin.from("offers").select("*").eq("code", code).maybeSingle();
     const o = data as OfferRow | null;
     if (!o || !o.active) throw new OfferError("That code isn't valid.");
     if (o.starts_at && new Date(o.starts_at).getTime() > Date.now()) throw new OfferError("This offer hasn't started yet.");
