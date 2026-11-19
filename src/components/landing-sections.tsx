@@ -15,7 +15,9 @@ import {
 import { listPublishedLandingMedia, type LandingMediaRow } from "@/lib/landing-media.functions";
 
 // Served from /public so it works on every host.
-const BUILTIN_DEMO_POSTER = "/brand/hero-poster.jpg";
+const BUILTIN_DEMO_POSTER = "/walkthroughs/tour.jpg";
+// 60-second product tour stitched from real screen recordings of the live app.
+const BUILTIN_DEMO_VIDEO = "/walkthroughs/tour.mp4";
 
 function landingRowToTestimonial(r: LandingMediaRow): Testimonial {
   return {
@@ -55,10 +57,8 @@ const HERO_FEATURES = [
  * every browser's autoplay policy; a fullscreen modal offers unmuted play.
  */
 export function DemoVideoSection() {
-  // Only shown when an admin publishes a real demo video (Admin → Landing →
-  // Main demo card). The old built-in animation still showed the previous
-  // "CreatorVault AI" brand and wasn't a real product recording, so it's no
-  // longer used — the walkthrough marquee below covers "see it in action".
+  // Main product tour. Defaults to the built-in 60s tour recorded from the
+  // live app; an admin can replace it from Admin → Landing → Main demo.
   const { data: dbRows } = useQuery({
     queryKey: ["landing-media-public"],
     queryFn: () => listPublishedLandingMedia(),
@@ -67,8 +67,12 @@ export function DemoVideoSection() {
   const demoOverride = (dbRows ?? []).find(
     (r) => r.kind === "demo" && r.video_url && (r.video_type === "mp4" || r.video_type === "webm"),
   );
-  if (!demoOverride?.video_url) return null;
-  return <DemoVideoPlayer videoUrl={demoOverride.video_url} posterUrl={demoOverride.poster_url ?? BUILTIN_DEMO_POSTER} />;
+  return (
+    <DemoVideoPlayer
+      videoUrl={demoOverride?.video_url ?? BUILTIN_DEMO_VIDEO}
+      posterUrl={demoOverride?.poster_url ?? BUILTIN_DEMO_POSTER}
+    />
+  );
 }
 
 function DemoVideoPlayer({ videoUrl, posterUrl }: { videoUrl: string; posterUrl: string }) {
@@ -133,8 +137,8 @@ function DemoVideoPlayer({ videoUrl, posterUrl }: { videoUrl: string; posterUrl:
           See CreatorFlow AI <span className="gradient-text">in Action</span>
         </h2>
         <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-          A real screen recording of the live product — Dashboard, Research, Strategy, Video Studio,
-          Thumbnails, Carousels, LinkedIn, Publishing and Analytics.
+          A 60-second tour recorded from the live product — Research, Video Studio, Thumbnails,
+          Images, Carousels, Captions, Planner and Analytics.
         </p>
 
         <div ref={containerRef} className="mt-10 glass rounded-3xl p-2 shadow-[var(--shadow-glow)]">
@@ -648,9 +652,9 @@ export function ProductWalkthroughsSection() {
   return (
     <section className="py-24">
       <div className="max-w-7xl mx-auto px-6 text-center mb-12">
-        <h2 className="text-4xl md:text-5xl font-bold">See CreatorFlow AI <span className="gradient-text">in Action</span></h2>
+        <h2 className="text-4xl md:text-5xl font-bold">Explore <span className="gradient-text">every feature</span></h2>
         <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-          Quick looks at the real app — research, video, thumbnails, carousels, captions and more. Hover to pause, click to watch full size.
+          A short clip for each tool in the real app. Hover to pause, click to watch full size.
         </p>
       </div>
       <div className="relative overflow-hidden group">
