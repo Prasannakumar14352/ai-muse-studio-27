@@ -337,6 +337,17 @@ function ImagesPage() {
     downloadJson(`creatorflow-image-debug-${Date.now()}.json`, debug);
   }
 
+  /** "New generation" starts from a blank prompt. Style, ratio, quality and batch are kept;
+   *  earlier prompts stay one click away in Prompt history. */
+  function startNewGeneration() {
+    setPrompt("");
+    setNegativePrompt("");
+    setReferenceImages([]);
+    setStyleImages([]);
+    setSeed("");
+    setView("input");
+  }
+
   function applyHistoryEntry(h: ImagePromptHistoryEntry) {
     setPrompt(h.prompt);
     setNegativePrompt(h.negativePrompt ?? "");
@@ -397,7 +408,7 @@ function ImagesPage() {
           )}
         </div>
         {view === "landing" && (
-          <button onClick={() => setView("input")}
+          <button onClick={startNewGeneration}
             className="rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-2 shrink-0">
             <Plus className="w-4 h-4" /> New generation
           </button>
@@ -668,7 +679,7 @@ function ImagesPage() {
               <p className="text-sm text-muted-foreground mt-1 max-w-md">
                 Generate your first AI image — describe a scene, pick a style, and get multiple concepts instantly.
               </p>
-              <button onClick={() => setView("input")}
+              <button onClick={startNewGeneration}
                 className="mt-5 rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-2">
                 <Plus className="w-4 h-4" /> New generation
               </button>
