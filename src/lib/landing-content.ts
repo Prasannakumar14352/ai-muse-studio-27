@@ -50,48 +50,31 @@ export type TrustBadge = { title: string; desc: string; icon: string };
 // intentionally empty and the landing page hides the section entirely.
 export const VIDEO_TESTIMONIALS: Testimonial[] = [];
 
-// Short product walkthrough clips shown in a separate "See CreatorFlow AI in
-// Action" section — never presented as customer testimonials.
-// The original walkthrough clips live only on Lovable's asset storage
-// (/__l5e/...), which 404s on Vercel. Until the real clips are added to
-// /public/walkthroughs/, every card plays the main demo video.
-const WALKTHROUGH_FALLBACK = "/creatorflow-demo.mp4";
-const demoPoster = { url: "/brand/hero-poster.jpg" };
-
+// Short product walkthrough clips shown in the "See CreatorFlow AI in Action"
+// marquee — never presented as customer testimonials. Each card has its own
+// clip recorded from the live app (in /public/walkthroughs/). Cards without a
+// clip show a still; admins can replace any card in Admin → Landing →
+// Walkthrough clips (a published clip with the same title wins).
 export type ProductWalkthrough = {
   id: string;
   title: string;
   caption: string;
-  videoUrl: string;
-  poster: string;
-  duration: string;
+  videoUrl?: string;
+  poster?: string;
+  duration?: string;
 };
 
+const wt = (id: string) => ({ videoUrl: `/walkthroughs/${id}.mp4`, poster: `/walkthroughs/${id}.jpg` });
+
 export const PRODUCT_WALKTHROUGHS: ProductWalkthrough[] = [
-  {
-    id: "pw1",
-    title: "Viral Research Engine",
-    caption: "Score a topic, get titles, hooks and one-click prefill into every studio.",
-    videoUrl: WALKTHROUGH_FALLBACK,
-    poster: demoPoster.url,
-    duration: "0:24",
-  },
-  {
-    id: "pw2",
-    title: "AI Thumbnail Studio",
-    caption: "Guided brief → batch concepts → upscale, remove background, inpaint.",
-    videoUrl: WALKTHROUGH_FALLBACK,
-    poster: demoPoster.url,
-    duration: "0:24",
-  },
-  {
-    id: "pw3",
-    title: "Publishing & Analytics",
-    caption: "Schedule to Instagram, YouTube, LinkedIn & more. Track CTR and revenue.",
-    videoUrl: WALKTHROUGH_FALLBACK,
-    poster: demoPoster.url,
-    duration: "0:24",
-  },
+  { id: "research", title: "Viral Research", caption: "Score any topic, see real top YouTube videos, then get titles, hooks and keywords.", ...wt("research") },
+  { id: "video", title: "AI Video Studio", caption: "Topic in → script, scenes, voiceover, captions and a finished reel out — with real motion clips.", ...wt("video") },
+  { id: "thumbnails", title: "Thumbnail Studio", caption: "High-CTR YouTube thumbnails at 1280×720, with an editable headline in any language.", ...wt("thumbnails") },
+  { id: "images", title: "AI Images (HD)", caption: "Any style, any ratio — HD mode spells text correctly and keeps every character.", ...wt("images") },
+  { id: "carousels", title: "Carousel Creator", caption: "Instagram and LinkedIn carousels with matching design across every slide.", ...wt("carousels") },
+  { id: "captions", title: "Captions in your language", caption: "Captions and hashtags in Telugu, Hindi, Tamil and more — ready to paste.", ...wt("captions") },
+  { id: "planner", title: "Content Planner", caption: "Plan the month, see every post on a calendar, publish when it's ready.", ...wt("planner") },
+  { id: "analytics", title: "Analytics", caption: "See everything you've made — videos, images, carousels and posts — in one place.", ...wt("analytics") },
 ];
 
 // Sample creator reviews shown until real, consented customer reviews are

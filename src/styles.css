@@ -184,8 +184,11 @@
 .animate-marquee {
   animation: marquee 60s linear infinite;
 }
+.animate-marquee-slow {
+  animation: marquee 90s linear infinite;
+}
 @media (prefers-reduced-motion: reduce) {
-  .animate-marquee { animation: none; }
+  .animate-marquee, .animate-marquee-slow { animation: none; }
 }
 
 /* Sliders use the brand colour instead of the browser's default blue. */

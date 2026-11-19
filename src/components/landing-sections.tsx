@@ -14,9 +14,7 @@ import {
 } from "@/lib/landing-content";
 import { listPublishedLandingMedia, type LandingMediaRow } from "@/lib/landing-media.functions";
 
-// Served from /public so they work on every host. The Lovable asset URLs
-// (/__l5e/...) only resolve on Lovable hosting and 404 on Vercel.
-const BUILTIN_DEMO_VIDEO = "/creatorflow-demo.mp4";
+// Served from /public so it works on every host.
 const BUILTIN_DEMO_POSTER = "/brand/hero-poster.jpg";
 
 function landingRowToTestimonial(r: LandingMediaRow): Testimonial {
@@ -57,7 +55,10 @@ const HERO_FEATURES = [
  * every browser's autoplay policy; a fullscreen modal offers unmuted play.
  */
 export function DemoVideoSection() {
-  // Admin override: first published landing_media row of kind 'demo'
+  // Only shown when an admin publishes a real demo video (Admin → Landing →
+  // Main demo card). The old built-in animation still showed the previous
+  // "CreatorVault AI" brand and wasn't a real product recording, so it's no
+  // longer used — the walkthrough marquee below covers "see it in action".
   const { data: dbRows } = useQuery({
     queryKey: ["landing-media-public"],
     queryFn: () => listPublishedLandingMedia(),
@@ -66,8 +67,11 @@ export function DemoVideoSection() {
   const demoOverride = (dbRows ?? []).find(
     (r) => r.kind === "demo" && r.video_url && (r.video_type === "mp4" || r.video_type === "webm"),
   );
-  const videoUrl = demoOverride?.video_url ?? BUILTIN_DEMO_VIDEO;
-  const posterUrl = demoOverride?.poster_url ?? BUILTIN_DEMO_POSTER;
+  if (!demoOverride?.video_url) return null;
+  return <DemoVideoPlayer videoUrl={demoOverride.video_url} posterUrl={demoOverride.poster_url ?? BUILTIN_DEMO_POSTER} />;
+}
+
+function DemoVideoPlayer({ videoUrl, posterUrl }: { videoUrl: string; posterUrl: string }) {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -540,81 +544,120 @@ function ProductWalkthroughCard({
 }: { w: ProductWalkthrough; onPlay: (v: PlayingVideo) => void }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const previewRef = useRef<HTMLVideoElement | null>(null);
-  const [visible, setVisible] = useState(false);
+  const [hasVideo, setHasVideo] = useState(!!w.videoUrl);
 
+  // Each card plays its own muted clip only while it's on screen.
   useEffect(() => {
     const el = cardRef.current;
-    if (!el) return;
+    if (!el || !w.videoUrl) return;
     const io = new IntersectionObserver(
       ([entry]) => {
-        setVisible(entry.isIntersecting);
         const v = previewRef.current;
         if (!v) return;
         if (entry.isIntersecting) v.play().catch(() => {});
         else v.pause();
       },
-      { threshold: 0.4 },
+      { threshold: 0.3 },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [w.videoUrl]);
 
   return (
-    <div ref={cardRef} className="glass rounded-2xl p-4 flex flex-col">
-      <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
-        <video
-          ref={previewRef}
-          src={w.videoUrl}
-          poster={w.poster}
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover"
+    <div ref={cardRef} className="glass rounded-2xl p-3 flex flex-col w-[320px] sm:w-[380px] shrink-0">
+      <div className="relative aspect-video rounded-xl overflow-hidden bg-[#0a0714]">
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{ background: "radial-gradient(600px 300px at 20% 10%, rgba(120,40,180,0.35) 0%, transparent 60%), radial-gradient(500px 300px at 80% 90%, rgba(255,60,140,0.25) 0%, transparent 60%), #0a0714" }}
         />
+        {w.poster && (
+          <img src={w.poster} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+        )}
+        {w.videoUrl && hasVideo && (
+          <video
+            ref={previewRef}
+            src={w.videoUrl}
+            poster={w.poster}
+            muted
+            loop
+            playsInline
+            preload="none"
+            aria-hidden="true"
+            onError={() => setHasVideo(false)}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-        <span className="absolute top-3 left-3 z-10 glass px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/90">
-          Product walkthrough
+        <span className="absolute top-2.5 left-2.5 z-10 glass px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider text-white/90">
+          {w.videoUrl && hasVideo ? "Live product" : "Feature"}
         </span>
-        <button
-          type="button"
-          onClick={() => onPlay({ name: w.title, url: w.videoUrl, type: "mp4" })}
-          aria-label={`Play ${w.title}`}
-          className="absolute inset-0 w-full h-full group flex items-center justify-center"
-        >
-          <div className={`w-14 h-14 rounded-full gradient-primary flex items-center justify-center shadow-[var(--shadow-glow)] group-hover:scale-110 transition ${visible ? "opacity-0 group-hover:opacity-100" : "opacity-100"}`}>
-            <Play className="w-6 h-6 text-white fill-white ml-0.5" />
-          </div>
-          <span className="absolute bottom-3 right-3 flex items-center gap-1 glass px-2 py-1 rounded-full text-[11px] text-white/90">
-            <Clock className="w-3 h-3" /> {w.duration}
-          </span>
-        </button>
+        {w.videoUrl && hasVideo && (
+          <button
+            type="button"
+            onClick={() => onPlay({ name: w.title, url: w.videoUrl!, type: "mp4" })}
+            aria-label={`Play ${w.title}`}
+            className="absolute inset-0 w-full h-full group/play flex items-center justify-center"
+          >
+            <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center shadow-[var(--shadow-glow)] opacity-0 group-hover/play:opacity-100 transition">
+              <Maximize2 className="w-5 h-5 text-white" />
+            </div>
+            {w.duration && (
+              <span className="absolute bottom-2.5 right-2.5 flex items-center gap-1 glass px-2 py-0.5 rounded-full text-[10px] text-white/90">
+                <Clock className="w-3 h-3" /> {w.duration}
+              </span>
+            )}
+          </button>
+        )}
       </div>
-      <div className="mt-4">
+      <div className="mt-3 px-1 text-left">
         <div className="text-sm font-semibold">{w.title}</div>
-        <p className="mt-1 text-xs text-muted-foreground">{w.caption}</p>
+        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{w.caption}</p>
       </div>
     </div>
   );
 }
 
+function landingRowToWalkthrough(r: LandingMediaRow): ProductWalkthrough {
+  return {
+    id: r.id,
+    title: r.title ?? "CreatorFlow AI",
+    caption: r.subtitle ?? "",
+    videoUrl: r.video_type === "mp4" || r.video_type === "webm" ? r.video_url ?? undefined : undefined,
+    poster: r.poster_url ?? undefined,
+    duration: r.duration ?? undefined,
+  };
+}
+
 export function ProductWalkthroughsSection() {
   const [playing, setPlaying] = useState<PlayingVideo | null>(null);
-  if (PRODUCT_WALKTHROUGHS.length === 0) return null;
+  const { data: dbRows } = useQuery({
+    queryKey: ["landing-media-public"],
+    queryFn: () => listPublishedLandingMedia(),
+    staleTime: 60_000,
+  });
+  // Admin-uploaded clips (Admin → Landing → Walkthrough clips) replace the
+  // built-in card with the same title; any others are added in front.
+  const fromDb = (dbRows ?? []).filter((r) => r.kind === "walkthrough").map(landingRowToWalkthrough);
+  const dbTitles = new Set(fromDb.map((w) => w.title.toLowerCase()));
+  const items = [...fromDb, ...PRODUCT_WALKTHROUGHS.filter((w) => !dbTitles.has(w.title.toLowerCase()))];
+  if (items.length === 0) return null;
+  const loop = [...items, ...items];
+
   return (
-    <section className="py-24 px-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-14">
-          <h2 className="text-4xl md:text-5xl font-bold">See CreatorFlow AI <span className="gradient-text">in Action</span></h2>
-          <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-            Short screen recordings of the real product — not customer testimonials.
-          </p>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {PRODUCT_WALKTHROUGHS.map((w) => (
-            <ProductWalkthroughCard key={w.id} w={w} onPlay={setPlaying} />
-          ))}
+    <section className="py-24">
+      <div className="max-w-7xl mx-auto px-6 text-center mb-12">
+        <h2 className="text-4xl md:text-5xl font-bold">See CreatorFlow AI <span className="gradient-text">in Action</span></h2>
+        <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
+          Quick looks at the real app — research, video, thumbnails, carousels, captions and more. Hover to pause, click to watch full size.
+        </p>
+      </div>
+      <div className="relative overflow-hidden group">
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-background to-transparent z-10" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-background to-transparent z-10" />
+        <div className="flex gap-5 animate-marquee-slow group-hover:[animation-play-state:paused]" style={{ width: "max-content" }}>
+          {loop.map((w, i) => <ProductWalkthroughCard key={`${w.id}-${i}`} w={w} onPlay={setPlaying} />)}
         </div>
       </div>
       {playing && (
@@ -623,9 +666,6 @@ export function ProductWalkthroughsSection() {
     </section>
   );
 }
-
-
-
 
 /* ---------------------- 3. WRITTEN TESTIMONIAL CAROUSEL ---------------------- */
 

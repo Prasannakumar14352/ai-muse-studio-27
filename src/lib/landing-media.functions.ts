@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-export type LandingMediaKind = "testimonial" | "demo";
+export type LandingMediaKind = "testimonial" | "demo" | "walkthrough";
 export type LandingMediaStatus = "draft" | "published";
 export type LandingVideoType = "mp4" | "webm" | "youtube" | "vimeo";
 export type LandingSource = "customer" | "sample" | "demo";
@@ -76,7 +76,7 @@ export const listAllLandingMedia = createServerFn({ method: "GET" })
 
 const UpsertSchema = z.object({
   id: z.string().uuid().optional(),
-  kind: z.enum(["testimonial", "demo"]),
+  kind: z.enum(["testimonial", "demo", "walkthrough"]),
   title: z.string().max(200).nullable().optional(),
   subtitle: z.string().max(300).nullable().optional(),
   country: z.string().max(80).nullable().optional(),
