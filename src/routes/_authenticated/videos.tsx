@@ -964,7 +964,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
           <span className="text-sm">
             <span className="font-medium">Keep the same person in every scene</span>
             <span className="block text-xs text-muted-foreground mt-0.5">
-              We create one portrait of your main character and use it for every scene they appear in. Those scenes use HD images (6 credits each instead of 1); scenery shots stay at 1 credit.
+              We create one portrait of your main character and use it for every scene they appear in. Those scenes use HD images (8 credits each instead of 1); scenery shots stay at 1 credit.
             </span>
           </span>
         </label>
@@ -1014,8 +1014,8 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
         {(() => {
           const base = estimateProjectCredits({ contentType: duration > 90 ? "long_video" : "short_reel", lengthSec: duration });
           const scenes = duration > 90 ? Math.ceil(duration / 8) : Math.max(4, Math.ceil(duration / 3.5));
-          // Same-character scenes use HD images (6 instead of 1) for ~70% of shots, plus one portrait.
-          const extra = sameCharacter ? Math.round(scenes * 0.7) * 5 + 6 : 0;
+          // Same-character scenes use HD images (8 instead of 1) for ~70% of shots, plus one portrait.
+          const extra = sameCharacter ? Math.round(scenes * 0.7) * 7 + 8 : 0;
           const motion = motionMode === "off" ? 0 : motionEstimate.credits;
           return (
             <div className="text-xs text-muted-foreground text-right">

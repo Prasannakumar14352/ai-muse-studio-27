@@ -41,14 +41,14 @@ export function estimateCost(action: CreditAction, p: EstimateParams = {}): numb
   switch (action) {
     case "image":
       return Math.max(1, (p.batch ?? 1)) * q;
-    // HD renders and edits use the Gemini image model (6 credits each).
+    // HD renders and edits use the Gemini image model (8 credits each).
     case "image_edit":
     case "upscale":
     case "bg_remove":
     case "inpaint":
     case "magic_eraser":
     case "thumbnail_quality":
-      return 6 * Math.max(1, p.batch ?? 1);
+      return 8 * Math.max(1, p.batch ?? 1);
     case "voiceover":
       return 2 * q; // ~1 per 100 characters; a typical scene is ~200
 

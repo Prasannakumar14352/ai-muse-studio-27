@@ -13,7 +13,7 @@ export type CreditCostRow = {
 export const CREDIT_COSTS: CreditCostRow[] = [
   { id: "script",      label: "Script + captions + hashtags",     category: "Text",     credits: 1,        unit: "per project",     notes: "AI-written script, on-screen text, caption, and hashtag pack." },
   { id: "image",       label: "AI image (standard)",              category: "Image",    credits: 1,        unit: "per image",       notes: "Fast, high-quality render (FLUX). Used for scene images, carousels and most thumbnails." },
-  { id: "image_hd",    label: "AI image (HD) or image edit",      category: "Image",    credits: 6,        unit: "per image",       notes: "Google Gemini image model: HD/Ultra renders, upscale, remove background, inpaint, outpaint, magic eraser, reference images." },
+  { id: "image_hd",    label: "AI image (HD) or image edit",      category: "Image",    credits: 8,        unit: "per image",       notes: "Google Gemini image model: HD/Ultra renders, upscale, remove background, inpaint, outpaint, magic eraser, reference images." },
   { id: "image_regen", label: "Regenerate scene image",           category: "Image",    credits: 1,        unit: "per image",       notes: "Only re-renders the affected scene after you tweak its prompt." },
   { id: "carousel",    label: "Instagram-style carousel",         category: "Carousel", credits: "1 + N",  unit: "1 script + 1 per slide", notes: "1 credit for the AI copy, plus 1 credit per rendered slide image (N = slide count, 3–10)." },
   { id: "voiceover",   label: "Voiceover (any language)",         category: "Audio",    credits: 1,        unit: "per 100 characters", notes: "ElevenLabs multilingual voice. A typical scene (1–2 sentences) is about 2 credits." },

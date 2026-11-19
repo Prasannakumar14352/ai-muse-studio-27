@@ -28,7 +28,7 @@ import { useAutogen } from "@/lib/use-autogen";
 import { promptDialog } from "@/components/prompt-dialog";
 
 /** Matches ACTION_COSTS.image_hd on the server. */
-const HD_CREDITS = 6;
+const HD_CREDITS = 8;
 
 export const Route = createFileRoute("/_authenticated/images")({ component: ImagesPage });
 

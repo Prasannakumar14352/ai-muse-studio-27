@@ -18,6 +18,12 @@ export type MotionModel = {
   usdPerSecond: number;
   /** Fixed clip lengths the model accepts (Kling: 5 or 10 s). Empty = any length. */
   fixedDurations: number[];
+  /**
+   * Seconds fal actually bills at minimum per clip. H3 returns up to ~0.7 s
+   * more than requested and bills a floor: 21 real 3.5 s clips cost $2.20
+   * (≈ $0.105 each ≈ 5.6 s), so price from that, not the request.
+   */
+  minBilledSeconds: number;
   minSeconds: number;
   maxSeconds: number;
 };
@@ -29,6 +35,7 @@ export const MOTION_MODELS: Record<MotionTier, MotionModel> = {
     endpoint: "minimax/h3-max-turbo/image-to-video",
     usdPerSecond: 0.01875,
     fixedDurations: [],
+    minBilledSeconds: 5.6,
     minSeconds: 2,
     maxSeconds: 10,
   },
@@ -38,6 +45,7 @@ export const MOTION_MODELS: Record<MotionTier, MotionModel> = {
     endpoint: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
     usdPerSecond: 0.07,
     fixedDurations: [5, 10],
+    minBilledSeconds: 5,
     minSeconds: 5,
     maxSeconds: 10,
   },
@@ -68,8 +76,9 @@ export function clipSecondsFor(tier: MotionTier, beatSeconds: number): number {
 
 /** Credits for one clip. Same function on client (display) and server (billing). */
 export function motionClipCredits(tier: MotionTier, beatSeconds: number): number {
-  const secs = clipSecondsFor(tier, beatSeconds);
-  const usd = secs * MOTION_MODELS[tier].usdPerSecond;
+  const m = MOTION_MODELS[tier];
+  const secs = Math.max(clipSecondsFor(tier, beatSeconds), m.minBilledSeconds);
+  const usd = secs * m.usdPerSecond;
   return Math.max(1, Math.ceil((usd * MARKUP) / CREDIT_FLOOR_USD));
 }
 
