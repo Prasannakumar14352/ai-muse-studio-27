@@ -177,8 +177,8 @@ function ThumbnailsPage() {
   async function runGeneration() {
     if (!plan) return;
     const count = CONCEPT_COUNTS.includes(brief.conceptCount) ? brief.conceptCount : 4;
-    // Matches server pricing in /api/generate-image: HD (Ultra) 6, otherwise 1.
-    const costPer = QUALITIES.find((x) => x.id === brief.quality)?.imageQuality === "high" ? 6 : 1;
+    // Matches server pricing in /api/generate-image: HD (Ultra) 8, otherwise 1.
+    const costPer = QUALITIES.find((x) => x.id === brief.quality)?.imageQuality === "high" ? 8 : 1;
     if (access && !canGenerate(access, count * costPer)) {
       toast.error(`Not enough credits (~${count * costPer} required)`); return;
     }
@@ -840,7 +840,7 @@ function GenerationGrid(props: {
               <ActionButton icon={Wand} label="Replace Face"
                 onClick={async () => { const v = await promptDialog({ title: "Replace face", description: "Describe the new face or expression.", placeholder: "e.g. shocked, mouth open, wide eyes", suggestions: ["Shocked", "Excited", "Curious", "Scared", "Laughing"], confirmText: "Replace face" }); if (v) props.onEdit(selectedItem, `Replace only the face with: ${v}. Preserve everything else.`, "Replace face"); }} />
               <ActionButton icon={Wand} label="Replace Text"
-                onClick={async () => { const v = await promptDialog({ title: "Replace text", description: "Type the thumbnail text in any language.", placeholder: "e.g. 2100లో THEATRE / ఇలా ఉంటుందా?", defaultValue: selectedItem.overlayText ?? "", hint: selectedItem.baseImage ? "Use \" / \" to split into a top and bottom line. Drawn with a proper font for any language — instant and free." : "Use \" / \" to split into a top and bottom line. The old AI-drawn text is erased first (one HD edit, 6 credits), then your text is drawn with a proper font.", confirmText: "Update text" }); if (v) props.onEdit(selectedItem, `Replace the overlay text with "${v.toUpperCase()}" in the same style.`, "Replace text", v.toUpperCase()); }} />
+                onClick={async () => { const v = await promptDialog({ title: "Replace text", description: "Type the thumbnail text in any language.", placeholder: "e.g. 2100లో THEATRE / ఇలా ఉంటుందా?", defaultValue: selectedItem.overlayText ?? "", hint: selectedItem.baseImage ? "Use \" / \" to split into a top and bottom line. Drawn with a proper font for any language — instant and free." : "Use \" / \" to split into a top and bottom line. The old AI-drawn text is erased first (one HD edit, 8 credits), then your text is drawn with a proper font.", confirmText: "Update text" }); if (v) props.onEdit(selectedItem, `Replace the overlay text with "${v.toUpperCase()}" in the same style.`, "Replace text", v.toUpperCase()); }} />
               <ActionButton icon={Wand} label="Replace BG"
                 onClick={async () => { const v = await promptDialog({ title: "Replace background", description: "Describe the new background.", placeholder: "e.g. neon city street at night, rain reflections", multiline: true, confirmText: "Replace background" }); if (v) props.onEdit(selectedItem, `Replace only the background with: ${v}. Keep subject and text intact.`, "Replace background"); }} />
               <ActionButton icon={BarChart3} label="Analyze" onClick={() => props.onAnalyze(selectedItem)} />

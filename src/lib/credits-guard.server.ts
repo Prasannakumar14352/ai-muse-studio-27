@@ -78,13 +78,14 @@ export const ACTION_COSTS = {
   // Provider cost: FLUX Schnell ~$0.003, Nano Banana (HD/edits) ~$0.04.
   // Cheapest credit sold is ~$0.0108, so these keep at least ~2x margin.
   image: 1,
-  image_hd: 6,
+  // Nano Banana bills ~$0.04/image on fal → 8 credits keeps ≥2× at the cheapest credit.
+  image_hd: 8,
   // Voice — charged per started 100 characters in /api/tts
   // (ElevenLabs Turbo via fal: $0.05 per 1,000 chars = $0.005 per 100)
   tts_per_100_chars: 1,
   // Real-motion clips — amount computed per clip in motion-clips.ts
   // (fal image-to-video price × MARKUP / CREDIT_FLOOR_USD).
-  motion_clip: 18,
+  motion_clip: 20,
 } as const;
 
 export type ChargeAction = keyof typeof ACTION_COSTS;
