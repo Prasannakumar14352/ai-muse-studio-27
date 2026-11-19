@@ -180,8 +180,9 @@ function OfferEditor({ initial, onClose }: { initial: Form; onClose: () => void 
   const qc = useQueryClient();
   const save = useServerFn(saveOffer);
   const plansFn = useServerFn(listPricingPlans);
-  const plansQ = useQuery({ queryKey: ["pricing-plans-public"], queryFn: () => plansFn() });
-  const plans = ((plansQ.data ?? []) as Array<{ code: string; name: string; planType?: string }>).filter((p) => p.planType !== "free" && p.code !== "free");
+  const plansQ = useQuery({ queryKey: ["offer-editor-plans"], queryFn: () => plansFn() });
+  // listPricingPlans returns { plans: [...] }.
+  const plans = (plansQ.data?.plans ?? []).filter((p) => p.planType !== "free" && p.code !== "free" && !p.contactSales);
   const [f, setF] = useState<Form>(initial);
   const [busy, setBusy] = useState(false);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((p) => ({ ...p, [k]: v }));
