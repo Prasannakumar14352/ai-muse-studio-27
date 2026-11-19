@@ -3,6 +3,7 @@ import { estimateProjectCredits } from "@/lib/credit-costs";
 import { creditsLabel } from "@/lib/credits-label";
 import { CONTENT_LANGUAGES } from "@/lib/content-language";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { estimateMotionCredits, motionClipCredits, MOTION_MODELS, KEY_MOMENT_CLIPS, type MotionMode, type MotionTier } from "@/lib/motion-clips";
 import { toast } from "sonner";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
@@ -769,6 +770,12 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
   const [ratio, setRatio] = useState<AspectRatio>(initialRatio ?? "9:16");
   const [sameCharacter, setSameCharacter] = useState(true);
   const [language, setLanguage] = useState("auto");
+  const [motionMode, setMotionMode] = useState<MotionMode>("off");
+  const [motionTier, setMotionTier] = useState<MotionTier>("standard");
+  // Full motion animates every beat — only offered for short videos.
+  const fullMotionAllowed = duration <= 90;
+  const motionBeats = Math.max(4, Math.ceil(duration / 3.5));
+  const motionEstimate = estimateMotionCredits(motionBeats, 3.5, motionMode === "full" && !fullMotionAllowed ? "key" : motionMode, motionTier);
 
   const autoFiredRef = useRef(false);
   useEffect(() => {
@@ -793,7 +800,11 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
     if (!title.trim()) return toast.error("Enter a video title or idea");
     if (isCustom && !customNiche.trim()) return toast.error("Describe your custom niche or topic area");
     onGenerate({
-      brief: { title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio, sameCharacter, language },
+      brief: {
+        title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio, sameCharacter, language,
+        motionMode: motionMode === "full" && !fullMotionAllowed ? "key" : motionMode,
+        motionTier,
+      },
       niche: isCustom ? customNiche.trim() : niche,
       topic: title.trim(),
     });
@@ -959,17 +970,57 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
         </label>
       </Section>
 
-      {/* 11. Generate */}
+      {/* 10. Motion */}
+      <Section index={11} title="Motion">
+        <div className="space-y-3">
+          <div className="grid sm:grid-cols-3 gap-2">
+            {([
+              { id: "off", label: "Camera moves", desc: "Still images with smooth pan & zoom. Cheapest." },
+              { id: "key", label: "Key moments", desc: `The hook + ${KEY_MOMENT_CLIPS - 1} key scenes become real AI video — people move and act.` },
+              { id: "full", label: "Full motion", desc: fullMotionAllowed ? "Every scene is a real AI video clip. Best result, highest cost." : "Available for videos up to 90 seconds." },
+            ] as Array<{ id: MotionMode; label: string; desc: string }>).map((o) => {
+              const disabled = o.id === "full" && !fullMotionAllowed;
+              const active = motionMode === o.id;
+              return (
+                <button key={o.id} type="button" disabled={disabled} onClick={() => setMotionMode(o.id)}
+                  className={`text-left rounded-xl p-3 border transition disabled:opacity-40 ${active ? "border-[color:var(--brand-orange)] bg-[color:var(--brand-orange)]/10" : "glass border-border hover:border-white/20"}`}>
+                  <div className="text-sm font-medium">{o.label}</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">{o.desc}</div>
+                </button>
+              );
+            })}
+          </div>
+          {motionMode !== "off" && (
+            <div className="glass rounded-xl p-3 border border-border space-y-2">
+              <div className="flex flex-wrap gap-2">
+                {(["standard", "premium"] as MotionTier[]).map((t) => (
+                  <button key={t} type="button" onClick={() => setMotionTier(t)}
+                    className={`px-3 py-1.5 rounded-lg text-xs border ${motionTier === t ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>
+                    {t === "standard" ? "Standard motion" : "Premium motion"} · {motionClipCredits(t, 3.5)} credits / clip
+                  </button>
+                ))}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {MOTION_MODELS[motionTier].label}. {motionEstimate.clips} clip{motionEstimate.clips === 1 ? "" : "s"} ≈ <span className="text-foreground font-medium">{motionEstimate.credits} credits</span> on top of the video.
+                {" "}Each clip takes 1–3 minutes. If a clip fails, that scene keeps its still image and the clip's credits are refunded.
+              </div>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* 12. Generate */}
       <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
         {(() => {
           const base = estimateProjectCredits({ contentType: duration > 90 ? "long_video" : "short_reel", lengthSec: duration });
           const scenes = duration > 90 ? Math.ceil(duration / 8) : Math.max(4, Math.ceil(duration / 3.5));
           // Same-character scenes use HD images (6 instead of 1) for ~70% of shots, plus one portrait.
           const extra = sameCharacter ? Math.round(scenes * 0.7) * 5 + 6 : 0;
+          const motion = motionMode === "off" ? 0 : motionEstimate.credits;
           return (
             <div className="text-xs text-muted-foreground text-right">
-              Estimated cost: <span className="font-semibold text-foreground">≈ {creditsLabel(base.total + extra)}</span>
-              <div className="text-[11px]">{base.parts}{extra ? ` + ${extra} for the same character` : ""}</div>
+              Estimated cost: <span className="font-semibold text-foreground">≈ {creditsLabel(base.total + extra + motion)}</span>
+              <div className="text-[11px]">{base.parts}{extra ? ` + ${extra} for the same character` : ""}{motion ? ` + ${motion} for motion clips` : ""}</div>
             </div>
           );
         })()}

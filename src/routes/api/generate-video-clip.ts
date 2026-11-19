@@ -1,39 +1,87 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// Beat-level AI video clip generation.
+// Real-motion clip for one story beat: animates the beat's still image with an
+// image-to-video model on fal.ai.
 //
-// Contract: POST { prompt, style, ratio, duration } → { ok: true, clip: <data URL mp4> }
-// or { ok: false, reason }. The client's beat visual pipeline calls this first
-// for every beat and falls back to a still image on any non-ok response.
+//   POST { image, prompt, beatSeconds, tier }  → { ok: true, token, credits, seconds }
+//   then poll POST /api/video-clip-status { token } until the clip is ready.
 //
-// Not wired to a video model: this always returns { ok: false } so the video
-// pipeline uses still images. (Paid per-clip video lives in Model Studio,
-// which charges credits per second; enabling it here would need the same.)
+// Credits are reserved here and finalized (or refunded) by the status route,
+// so a failed clip never costs the user anything. Generation takes ~1–3 min,
+// which is why this is a queue + poll instead of one long request.
 
 export const Route = createFileRoute("/api/generate-video-clip")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         const { getUserIdFromRequest, unauthorized } = await import("@/lib/route-auth.server");
-        if (!(await getUserIdFromRequest(request))) return unauthorized();
+        const userId = await getUserIdFromRequest(request);
+        if (!userId) return unauthorized();
+
+        let body: { image?: string; prompt?: string; beatSeconds?: number; tier?: string };
+        try { body = await request.json(); } catch { return Response.json({ ok: false, reason: "bad_json" }, { status: 400 }); }
+
+        const image = (body.image ?? "").trim();
+        const prompt = (body.prompt ?? "").trim();
+        if (!image || !/^(https:\/\/|data:image\/)/.test(image)) {
+          return Response.json({ ok: false, reason: "image_required" }, { status: 400 });
+        }
+        if (!prompt) return Response.json({ ok: false, reason: "prompt_required" }, { status: 400 });
+
+        const { MOTION_MODELS, clipSecondsFor, motionClipCredits } = await import("@/lib/motion-clips");
+        const tier = body.tier === "premium" ? "premium" : "standard";
+        const model = MOTION_MODELS[tier];
+        const beatSeconds = Math.max(1, Math.min(15, Number(body.beatSeconds) || 4));
+        const seconds = clipSecondsFor(tier, beatSeconds);
+        const credits = motionClipCredits(tier, beatSeconds);
+
+        const { isFalConfigured, falSubmit } = await import("@/lib/fal.server");
+        if (!isFalConfigured()) return Response.json({ ok: false, reason: "video_model_not_configured" });
+
+        const { chargeCredits } = await import("@/lib/credits-guard.server");
+        let reservation: Awaited<ReturnType<typeof chargeCredits>>;
         try {
-          const body = (await request.json()) as {
-            prompt?: string; style?: string; ratio?: string; duration?: number;
-          };
-          const prompt = (body.prompt ?? "").trim();
-          if (!prompt) {
-            return Response.json({ ok: false, reason: "prompt required" }, { status: 400 });
-          }
-          // Return ok:false so callers cleanly fall back to still images.
-          return Response.json({
-            ok: false,
-            reason: "video_model_not_configured",
+          reservation = await chargeCredits({
+            userId,
+            action: "motion_clip",
+            amount: credits,
+            description: `Motion clip (${tier}, ${seconds}s)`,
           });
         } catch (e) {
-          return Response.json(
-            { ok: false, reason: e instanceof Error ? e.message : String(e) },
-            { status: 200 },
-          );
+          const msg = e instanceof Error ? e.message : String(e);
+          if (msg.startsWith("insufficient_credits:")) {
+            return Response.json({ ok: false, reason: "insufficient_credits", credits }, { status: 402 });
+          }
+          return Response.json({ ok: false, reason: msg.slice(0, 200) }, { status: 400 });
+        }
+
+        const input: Record<string, unknown> = tier === "premium"
+          ? {
+              prompt: prompt.slice(0, 2400),
+              image_url: image,
+              duration: String(seconds),
+              negative_prompt: "text, captions, letters, watermark, logo, blur, distortion, morphing faces, extra people",
+            }
+          : {
+              prompt: prompt.slice(0, 4000),
+              image_url: image,
+              duration: seconds,
+              resolution: "768P",
+              prompt_expansion_mode: "balanced",
+            };
+
+        try {
+          const job = await falSubmit(model.endpoint, input);
+          if (!reservation.ledgerId) throw new Error("No credit reservation");
+          const { signClipToken } = await import("@/lib/motion-clips.server");
+          const token = signClipToken({
+            u: userId, l: reservation.ledgerId, s: job.statusUrl, r: job.responseUrl,
+            e: Date.now() + 60 * 60 * 1000,
+          });
+          return Response.json({ ok: true, token, credits, seconds, model: model.endpoint });
+        } catch (e) {
+          await reservation.refund("provider_submit_failed");
+          return Response.json({ ok: false, reason: (e instanceof Error ? e.message : String(e)).slice(0, 300) }, { status: 502 });
         }
       },
     },
