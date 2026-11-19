@@ -753,6 +753,8 @@ function VideoPreview({
   const aspect = isVertical ? "aspect-[9/16] max-w-[340px]" : "aspect-video w-full";
   const totalScenes = scenes.length;
   const ratio = isVertical ? "9:16" : "16:9";
+  /** Download / export / publish only for a finished render — hidden while a render runs. */
+  const readyVideoUrl = rendering || ugcRendering ? null : videoUrl;
 
   useEffect(() => {
     setVideoUrl(existingVideoUrl);
@@ -1182,8 +1184,8 @@ function VideoPreview({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {videoUrl && (
-            <button onClick={() => forceDownloadUrl(videoUrl, `${(title || "video").replace(/[^\w]+/g, "-")}.mp4`)} className="rounded-lg glass hover:bg-white/5 px-4 py-2 text-sm font-medium flex items-center gap-2">
+          {readyVideoUrl && (
+            <button onClick={() => forceDownloadUrl(readyVideoUrl, `${(title || "video").replace(/[^\w]+/g, "-")}.mp4`)} className="rounded-lg glass hover:bg-white/5 px-4 py-2 text-sm font-medium flex items-center gap-2">
               <Download className="w-4 h-4" /> Download video
             </button>
           )}
@@ -1217,7 +1219,7 @@ function VideoPreview({
         </div>
       </div>
 
-      {videoUrl && (
+      {readyVideoUrl && (
         <PublishActions
           className="mb-4"
           projectId={projectId}
@@ -1228,8 +1230,8 @@ function VideoPreview({
           caption={publishKit?.platforms?.[publishKit.primary_platform]?.caption || publishKit?.seo_description || fallbackCaption || ""}
           hashtags={(publishKit?.platforms?.[publishKit.primary_platform]?.hashtags ?? []).join(" ") || fallbackHashtags || ""}
           captions={captionsFromKit(publishKit)}
-          media={[{ url: videoUrl, kind: "video", name: "video.mp4" }]}
-          onDownload={() => forceDownloadUrl(videoUrl, `${(title || "video").replace(/[^\w]+/g, "-")}.mp4`)}
+          media={[{ url: readyVideoUrl, kind: "video", name: "video.mp4" }]}
+          onDownload={() => forceDownloadUrl(readyVideoUrl, `${(title || "video").replace(/[^\w]+/g, "-")}.mp4`)}
         />
       )}
 
@@ -1499,7 +1501,8 @@ function VideoPreview({
         )}
       </div>
 
-      {/* --- Export bundle --------------------------------------------------- */}
+      {/* --- Export bundle (only once the video is rendered) ------------------ */}
+      {readyVideoUrl && (
       <div className="mb-4 rounded-xl border border-border bg-black/30">
         <button
           onClick={() => setOpenBundle((v) => !v)}
@@ -1509,7 +1512,7 @@ function VideoPreview({
             {openBundle ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             <Package className="w-4 h-4 text-[color:var(--neon-purple)]" /> Export & download
           </span>
-          <span className="text-xs text-muted-foreground">{videoUrl ? "video ready" : "render video first"}</span>
+          <span className="text-xs text-muted-foreground">video ready</span>
         </button>
         {openBundle && (
           <div className="px-4 pb-4 space-y-3">
@@ -1525,8 +1528,8 @@ function VideoPreview({
                 {bundleBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
                 Download final bundle
               </button>
-              {videoUrl && (
-                <button onClick={() => forceDownloadUrl(videoUrl, `${(title || "video").replace(/[^\w]+/g, "-")}.mp4`)} className="rounded-lg glass border border-border hover:bg-white/5 px-4 py-2 text-sm flex items-center gap-2">
+              {readyVideoUrl && (
+                <button onClick={() => forceDownloadUrl(readyVideoUrl, `${(title || "video").replace(/[^\w]+/g, "-")}.mp4`)} className="rounded-lg glass border border-border hover:bg-white/5 px-4 py-2 text-sm flex items-center gap-2">
                   <VideoIcon className="w-4 h-4" /> Video only
                 </button>
               )}
@@ -1546,6 +1549,7 @@ function VideoPreview({
           </div>
         )}
       </div>
+      )}
 
 
 
