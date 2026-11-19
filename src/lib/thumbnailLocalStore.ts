@@ -3,7 +3,7 @@
 // Mirrors videoLocalStore.ts / local-store.ts patterns.
 
 import { supabase } from "@/integrations/supabase/client";
-import { putBlob, getBlob, deleteBlob, makeBlobKey, putDataURL } from "@/lib/blob-store";
+import { putBlob, getBlob, deleteBlob, makeBlobKey } from "@/lib/blob-store";
 
 export type LocalThumbnail = {
   id: string;
@@ -89,15 +89,12 @@ export async function saveGeneratedThumbnail(input: SaveThumbnailInput): Promise
   const key = `thumbnail:${uid}:${id}`;
 
   let mime = "image/png";
-  if (typeof input.image === "string" && input.image.startsWith("data:")) {
-    await putDataURL(key, input.image);
-    const m = input.image.match(/^data:([^;,]+)/);
-    if (m) mime = m[1];
-  } else {
-    const { blob, mime: m } = await toBlob(input.image);
-    await putBlob(key, blob);
-    mime = m;
-  }
+  const { blob: fileBlob, mime: m } = await toBlob(input.image);
+  await putBlob(key, fileBlob);
+  mime = m;
+  void import("@/lib/cloud-sync").then(({ recordLibraryAsset }) => recordLibraryAsset({
+    rawKey: key, blob: fileBlob, kind: "image", title: input.title || "Thumbnail", tags: ["thumbnail"],
+  })).catch(() => {});
 
   const rec: LocalThumbnail = {
     id,
