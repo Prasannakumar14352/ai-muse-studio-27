@@ -163,7 +163,9 @@ For EACH scene, produce:
 - visual: 1-line description of what's on screen.
 - image_prompt: a rich, self-contained prompt for an AI image model. It MUST
   include: "${data.styleLabel} style, ${ratio}, photorealistic, cinematic,
-  premium commercial look, 8k, shallow depth of field".
+  premium commercial look, 8k, shallow depth of field". Write it in English
+  only and NEVER include words for the image to show — no quoted lines, no
+  captions, no signs, no on-screen text (captions are added later).
 - duration: e.g. "3s" (integer seconds, 2-5s per scene).
 
 Also produce:
@@ -444,7 +446,7 @@ For EACH scene produce:
 - visual: 1-line description of what's on screen
 - image_prompt: rich prompt for an AI image model. MUST include:
   "${data.styleLabel} style, ${ratio}, photorealistic, cinematic, premium commercial look, 8k, shallow depth of field".
-  Describe subject, setting, lighting, framing. NO text overlays in the image.
+  Describe subject, setting, lighting, framing, in English only. NEVER include words for the image to show (no quoted lines, captions, signs or on-screen text).
 - duration: "Ns" integer seconds 2-8
 
 Return ONLY this JSON object shape with no prose:

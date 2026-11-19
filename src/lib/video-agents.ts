@@ -994,16 +994,51 @@ function mapStyleForRenderer(id: StyleId): string {
 
 import { planThumbnails } from "@/lib/thumbnail-director";
 
+const THUMB_NON_LATIN = /[\u0400-\u04FF\u0590-\u06FF\u0900-\u0DFF\u0E00-\u0E7F\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/;
+
+/**
+ * Full-scene thumbnail prompt built from the video's own content. The old
+ * version asked for an empty "background only" plate (meant for compositing
+ * a subject that the video pipeline never added), so thumbnails came out as
+ * empty, off-topic scenes. Non-English titles are never quoted, so the image
+ * model can't paint them as garbled text.
+ */
+function videoThumbnailPrompt(
+  brief: VideoBrief,
+  script: AiVideoScript | null | undefined,
+  mood: string,
+  modifier: string,
+): string {
+  const visuals = (script?.scenes ?? [])
+    .map((sc) => (sc.visual || "").trim())
+    .filter((v) => v && !THUMB_NON_LATIN.test(v))
+    .slice(0, 3);
+  const titleIsEnglish = !THUMB_NON_LATIN.test(brief.title);
+  const about = titleIsEnglish
+    ? `a video about ${brief.title.replace(/["“”]/g, "")}`
+    : `this video`;
+  return [
+    `Eye-catching YouTube thumbnail image for ${about}.`,
+    visuals.length ? `Show the key moment: ${visuals[0]}.` : "",
+    visuals.length > 1 ? `Context: ${visuals.slice(1).join("; ")}.` : "",
+    `Mood: ${mood}. ${modifier}.`,
+    `One clear hero subject, close framing, expressive emotion, bold contrasting colors, dramatic lighting, 16:9.`,
+    `Keep the top third simple so a headline can be added on top later.`,
+    `Absolutely no written words, letters, numbers, captions, signs, labels, watermarks or logos anywhere in the image.`,
+  ].filter(Boolean).join(" ");
+}
+
 export const ThumbnailAgent = {
-  async run(brief: VideoBrief): Promise<ThumbnailResult> {
+  async run(brief: VideoBrief, script?: AiVideoScript | null): Promise<ThumbnailResult> {
     const topic = brief.title;
     const plan = planThumbnails(topic);
 
     const results = await Promise.all(
       plan.concepts.map(async (c) => {
-        // Background-only image (opaque). Deliberately NO text and clear
-        // negative space so the client can composite the subject + HTML text.
-        const url = await fetchSceneImage(c.backgroundPrompt, brief.style, "16:9");
+        // Text-free image; the headline is overlaid by the UI so it stays
+        // spelled correctly (in any language) and editable.
+        const prompt = videoThumbnailPrompt(brief, script, c.label.toLowerCase(), c.style.bgPromptModifier);
+        const url = await fetchSceneImage(prompt, brief.style, "16:9");
         if (url) {
           return {
             url,
@@ -1367,7 +1402,7 @@ export async function runVideoPipeline(
       onStep("render", "running", `${Math.round(p * 100)}%`)
     ),
   );
-  const thumbnail = await mark("thumbnail", () => ThumbnailAgent.run(brief));
+  const thumbnail = await mark("thumbnail", () => ThumbnailAgent.run(brief, script));
   const seo = await mark("seo", () => SeoAgent.run(brief, script, timeline));
 
   validatePipelineDuration({
@@ -1864,7 +1899,7 @@ export async function runVideoJobPipeline(
   );
   job.renderProgress = 1;
 
-  const thumbnail = await ThumbnailAgent.run(brief);
+  const thumbnail = await ThumbnailAgent.run(brief, script);
   const seo = await SeoAgent.run(brief, script, timeline);
 
   // New pipeline agents — run after script so they can annotate it.
@@ -2242,7 +2277,7 @@ export async function runRenderPhase(
     }
   }
 
-  const thumbnail = await ThumbnailAgent.run(brief);
+  const thumbnail = await ThumbnailAgent.run(brief, script);
   const seo = await SeoAgent.run(brief, script, timeline);
 
   const [titles, hook] = await Promise.all([

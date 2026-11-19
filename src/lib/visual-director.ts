@@ -361,6 +361,9 @@ function pickCameraMove(beatIndex: number): CameraMove {
  * Pure function. Topic-aware: infers palette, environment, lighting recipe,
  * emotion, and story details from the beat + title without any LLM call.
  */
+/** Indic, Arabic, CJK, Cyrillic, Thai… — scripts image models can't render and shouldn't try. */
+const NON_LATIN_SCRIPT = /[\u0400-\u04FF\u0590-\u06FF\u0900-\u0DFF\u0E00-\u0E7F\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/;
+
 export function directBeatPrompt(input: DirectorInput): DirectorOutput {
   const preset = STYLE_PRESETS[input.styleId] ?? STYLE_PRESETS.cinematic;
   const shotType = pickShotType(input.beatIndex, input.previousShotType);
@@ -383,6 +386,14 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
   const negativePrompt = negatives.join(", ");
 
   const beat = input.beatText.trim().replace(/\s+/g, " ");
+  // The beat is the spoken line, often in Telugu/Hindi/etc. Quoting it in the
+  // prompt makes image models paint it as (garbled) text, so non-Latin lines
+  // are left out and described through the scene's English visual instead,
+  // and English lines are paraphrased without quotes.
+  const sceneVisual = (input.sceneContext ?? "").trim();
+  const beatIdea = NON_LATIN_SCRIPT.test(beat)
+    ? (sceneVisual || "the moment described by the scene")
+    : `the idea: ${beat.replace(/["“”'‘’]/g, "")}`;
   void input.continuity.subjectAnchor;
 
   // B-roll shots show the place / objects, not the protagonist.
@@ -399,8 +410,8 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
     );
     parts.push(
       hasCharacter
-        ? `Subject: the protagonist described below, visualizing "${beat}" — show the action and setting, not just a portrait`
-        : `Subject: visualize "${beat}" through the place, objects and details — no close-up of any person's face`,
+        ? `Subject: the protagonist described below, acting out ${beatIdea} — show the action and setting, not just a portrait`
+        : `Subject: show ${beatIdea} through the place, objects and details — no close-up of any person's face`,
     );
     parts.push(`Environment: ${environment}`);
     if (hasCharacter) {
@@ -435,8 +446,7 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
       parts.push(`Continuity RULES: ${input.continuity.locationAnchor}`);
     }
     parts.push(`Emotion driving the frame: ${emotion}${input.scenePurpose ? ` — ${input.scenePurpose}` : ""}`);
-    if (input.chapterLabel) parts.push(`Chapter: ${input.chapterLabel}`);
-    if (input.sceneNumber != null) parts.push(`Scene ${input.sceneNumber}`);
+    // Chapter / scene numbers are not added: models tend to print them as labels.
     parts.push(
       "photorealistic, ultra realistic texture, HDR, 8K, premium color grading, " +
       "subtle film grain, ARRI / Sony / RED cinema quality, ultra detailed, sharp focus, " +
@@ -504,9 +514,9 @@ export function optimizePrompt(raw: string, styleId: VDStyle): string {
   const MAX = 2000;
   if (s.length > MAX) s = s.slice(0, MAX - 1).replace(/,[^,]*$/, "") + "…";
   // Added after the cap so it can never be trimmed away.
-  if (!/no text|no watermark/i.test(s)) {
-    s += ". No text, no watermark, no captions, no logos in the image.";
-  }
+  // Always end with the text ban (after the cap so it can never be trimmed).
+  // Captions are drawn by the app with real fonts, so the image must be clean.
+  s += ". Absolutely no written words, letters, numbers, captions, subtitles, signs, labels, watermarks or logos anywhere in the image.";
   // Anchor illustrated styles so photorealism cues don't override them.
   if (STYLE_PRESETS[styleId].isIllustrated && !/illustration|animation|painting/i.test(s)) {
     s = `${STYLE_PRESETS[styleId].label} illustration. ${s}`;
