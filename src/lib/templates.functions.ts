@@ -258,6 +258,8 @@ const TIER_RANK: Record<TemplateAccessTier, number> = { free: 0, starter: 1, cre
 
 export function planTier(planId?: string | null): TemplateAccessTier {
   if (!planId) return "free";
+  // Admins (plan "admin") get every template.
+  if (planId === "admin") return "pro";
   if (planId.startsWith("pro")) return "pro";
   if (planId.startsWith("creator")) return "creator";
   if (planId.startsWith("starter")) return "starter";

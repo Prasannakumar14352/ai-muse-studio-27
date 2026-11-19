@@ -12,7 +12,7 @@ import { z } from "zod";
 import type { JsonValue } from "@/lib/generation-jobs.functions";
 import { gatewayChatJson } from "@/lib/ai-gateway.server";
 import {
-  createGenerationJobFn,
+  createGenerationJobAdmin,
   markJobCompleteAdmin,
   markJobFailedAdmin,
   updateJobProgressAdmin,
@@ -121,17 +121,14 @@ export const generateSeoPackageFn = createServerFn({ method: "POST" })
   .inputValidator((v: unknown) => inputSchema.parse(v))
   .handler(async ({ data, context }) => {
     // Create + reserve credits via the shared job service.
-    const create = (createGenerationJobFn as unknown as (opts: { data: unknown }) => Promise<{ job: { id: string }; reused: boolean }>);
-    const { job } = await create({
-      data: {
+    const { job } = await createGenerationJobAdmin(context.userId, {
         moduleType: "seo_package",
         jobType: `seo_${data.contentType}`,
         projectId: data.projectId ?? null,
         requestPayload: { contentType: data.contentType, topic: data.topic, length: data.length } as never,
-        creditsEstimated: CREDITS_FULL,
+        creditsEstimated: 0, // the page already reserved credits via runWithCredits
         provider: "lovable-gateway",
         idempotencyKey: data.idempotencyKey,
-      },
     });
 
     try {
@@ -189,17 +186,14 @@ export const regenerateSeoSectionFn = createServerFn({ method: "POST" })
     }).parse(v),
   )
   .handler(async ({ data, context }) => {
-    const create = (createGenerationJobFn as unknown as (opts: { data: unknown }) => Promise<{ job: { id: string }; reused: boolean }>);
-    const { job } = await create({
-      data: {
+    const { job } = await createGenerationJobAdmin(context.userId, {
         moduleType: "seo_package",
         jobType: `seo_section_${data.instruction}`,
         projectId: data.projectId,
         requestPayload: { sectionKey: data.sectionKey, instruction: data.instruction } as never,
-        creditsEstimated: 1,
+        creditsEstimated: 0, // charged by the page
         provider: "lovable-gateway",
         idempotencyKey: data.idempotencyKey,
-      },
     });
 
     try {

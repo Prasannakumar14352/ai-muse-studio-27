@@ -639,8 +639,18 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
     try {
       const mod = await webmFixModule;
       if (!mod) throw new Error("webm-duration-fix unavailable");
-      const fixWebmDuration = (mod as { default?: (b: Blob) => Promise<Blob> }).default
-        ?? (mod as unknown as (b: Blob) => Promise<Blob>);
+      // webm-duration-fix is CommonJS (`exports.default = fn`). Depending on
+      // the bundler's interop, the function sits at mod, mod.default or
+      // mod.default.default — pick whichever is actually callable.
+      type Fix = (b: Blob) => Promise<Blob>;
+      const m = mod as unknown as { default?: Fix | { default?: Fix } } & Partial<Fix>;
+      const candidates: unknown[] = [
+        (m.default as { default?: Fix } | undefined)?.default,
+        m.default,
+        m,
+      ];
+      const fixWebmDuration = candidates.find((c): c is Fix => typeof c === "function");
+      if (!fixWebmDuration) throw new Error("webm-duration-fix: no callable export");
       const fixed = await fixWebmDuration(blob);
       if (fixed && fixed.size > 0) {
         blob = fixed;

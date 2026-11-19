@@ -10,7 +10,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { createGenerationJobFn, markJobCompleteAdmin, markJobFailedAdmin } from "@/lib/generation-jobs.functions";
+import { createGenerationJobAdmin, markJobCompleteAdmin, markJobFailedAdmin } from "@/lib/generation-jobs.functions";
 
 const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
 
@@ -41,9 +41,7 @@ export const saveEditedImageFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => saveSchema.parse(v))
   .handler(async ({ data, context }) => {
-    const create = (createGenerationJobFn as unknown as (opts: { data: unknown }) => Promise<{ job: { id: string }; reused: boolean }>);
-    const { job } = await create({
-      data: {
+    const { job } = await createGenerationJobAdmin(context.userId, {
         moduleType: "image_editing",
         jobType: "save_edited",
         projectId: data.projectId ?? null,
@@ -54,7 +52,6 @@ export const saveEditedImageFn = createServerFn({ method: "POST" })
         creditsEstimated: 0,
         provider: "internal",
         idempotencyKey: data.idempotencyKey,
-      },
     });
 
     try {

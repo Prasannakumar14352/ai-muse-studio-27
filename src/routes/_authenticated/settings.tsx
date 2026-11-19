@@ -1,5 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useAccess } from "@/lib/access";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ import JSZip from "jszip";
 export const Route = createFileRoute("/_authenticated/settings")({ component: SettingsPage });
 
 function SettingsPage() {
+  const { data: access } = useAccess();
   const { data: profile, refetch } = useQuery({
     queryKey: ["profile"],
     queryFn: async () => {
@@ -108,7 +110,8 @@ function SettingsPage() {
       <div className="glass rounded-2xl p-6">
         <h2 className="font-semibold">Account</h2>
         <p className="text-sm text-muted-foreground mt-1">Signed in as <span className="text-foreground">{profile?.email}</span></p>
-        <p className="text-sm text-muted-foreground mt-1">Plan: <span className="text-foreground capitalize">{profile?.plan ?? "free"}</span></p>
+        <p className="text-sm text-muted-foreground mt-1">Plan: <span className="text-foreground capitalize">{access?.isAdmin ? "Admin — unlimited" : (access?.plan ?? "free")}</span>{" "}
+          <Link to="/billing" className="underline text-xs ml-1">Billing</Link></p>
       </div>
     </div>
   );
