@@ -87,7 +87,7 @@ function coerceValue(kind: PlanSection["kind"], raw: unknown): string | string[]
 
 export const planContentFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, chargeMiddleware("plan_content")])
-  .inputValidator((i: { module: PlanModule; topic: string; context?: string; strategyContext?: string; projectId?: string | null }) => {
+  .inputValidator((i: { module: PlanModule; topic: string; context?: string; strategyContext?: string; projectId?: string | null; language?: string }) => {
     if (!i.module) throw new Error("module required");
     if (!i.topic?.trim()) throw new Error("topic required");
     return i;
@@ -139,16 +139,18 @@ export const planContentFn = createServerFn({ method: "POST" })
       }
     } catch { /* ignore — brand kit is optional */ }
 
+    const { languageAndFidelityRules } = await import("@/lib/content-language");
+    const langBlock = data.language ? `\n${languageAndFidelityRules(data.language, data.topic)}\n` : "";
     const raw = await gatewayChatJson<Record<string, unknown>>({
       messages: [
         {
           role: "system",
           content:
-            "You are an elite content strategist. Return ONLY valid JSON matching the requested keys. For 'list' kinds use string arrays; for 'text'/'longtext' use strings. No commentary.",
+            "You are an elite content strategist. Return ONLY valid JSON matching the requested keys. For 'list' kinds use string arrays; for 'text'/'longtext' use strings. No commentary. Never use markdown symbols (#, *, **) inside values — plain text only.",
         },
         {
           role: "user",
-          content: `Module: ${data.module}\nTopic: ${data.topic}\n${data.context ? `Context: ${data.context}\n` : ""}${strategyBlock}${brandBlock}\nReturn a JSON object with exactly these keys:\n${keys}`,
+          content: `Module: ${data.module}\nTopic: ${data.topic}\n${data.context ? `Context: ${data.context}\n` : ""}${strategyBlock}${brandBlock}${langBlock}\nReturn a JSON object with exactly these keys:\n${keys}`,
         },
       ],
       temperature: 0.8,

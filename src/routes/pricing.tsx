@@ -248,6 +248,7 @@ function PricingCard({
                   ? <>Includes <strong className="text-foreground">{plan.includedCredits.toLocaleString()}</strong> signup credits.</>
                   : "Free to start — no card required."}
         </p>
+        <CreditsBuyLine credits={plan.monthlyCredits || plan.includedCredits} />
       </div>
 
       <ul className="mt-6 space-y-3 flex-1">
@@ -739,5 +740,22 @@ function CreditPacksSection() {
         ))}
       </div>
     </section>
+  );
+}
+
+/** "What do my credits buy?" — so a 224-credit Seedance video isn't a surprise. */
+function CreditsBuyLine({ credits }: { credits: number }) {
+  if (!credits || credits <= 0) return null;
+  const parts = [
+    `${Math.floor(credits / 1).toLocaleString()} images`,
+    `${Math.floor(credits / 25).toLocaleString()} short reels with voice`,
+    `${Math.floor(credits / 8).toLocaleString()} carousels`,
+  ];
+  const seedance = Math.floor(credits / 224);
+  return (
+    <p className="mt-1.5 text-[11px] text-muted-foreground leading-snug">
+      ≈ {parts.join(" · ")}
+      {seedance > 0 ? ` · or about ${seedance} premium Seedance clip${seedance === 1 ? "" : "s"} (~224 credits each)` : " · premium Seedance clips cost ~224 credits each"}
+    </p>
   );
 }

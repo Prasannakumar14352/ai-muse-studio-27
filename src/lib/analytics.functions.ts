@@ -6,6 +6,8 @@ export type DashboardStats = {
   projectsTotal: number;
   videosTotal: number;
   imagesTotal: number;
+  carouselsTotal: number;
+  textTotal: number;
   publishesTotal: number;
   estimatedWatchTimeMin: number;
   views30d: number;
@@ -123,6 +125,8 @@ export const getDashboardStatsFn = createServerFn({ method: "GET" })
       projectsTotal: projectCount.count ?? 0,
       videosTotal: videoCount.count ?? 0,
       imagesTotal: imageCount.count ?? 0,
+      carouselsTotal: ((allProjectsForTop.data ?? []) as Array<{ content_type: string }>).filter((p) => p.content_type === "carousel").length,
+      textTotal: ((allProjectsForTop.data ?? []) as Array<{ content_type: string }>).filter((p) => ["caption_only", "seo_pack", "linkedin_post", "blog"].includes(p.content_type)).length,
       publishesTotal: publishCount.count ?? 0,
       estimatedWatchTimeMin: Math.round(((videoCount.count ?? 0) * 45) / 60),
       views30d,

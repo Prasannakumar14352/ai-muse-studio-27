@@ -140,6 +140,7 @@ export const runResearchFn = createServerFn({ method: "POST" })
   .inputValidator((i: ResearchInputs & { projectId?: string | null }) => i)
   .handler(async ({ data, context }) => {
     const { gatewayChatJson } = await import("@/lib/ai-gateway.server");
+    const { fetchLiveYouTube, fmtViews, fmtDuration } = await import("@/lib/youtube-research.server");
 
     const inputs: ResearchInputs = {
       topic: data.topic,
@@ -152,6 +153,14 @@ export const runResearchFn = createServerFn({ method: "POST" })
       competitorUrl: data.competitorUrl,
     };
 
+    const live = await fetchLiveYouTube(data.topic, data.country);
+    const liveBlock = live && live.length
+      ? `\n\nLIVE YOUTUBE DATA (real, from the YouTube Data API — top videos on this topic in the last 6 months, by views):\n${live
+          .slice(0, 10)
+          .map((v, i) => `${i + 1}. "${v.title}" — ${v.creator} — ${fmtViews(v.views)}, ${v.likes} likes, ${v.comments} comments, ${fmtDuration(v.durationSec)}, published ${v.publishedAt}`)
+          .join("\n")}\nUse this real data to judge demand, competition and momentum. Base "youtubeSearches" on it.`
+      : "";
+
     const prompt = `You are a viral content research analyst. Assess whether a creator should make content about the topic below and return ONE JSON object.
 
 Topic: ${inputs.topic}
@@ -161,10 +170,10 @@ Target audience: ${inputs.audience ?? "general"}
 Niche: ${inputs.niche ?? "general"}
 Channel size: ${inputs.channelSize ?? "unspecified"}
 Content format: ${inputs.contentFormat ?? "unspecified"}
-Competitor URL: ${inputs.competitorUrl ?? "none"}
+Competitor URL: ${inputs.competitorUrl ?? "none"}${liveBlock}
 
 IMPORTANT DATA-INTEGRITY RULES:
-- You do NOT have live access to Google Trends, YouTube API, or TikTok. All numeric estimates are AI strategic estimates based on well-known patterns.
+- ${live && live.length ? "You DO have the live YouTube data above, but NOT Google Trends or TikTok." : "You do NOT have live access to Google Trends, YouTube API, or TikTok."} All numeric estimates are AI strategic estimates based on well-known patterns.
 - DO NOT invent specific view counts, creator names, channel IDs, or dates unless they are widely and reliably known. When unsure, leave optional fields blank.
 - For "similarContent", produce at most 4 entries and only include a metric/date when you are highly confident.
 
@@ -243,13 +252,28 @@ Return EXACTLY this JSON shape (no prose, no markdown):
       ai.viralAnalysis.recommendation = recommendationFromScore(clamped);
     }
 
+    const hasLive = !!(live && live.length);
+    if (hasLive) {
+      // Replace AI-guessed examples with the real top videos.
+      ai.similarContent = live!.slice(0, 6).map((v) => ({
+        title: v.title,
+        platform: "YouTube",
+        creator: v.creator,
+        metric: fmtViews(v.views),
+        publishedAt: v.publishedAt,
+        length: fmtDuration(v.durationSec),
+        whyItWorked: `Real top result — ${v.likes.toLocaleString()} likes, ${v.comments.toLocaleString()} comments. Open: ${v.url}`,
+      })) as ResearchFindings["similarContent"];
+    }
     const findings: ResearchFindings = {
       ...ai,
       inputs,
-      evidenceMode: "ai_estimate",
+      evidenceMode: hasLive ? "mixed" : "ai_estimate",
       generatedAt: new Date().toISOString(),
       disclaimers: [
-        "All metrics are AI strategic estimates — live Google Trends, YouTube, and TikTok data are not connected.",
+        hasLive
+          ? "Similar videos are live YouTube data. Scores, Google Trends, Reddit and keyword volumes are AI estimates."
+          : "All metrics are AI strategic estimates — live Google Trends, YouTube, and TikTok data are not connected.",
         ...(ai.disclaimers ?? []),
       ],
     };
@@ -263,7 +287,7 @@ Return EXACTLY this JSON shape (no prose, no markdown):
         niche: data.niche ?? null,
         platform: data.platform ?? null,
         findings,
-        sources: ["ai_estimate:v2"],
+        sources: hasLive ? ["youtube_data_api:v3", "ai_estimate:v2"] : ["ai_estimate:v2"],
       } as never)
       .select()
       .single();

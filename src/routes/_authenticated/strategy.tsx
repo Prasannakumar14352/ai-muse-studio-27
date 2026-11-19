@@ -64,7 +64,12 @@ function StrategyPage() {
           <StrategyWizard onCreated={(plan, id) => {
             const row = { id, plan } as Row;
             setCurrent(row);
-            qc.invalidateQueries({ queryKey: ["strategies"] });
+            // Show it in History immediately, then refresh from the server.
+            qc.setQueryData(["strategies"], (old: unknown) => {
+              const list = Array.isArray(old) ? old : [];
+              return list.some((x: { id: string }) => x.id === id) ? list : [{ id, plan, promoting: "", product: "", goal: "", primary_platform: "", created_at: new Date().toISOString() }, ...list];
+            });
+            void qc.refetchQueries({ queryKey: ["strategies"] });
           }} />
           {current && (
             <>

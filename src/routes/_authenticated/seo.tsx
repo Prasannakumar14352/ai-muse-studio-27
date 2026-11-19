@@ -73,17 +73,17 @@ function SeoPage() {
   const canGen = topic.trim().length >= 3 && !genM.isPending;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
+    <div className="max-w-6xl space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-white">SEO Content Package</h1>
-        <p className="mt-1 text-sm text-white/60">
+        <h1 className="text-3xl md:text-4xl font-bold">SEO <span className="gradient-text">Content Package</span></h1>
+        <p className="mt-1 text-muted-foreground">
           Generate a structured, editable SEO package. Keyword suggestions are AI-generated
           and clearly labelled — search volume, difficulty, and ranking claims are never
           fabricated.
         </p>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:grid-cols-2">
+      <section className="glass grid grid-cols-1 gap-4 rounded-2xl p-5 md:grid-cols-2">
         <label className="space-y-1 text-sm">
           <span className="text-white/70">Content type</span>
           <CreatorFlowSelect

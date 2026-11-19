@@ -106,7 +106,7 @@ function Dashboard() {
               className="inline-flex items-center gap-2 rounded-xl border border-border/60 bg-white/[0.04] hover:bg-white/[0.08] px-3 py-2 text-sm transition"
             >
               <CommandIcon className="w-4 h-4" /> Command palette
-              <span className="ml-1 rounded border border-border/60 bg-white/[0.04] px-1.5 py-0.5 text-[10px]">⌘K</span>
+              <span className="ml-1 rounded border border-border/60 bg-white/[0.04] px-1.5 py-0.5 text-[10px]">{typeof navigator !== "undefined" && /mac|iphone|ipad/i.test(navigator.platform) ? "⌘K" : "Ctrl+K"}</span>
             </button>
             <Link
               to="/create"

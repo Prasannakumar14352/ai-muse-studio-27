@@ -49,5 +49,16 @@ TOPIC FIDELITY (hard rules):
 - If the topic promises a number of items ("7 free AI tools", "5 habits"),
   deliver exactly that many, each one specific and NAMED (real tool, real
   habit, real step) — never generic placeholders like "Tool #1".
-- Every hashtag must be specific to this topic; no generic filler tags.`;
+- Every hashtag must be specific to this topic; no generic filler tags.
+
+NO FILLER (hard rules — applies in every language, especially ${lang === "English" ? "English" : lang}):
+- Every scene / slide must state one concrete fact, name, number, step or
+  example about the topic. A line a viewer could hear on ANY video
+  ("this is very important", "let's see", "you will be surprised", "chala
+  important", "mari choodandi") is filler — delete it and say the fact.
+- Never repeat a sentence or the same idea across scenes in other words.
+- No vague openers like "In today's world…" / "Friends, today…". Open on the
+  most surprising specific detail.
+- If you don't know a specific detail for certain, choose a different real
+  item you DO know rather than padding.`;
 }

@@ -108,10 +108,12 @@ function ListEditor({ items, onChange }: { items: string[]; onChange: (next: str
     <div className="space-y-1.5">
       {items.map((v, i) => (
         <div key={i} className="flex gap-1.5">
-          <input
+          {/* Long items (captions, posts) need room — a one-line input cut them off. */}
+          <textarea
             value={v}
+            rows={Math.min(8, Math.max(1, Math.ceil(v.length / 90) + (v.match(/\n/g)?.length ?? 0)))}
             onChange={(e) => onChange(items.map((x, j) => (i === j ? e.target.value : x)))}
-            className="input-base flex-1 text-sm"
+            className="input-base flex-1 text-sm resize-y min-h-[2.25rem] leading-relaxed"
           />
           <button
             onClick={() => onChange(items.filter((_, j) => j !== i))}

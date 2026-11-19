@@ -46,12 +46,12 @@ export const repurposeFn = createServerFn({ method: "POST" })
       const promptSuffix = FORMAT_PROMPTS[fmt];
       const text = await gatewayChatText({
         messages: [
-          { role: "system", content: "You are a multi-format content repurposing engine. Preserve core message, adapt to platform norms." },
+          { role: "system", content: "You are a multi-format content repurposing engine. Preserve the core message and adapt it to the platform's norms. Output ONLY the finished content, ready to paste: no preface or sign-off (never start with \"Here are…\" / \"Sure\"), and plain text only — no markdown symbols like #, ##, *, ** or backticks. Use line breaks, numbered lines or emoji for structure instead." },
           { role: "user", content: `${promptSuffix}\n\nSource content:\n${data.source.slice(0, 8000)}` },
         ],
         temperature: 0.7,
         maxTokens: 2500,
-      });
+      }).then(cleanPasteReady);
       const { data: row, error } = await context.supabase
         .from("repurposed_assets" as never)
         .insert({
@@ -83,3 +83,20 @@ export const listRepurposedFn = createServerFn({ method: "GET" })
       id: string; format: RepurposeFormat; content: { text?: string }; created_at: string;
     }>;
   });
+
+/** Strip chatty prefaces and markdown so the text pastes cleanly into LinkedIn, X, etc. */
+export function cleanPasteReady(raw: string): string {
+  let t = (raw ?? "").replace(/\r/g, "").trim();
+  // Drop a leading "Here are/is…", "Sure…", "Certainly…" line.
+  t = t.replace(/^(?:sure|certainly|absolutely|of course|okay|here(?:'s| is| are)\b)[^\n]*\n+/i, "");
+  t = t
+    .replace(/^```[a-z]*\n?|```$/gim, "")
+    .replace(/^#{1,6}\s+/gm, "")            // headings
+    .replace(/\*\*(.+?)\*\*/g, "$1")         // bold
+    .replace(/__(.+?)__/g, "$1")
+    .replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\*)/g, "$1$2") // italics
+    .replace(/^\s*[-*]\s+/gm, "• ")           // bullets → •
+    .replace(/^-{3,}$/gm, "")
+    .replace(/\n{3,}/g, "\n\n");
+  return t.trim();
+}
