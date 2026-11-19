@@ -65,7 +65,10 @@ export function BrandKitForm() {
   });
 
   return (
-    <div className="grid xl:grid-cols-[240px_minmax(0,1fr)_minmax(0,520px)] lg:grid-cols-[240px_minmax(0,1fr)] gap-6">
+    // Three columns only on very wide screens: with the app sidebar open, the
+    // old xl layout squeezed the form to ~170px. Below 2xl the preview drops
+    // under the form at full width.
+    <div className="grid 2xl:grid-cols-[220px_minmax(0,1fr)_minmax(0,460px)] lg:grid-cols-[200px_minmax(0,1fr)] gap-6">
       {/* Kit list */}
       <aside className="space-y-2">
         <button onClick={() => setEditing(empty)} className="w-full px-3 py-2.5 rounded-xl bg-gradient-to-r from-primary to-primary/70 text-primary-foreground text-sm font-semibold shadow-lg">
@@ -252,7 +255,7 @@ export function BrandKitForm() {
       </div>
 
       {/* Live preview */}
-      <div className="xl:sticky xl:top-4 h-fit space-y-3">
+      <div className="2xl:sticky 2xl:top-4 h-fit space-y-3 lg:col-span-2 2xl:col-span-1">
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold">Live preview</div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Updates instantly</div>

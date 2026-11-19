@@ -47,6 +47,12 @@ export function SupportChatWidget() {
   }, [open, unread, seenFn, qc]);
 
   useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener("cf:open-support-chat", onOpen);
+    return () => window.removeEventListener("cf:open-support-chat", onOpen);
+  }, []);
+
+  useEffect(() => {
     if (open) listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [open, messages.length, pending, sending]);
 
@@ -85,7 +91,7 @@ export function SupportChatWidget() {
         <button
           onClick={() => setOpen(true)}
           aria-label={unread ? `Open support chat (${unread} new ${unread === 1 ? "reply" : "replies"})` : "Open support chat"}
-          className="fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full gradient-primary text-white shadow-lg shadow-orange-500/20 flex items-center justify-center hover:scale-105 transition"
+          className="fixed bottom-4 right-4 z-40 w-12 h-12 rounded-full gradient-primary text-white shadow-lg shadow-orange-500/20 flex items-center justify-center hover:scale-105 transition"
         >
           <MessageCircleQuestion className="w-6 h-6" />
           {unread > 0 && (

@@ -1,4 +1,5 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -69,6 +70,30 @@ function CalendarPage() {
 
   const rows = (posts.data ?? []) as Array<Record<string, unknown>>;
 
+  // Posts published straight from a project ("Publish now") never go through
+  // the scheduler, so show them on the calendar from the project record.
+  const published = useQuery({
+    queryKey: ["calendar-published-projects"],
+    queryFn: async () => {
+      const { data } = await supabase.from("projects")
+        .select("id, title, platform_urls, manually_published_at, updated_at")
+        .in("publish_status", ["published", "manually_published"]).limit(200);
+      const out: Array<Record<string, unknown>> = [];
+      for (const p of (data ?? []) as Array<{ id: string; title: string | null; platform_urls: Record<string, string> | null; manually_published_at: string | null; updated_at: string }>) {
+        const urls = Object.entries(p.platform_urls ?? {});
+        for (const [platform, url] of urls.length ? urls : [["youtube", ""]]) {
+          out.push({ id: `project:${p.id}:${platform}`, platform, status: "published", caption: p.title ?? "Published",
+            scheduled_at: p.manually_published_at ?? p.updated_at, external_post_url: url || null, readonly: true });
+        }
+      }
+      return out;
+    },
+  });
+  const calendarRows = useMemo(() => {
+    const seen = new Set(rows.map((r) => String(r.external_post_url ?? "")).filter(Boolean));
+    return [...rows, ...(published.data ?? []).filter((r) => !r.external_post_url || !seen.has(String(r.external_post_url)))];
+  }, [rows, published.data]);
+
   const counts = useMemo(() => {
     const c = { scheduled: 0, queue: 0, drafts: 0, failed: 0 };
     for (const r of rows) {
@@ -133,7 +158,7 @@ function CalendarPage() {
           <>
             {tab === "calendar" && (
               <MonthlyCalendar
-                rows={rows}
+                rows={calendarRows}
                 anchor={monthAnchor}
                 onPrev={() => setMonthAnchor(m => { const n = new Date(m); n.setMonth(n.getMonth() - 1); return n; })}
                 onNext={() => setMonthAnchor(m => { const n = new Date(m); n.setMonth(n.getMonth() + 1); return n; })}
@@ -183,13 +208,15 @@ function MonthlyCalendar({
     for (const r of rows) {
       const s = r.scheduled_at ? new Date(String(r.scheduled_at)) : null;
       if (!s) continue;
-      const key = s.toISOString().slice(0, 10);
+      const key = localDayKey(s); // local date, not UTC (IST evenings were landing on the previous day)
       (map[key] ??= []).push(r);
     }
     return map;
   }, [rows]);
 
   const monthLabel = first.toLocaleString(undefined, { month: "long", year: "numeric" });
+  const [openDay, setOpenDay] = useState<Date | null>(null);
+  const openItems = openDay ? (byDay[localDayKey(openDay)] ?? []) : [];
 
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-4">
@@ -212,12 +239,19 @@ function MonthlyCalendar({
           <div key={d} className="bg-black/40 py-2 text-center text-white/50 uppercase tracking-wider">{d}</div>
         ))}
         {cells.map((c, i) => {
-          const key = c.date ? c.date.toISOString().slice(0,10) : `e${i}`;
+          const key = c.date ? localDayKey(c.date) : `e${i}`;
           const items = c.date ? (byDay[key] ?? []) : [];
           const isToday = c.date && c.date.toDateString() === new Date().toDateString();
           return (
-            <div key={key} className={cn(
+            <div key={key}
+              role={c.date ? "button" : undefined}
+              tabIndex={c.date ? 0 : undefined}
+              aria-label={c.date ? `${c.date.toDateString()}, ${items.length} post${items.length === 1 ? "" : "s"}` : undefined}
+              onClick={(e) => { if (c.date && !(e.target as HTMLElement).closest("button,a")) setOpenDay(c.date); }}
+              onKeyDown={(e) => { if (c.date && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setOpenDay(c.date); } }}
+              className={cn(
               "bg-black/30 min-h-[110px] p-1.5 flex flex-col gap-1",
+              c.date && "cursor-pointer hover:bg-white/[0.06] transition",
               !c.date && "opacity-30",
               isToday && "ring-1 ring-pink-400/60"
             )}>
@@ -241,8 +275,40 @@ function MonthlyCalendar({
           );
         })}
       </div>
+      {openDay && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setOpenDay(null)}>
+          <div role="dialog" aria-label={openDay.toDateString()} className="w-full max-w-md rounded-2xl border border-white/10 bg-[#120a08] p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">{openDay.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</h3>
+              <button onClick={() => setOpenDay(null)} aria-label="Close" className="text-white/60 hover:text-white"><XCircle className="w-5 h-5" /></button>
+            </div>
+            {openItems.length === 0 ? (
+              <p className="text-sm text-white/60">Nothing planned for this day yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {openItems.map((p) => (
+                  <div key={String(p.id)} className="rounded-lg border border-white/10 p-2.5 text-sm flex items-center gap-2">
+                    <span className="capitalize text-white/60 text-xs w-20 shrink-0">{String(p.platform)}</span>
+                    <span className="flex-1 truncate">{String(p.caption ?? p.title ?? "Post")}</span>
+                    <span className="text-[11px] text-white/50">{String(p.status).replace("_", " ")}</span>
+                    {p.external_post_url ? <a href={String(p.external_post_url)} target="_blank" rel="noreferrer" className="text-xs underline">View</a> : null}
+                  </div>
+                ))}
+              </div>
+            )}
+            <Link to="/create" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-pink-500 to-orange-500 px-4 py-2 text-sm font-medium">
+              Create content for this day
+            </Link>
+            <p className="text-xs text-white/50">To schedule, open a finished project and choose Publish → Schedule.</p>
+          </div>
+        </div>
+      )}
     </section>
   );
+}
+
+function localDayKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function LegendDot({ color, label }: { color: string; label: string }) {
@@ -266,11 +332,13 @@ function CalendarChip({ row, onChange }: { row: Record<string, unknown>; onChang
     >
       <Icon className="w-3 h-3 shrink-0" />
       <span className="truncate flex-1">{time} · {String(row.caption ?? "").slice(0, 24) || String(row.platform)}</span>
-      <button
-        className="opacity-0 group-hover:opacity-100 transition"
-        onClick={async () => { await cancel({ data: { id: String(row.id) } }); onChange(); }}
-        title="Remove"
-      ><XCircle className="w-3 h-3" /></button>
+      {!row.readonly && (
+        <button
+          className="opacity-0 group-hover:opacity-100 transition"
+          onClick={async () => { await cancel({ data: { id: String(row.id) } }); onChange(); }}
+          title="Remove"
+        ><XCircle className="w-3 h-3" /></button>
+      )}
     </div>
   );
 }

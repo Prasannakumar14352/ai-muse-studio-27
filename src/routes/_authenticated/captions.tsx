@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { CONTENT_LANGUAGES } from "@/lib/content-language";
 import { Copy, Loader2, Wand2 } from "lucide-react";
 import { ProjectsSection } from "@/components/projects-section";
 import { PLATFORMS } from "@/lib/constants";
@@ -26,12 +28,17 @@ function CaptionsPage() {
   const [topic, setTopic] = useState(handoff?.topic ?? initial?.originalPrompt ?? "");
   const [platform, setPlatform] = useState(handoff?.platform ?? "instagram");
   const [plan, setPlan] = useState<ContentPlan | null>(initial?.editedPlan ?? initial?.aiPlan ?? null);
+  const [language, setLanguage] = useState<string>("auto");
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const qc = useQueryClient();
 
   const plan$ = useServerFn(planContentFn);
   const planM = useMutation({
-    mutationFn: () => plan$({ data: { module: "caption", topic, context: `Platform: ${platform}`, strategyContext: getActiveStrategyContext() } }),
+    mutationFn: () => plan$({ data: { module: "caption", topic, context: `Platform: ${platform}`, strategyContext: getActiveStrategyContext(), language } }),
     onSuccess: (p) => {
       setPlan(p);
+      setSavedId(null);
       saveDraft({ module: "caption", originalPrompt: topic, aiPlan: p, editedPlan: p, result: null, exports: [], updatedAt: Date.now() });
       setStep("review");
       toast.success("Plan ready — edit and continue");
@@ -59,8 +66,40 @@ function CaptionsPage() {
 
   async function copy(text: string) { await navigator.clipboard.writeText(text); toast.success("Copied"); }
 
+  /** Save the finished caption set to the account (shows in "Your caption projects"). */
+  async function saveCaptions(): Promise<boolean> {
+    if (!plan || !result) return false;
+    setSaving(true);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) throw new Error("Please sign in again");
+      const payload = {
+        user_id: u.user.id,
+        title: topic.trim().slice(0, 120) || "Captions",
+        topic,
+        platform,
+        content_type: "caption_only",
+        status: "completed",
+        language: language === "auto" ? null : language,
+        metadata: { captions: result, plan } as never,
+      };
+      const q = savedId
+        ? supabase.from("projects").update(payload).eq("id", savedId).select("id").single()
+        : supabase.from("projects").insert(payload).select("id").single();
+      const { data, error } = await q;
+      if (error) throw error;
+      setSavedId(data.id as string);
+      qc.invalidateQueries({ queryKey: ["projects-section"] });
+      toast.success("Captions saved to your account");
+      return true;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't save");
+      return false;
+    } finally { setSaving(false); }
+  }
+
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-6xl">
       <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
       <ActiveStrategyBanner />
       <GenerationWizard
@@ -68,7 +107,7 @@ function CaptionsPage() {
         onStepChange={setStep}
         title="Caption & Hashtag Wizard"
         subtitle="Plan → Review → Generate → Preview → Export."
-        canAdvance={step === "plan" ? !!topic.trim() && !!plan : true}
+        canAdvance={step === "plan" ? !!topic.trim() && !!plan : step === "generate" ? !!savedId : true}
       >
         {step === "plan" && (
           <div className="space-y-4">
@@ -83,6 +122,15 @@ function CaptionsPage() {
                 <button key={p.id} onClick={() => setPlatform(p.id)}
                   className={`px-3 py-1.5 rounded-full text-xs border ${platform === p.id ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>{p.label}</button>
               ))}
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1.5">Language</div>
+              <div className="flex flex-wrap gap-2">
+                {CONTENT_LANGUAGES.map((l) => (
+                  <button key={l.id} type="button" onClick={() => setLanguage(l.id)}
+                    className={`px-3 py-1.5 rounded-full text-xs border ${language === l.id ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>{l.label}</button>
+                ))}
+              </div>
             </div>
             <button
               onClick={() => topic.trim() ? planM.mutate() : toast.error("Enter a topic")}
@@ -105,12 +153,15 @@ function CaptionsPage() {
           </div>
         )}
 
-        {step === "generate" && plan && (
+        {step === "generate" && plan && result && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">The edited plan already contains your caption variants, hooks, CTAs and hashtags. Continue to preview or regenerate any section from the Review step.</p>
-            <button onClick={() => setStep("preview")}
-              className="rounded-lg gradient-primary text-white px-5 py-2 text-sm inline-flex items-center gap-2">
-              <Wand2 className="w-4 h-4" /> Preview final output
+            <p className="text-sm text-muted-foreground">
+              Your final set: {result.captions.length} captions, {result.hooks.length} hooks, {result.ctas.length} CTAs and {result.hashtags.length} hashtags.
+              Generate saves them to your account so they're in "Your caption projects" on any device.
+            </p>
+            <button disabled={saving} onClick={async () => { if (await saveCaptions()) setStep("preview"); }}
+              className="rounded-lg gradient-primary text-white px-5 py-2 text-sm inline-flex items-center gap-2 disabled:opacity-60">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} Generate & save captions
             </button>
           </div>
         )}
@@ -146,7 +197,7 @@ function CaptionsPage() {
                 if (a === "duplicate") { setPlan(null); setStep("plan"); toast.success("Duplicated — start a new draft"); }
                 else if (a === "edit") setStep("review");
                 else if (a === "regenerate") planM.mutate();
-                else if (a === "save") { toast.success("Saved locally"); }
+                else if (a === "save") { void saveCaptions(); }
                 else if (a === "export") {
                   const text = [
                     ...result.captions.map((c, i) => `# Caption ${i + 1}\n${c}`),

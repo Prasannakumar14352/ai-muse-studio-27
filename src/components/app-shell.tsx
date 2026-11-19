@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useAccess, getAvailableCredits } from "@/lib/access";
 import { MODULE_CONTENT_TYPES, type ModuleId } from "@/lib/content-types";
 import { usePlanAccess, useUpgradeDialog, userTier } from "@/lib/use-plan-access";
@@ -21,6 +22,7 @@ import {
 
 import { ConfirmDialogHost } from "@/components/confirm-dialog";
 import { BrandLogo } from "@/components/brand-logo";
+import { getSupportChat } from "@/lib/support-chat.functions";
 import { isHiddenPath, CONNECTIONS_PATH } from "@/lib/hidden-features";
 import { useSocialPublishingAvailable } from "@/lib/use-social-publishing";
 import { PromptDialogHost } from "@/components/prompt-dialog";
@@ -466,7 +468,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Search className="w-4 h-4" />
             <span className="flex-1 text-left">Search or run a command…</span>
             <span className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
-              <kbd className="rounded border border-border/70 bg-white/[0.04] px-1.5 py-0.5">⌘</kbd>
+              <kbd className="rounded border border-border/70 bg-white/[0.04] px-1.5 py-0.5">{modKey()}</kbd>
               <kbd className="rounded border border-border/70 bg-white/[0.04] px-1.5 py-0.5">K</kbd>
             </span>
           </button>
@@ -476,16 +478,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <Plus className="w-4 h-4" /> New
           </Link>
-          <button
-            aria-label="Notifications"
-            className="relative rounded-xl p-2 border border-border/60 bg-white/[0.03] hover:bg-white/[0.06] transition"
-          >
-            <Bell className="w-4 h-4" />
-          </button>
+          <NotificationsMenu />
           <CreditsChip />
           <ProfileMenu onSignOut={signOut} />
         </div>
-        <div className="max-w-7xl mx-auto p-6 md:p-10">{children}</div>
+        {/* Extra bottom padding so the floating support button never covers the last action on a page. */}
+        <div className="max-w-7xl mx-auto p-6 md:p-10 pb-28 md:pb-28">{children}</div>
       </main>
       <ConfirmDialogHost />
       <PromptDialogHost />
@@ -497,13 +495,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function ProfileMenu({ onSignOut }: { onSignOut: () => void }) {
   const { data: access } = useAccess();
-  const initial = (access?.email ?? "?").charAt(0).toUpperCase();
+  const initial = access?.email ? access.email.charAt(0).toUpperCase() : "";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           aria-label="Account menu"
-          className="grid h-9 w-9 place-items-center rounded-full text-sm font-semibold text-white gradient-primary hover:opacity-95 transition"
+          className={`grid h-9 w-9 place-items-center rounded-full text-sm font-semibold text-white hover:opacity-95 transition ${initial ? "gradient-primary" : "bg-white/10 animate-pulse"}`}
         >
           {initial}
         </button>
@@ -525,7 +523,7 @@ function ProfileMenu({ onSignOut }: { onSignOut: () => void }) {
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={openCommandPalette}>
           <CommandIcon className="mr-2 h-4 w-4" /> Command palette
-          <span className="ml-auto text-[10px] text-muted-foreground">⌘K</span>
+          <span className="ml-auto text-[10px] text-muted-foreground">{modKey()}+K</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onSignOut} className="text-rose-400 focus:text-rose-300">
@@ -613,5 +611,59 @@ function PlanPill() {
       <Crown className={`w-3 h-3 ${unlimited ? "text-amber-300" : "text-muted-foreground"}`} />
       <span>{planName}</span>
     </Link>
+  );
+}
+
+/** "⌘" on Apple devices, "Ctrl" elsewhere. */
+function modKey(): string {
+  if (typeof navigator === "undefined") return "Ctrl";
+  const p = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ?? navigator.platform ?? "";
+  return /mac|iphone|ipad|ipod/i.test(p) ? "⌘" : "Ctrl";
+}
+
+/** Bell menu: replies from the team in support chat, payment problems. */
+function NotificationsMenu() {
+  const { data: access } = useAccess();
+  const getChat = useServerFn(getSupportChat);
+  const { data: chat } = useQuery({ queryKey: ["support-chat"], queryFn: () => getChat(), staleTime: 30_000, refetchInterval: 90_000 });
+  const unread = (chat?.messages ?? []).filter((m) => !m.seen_by_user && m.role !== "user");
+  const items: Array<{ id: string; title: string; body: string; action: () => void }> = unread.slice(-5).reverse().map((m) => ({
+    id: m.id,
+    title: m.role === "admin" ? "Reply from the CreatorFlow team" : "Support reply",
+    body: m.text.length > 120 ? `${m.text.slice(0, 120)}…` : m.text,
+    action: () => window.dispatchEvent(new CustomEvent("cf:open-support-chat")),
+  }));
+  const lowCredits = access && !access.unlimited && (access.monthlyRemaining + access.balance + access.lifetimeCredits) < 10;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button aria-label={items.length ? `Notifications (${items.length} new)` : "Notifications"}
+          className="relative rounded-xl p-2 border border-border/60 bg-white/[0.03] hover:bg-white/[0.06] transition">
+          <Bell className="w-4 h-4" />
+          {(items.length > 0 || lowCredits) && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-background" />}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80">
+        <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {lowCredits && (
+          <DropdownMenuItem asChild>
+            <Link to="/billing" className="flex flex-col items-start gap-0.5">
+              <span className="text-sm font-medium">You're almost out of credits</span>
+              <span className="text-xs text-muted-foreground">Top up or upgrade to keep generating.</span>
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {items.map((n) => (
+          <DropdownMenuItem key={n.id} onSelect={n.action} className="flex flex-col items-start gap-0.5">
+            <span className="text-sm font-medium">{n.title}</span>
+            <span className="text-xs text-muted-foreground whitespace-normal">{n.body}</span>
+          </DropdownMenuItem>
+        ))}
+        {!items.length && !lowCredits && (
+          <div className="px-2 py-6 text-center text-sm text-muted-foreground">You're all caught up.</div>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

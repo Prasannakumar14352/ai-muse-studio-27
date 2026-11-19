@@ -17,8 +17,14 @@ export function RepurposePicker() {
   const { data: projects } = useQuery({
     queryKey: ["all-projects-min"],
     queryFn: async () => {
-      const { data } = await supabase.from("projects").select("id, title, content_type").order("created_at", { ascending: false }).limit(50);
-      return data ?? [];
+      const { data } = await supabase.from("projects").select("id, title, project_name, content_type").order("created_at", { ascending: false }).limit(50);
+      // Show the same name as the project page: the generated title wins.
+      const { listOutputs } = await import("@/lib/local-store");
+      const outputs = new Map((await listOutputs()).map((o) => [o.project_id, o]));
+      return (data ?? []).map((p) => ({
+        ...p,
+        title: outputs.get(p.id as string)?.title || (p as { project_name?: string | null }).project_name || p.title,
+      }));
     },
   });
 
@@ -37,10 +43,9 @@ export function RepurposePicker() {
     const p = projects?.find((x: { id: string }) => x.id === id);
     if (!p) return;
     setProjectId(id);
-    supabase.from("projects").select("brief, metadata").eq("id", id).single().then(({ data }) => {
-      const brief: unknown = (data as { brief?: unknown } | null)?.brief;
-      if (typeof brief === "string") setSource(brief);
-      else if (brief && typeof brief === "object") setSource(JSON.stringify(brief, null, 2));
+    void loadProjectSource(id).then((text) => {
+      if (text) setSource(text);
+      else toast.error("That project has no script or text yet — paste content instead.");
     });
   }, [projects]);
 
@@ -109,4 +114,27 @@ export function RepurposePicker() {
       )}
     </div>
   );
+}
+
+/** Build readable source text from a project: its generated script, captions and scenes. */
+async function loadProjectSource(id: string): Promise<string> {
+  const [{ data: proj }, { getOutput }] = await Promise.all([
+    supabase.from("projects").select("title, topic, objective, metadata").eq("id", id).maybeSingle(),
+    import("@/lib/local-store"),
+  ]);
+  const out = await getOutput(id);
+  const p = (proj ?? {}) as { title?: string | null; topic?: string | null; objective?: string | null; metadata?: Record<string, unknown> | null };
+  const parts: string[] = [];
+  const title = out?.title || p.title;
+  if (title) parts.push(title);
+  if (out?.hook) parts.push(`Hook: ${out.hook}`);
+  if (out?.script) parts.push(out.script);
+  else if (out?.scenes?.length) parts.push(out.scenes.map((s) => s.voiceover).filter(Boolean).join("\n"));
+  if (out?.carousel_slides?.length) parts.push(out.carousel_slides.map((s) => [s.headline, s.body].filter(Boolean).join(" — ")).join("\n"));
+  if (out?.captions) parts.push(`Caption: ${out.captions}`);
+  const meta = p.metadata ?? {};
+  const metaText = ["script", "caption", "body", "summary"].map((k) => meta[k]).find((v) => typeof v === "string") as string | undefined;
+  if (!out && metaText) parts.push(metaText);
+  if (parts.length <= 1 && p.topic) parts.push(`Topic: ${p.topic}${p.objective ? `\nGoal: ${p.objective}` : ""}`);
+  return parts.join("\n\n").trim();
 }

@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { getDashboardStatsFn } from "@/lib/analytics.functions";
 import { AnalyticsStatCard } from "@/components/analytics-stat-card";
 import {
-  Zap, FolderKanban, Film, Image as ImageIcon, Send, Eye, Download,
+  Zap, FolderKanban, Film, Image as ImageIcon, FileText, Send, Eye, Download,
   TrendingUp, BarChart3, DollarSign, Sparkles, MousePointerClick,
 } from "lucide-react";
 
@@ -17,8 +17,6 @@ function AnalyticsPage() {
 
   if (isLoading || !s) return <div className="p-6"><div className="glass rounded-2xl h-64 animate-pulse" /></div>;
 
-  const cur = s.revenue30d.currency || "USD";
-  const fmtMoney = (n: number) => new Intl.NumberFormat(undefined, { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(n);
 
   const maxCredit = Math.max(1, ...s.creditsSeries.map((p) => p.credits));
 
@@ -26,18 +24,18 @@ function AnalyticsPage() {
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       <header>
         <h1 className="text-3xl font-bold flex items-center gap-2"><BarChart3 className="w-7 h-7 text-primary" /> Analytics</h1>
-        <p className="text-sm text-muted-foreground mt-1">Performance across content, publishing, and revenue.</p>
+        <p className="text-sm text-muted-foreground mt-1">What you've created and published, and how many credits it used.</p>
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        <AnalyticsStatCard icon={Eye} label="Views (30d)" value={s.views30d} />
-        <AnalyticsStatCard icon={Download} label="Downloads (30d)" value={s.downloads30d} />
-        <AnalyticsStatCard icon={Send} label="Published assets" value={s.publishesTotal} />
-        <AnalyticsStatCard icon={MousePointerClick} label="CTR" value={`${s.ctr}%`} hint="clicks / impressions" />
-        <AnalyticsStatCard icon={Zap} label="Credits used (30d)" value={s.creditsUsed30d} delta={s.growth.creditsDelta} />
-        <AnalyticsStatCard icon={DollarSign} label="Revenue (30d)" value={fmtMoney(s.revenue30d.amount)} hint={`Total: ${fmtMoney(s.revenueTotal.amount)}`} />
         <AnalyticsStatCard icon={Film} label="Videos" value={s.videosTotal} />
         <AnalyticsStatCard icon={ImageIcon} label="Images" value={s.imagesTotal} />
+        <AnalyticsStatCard icon={ImageIcon} label="Carousels" value={s.carouselsTotal} />
+        <AnalyticsStatCard icon={FileText} label="Captions, SEO & posts" value={s.textTotal} />
+        <AnalyticsStatCard icon={Send} label="Published assets" value={s.publishesTotal} />
+        <AnalyticsStatCard icon={Download} label="Downloads (30d)" value={s.downloads30d} />
+        <AnalyticsStatCard icon={Zap} label="Credits used (30d)" value={s.creditsUsed30d} delta={s.growth.creditsDelta} />
+        <AnalyticsStatCard icon={Eye} label="Platform views & CTR" value="—" hint="Shows once Instagram / YouTube insights are connected" />
       </div>
 
       {/* Credit Usage sparkline */}

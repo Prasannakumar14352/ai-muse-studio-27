@@ -37,14 +37,14 @@ export function StrategyWizard({ onCreated }: { onCreated?: (plan: StrategyPlan,
         <h2 className="text-xl font-semibold">Build your content strategy</h2>
       </div>
       <div className="grid md:grid-cols-2 gap-4">
-        <Field label="What are you promoting?">
+        <Field label="What are you promoting?" required>
           <input className="input-base" value={form.promoting} onChange={(e) => upd("promoting", e.target.value)}
             placeholder="e.g. SaaS launch, coaching, community" />
         </Field>
-        <Field label="Product or Brand">
+        <Field label="Product or Brand" required>
           <input className="input-base" value={form.product} onChange={(e) => upd("product", e.target.value)} />
         </Field>
-        <Field label="Target audience">
+        <Field label="Target audience" required>
           <input className="input-base" value={form.audience} onChange={(e) => upd("audience", e.target.value)}
             placeholder="e.g. solo founders 25–40" />
         </Field>
@@ -87,10 +87,13 @@ export function StrategyWizard({ onCreated }: { onCreated?: (plan: StrategyPlan,
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
   return (
     <label className="space-y-1.5 block">
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="text-xs font-medium text-muted-foreground">
+        {label}{required && <span className="text-rose-400 ml-0.5" aria-hidden="true">*</span>}
+        {required && <span className="sr-only"> (required)</span>}
+      </div>
       {children}
     </label>
   );
