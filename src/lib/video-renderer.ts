@@ -94,6 +94,36 @@ async function loadImage(src: string): Promise<HTMLImageElement | null> {
 }
 
 /** Preload a muted <video> element ready to play into the recorder canvas. */
+/**
+ * Steady frame clock that keeps running when the tab is hidden. Uses a
+ * Worker timer (not throttled like page timers / requestAnimationFrame),
+ * falling back to setInterval where Workers aren't available.
+ */
+function startFrameTicker(intervalMs: number): { onTick: (fn: () => void) => void; stop: () => void } {
+  let handler: () => void = () => {};
+  let worker: Worker | null = null;
+  let workerUrl: string | null = null;
+  let fallbackId: ReturnType<typeof setInterval> | null = null;
+  try {
+    const src = "let id=null;onmessage=function(e){if(e.data==='stop'){if(id)clearInterval(id);return;}id=setInterval(function(){postMessage(0)},e.data);};";
+    workerUrl = URL.createObjectURL(new Blob([src], { type: "text/javascript" }));
+    worker = new Worker(workerUrl);
+    worker.onmessage = () => handler();
+    worker.postMessage(intervalMs);
+  } catch {
+    worker = null;
+    fallbackId = setInterval(() => handler(), intervalMs);
+  }
+  return {
+    onTick(fn) { handler = fn; },
+    stop() {
+      try { worker?.postMessage("stop"); worker?.terminate(); } catch { /* noop */ }
+      if (workerUrl) URL.revokeObjectURL(workerUrl);
+      if (fallbackId) clearInterval(fallbackId);
+    },
+  };
+}
+
 async function loadClip(src: string): Promise<HTMLVideoElement | null> {
   return new Promise((resolve) => {
     try {
@@ -580,9 +610,17 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   const abortHandler = () => { aborted = true; };
   opts.signal?.addEventListener("abort", abortHandler);
 
+  // Frame clock. requestAnimationFrame stops when the tab is in the
+  // background, while the voiceover keeps playing in real time — that froze
+  // the picture mid-video (audio running over a stuck frame). A dedicated
+  // Worker's timer keeps firing in background tabs, so frames keep coming.
+  const ticker = startFrameTicker(Math.round(1000 / Math.max(1, fps)));
   await new Promise<void>((resolve) => {
+    let finished = false;
+    const finish = () => { if (!finished) { finished = true; ticker.stop(); resolve(); } };
     function tick() {
-      if (aborted) { resolve(); return; }
+      if (finished) return;
+      if (aborted) { finish(); return; }
       const elapsed = (performance.now() - startedAt) / 1000;
       const clamped = Math.min(elapsed, totalDuration);
       let acc = 0, sceneIdx = 0, localProgress = 0;
@@ -597,10 +635,10 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       });
       requestFrame();
       opts.onProgress?.(clamped / totalDuration);
-      if (elapsed >= totalDuration) { resolve(); return; }
-      requestAnimationFrame(tick);
+      if (elapsed >= totalDuration) { finish(); return; }
     }
-    requestAnimationFrame(tick);
+    ticker.onTick(tick);
+    tick();
   });
 
   opts.signal?.removeEventListener("abort", abortHandler);

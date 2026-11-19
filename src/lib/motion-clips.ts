@@ -43,8 +43,18 @@ export const MOTION_MODELS: Record<MotionTier, MotionModel> = {
   },
 };
 
-/** How many beats "Key moments" animates (the hook plus a few evenly spread beats). */
-export const KEY_MOMENT_CLIPS = 4;
+/** "Key moments" = the hook plus one clip about every this many seconds. */
+export const KEY_MOMENT_EVERY_SEC = 30;
+/** Seconds of video per beat (matches the pipeline's TARGET_BEAT_SEC). */
+export const BEAT_SEC = 3.5;
+/** Longest video that may use "Full motion" (every beat animated). */
+export const FULL_MOTION_MAX_SEC = 300;
+
+/** Number of clips "Key moments" makes for a video with this many beats. */
+export function keyMomentClipCount(totalBeats: number): number {
+  const seconds = totalBeats * BEAT_SEC;
+  return Math.min(totalBeats, Math.max(3, 1 + Math.round(seconds / KEY_MOMENT_EVERY_SEC)));
+}
 
 /** The clip length actually requested from the provider for a beat. */
 export function clipSecondsFor(tier: MotionTier, beatSeconds: number): number {
@@ -64,13 +74,13 @@ export function motionClipCredits(tier: MotionTier, beatSeconds: number): number
 }
 
 /**
- * Which beats get a real clip. "key" = the first beat (the hook) plus evenly
- * spaced beats after it; "full" = every beat.
+ * Which beats get a real clip. "key" = the first beat (the hook) plus about
+ * one beat every 30 s, evenly spread; "full" = every beat.
  */
 export function pickMotionBeats(totalBeats: number, mode: MotionMode): number[] {
   if (mode === "off" || totalBeats <= 0) return [];
   if (mode === "full") return Array.from({ length: totalBeats }, (_, i) => i);
-  const n = Math.min(KEY_MOMENT_CLIPS, totalBeats);
+  const n = keyMomentClipCount(totalBeats);
   if (n === 1) return [0];
   const picks = new Set<number>([0]);
   for (let k = 1; k < n; k++) picks.add(Math.round((k * (totalBeats - 1)) / (n - 1)));
