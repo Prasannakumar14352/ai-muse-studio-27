@@ -23,6 +23,17 @@ const EMPTY_TESTIMONIAL: Draft = {
   kind: "testimonial", status: "draft", display_order: 0, source: "customer", rating: 5, consent_confirmed: false,
 };
 const EMPTY_DEMO: Draft = { kind: "demo", status: "draft", display_order: 0, consent_confirmed: false };
+const EMPTY_WALKTHROUGH: Draft = { kind: "walkthrough", status: "draft", display_order: 0, consent_confirmed: false, source: "demo" };
+
+/** Upload a file to the public "landing" bucket (admins only) and return its URL. */
+async function uploadLandingFile(file: File, folder: string): Promise<string> {
+  const { supabase } = await import("@/integrations/supabase/client");
+  const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage.from("landing").upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw new Error(error.message);
+  return supabase.storage.from("landing").getPublicUrl(path).data.publicUrl;
+}
 
 function detectVideoType(url: string): LandingVideoType | null {
   if (!url) return null;
@@ -74,6 +85,7 @@ function AdminLanding() {
 
   const testimonials = useMemo(() => (rows ?? []).filter((r) => r.kind === "testimonial"), [rows]);
   const demos = useMemo(() => (rows ?? []).filter((r) => r.kind === "demo"), [rows]);
+  const walkthroughs = useMemo(() => (rows ?? []).filter((r) => r.kind === "walkthrough"), [rows]);
 
   if (accessLoading) return <div className="glass rounded-2xl h-64 animate-pulse" />;
   if (!access?.isAdmin) return <Navigate to="/dashboard" />;
@@ -108,12 +120,10 @@ function AdminLanding() {
         <div>
           <div className="font-semibold">How this works</div>
           <p className="text-muted-foreground mt-1 leading-relaxed">
-            Direct file uploads to public storage are currently blocked by your workspace privacy policy.
-            Provide media as <strong>hosted URLs</strong> — MP4/WebM (H.264/AAC recommended for broadest support),
-            YouTube <code className="px-1 rounded bg-black/30">/embed/</code> URL, or Vimeo{" "}
-            <code className="px-1 rounded bg-black/30">player.vimeo.com/video/&lt;id&gt;</code> URL.
-            Video type is auto-detected. Only <strong>published</strong> items appear on the landing page.
-            To enable in-app uploads, ask an admin/owner to allow public buckets in Settings → Privacy &amp; Security.
+            Upload an MP4/WebM clip and a poster image straight from your computer, or paste a hosted URL
+            (MP4/WebM, YouTube <code className="px-1 rounded bg-black/30">/embed/</code> or Vimeo player URL).
+            Only <strong>published</strong> items appear on the landing page. Keep walkthrough clips short
+            (10–20 s, muted, under ~8 MB) so the page stays fast.
           </p>
         </div>
       </div>
@@ -132,6 +142,20 @@ function AdminLanding() {
         emptyNote="Manage both video testimonials and written Sample Creator Reviews here. Leave the Video URL blank to publish a written-only review (shown in the Sample Creator Reviews marquee). Set Source to 'Customer' + confirm consent to publish a verified review — the 'Sample Review' badge disappears automatically. Set Source to 'Sample' for illustrative sample copy."
       />
 
+
+      <MediaSection
+        label="Walkthrough clips (See CreatorFlow AI in Action)"
+        kind="walkthrough"
+        rows={walkthroughs}
+        isLoading={isLoading}
+        onNew={() => setEditing({ ...EMPTY_WALKTHROUGH, display_order: walkthroughs.length })}
+        onEdit={(r) => setEditing(r)}
+        onDelete={(id) => confirm("Delete this walkthrough clip?") && deleteMut.mutate(id)}
+        onPublishToggle={(r) => upsertMut.mutate({ ...r, status: r.status === "published" ? "draft" : "published" })}
+        onMove={(id, dir) => move(walkthroughs, id, dir)}
+        onPreview={setPreviewUrl}
+        emptyNote="The landing shows the built-in feature clips. Add one here to replace a card (use the same title, e.g. 'Thumbnail Studio') or to add a new feature to the moving row."
+      />
 
       <MediaSection
         label="Main demo card"
@@ -284,12 +308,12 @@ function EditorModal({
     <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm p-4 flex items-center justify-center" role="dialog" aria-modal="true" onClick={onCancel}>
       <div className="glass w-full max-w-2xl rounded-2xl p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-lg">{d.id ? "Edit" : "New"} {d.kind === "testimonial" ? "testimonial" : "demo"}</h3>
+          <h3 className="font-semibold text-lg">{d.id ? "Edit" : "New"} {d.kind === "testimonial" ? "testimonial" : d.kind === "walkthrough" ? "walkthrough clip" : "demo"}</h3>
           <button onClick={onCancel} className="text-white/60 hover:text-white text-sm">Close</button>
         </div>
 
         <div className="grid gap-4">
-          <Field label={d.kind === "testimonial" ? "Customer name" : "Demo title"}>
+          <Field label={d.kind === "testimonial" ? "Customer name" : d.kind === "walkthrough" ? "Feature name (same as a built-in card to replace it)" : "Demo title"}>
             <input value={d.title ?? ""} onChange={(e) => set("title", e.target.value)} className="w-full glass rounded-lg px-3 py-2 text-sm" />
           </Field>
 
@@ -332,12 +356,18 @@ function EditorModal({
             </Field>
           )}
 
-          <Field label={d.kind === "testimonial" ? "Video poster / thumbnail URL" : "Poster URL"}>
-            <input value={d.poster_url ?? ""} onChange={(e) => set("poster_url", e.target.value)} placeholder="https://…jpg or …png" className="w-full glass rounded-lg px-3 py-2 text-sm" />
+          <Field label={d.kind === "testimonial" ? "Video poster / thumbnail URL" : "Poster image"}>
+            <div className="flex gap-2">
+              <input value={d.poster_url ?? ""} onChange={(e) => set("poster_url", e.target.value)} placeholder="https://…jpg or …png" className="flex-1 glass rounded-lg px-3 py-2 text-sm" />
+              <UploadButton accept="image/*" folder="posters" onUploaded={(url) => set("poster_url", url)} />
+            </div>
           </Field>
 
-          <Field label="Video URL (MP4, WebM, YouTube /embed/… or Vimeo player.vimeo.com/video/…)">
-            <input value={d.video_url ?? ""} onChange={(e) => onVideoUrlChange(e.target.value)} placeholder="https://…" className="w-full glass rounded-lg px-3 py-2 text-sm" />
+          <Field label="Video (upload MP4/WebM, or paste an MP4, YouTube /embed/… or Vimeo URL)">
+            <div className="flex gap-2">
+              <input value={d.video_url ?? ""} onChange={(e) => onVideoUrlChange(e.target.value)} placeholder="https://…" className="flex-1 glass rounded-lg px-3 py-2 text-sm" />
+              <UploadButton accept="video/mp4,video/webm" folder={d.kind === "walkthrough" ? "walkthroughs" : "videos"} maxMb={50} onUploaded={onVideoUrlChange} />
+            </div>
             {d.video_url && (
               <div className="mt-1 text-xs text-muted-foreground">Detected: <span className="text-white/80">{d.video_type ?? "unknown"}</span></div>
             )}
@@ -450,5 +480,33 @@ function PreviewModal({ url, onClose }: { url: string; onClose: () => void }) {
         <button onClick={onClose} className="absolute top-3 right-3 glass rounded-full w-9 h-9 text-white">✕</button>
       </div>
     </div>
+  );
+}
+
+function UploadButton({
+  accept, folder, onUploaded, maxMb = 10,
+}: { accept: string; folder: string; onUploaded: (url: string) => void; maxMb?: number }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  return (
+    <label className={`shrink-0 glass rounded-lg px-3 py-2 text-sm cursor-pointer inline-flex items-center gap-1.5 ${busy ? "opacity-60 pointer-events-none" : ""}`} title={err ?? `Upload (max ${maxMb} MB)`}>
+      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+      {busy ? "Uploading…" : err ? "Retry" : "Upload"}
+      <input
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          if (file.size > maxMb * 1024 * 1024) { setErr(`File is over ${maxMb} MB`); return; }
+          setBusy(true); setErr(null);
+          try { onUploaded(await uploadLandingFile(file, folder)); }
+          catch (x) { setErr(x instanceof Error ? x.message : "Upload failed"); }
+          finally { setBusy(false); }
+        }}
+      />
+    </label>
   );
 }
