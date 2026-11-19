@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { OfferBanner } from "@/components/offer-code";
 import { BrandLogo } from "@/components/brand-logo";
 import { useAccess } from "@/lib/access";
 import type { ReactNode } from "react";
@@ -13,6 +14,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <OfferBanner />
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/60 border-b border-border/40">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2" aria-label="CreatorFlow AI home">

@@ -3,7 +3,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
   Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug, Linkedin,
-  ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target, Calendar as CalendarIcon, Library, Megaphone,
+  ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target, Calendar as CalendarIcon, Library, Megaphone, Tag,
   Bell, User as UserIcon, FolderKanban, Command as CommandIcon, Clapperboard, Lock,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -125,6 +125,7 @@ const SECTIONS: readonly NavSection[] = [
       { to: "/admin/readiness", label: "Feature Readiness", icon: Crown },
       { to: "/admin/plan-access", label: "Plan Access", icon: Lock },
       { to: "/admin/payments", label: "Payment Settings", icon: CreditCard },
+      { to: "/admin/offers", label: "Offers & Codes", icon: Tag },
       { to: "/admin/agents", label: "Agent HQ", icon: Bot },
     ],
   },

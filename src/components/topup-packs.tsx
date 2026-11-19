@@ -7,6 +7,7 @@ import { Zap, Loader2, Crown, Infinity as InfinityIcon } from "lucide-react";
 import { CREDIT_PACKS, type CreditPack } from "@/lib/constants";
 import { createRazorpayOrder, verifyRazorpayPayment } from "@/lib/razorpay.functions";
 import { useAccess } from "@/lib/access";
+import { OfferCodeBox, useOfferPreview, useSavedOfferCode } from "@/components/offer-code";
 
 declare global {
   interface Window {
@@ -39,13 +40,17 @@ export function TopUpPacks({ compact = false }: { compact?: boolean }) {
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [offerCode, setOfferCode] = useSavedOfferCode();
+  const offerQ = useOfferPreview(CREDIT_PACKS[0] ? { kind: "pack", packId: CREDIT_PACKS[0].id } : null, offerCode, !!access?.email);
+  const packQuote = offerQ.data?.quote ?? null;
+  const offerError = offerQ.data?.error ?? null;
 
   async function handleBuy(pack: CreditPack) {
     setBuyingId(pack.id);
     try {
       const ok = await loadRazorpayScript();
       if (!ok || !window.Razorpay) throw new Error("Could not load Razorpay checkout");
-      const order = await createOrder({ data: { packId: pack.id } });
+      const order = await createOrder({ data: { packId: pack.id, offerCode: offerCode && !offerError ? offerCode : undefined } });
       await new Promise<void>((resolve, reject) => {
         const rzp = new window.Razorpay!({
           key: order.keyId,
@@ -126,6 +131,10 @@ export function TopUpPacks({ compact = false }: { compact?: boolean }) {
             Invoices →
           </Link>
         </div>
+      </div>
+
+      <div className="max-w-sm">
+        <OfferCodeBox code={offerCode} setCode={setOfferCode} quote={packQuote ? { ...packQuote, discountPaise: 0, bonusCredits: 0 } : null} error={offerError} loading={offerQ.isFetching} />
       </div>
 
       <div className={`grid gap-3 ${compact ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2 lg:grid-cols-4"}`}>

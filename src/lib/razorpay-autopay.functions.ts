@@ -37,6 +37,7 @@ export const createAutopaySubscription = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     planCode: z.string().min(1),
     cycle: z.enum(["monthly", "yearly"]),
+    offerCode: z.string().trim().max(40).optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -49,9 +50,25 @@ export const createAutopaySubscription = createServerFn({ method: "POST" })
     if (!rzpPlan) throw new Error("Auto-renew isn't available for this plan yet. Please pay once instead.");
 
     const creds = await resolveRazorpayCredentials();
+
+    // Festival offer: a Razorpay offer gives the discount on the charges it
+    // covers; without one, the buyer gets the same value as bonus credits.
+    const { quoteOffer, OfferError, recordPendingRedemption } = await import("./offers.server");
+    let quote: Awaited<ReturnType<typeof quoteOffer>> = null;
+    try {
+      quote = await quoteOffer(supabaseAdmin, {
+        code: data.offerCode, userId: context.userId, kind: "autopay", planCode: data.planCode, cycle: data.cycle,
+        amountPaise: rzpPlan.amountPaise, credits: planCredits(plan, data.cycle),
+      });
+    } catch (e) {
+      if (e instanceof OfferError) throw new Error(e.message);
+      if (data.offerCode) throw new Error("Couldn't check that code right now. Try again, or subscribe without it.");
+    }
+
     const sub = await razorpayApi<{ id: string; status: string }>("/subscriptions", {
       method: "POST",
       body: {
+        ...(quote?.razorpayOfferId ? { offer_id: quote.razorpayOfferId } : {}),
         plan_id: rzpPlan.razorpayPlanId,
         total_count: AUTOPAY_TOTAL_COUNT[data.cycle],
         quantity: 1,
@@ -70,13 +87,15 @@ export const createAutopaySubscription = createServerFn({ method: "POST" })
       environment: creds.environment,
     } as never);
     if (error) throw new Error("Could not start subscription");
+    if (quote) await recordPendingRedemption(supabaseAdmin, { quote, userId: context.userId, paymentRef: sub.id, kind: "autopay" });
 
     return {
       subscriptionId: sub.id,
       keyId: creds.keyId,
       amountPaise: rzpPlan.amountPaise,
       planName: String(plan.name),
-      credits: planCredits(plan, data.cycle),
+      credits: planCredits(plan, data.cycle) + (quote?.bonusCredits ?? 0),
+      offer: quote ? { code: quote.code, label: quote.label, firstPaymentPaise: quote.finalPaise, bonusCredits: quote.bonusCredits, duration: quote.duration } : null,
     };
   });
 
