@@ -2,7 +2,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { SUPPORT_EMAIL } from "@/lib/constants";
 import {
   Wand2, Video, Image as ImageIcon, Type, Mic, Music2,
-  Zap, Layers, Rocket, Mail, ChevronRight, Star,
+  Zap, Layers, Rocket, Mail, ChevronRight, Sparkles,
 } from "lucide-react";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
@@ -87,8 +87,8 @@ function Landing() {
             </a>
           </div>
           <div className="mt-8 flex items-center justify-center gap-1 text-xs text-muted-foreground">
-            {[...Array(5)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-[color:var(--neon-pink)] text-[color:var(--neon-pink)]" />)}
-            <span className="ml-2">Loved by 10,000+ creators</span>
+            <Sparkles className="w-3.5 h-3.5 text-[color:var(--neon-pink)]" />
+            <span className="ml-1.5">Reels, carousels, thumbnails &amp; publishing in one studio</span>
           </div>
         </div>
       </section>
