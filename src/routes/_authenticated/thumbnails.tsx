@@ -61,6 +61,29 @@ type GeneratedItem = {
 type Mode = "create" | "reverse";
 type Step = 1 | 2 | 3;
 
+/** Cover-crop + upscale an AI image to the exact delivery size (e.g. YouTube 1280×720). */
+async function toDeliverySize(image: string, w: number, h: number): Promise<string> {
+  try {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = image;
+    await new Promise((r, j) => { img.onload = r; img.onerror = j; });
+    if (img.naturalWidth >= w && img.naturalHeight >= h && Math.abs(img.naturalWidth / img.naturalHeight - w / h) < 0.01) return image;
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return image;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+    const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
+    ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    return canvas.toDataURL("image/jpeg", 0.95);
+  } catch {
+    return image;
+  }
+}
+
 /** If the text is in a regional script, draw it with a real font on top of the AI image. */
 async function withOverlay(image: string, text: string | undefined, force = false): Promise<Pick<GeneratedItem, "image" | "baseImage" | "overlayText">> {
   if (!text || (!force && !needsTextOverlay(text))) return { image };
@@ -179,9 +202,10 @@ function ThumbnailsPage() {
           referenceImages: brief.referenceImages,
         });
         if (image) {
+          const sized = await toDeliverySize(image, format.outputWidth, format.outputHeight);
           const item: GeneratedItem = {
             id: crypto.randomUUID(),
-            ...(await withOverlay(image, plan.thumbnailText || brief.customText, plan.textOverlay)),
+            ...(await withOverlay(sized, plan.thumbnailText || brief.customText, plan.textOverlay)),
             prompt: positive,
             ratio: format.ratio,
             createdAt: Date.now(),

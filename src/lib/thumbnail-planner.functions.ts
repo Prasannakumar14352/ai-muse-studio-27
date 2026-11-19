@@ -132,10 +132,10 @@ export const planThumbnailBrief = createServerFn({ method: "POST" })
     // Image models garble Indic/Arabic scripts. If the topic or the text uses one,
     // the app draws the text itself and the model is told to draw none — even when
     // the hook text is English, the model tends to add regional text on its own.
-    const textOverlay =
-      !!thumbnailText &&
-      (needsOverlayScript(thumbnailText) ||
-        needsOverlayScript(`${data.brief.title ?? ""} ${data.brief.prompt ?? ""}`));
+    // Image models also misspell English ("AII BROKE ME"), so the headline is
+    // ALWAYS drawn by the app as an editable text layer; the model draws none.
+    const textOverlay = !!thumbnailText;
+    void needsOverlayScript;
 
     // Build the FINAL image-generation prompt from the single universal template.
     const positivePrompt = buildUniversalThumbnailPrompt(format, {

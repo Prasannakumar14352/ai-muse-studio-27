@@ -74,7 +74,7 @@ export function ViralResearchView({ findings }: { findings: ResearchFindings }) 
         </section>
       )}
 
-      <Collapsible title="Similar content (AI estimate)" defaultOpen={false}>
+      <Collapsible title={findings.evidenceMode === "mixed" || findings.evidenceMode === "live" ? "Similar content (live YouTube data)" : "Similar content (AI estimate)"} defaultOpen={findings.evidenceMode === "mixed"}>
         {similar.length ? (
           <div className="space-y-2">
             {similar.map((s, i) => (
@@ -183,7 +183,7 @@ function VerdictCard({ va, evidenceMode, generatedAt }: { va: ViralAnalysis; evi
           <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
             {/* Without live data an estimate can't be "high" confidence — cap it so the two labels agree. */}
             <span>Confidence: <span className="text-foreground/80 capitalize">{evidenceMode === "live" ? va.confidence : (va.confidence === "high" ? "medium" : va.confidence)}</span>{evidenceMode !== "live" && <span className="text-muted-foreground"> (estimate)</span>}</span>
-            <span>Evidence: <span className="text-amber-300">{evidenceMode === "live" ? "Live data" : "AI strategic estimate"}</span></span>
+            <span>Evidence: <span className="text-amber-300">{evidenceMode === "live" ? "Live data" : evidenceMode === "mixed" ? "Live YouTube + AI estimate" : "AI strategic estimate"}</span></span>
             {generatedAt && <span>{new Date(generatedAt).toLocaleString()}</span>}
           </div>
         </div>
