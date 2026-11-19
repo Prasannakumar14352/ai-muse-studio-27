@@ -82,6 +82,9 @@ export const ACTION_COSTS = {
   // Voice — charged per started 100 characters in /api/tts
   // (ElevenLabs Turbo via fal: $0.05 per 1,000 chars = $0.005 per 100)
   tts_per_100_chars: 1,
+  // Real-motion clips — amount computed per clip in motion-clips.ts
+  // (fal image-to-video price × MARKUP / CREDIT_FLOOR_USD).
+  motion_clip: 18,
 } as const;
 
 export type ChargeAction = keyof typeof ACTION_COSTS;

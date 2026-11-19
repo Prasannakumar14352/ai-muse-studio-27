@@ -38,6 +38,7 @@ import { ttsFetch } from "@/lib/tts-client";
 // and a lazily-loaded chunk from the old build no longer exists afterwards
 // ("Failed to fetch dynamically imported module"), which killed finished renders.
 import { fetchGeneratedImage } from "@/lib/image-stream";
+import { pickMotionBeats, motionPromptFor, type MotionMode, type MotionTier } from "@/lib/motion-clips";
 import { validateRenderedVideo } from "./video-validate";
 import { convertBlobToMp4 } from "@/lib/transcode-client";
 import { AI_NOT_CONFIGURED } from "@/lib/ai-provider";
@@ -260,6 +261,10 @@ export type VideoBrief = {
   sameCharacter?: boolean;
   /** Script / subtitle / narration language ("auto" = same as the title). */
   language?: string;
+  /** Real motion: animate key beats (or all) into AI video clips. Default "off". */
+  motionMode?: MotionMode;
+  /** "standard" = MiniMax H3 Turbo, "premium" = Kling 2.5 Turbo Pro. */
+  motionTier?: MotionTier;
 };
 
 export type ResearchBrief = {
@@ -741,24 +746,58 @@ async function fetchSceneImage(prompt: string, style: StyleId, ratio: AspectRati
   return image;
 }
 
-/** Try to generate a short AI video clip for a beat. Returns null on any failure. */
-async function fetchBeatClip(prompt: string, style: StyleId, ratio: AspectRatio, duration: number): Promise<string | null> {
+/**
+ * Animate a beat's still image into a real AI video clip (image-to-video).
+ * Starts the job on the server (credits reserved there), then polls until
+ * it's ready. Returns the clip as a Blob, or null on any failure — the caller
+ * then keeps the still image, and the server refunds a failed clip.
+ */
+async function fetchMotionClip(
+  image: string,
+  prompt: string,
+  beatSeconds: number,
+  tier: MotionTier,
+  signal?: AbortSignal,
+): Promise<Blob | null> {
   try {
-    const res = await authFetch("/api/generate-video-clip", {
+    const start = await authFetch("/api/generate-video-clip", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        // Visual Director already fully composed the prompt.
-        prompt,
-        ratio,
-        duration,
-      }),
+      body: JSON.stringify({ image, prompt, beatSeconds, tier }),
+      signal,
     });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { ok?: boolean; clip?: string };
-    if (!json.ok || !json.clip) return null;
-    return json.clip;
-  } catch {
+    const job = (await start.json().catch(() => ({}))) as { ok?: boolean; token?: string; reason?: string };
+    if (!start.ok || !job.ok || !job.token) {
+      console.warn("[motion] clip not started:", job.reason ?? start.status);
+      return null;
+    }
+    // Clips take ~1–3 minutes. Poll every 5 s for up to 8 minutes.
+    const deadline = Date.now() + 8 * 60 * 1000;
+    while (Date.now() < deadline) {
+      if (signal?.aborted) return null;
+      await new Promise((r) => setTimeout(r, 5000));
+      const res = await authFetch("/api/video-clip-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: job.token }),
+        signal,
+      });
+      const st = (await res.json().catch(() => ({}))) as { state?: string; url?: string; error?: string };
+      if (st.state === "completed" && st.url) {
+        const file = await fetch(st.url, { signal });
+        if (!file.ok) return null;
+        const blob = await file.blob();
+        return blob.size > 0 ? blob : null;
+      }
+      if (st.state === "failed") {
+        console.warn("[motion] clip failed:", st.error);
+        return null;
+      }
+    }
+    console.warn("[motion] clip timed out");
+    return null;
+  } catch (e) {
+    if ((e as { name?: string })?.name !== "AbortError") console.warn("[motion] clip error", e);
     return null;
   }
 }
@@ -775,18 +814,6 @@ export const VisualGenerationAgent = {
     const results = await Promise.all(
       beats.map(async (b, i) => {
         // Dynamic Scene Detection routing (see generateOneShot for details).
-        if (b.sceneKind === "dynamic") {
-          const dynPrompt = b.videoPrompt || b.imagePrompt;
-          const clip = await fetchBeatClip(dynPrompt, brief.style, brief.aspectRatio, TARGET_BEAT_SEC);
-          if (clip) {
-            done += 1;
-            onProgress?.(done, total);
-            return { n: i + 1, kind: "clip" as const, url: clip, duration_sec: TARGET_BEAT_SEC, generated: true };
-          }
-          console.warn(
-            `[scene-detector] Dynamic beat ${i + 1} (${b.activity}) fell back to still image — no video model available.`,
-          );
-        }
         const url = await fetchSceneImage(b.imagePrompt, brief.style, brief.aspectRatio);
         done += 1;
         onProgress?.(done, total);
@@ -1691,30 +1718,10 @@ async function generateOneShot(
   jobId: string,
   signal: AbortSignal,
   characterRef?: string | null,
+  totalShots?: number,
 ): Promise<{ blobKey: string; kind: "clip" | "image"; mime: string; previewUrl: string }> {
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
 
-  // Dynamic Scene Detection routing:
-  //   • dynamic beats  → AI video clip using the rich motion prompt.
-  //   • static beats   → still image + Motion Director camera move; never
-  //     waste a video call on a truly static subject (product / logo /
-  //     landscape / document).
-  //
-  // Dynamic beats fall back to an image ONLY if the video model is
-  // unavailable — the ideal is to never ship a still for a dynamic beat.
-  if (shot.sceneKind === "dynamic") {
-    const dynPrompt = shot.videoPrompt || shot.prompt;
-    const clip = await fetchBeatClip(dynPrompt, brief.style, brief.aspectRatio, TARGET_BEAT_SEC);
-    if (clip) {
-      const blob = await dataUrlToBlob(clip);
-      const key = await saveShotBlob(jobId, shot.id, blob);
-      const url = await loadShotObjectURL(key);
-      return { blobKey: key, kind: "clip", mime: blob.type || "video/mp4", previewUrl: url ?? clip };
-    }
-    console.warn(
-      `[scene-detector] Dynamic beat ${shot.id} (${shot.activity}) fell back to still image — no video model available.`,
-    );
-  }
   // Shots with the main character are anchored to the reference portrait so
   // the face stays the same; if that render fails, fall back to text-only.
   let img: string | null = null;
@@ -1723,6 +1730,27 @@ async function generateOneShot(
   }
   if (!img) img = await fetchSceneImage(shot.prompt, brief.style, brief.aspectRatio);
   if (!img) throw new Error("Image generation failed");
+
+  // Real motion: animate the still into a clip for the beats the user chose
+  // (key moments or all). The image is the first frame, so faces and outfits
+  // stay consistent. Any failure keeps the still (camera-move) version.
+  const mode = brief.motionMode ?? "off";
+  if (mode !== "off" && totalShots && pickMotionBeats(totalShots, mode).includes(shot.index)) {
+    // shot.prompt is the director's English, text-free frame description.
+    const clipBlob = await fetchMotionClip(
+      img,
+      motionPromptFor(shot.prompt.slice(0, 500)),
+      TARGET_BEAT_SEC,
+      brief.motionTier ?? "standard",
+      signal,
+    );
+    if (clipBlob) {
+      const key = await saveShotBlob(jobId, shot.id, clipBlob);
+      const url = await loadShotObjectURL(key);
+      return { blobKey: key, kind: "clip", mime: clipBlob.type || "video/mp4", previewUrl: url ?? "" };
+    }
+  }
+
   const blob = await dataUrlToBlob(img);
   const key = await saveShotBlob(jobId, shot.id, blob);
   const url = await loadShotObjectURL(key);
@@ -1810,7 +1838,7 @@ export async function runVideoJobPipeline(
     run: async (sig: AbortSignal) => {
       shot.status = "running";
       shot.attempts += 1;
-      return await generateOneShot(shot, brief, job.id, sig, characterRef);
+      return await generateOneShot(shot, brief, job.id, sig, characterRef, job.shots.length);
     },
   }));
 
@@ -2061,7 +2089,7 @@ export async function runAssetGenerationPhase(
     run: async (sig: AbortSignal) => {
       shot.status = "running";
       shot.attempts += 1;
-      return await generateOneShot(shot, brief, job.id, sig, characterRef);
+      return await generateOneShot(shot, brief, job.id, sig, characterRef, job.shots.length);
     },
   }));
 
@@ -2110,7 +2138,7 @@ export async function runAssetGenerationPhase(
       run: async (sig: AbortSignal) => {
         shot.status = "running";
         shot.attempts += 1;
-        return await generateOneShot(shot, brief, job.id, sig, characterRef);
+        return await generateOneShot(shot, brief, job.id, sig, characterRef, job.shots.length);
       },
     }));
     await runShotPool(retryJobs, {
@@ -2357,7 +2385,7 @@ export async function regenerateShot(
   signal?.addEventListener("abort", onAbort);
   try {
     const characterRef = shot.hasCharacter !== false ? await ensureCharacterReference(job, brief) : null;
-    const out = await generateOneShot(shot, brief, job.id, controller.signal, characterRef);
+    const out = await generateOneShot(shot, brief, job.id, controller.signal, characterRef, job.shots.length);
     shot.status = "done";
     shot.kind = out.kind;
     shot.blobKey = out.blobKey;
@@ -2413,7 +2441,7 @@ export async function retryFailedShots(
     run: async (sig: AbortSignal) => {
       shot.status = "running";
       shot.attempts += 1;
-      return await generateOneShot(shot, brief, job.id, sig, characterRef);
+      return await generateOneShot(shot, brief, job.id, sig, characterRef, job.shots.length);
     },
   }));
 
