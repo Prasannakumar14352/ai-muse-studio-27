@@ -1762,11 +1762,9 @@ function SafeVideoPreview({
             playsInline
             preload="metadata"
             className="w-full h-full object-contain"
-            onLoadedMetadata={(e) => {
-              // Explicit load() after metadata is a workaround for Chromium
-              // Range-request quirks on MediaRecorder blobs.
-              try { (e.currentTarget as HTMLVideoElement).load(); } catch { /* noop */ }
-            }}
+            // Note: never call load() from onLoadedMetadata — it re-fires
+            // loadedmetadata, so the player restarts forever and sits on a
+            // grey frame at 0:00.
             onError={() => {
               setPlaybackError("Rendered video exists but the browser could not play it. Please download the MP4 or regenerate render.");
             }}
