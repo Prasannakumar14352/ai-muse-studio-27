@@ -9,6 +9,7 @@ import {
 } from "@/lib/pricing.functions";
 import { createRazorpayOrder, verifyRazorpayPayment, createRazorpayPlanOrder, getUsdInrRate } from "@/lib/razorpay.functions";
 import { getAutopayOptions, createAutopaySubscription, verifyAutopaySubscription } from "@/lib/razorpay-autopay.functions";
+import { OfferCodeBox, useOfferPreview, useSavedOfferCode, type OfferTarget } from "@/components/offer-code";
 import { CREDIT_PACKS, type CreditPack } from "@/lib/constants";
 import { useAccess } from "@/lib/access";
 import { toast } from "sonner";
@@ -432,6 +433,15 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
     : (autopayQ.data ?? []).find((o) => o.planCode === plan.code && o.cycle === effective) ?? null;
   const [mode, setMode] = useState<"autopay" | "once">("autopay");
   const useAutopay = !!autopay && mode === "autopay";
+  const [offerCode, setOfferCode] = useSavedOfferCode();
+  const offerTarget: OfferTarget = useAutopay
+    ? { kind: "autopay", planCode: plan.code, cycle: effective as "monthly" | "yearly" }
+    : { kind: "plan", planId: plan.id, cycle: effective };
+  const offerQ = useOfferPreview(offerTarget, offerCode, !!access?.email);
+  const quote = offerQ.data?.quote ?? null;
+  const offerError = offerQ.data?.error ?? null;
+  // A code that doesn't fit this purchase isn't sent, so checkout still works.
+  const sendCode = offerCode && !offerError ? offerCode : undefined;
   const credits = effective === "lifetime"
     ? (plan.includedCredits || plan.monthlyCredits)
     : effective === "yearly"
@@ -460,7 +470,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
 
   /** Auto-renew: Razorpay subscription — the user approves a UPI AutoPay / card mandate once. */
   async function handleAutopay() {
-    const sub = await createSub({ data: { planCode: plan.code, cycle: effective as "monthly" | "yearly" } });
+    const sub = await createSub({ data: { planCode: plan.code, cycle: effective as "monthly" | "yearly", offerCode: sendCode } });
     await new Promise<void>((resolve, reject) => {
       const rzp = new window.Razorpay!({
         key: sub.keyId,
@@ -503,7 +513,7 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
         await handleAutopay();
         return;
       }
-      const order = await createOrder({ data: { planId: plan.id, billingCycle: effective } });
+      const order = await createOrder({ data: { planId: plan.id, billingCycle: effective, offerCode: sendCode } });
       await new Promise<void>((resolve, reject) => {
         const rzp = new window.Razorpay!({
           key: order.keyId,
@@ -601,12 +611,28 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
           {rateInfo?.warning && (
             <div className="text-[11px] text-amber-300">{rateInfo.warning}</div>
           )}
+          {quote && quote.discountPaise > 0 && (
+            <div className="flex justify-between text-emerald-300">
+              <span>{quote.code} · {quote.label}</span>
+              <span>− {inr(quote.discountPaise / 100)}</span>
+            </div>
+          )}
+          {quote && quote.bonusCredits > 0 && (
+            <div className="flex justify-between text-emerald-300">
+              <span>{quote.code} bonus</span>
+              <span>+{quote.bonusCredits.toLocaleString()} credits</span>
+            </div>
+          )}
           <div className="flex justify-between text-base pt-2 border-t border-border/40">
             <span className="font-semibold">Payable today</span>
             <span className="font-bold gradient-text">
-              {useAutopay ? inr(autopay!.amountPaise / 100) : inrPreview !== null ? inr(inrPreview) : "…"}
+              {quote && quote.discountPaise > 0 ? inr(quote.finalPaise / 100)
+                : useAutopay ? inr(autopay!.amountPaise / 100) : inrPreview !== null ? inr(inrPreview) : "…"}
             </span>
           </div>
+          {useAutopay && quote && quote.discountPaise > 0 && quote.duration && (
+            <div className="text-[11px] text-muted-foreground">Discount applies {quote.duration}; then {inr(autopay!.amountPaise / 100)} / {effective === "yearly" ? "year" : "month"}.</div>
+          )}
         </div>
         {autopay && (
           <div className="mb-3 space-y-2" role="radiogroup" aria-label="Payment type">
@@ -625,6 +651,9 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
             ))}
           </div>
         )}
+        {access?.email && (
+          <OfferCodeBox code={offerCode} setCode={setOfferCode} quote={quote} error={offerError} loading={offerQ.isFetching} />
+        )}
         <button
           onClick={handlePay}
           disabled={paying || (!rate && !useAutopay)}
@@ -632,7 +661,8 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
         >
           {paying && <Loader2 className="w-4 h-4 animate-spin" />}
           {paying ? "Opening checkout…" : lastError ? "Retry payment"
-            : useAutopay ? `Subscribe · ${inr(autopay!.amountPaise / 100)} / ${effective === "yearly" ? "year" : "month"}`
+            : useAutopay ? `Subscribe · ${inr((quote && quote.discountPaise > 0 ? quote.finalPaise : autopay!.amountPaise) / 100)}${quote && quote.discountPaise > 0 ? " today" : ` / ${effective === "yearly" ? "year" : "month"}`}`
+            : quote && quote.discountPaise > 0 ? `Pay ${inr(quote.finalPaise / 100)}`
             : inrPreview !== null ? `Pay ${inr(inrPreview)}` : "Loading…"}
         </button>
         {lastError && (
@@ -657,6 +687,10 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
 /* ---------- Credit packs (unchanged behavior) ---------- */
 function CreditPacksSection() {
   const { data: access } = useAccess();
+  const [offerCode, setOfferCode] = useSavedOfferCode();
+  const packQ = useOfferPreview(CREDIT_PACKS[0] ? { kind: "pack", packId: CREDIT_PACKS[0].id } : null, offerCode, !!access?.email);
+  const packQuote = packQ.data?.quote ?? null;
+  const packError = packQ.data?.error ?? null;
   const createOrder = useServerFn(createRazorpayOrder);
   const verifyPayment = useServerFn(verifyRazorpayPayment);
   const [buyingId, setBuyingId] = useState<string | null>(null);
@@ -672,7 +706,7 @@ function CreditPacksSection() {
     try {
       const ok = await loadRazorpayScript();
       if (!ok || !window.Razorpay) throw new Error("Could not load Razorpay checkout");
-      const order = await createOrder({ data: { packId: pack.id, currency: "USD" } });
+      const order = await createOrder({ data: { packId: pack.id, currency: "USD", offerCode: offerCode && !packError ? offerCode : undefined } });
       await new Promise<void>((resolve, reject) => {
         const rzp = new window.Razorpay!({
           key: order.keyId,
@@ -715,6 +749,11 @@ function CreditPacksSection() {
         <h2 className="text-2xl md:text-3xl font-bold mt-2">One-time credit packs</h2>
         <p className="text-sm text-muted-foreground mt-2">Credits never expire. Stacks on top of any plan.</p>
       </div>
+      {access?.email && (
+        <div className="max-w-sm mx-auto mb-5">
+          <OfferCodeBox code={offerCode} setCode={setOfferCode} quote={packQuote ? { ...packQuote, discountPaise: 0, bonusCredits: 0 } : null} error={packError} loading={packQ.isFetching} />
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {CREDIT_PACKS.map((pack) => (
           <div key={pack.id} className="glass rounded-2xl p-5 flex flex-col hover:-translate-y-0.5 transition">

@@ -1,4 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { OfferBanner } from "@/components/offer-code";
 import { SUPPORT_EMAIL } from "@/lib/constants";
 import {
   Wand2, Video, Image as ImageIcon, Type, Mic, Music2,
@@ -41,6 +42,8 @@ const FAQ = [
 function Landing() {
   return (
     <div className="min-h-screen">
+      {/* Festival offer (only while one is live) */}
+      <OfferBanner />
       {/* Nav */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/60 border-b border-border/40">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">

@@ -81,8 +81,17 @@ export async function activatePlan(admin: Admin, userId: string, opts: {
  * paying still gets exactly what they bought.
  */
 export async function fulfillOrderPayment(admin: Admin, payment: {
-  user_id: string; pack_id: string | null; credits: number;
+  user_id: string; pack_id: string | null; credits: number; razorpay_order_id?: string | null;
 }): Promise<{ credits: number; planId?: string; lifetime?: boolean; subscription?: boolean; newBalance?: number }> {
+  // Festival offer used on this order → count it (once) and pick up any bonus credits.
+  let bonus = 0;
+  if (payment.razorpay_order_id) {
+    try {
+      const { markRedeemed } = await import("./offers.server");
+      const r = await markRedeemed(admin, payment.razorpay_order_id);
+      bonus = r?.bonus_credits ?? 0;
+    } catch (e) { console.error("offer redeem failed", e); }
+  }
   const packId = payment.pack_id ?? "";
   const m = packId.startsWith("plan_") ? packId.slice(5).match(/^(.+)_(monthly|yearly|lifetime)$/) : null;
   if (m) {
@@ -90,10 +99,14 @@ export async function fulfillOrderPayment(admin: Admin, payment: {
     if (plan) {
       const cycle = m[2] as Cycle;
       const { credits } = await activatePlan(admin, payment.user_id, { plan, cycle });
-      return { credits, planId: String(plan.code), lifetime: cycle === "lifetime", subscription: cycle !== "lifetime" };
+      if (bonus) {
+        const { addBonusCredits } = await import("./offers.server");
+        await addBonusCredits(admin, payment.user_id, bonus);
+      }
+      return { credits: credits + bonus, planId: String(plan.code), lifetime: cycle === "lifetime", subscription: cycle !== "lifetime" };
     }
   }
-  // Credit pack → wallet balance.
+  // Credit pack → wallet balance (payment.credits already includes any offer bonus).
   const { data: profile } = await admin.from("profiles").select("user_credits").eq("id", payment.user_id).maybeSingle();
   const current = (profile as { user_credits?: number } | null)?.user_credits ?? 0;
   const { error } = await admin.from("profiles").update({ user_credits: current + payment.credits } as never).eq("id", payment.user_id);
@@ -189,6 +202,13 @@ export async function applyAutopayCharge(supabaseAdmin: Admin, args: {
   if (!plan) throw new Error("Unknown plan");
   const credits = planCredits(plan, rsub.cycle);
 
+  // What was actually charged (a Razorpay offer can make it less than the plan price).
+  let chargedPaise = rsub.amount_paise;
+  try {
+    const p = await razorpayApi<{ amount?: number }>(`/payments/${args.paymentId}`);
+    if (typeof p.amount === "number" && p.amount > 0) chargedPaise = p.amount;
+  } catch { /* keep plan amount */ }
+
   // One payment row per charge; the unique payment id makes this idempotent.
   const { error: payErr } = await supabaseAdmin.from("payments").insert({
     user_id: rsub.user_id,
@@ -196,8 +216,8 @@ export async function applyAutopayCharge(supabaseAdmin: Admin, args: {
     razorpay_payment_id: args.paymentId,
     pack_id: `plan_${rsub.plan_code}_${rsub.cycle}`,
     credits,
-    amount_cents: rsub.amount_paise,
-    amount_inr_paise: rsub.amount_paise,
+    amount_cents: chargedPaise,
+    amount_inr_paise: chargedPaise,
     currency: "INR",
     status: "success",
     receipt_number: `autopay_${args.paymentId}`.slice(0, 40),
@@ -223,6 +243,12 @@ export async function applyAutopayCharge(supabaseAdmin: Admin, args: {
   } else {
     // First charge: switch the user onto this plan.
     await activatePlan(supabaseAdmin, rsub.user_id, { plan, cycle: rsub.cycle, razorpaySubscriptionId: args.subscriptionId, periodEnd });
+    // Offer used when subscribing → count it and add any bonus credits.
+    try {
+      const { markRedeemed, addBonusCredits } = await import("./offers.server");
+      const r = await markRedeemed(supabaseAdmin, args.subscriptionId);
+      if (r?.bonus_credits) await addBonusCredits(supabaseAdmin, rsub.user_id, r.bonus_credits);
+    } catch (e) { console.error("offer redeem failed", e); }
   }
   await supabaseAdmin.from("razorpay_subscriptions" as never).update({
     status: "active", current_end: periodEnd?.toISOString() ?? null, updated_at: new Date().toISOString(),

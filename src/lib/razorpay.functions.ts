@@ -24,6 +24,35 @@ function usdToInrPaise(priceUsd: number, rate: number): { inrRupees: number; inr
   return { inrRupees: rupees, inrPaise: rupees * 100 };
 }
 
+type Quote = import("@/lib/offers.server").OfferQuote;
+
+/** Price an offer for this checkout; a bad code becomes a clear error for the buyer. */
+async function quoteOrThrow(
+  db: unknown,
+  args: Parameters<typeof import("@/lib/offers.server").quoteOffer>[1],
+): Promise<Quote | null> {
+  const { quoteOffer, OfferError } = await import("@/lib/offers.server");
+  try {
+    return await quoteOffer(db, args);
+  } catch (e) {
+    if (e instanceof OfferError) throw new Error(e.message);
+    // The offers table missing / unreadable must never block a normal purchase.
+    if (args.code) throw new Error("Couldn't check that code right now. Try again, or pay without it.");
+    console.error("offer lookup failed", e);
+    return null;
+  }
+}
+
+function offerMetadata(q: Quote | null): Record<string, unknown> {
+  if (!q) return {};
+  return {
+    offer: {
+      id: q.offerId, code: q.code, label: q.label,
+      original_paise: q.originalPaise, discount_paise: q.discountPaise, bonus_credits: q.bonusCredits,
+    },
+  };
+}
+
 /** Back-compat shim used by the pricing modal + legacy admin page. */
 export const getUsdInrRate = createServerFn({ method: "GET" }).handler(async () => {
   const r = await resolveRate();
@@ -69,9 +98,10 @@ export const getRazorpayConfig = createServerFn({ method: "GET" }).handler(async
 /** Create a Razorpay order for a credit pack. Always billed in INR. */
 export const createRazorpayOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { packId: string; currency?: string }) => {
+  .inputValidator((input: { packId: string; currency?: string; offerCode?: string }) => {
     if (!input || typeof input.packId !== "string") throw new Error("packId required");
-    return { packId: input.packId };
+    const offerCode = typeof input.offerCode === "string" ? input.offerCode.trim().slice(0, 40) : "";
+    return { packId: input.packId, offerCode };
   })
   .handler(async ({ data, context }) => {
     const pack = CREDIT_PACKS.find((p) => p.id === data.packId);
@@ -85,7 +115,15 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     const resolved = await resolveRate();
     const rate = resolved.rate;
     const priceUsdCents = Math.round(pack.priceUSD * 100);
-    const { inrRupees, inrPaise } = usdToInrPaise(pack.priceUSD, rate);
+    const base = usdToInrPaise(pack.priceUSD, rate);
+
+    const { supabaseAdmin: offerDb } = await import("@/integrations/supabase/client.server");
+    const quote = await quoteOrThrow(offerDb, {
+      code: data.offerCode, userId: context.userId, kind: "packs", amountPaise: base.inrPaise, credits: pack.credits,
+    });
+    const inrPaise = quote?.finalPaise ?? base.inrPaise;
+    const inrRupees = Math.round(inrPaise / 100);
+    const totalCredits = pack.credits + (quote?.bonusCredits ?? 0);
 
     const shortUid = context.userId.replace(/-/g, "").slice(0, 12);
     const receipt = `rcpt_${shortUid}_${Date.now().toString(36)}`.slice(0, 40);
@@ -101,7 +139,8 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
         notes: {
           user_id: context.userId,
           pack_id: pack.id,
-          credits: pack.credits,
+          credits: totalCredits,
+          ...(quote ? { offer_code: quote.code, offer_discount_paise: quote.discountPaise } : {}),
           usd_price: pack.priceUSD,
           usd_to_inr_rate: rate,
         },
@@ -119,7 +158,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       user_id: context.userId,
       razorpay_order_id: order.id,
       pack_id: pack.id,
-      credits: pack.credits,
+      credits: totalCredits,
       amount_cents: inrPaise,
       currency: "INR",
       status: "pending",
@@ -129,10 +168,15 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       exchange_rate_source: resolved.source,
       exchange_rate_fetched_at: resolved.fetchedAt,
       amount_inr_paise: inrPaise,
-    });
+      metadata: offerMetadata(quote),
+    } as never);
     if (error) {
       console.error("payments insert error:", error);
       throw new Error("Could not record payment");
+    }
+    if (quote) {
+      const { recordPendingRedemption } = await import("@/lib/offers.server");
+      await recordPendingRedemption(supabaseAdmin, { quote, userId: context.userId, paymentRef: order.id, kind: "packs" });
     }
 
     return {
@@ -143,20 +187,22 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       inrRupees,
       inrPaise,
       rate,
-      pack: { id: pack.id, label: pack.label, credits: pack.credits, priceUSD: pack.priceUSD },
+      pack: { id: pack.id, label: pack.label, credits: totalCredits, priceUSD: pack.priceUSD },
+      offer: quote ? { code: quote.code, label: quote.label, discountPaise: quote.discountPaise, bonusCredits: quote.bonusCredits } : null,
     };
   });
 
 /** Create a Razorpay order for a plan. Always billed in INR. */
 export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { planId: string; billingCycle: "monthly" | "yearly" | "lifetime" }) => {
+  .inputValidator((input: { planId: string; billingCycle: "monthly" | "yearly" | "lifetime"; offerCode?: string }) => {
     if (!input || typeof input.planId !== "string") throw new Error("planId required");
     const cycle = input.billingCycle;
     if (cycle !== "monthly" && cycle !== "yearly" && cycle !== "lifetime") {
       throw new Error("Invalid billingCycle");
     }
-    return { planId: input.planId, billingCycle: cycle };
+    const offerCode = typeof input.offerCode === "string" ? input.offerCode.trim().slice(0, 40) : "";
+    return { planId: input.planId, billingCycle: cycle, offerCode };
   })
   .handler(async ({ data, context }) => {
     const { resolveRazorpayCredentials } = await import("@/lib/razorpay-settings.server");
@@ -194,7 +240,13 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
     const resolved = await resolveRate();
     const rate = resolved.rate;
     const priceUsdCents = Math.round(priceUsd * 100);
-    const { inrRupees, inrPaise } = usdToInrPaise(priceUsd, rate);
+    const base = usdToInrPaise(priceUsd, rate);
+    const quote = await quoteOrThrow(supabaseAdmin, {
+      code: data.offerCode, userId: context.userId, kind: data.billingCycle,
+      planCode: String(plan.code), amountPaise: base.inrPaise, credits,
+    });
+    const inrPaise = quote?.finalPaise ?? base.inrPaise;
+    const inrRupees = Math.round(inrPaise / 100);
 
     const shortUid = context.userId.replace(/-/g, "").slice(0, 12);
     const receipt = `rcpt_${shortUid}_${Date.now().toString(36)}`.slice(0, 40);
@@ -213,6 +265,7 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
           plan_code: String(plan.code),
           billing_cycle: data.billingCycle,
           credits,
+          ...(quote ? { offer_code: quote.code, offer_discount_paise: quote.discountPaise, offer_bonus_credits: quote.bonusCredits } : {}),
           usd_price: priceUsd,
           usd_to_inr_rate: rate,
         },
@@ -229,7 +282,7 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
       user_id: context.userId,
       razorpay_order_id: order.id,
       pack_id: `plan_${String(plan.code)}_${data.billingCycle}`,
-      credits,
+      credits: credits + (quote?.bonusCredits ?? 0),
       amount_cents: inrPaise,
       currency: "INR",
       status: "pending",
@@ -239,10 +292,15 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
       exchange_rate_source: resolved.source,
       exchange_rate_fetched_at: resolved.fetchedAt,
       amount_inr_paise: inrPaise,
-    });
+      metadata: offerMetadata(quote),
+    } as never);
     if (error) {
       console.error("payments insert error:", error);
       throw new Error("Could not record payment");
+    }
+    if (quote) {
+      const { recordPendingRedemption } = await import("@/lib/offers.server");
+      await recordPendingRedemption(supabaseAdmin, { quote, userId: context.userId, paymentRef: order.id, kind: data.billingCycle });
     }
 
     return {
@@ -257,10 +315,11 @@ export const createRazorpayPlanOrder = createServerFn({ method: "POST" })
         id: String(plan.id),
         code: String(plan.code),
         name: String(plan.name),
-        credits,
+        credits: credits + (quote?.bonusCredits ?? 0),
         priceUsd,
         billingCycle: data.billingCycle,
       },
+      offer: quote ? { code: quote.code, label: quote.label, discountPaise: quote.discountPaise, bonusCredits: quote.bonusCredits } : null,
     };
   });
 
@@ -370,4 +429,63 @@ export const getMySubscription = createServerFn({ method: "GET" })
       isAdmin: !!profile?.is_admin,
       recentPayments: recent ?? [],
     };
+  });
+
+/**
+ * Price preview for the checkout UI: what this code (or an auto-applied
+ * festival offer) does to this exact purchase. Display only — the real amount
+ * is recomputed when the order / subscription is created.
+ */
+export const previewOffer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: {
+    code?: string;
+    target: { kind: "pack"; packId: string } | { kind: "plan"; planId: string; cycle: "monthly" | "yearly" | "lifetime" } | { kind: "autopay"; planCode: string; cycle: "monthly" | "yearly" };
+  }) => {
+    if (!input?.target) throw new Error("target required");
+    return { code: typeof input.code === "string" ? input.code.trim().slice(0, 40) : "", target: input.target };
+  })
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const t = data.target;
+    let amountPaise = 0;
+    let credits = 0;
+    let planCode: string | null = null;
+    let cycle: "monthly" | "yearly" | null = null;
+    let kind: import("@/lib/offers.server").OfferKind = "packs";
+    if (t.kind === "pack") {
+      const pack = CREDIT_PACKS.find((p) => p.id === t.packId);
+      if (!pack) throw new Error("Unknown pack");
+      amountPaise = usdToInrPaise(pack.priceUSD, (await resolveRate()).rate).inrPaise;
+      credits = pack.credits;
+    } else if (t.kind === "plan") {
+      const { data: row } = await supabaseAdmin.from("pricing_plans").select("*").eq("id", t.planId).maybeSingle();
+      const plan = row as Record<string, unknown> | null;
+      if (!plan) throw new Error("Unknown plan");
+      const usd = t.cycle === "monthly" ? Number(plan.price_monthly_usd ?? 0) : t.cycle === "yearly" ? Number(plan.price_yearly_usd ?? 0) : Number(plan.price_lifetime_usd ?? 0);
+      amountPaise = usdToInrPaise(usd, (await resolveRate()).rate).inrPaise;
+      const mc = Number(plan.monthly_credits ?? 0);
+      credits = t.cycle === "lifetime" ? (Number(plan.included_credits ?? 0) || mc) : t.cycle === "yearly" ? mc * 12 : mc;
+      planCode = String(plan.code);
+      kind = t.cycle;
+    } else {
+      const { listAutopayPlans, loadPricingPlan, planCredits } = await import("./billing.server");
+      const rzp = (await listAutopayPlans(supabaseAdmin)).find((p) => p.planCode === t.planCode && p.cycle === t.cycle);
+      const plan = await loadPricingPlan(supabaseAdmin, t.planCode);
+      if (!rzp || !plan) throw new Error("Auto-renew isn't available for this plan");
+      amountPaise = rzp.amountPaise;
+      credits = planCredits(plan, t.cycle);
+      planCode = t.planCode;
+      cycle = t.cycle;
+      kind = "autopay";
+    }
+    const { quoteOffer, OfferError } = await import("@/lib/offers.server");
+    try {
+      const q = await quoteOffer(supabaseAdmin, { code: data.code, userId: context.userId, kind, planCode, cycle, amountPaise, credits });
+      return { ok: true as const, quote: q, error: null };
+    } catch (e) {
+      if (e instanceof OfferError) return { ok: false as const, quote: null, error: e.message };
+      if (!data.code) return { ok: true as const, quote: null, error: null };
+      return { ok: false as const, quote: null, error: "Couldn't check that code right now." };
+    }
   });
