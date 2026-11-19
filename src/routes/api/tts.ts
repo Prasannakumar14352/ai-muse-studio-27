@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { fetchWithRetry } from "@/lib/fetch-retry";
 
 // Text-to-speech via fal.ai (ElevenLabs Turbo v2.5, multilingual).
 // Returns MP3 bytes so callers can decode it into an AudioBuffer exactly as
@@ -49,7 +50,10 @@ export const Route = createFileRoute("/api/tts")({
           return jsonError(msg.startsWith("insufficient_credits:") ? `Not enough credits: this voiceover needs ${credits}.` : msg, msg.startsWith("insufficient_credits:") ? 402 : 400);
         }
 
-        const upstream = await fetch(
+        // The voice provider rate-limits bursts (a 12-scene video asks for 12
+        // clips at once). Retry 429/5xx a few times with backoff before
+        // giving up and refunding.
+        const upstream = await fetchWithRetry(
           v3Code ? "https://fal.run/fal-ai/elevenlabs/tts/eleven-v3" : "https://fal.run/fal-ai/elevenlabs/tts/turbo-v2.5",
           {
             method: "POST",

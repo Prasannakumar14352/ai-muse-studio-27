@@ -54,6 +54,27 @@ export async function runQaHealthCheck(trigger = "schedule"): Promise<{ ok: bool
   } else {
     problems.push("OPENROUTER_API_KEY is not set — all text AI is down.");
   }
+
+  // 2b. fal.ai credit (images, voice, video). Needs a key that may read
+  // billing; if fal refuses, say so once instead of failing the check.
+  const falKey = process.env.FAL_KEY;
+  if (falKey) {
+    try {
+      const r = await fetch("https://api.fal.ai/v1/account/billing?expand=credits", {
+        headers: { Authorization: `Key ${falKey}`, Accept: "application/json" },
+      });
+      const j = (await r.json().catch(() => ({}))) as { credits?: { current_balance?: number } };
+      const left = j.credits?.current_balance;
+      if (r.ok && typeof left === "number") {
+        if (left < 5) problems.push(`fal.ai balance is low: $${left.toFixed(2)} left — images, voiceovers and video will stop when it runs out. Top up at fal.ai/dashboard/billing.`);
+        else notes.push(`fal.ai balance: $${left.toFixed(2)}.`);
+      } else {
+        notes.push(`Couldn't read the fal.ai balance (HTTP ${r.status}) — the FAL_KEY may not have billing access.`);
+      }
+    } catch { notes.push("Couldn't read the fal.ai balance."); }
+  } else {
+    problems.push("FAL_KEY is not set — images, voiceovers and video are down.");
+  }
   if (!process.env.FAL_KEY) problems.push("FAL_KEY is not set — images, voice and Model Studio are down.");
 
   // 3. Generation failures in the last 24 h (fal out of credit shows as 403).
