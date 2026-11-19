@@ -150,13 +150,40 @@ export const sendTaskReply = createServerFn({ method: "POST" })
 
 export const runAgentNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ agent: z.enum(["qa", "ops", "product_manager"]) }).parse(d))
+  .inputValidator((d: unknown) => z.object({
+    agent: z.enum(["qa", "ops", "product_manager", "social_media_manager", "app_promoter"]),
+    count: z.number().int().min(1).max(10).optional(),
+    focus: z.string().trim().max(500).optional(),
+  }).parse(d))
   .handler(async ({ data, context }) => {
     await assertAdmin(context as unknown as Ctx);
+    if (data.agent === "social_media_manager" || data.agent === "app_promoter") {
+      const m = await import("@/lib/agents/marketing.server");
+      const opts = { count: data.count, focus: data.focus || undefined };
+      const result = data.agent === "social_media_manager"
+        ? await m.runSocialMediaManager("manual", opts)
+        : await m.runAppPromoter("manual", opts);
+      if (!result) throw new Error("Skipped — the monthly agent budget is used up (Agent HQ → Settings).");
+      return { result };
+    }
     const s = await import("@/lib/agents/scheduled.server");
     if (data.agent === "qa") return { result: await s.runQaHealthCheck("manual") };
     if (data.agent === "ops") return { result: await s.runOpsReport("manual") };
     return { result: await s.runProductManager("manual") };
+  });
+
+/** Approved promotion text → the buyers' Telegram group(s). */
+export const sendPromoToTelegram = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), text: z.string().trim().min(1).max(4000) }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context as unknown as Ctx);
+    const m = await import("@/lib/agents/marketing.server");
+    const sent = await m.sendPromoToTelegramGroup(data.text);
+    const core = await import("@/lib/agents/core.server");
+    const db = await core.admin();
+    await db.from("agent_tasks").update({ status: "done", draft_reply: data.text, resolved_at: new Date().toISOString() }).eq("id", data.id);
+    return { ok: true, sent };
   });
 
 /** Any signed-in user: a one-time code to link their Telegram (/link CODE to the bot). */

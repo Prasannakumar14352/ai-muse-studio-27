@@ -205,5 +205,10 @@ export async function runDailyAgents(): Promise<Record<string, unknown>> {
   // Mondays (IST) — the cron runs at 08:10 IST.
   const ist = new Date(Date.now() + 5.5 * 3600e3);
   if (ist.getUTCDay() === 1) out.pm = await runProductManager().catch((e) => ({ error: String(e) }));
+  // Marketing: social plan + posts on Mondays and Thursdays, promotion ideas on Wednesdays.
+  // Everything lands in the approval inbox — nothing is posted automatically.
+  const m = await import("@/lib/agents/marketing.server");
+  if (ist.getUTCDay() === 1 || ist.getUTCDay() === 4) out.social = await m.runSocialMediaManager("schedule", { count: 4 }).catch((e) => ({ error: String(e) }));
+  if (ist.getUTCDay() === 3) out.promo = await m.runAppPromoter("schedule", { count: 5 }).catch((e) => ({ error: String(e) }));
   return out;
 }
