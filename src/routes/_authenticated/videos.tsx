@@ -3,7 +3,7 @@ import { estimateProjectCredits } from "@/lib/credit-costs";
 import { creditsLabel } from "@/lib/credits-label";
 import { CONTENT_LANGUAGES } from "@/lib/content-language";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { estimateMotionCredits, motionClipCredits, MOTION_MODELS, KEY_MOMENT_CLIPS, type MotionMode, type MotionTier } from "@/lib/motion-clips";
+import { estimateMotionCredits, motionClipCredits, keyMomentClipCount, MOTION_MODELS, KEY_MOMENT_EVERY_SEC, FULL_MOTION_MAX_SEC, type MotionMode, type MotionTier } from "@/lib/motion-clips";
 import { toast } from "sonner";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
@@ -772,8 +772,8 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
   const [language, setLanguage] = useState("auto");
   const [motionMode, setMotionMode] = useState<MotionMode>("off");
   const [motionTier, setMotionTier] = useState<MotionTier>("standard");
-  // Full motion animates every beat — only offered for short videos.
-  const fullMotionAllowed = duration <= 90;
+  // Full motion animates every beat — offered up to 5 minutes.
+  const fullMotionAllowed = duration <= FULL_MOTION_MAX_SEC;
   const motionBeats = Math.max(4, Math.ceil(duration / 3.5));
   const motionEstimate = estimateMotionCredits(motionBeats, 3.5, motionMode === "full" && !fullMotionAllowed ? "key" : motionMode, motionTier);
 
@@ -976,8 +976,8 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
           <div className="grid sm:grid-cols-3 gap-2">
             {([
               { id: "off", label: "Camera moves", desc: "Still images with smooth pan & zoom. Cheapest." },
-              { id: "key", label: "Key moments", desc: `The hook + ${KEY_MOMENT_CLIPS - 1} key scenes become real AI video — people move and act.` },
-              { id: "full", label: "Full motion", desc: fullMotionAllowed ? "Every scene is a real AI video clip. Best result, highest cost." : "Available for videos up to 90 seconds." },
+              { id: "key", label: "Key moments", desc: `The hook + about one scene every ${KEY_MOMENT_EVERY_SEC}s become real AI video (${keyMomentClipCount(motionBeats)} clips) — people move and act.` },
+              { id: "full", label: "Full motion", desc: fullMotionAllowed ? `Every scene is a real AI video clip (${motionBeats} clips). Best result, highest cost.` : "Available for videos up to 5 minutes." },
             ] as Array<{ id: MotionMode; label: string; desc: string }>).map((o) => {
               const disabled = o.id === "full" && !fullMotionAllowed;
               const active = motionMode === o.id;
@@ -1002,7 +1002,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
               </div>
               <div className="text-[11px] text-muted-foreground">
                 {MOTION_MODELS[motionTier].label}. {motionEstimate.clips} clip{motionEstimate.clips === 1 ? "" : "s"} ≈ <span className="text-foreground font-medium">{motionEstimate.credits} credits</span> on top of the video.
-                {" "}Each clip takes 1–3 minutes. If a clip fails, that scene keeps its still image and the clip's credits are refunded.
+                {" "}Clips are made 4 at a time and each takes 1–3 minutes{motionEstimate.clips > 12 ? ` — expect roughly ${Math.ceil(motionEstimate.clips / 4) * 2} minutes extra` : ""}. Keep this tab open until it finishes. If a clip fails, that scene keeps its still image and the clip's credits are refunded.
               </div>
             </div>
           )}
