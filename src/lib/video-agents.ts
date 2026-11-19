@@ -33,6 +33,7 @@ import {
 } from "@/lib/character-bible";
 import { classifyTopic } from "@/lib/cinematic-engine";
 import { authFetch } from "@/lib/auth-fetch";
+import { ttsFetch } from "@/lib/tts-client";
 // Static (not lazy) imports on purpose: a long render can outlive a deploy,
 // and a lazily-loaded chunk from the old build no longer exists afterwards
 // ("Failed to fetch dynamically imported module"), which killed finished renders.
@@ -879,11 +880,7 @@ export const RenderAgent = {
 
 async function fetchSceneAudio(text: string, voice: VoiceId, ctx: AudioContext): Promise<{ blobUrl: string; buffer: AudioBuffer } | null> {
   try {
-    const res = await authFetch("/api/tts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, voice: VOICE_MAP[voice] }),
-    });
+    const res = await ttsFetch(text, VOICE_MAP[voice]);
     if (!res.ok) return null;
     const bytes = await res.arrayBuffer();
     const buffer = await ctx.decodeAudioData(bytes.slice(0));
