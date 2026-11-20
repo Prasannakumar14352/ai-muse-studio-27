@@ -5,7 +5,7 @@ import { chargeMiddleware } from "@/lib/credits-guard.server";
 import { z } from "zod";
 import { parseStructuredJsonResponse } from "@/lib/video-json";
 import { buildFallbackScenesFromScript, buildFallbackVideoScript } from "@/lib/video-fallback";
-import { countWords, getDurationTargets, maxWordsForScene, speechWordsPerSecond, totalVoiceoverWords } from "@/lib/video-duration";
+import { countWords, getDurationTargets, maxWordsForScene, normalizeSceneTiming, speechWordsPerSecond, totalVoiceoverWords } from "@/lib/video-duration";
 import { aiChatFetch, aiKey, AI_NOT_CONFIGURED } from "@/lib/ai-provider";
 
 
@@ -364,14 +364,9 @@ Return ONLY this JSON shape with no prose:
         const n = m ? parseFloat(m[1]) : 3;
         return Number.isFinite(n) && n > 0 ? n : 3;
       };
-      const current = finalOut.scenes.reduce((a, s) => a + parseSec(s.duration), 0);
-      if (current > 0) {
-        const factor = lenSec / current;
-        finalOut.scenes = finalOut.scenes.map((s) => {
-          const scaled = Math.max(2, Math.min(8, Math.round(parseSec(s.duration) * factor)));
-          return { ...s, duration: `${scaled}s` };
-        });
-      }
+      // Rescale to the requested length with a ≥3s floor per scene (merging scenes that
+      // can't get one) and rewrite time_range, which the blueprint reads first.
+      finalOut.scenes = normalizeSceneTiming(finalOut.scenes, lenSec);
       finalOut.length_sec = finalOut.scenes.reduce((a, s) => a + parseSec(s.duration), 0);
 
       // SHORTEN PASS — any line longer than its scene can hold gets rewritten
@@ -548,7 +543,8 @@ Return ONLY this JSON object shape with no prose:
       parseErrors.push("Used fallback scenes after 3 invalid JSON attempts");
     }
 
-    const scenes = finalOut.scenes.map((s, i) => ({ ...s, n: i + 1 }));
+    // Same ≥3s-per-scene timing as generated scripts.
+    const scenes = normalizeSceneTiming(finalOut.scenes.map((s, i) => ({ ...s, n: i + 1 })), lenSec);
 
     const image_prompts = scenes.map((s) => ({
       n: s.n,
@@ -1036,6 +1032,7 @@ export const shortenVoiceoverLines = createServerFn({ method: "POST" })
     const key = aiKey();
     if (!key) throw new Error(AI_NOT_CONFIGURED);
     const { shortenLinesWithAi } = await import("@/lib/voiceover-fit.server");
-    const fixed = await shortenLinesWithAi(key, data.lines, data.language);
-    return { lines: [...fixed.entries()].map(([n, text]) => ({ n, text })) };
+    const trimmed = new Set<number>();
+    const fixed = await shortenLinesWithAi(key, data.lines, data.language, 3, trimmed);
+    return { lines: [...fixed.entries()].map(([n, text]) => ({ n, text })), trimmed: [...trimmed] };
   });

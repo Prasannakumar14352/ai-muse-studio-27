@@ -177,7 +177,7 @@ export type UniversalPromptVars = {
 };
 
 // The topic is NOT quoted: image models tend to typeset any quoted string into the picture.
-const UNIVERSAL_TEMPLATE = `Create a highly clickable thumbnail background image in EXACT {ASPECT_RATIO} aspect ratio. Topic (context only, never write it in the image): {TOPIC}.
+const UNIVERSAL_TEMPLATE = `Create a highly clickable thumbnail background image in EXACT {ASPECT_RATIO} aspect ratio. Scene (never write any words in the image): {TOPIC}.
 
 COMPOSITION RULES ({ASPECT_RATIO}):
 {COMPOSITION_RULE}

@@ -45,7 +45,7 @@ export const Route = createFileRoute("/api/tts")({
         const credits = voiceoverClipCredits(clipped.length, lang) * ACTION_COSTS.tts_per_100_chars;
         let reservation: Awaited<ReturnType<typeof chargeCredits>>;
         try {
-          reservation = await chargeCredits({ userId, action: "voiceover", amount: credits, description: "Voiceover", projectId: jobTagFromRequest(request) });
+          reservation = await chargeCredits({ userId, action: "voiceover", amount: credits, description: "Voiceover", jobTag: jobTagFromRequest(request) });
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           return jsonError(msg.startsWith("insufficient_credits:") ? `Not enough credits: this voiceover needs ${credits}.` : msg, msg.startsWith("insufficient_credits:") ? 402 : 400);

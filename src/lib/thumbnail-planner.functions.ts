@@ -138,11 +138,16 @@ export const planThumbnailBrief = createServerFn({ method: "POST" })
     void needsOverlayScript;
 
     // Build the FINAL image-generation prompt from the single universal template.
+    // The headline is drawn once, by the app, from the brief's text. Any title/headline
+    // words that reach the image model get typeset into the background (QA: the topic
+    // "5 morning habits" appeared as "MORNING HABITS" under the overlay), so the prompt
+    // carries a visual scene description instead of the title, and text cues are stripped.
+    const banned = [data.brief.title, data.brief.prompt, thumbnailText, data.brief.customText];
     const positivePrompt = buildUniversalThumbnailPrompt(format, {
-      TOPIC: data.brief.title || data.brief.prompt || "",
-      SUBJECT_ACTION: subjectAction,
-      SUBJECT_EXPRESSION: subjectExpression,
-      BACKGROUND_DESCRIPTION: backgroundDesc,
+      TOPIC: stripTextCues(String(optimized.sceneDescription ?? ""), banned) || "a striking scene that fits the subject below",
+      SUBJECT_ACTION: stripTextCues(subjectAction, banned),
+      SUBJECT_EXPRESSION: stripTextCues(subjectExpression, banned),
+      BACKGROUND_DESCRIPTION: stripTextCues(backgroundDesc, banned),
       THUMBNAIL_TEXT: thumbnailText,
       ASPECT_RATIO: format.ratio,
       hasUploadedSubject: Boolean(data.brief.subjectImage),
@@ -267,4 +272,23 @@ export const reverseEngineerThumbnail = createServerFn({ method: "POST" })
 const NO_TEXT_NEGATIVE = "any text, words, letters, numbers, captions, titles, typography, signs, labels, watermark, logo";
 function withNoTextNegative(neg: string): string {
   return /typography/i.test(neg) ? neg : [neg.trim().replace(/,\s*$/, ""), NO_TEXT_NEGATIVE].filter(Boolean).join(", ");
+}
+
+/**
+ * Remove anything an image model would typeset: quoted strings, "a sign that says …"
+ * style phrases, and the title / headline words themselves.
+ */
+export function stripTextCues(text: string, banned: Array<string | undefined | null>): string {
+  let out = (text || "")
+    .replace(/["“”'‘’«»][^"“”'‘’«»]{1,120}["“”'‘’«»]/g, "")
+    .replace(/\b(?:with|showing|displaying|reading|that (?:says|reads)|saying|labell?ed|titled|captioned)\b[^,.;]*?\b(?:text|words?|title|caption|headline|sign|letters?|banner)\b[^,.;]*/gi, "")
+    .replace(/\b(?:bold|large|big|overlay|headline|title)\s+(?:text|typography|letters|words)\b[^,.;]*/gi, "")
+    .replace(/\b(?:an?\s+)?(?:neon\s+)?(?:sign|banner|poster|caption|label|text|title|headline|board)\s+(?:that\s+)?(?:says|reads|saying|reading|with the words)\b[^,.;]*/gi, "");
+  for (const b of banned) {
+    const phrase = (b || "").trim();
+    if (phrase.length < 3) continue;
+    const esc = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    out = out.replace(new RegExp(esc, "gi"), "");
+  }
+  return out.replace(/(?:\s*,){2,}/g, ",").replace(/\s{2,}/g, " ").replace(/\s+([,.;])/g, "$1").replace(/^[\s,.;]+|[\s,;]+$/g, "").trim();
 }

@@ -62,3 +62,43 @@ NO FILLER (hard rules — applies in every language, especially ${lang === "Engl
 - If you don't know a specific detail for certain, choose a different real
   item you DO know rather than padding.`;
 }
+
+// Common function words of romanized ("Hinglish" / "Tenglish" …) titles. A Latin-script
+// title with several of these is not English, even when YouTube tags it "en"
+// (that tag is often just the channel default).
+const ROMANIZED_MARKERS: Array<{ lang: string; words: Set<string> }> = [
+  {
+    lang: "Hindi",
+    words: new Set(("hai hain ka ki ke ko se pe mein jab tab aa gaya gayi gaye kya kyun kaise kaisa nahi nahin " +
+      "aur bhi yeh wo woh tha thi hua hui hoga sabse apna apni apne zid ladki ladka bhai behen maa papa " +
+      "dekho dekhiye karo karna kar diya liya wala wali wale baat sach jaan pyaar hum tum aap").split(" ")),
+  },
+  {
+    lang: "Telugu",
+    words: new Set(("lo ki ela enti emi enduku cheyyali chesindi chesadu ayindi undi unnadu kadha katha telugu " +
+      "manam meeru nenu vadu ame vallu chala inka kuda amma nanna anna akka pelli sinima").split(" ")),
+  },
+  {
+    lang: "Tamil",
+    words: new Set(("enna eppadi yen illa irukku pannunga panna da di amma appa thambi akka anna kadhai tamil nalla").split(" ")),
+  },
+];
+
+/**
+ * Language of a video from its title, for research results.
+ * Non-Latin script wins; then YouTube's tag when it's not English; then romanized
+ * Indic markers (≥2 hits); then the tag; else English.
+ */
+export function detectVideoTitleLanguage(title: string, taggedLanguage?: string | null): string {
+  const script = detectTopicLanguage(title);
+  if (script !== "English") return script;
+  if (taggedLanguage && taggedLanguage !== "English" && taggedLanguage !== "Other") return taggedLanguage;
+  const tokens = title.toLowerCase().normalize("NFKD").replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
+  let best: { lang: string; hits: number } | null = null;
+  for (const m of ROMANIZED_MARKERS) {
+    const hits = tokens.filter((t) => m.words.has(t)).length;
+    if (hits >= 2 && (!best || hits > best.hits)) best = { lang: m.lang, hits };
+  }
+  if (best) return best.lang;
+  return taggedLanguage || "English";
+}

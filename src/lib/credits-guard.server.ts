@@ -95,6 +95,13 @@ export type ChargeOptions = {
   action: string;
   amount?: number;
   projectId?: string | null;
+  /**
+   * Video job this charge belongs to (stored in credit_ledger.render_job_id).
+   * Not project_id: finalize_credits copies project_id into usage_history, whose
+   * project_id references projects(id) — a job id there fails the FK and the row
+   * is left "reserved" forever.
+   */
+  jobTag?: string | null;
   description?: string;
   idempotencyKey?: string;
 };
@@ -157,6 +164,13 @@ export async function chargeCredits(opts: ChargeOptions): Promise<Reservation> {
   }
 
   const ledgerId = res.ledger_id ?? null;
+  if (ledgerId && opts.jobTag) {
+    const { error: tagErr } = await supabaseAdmin
+      .from("credit_ledger")
+      .update({ render_job_id: opts.jobTag } as never)
+      .eq("id", ledgerId);
+    if (tagErr) console.warn("[chargeCredits] job tag failed", tagErr.message);
+  }
   return {
     ledgerId,
     source: res.source ?? "balance",

@@ -276,8 +276,10 @@ Return EXACTLY this JSON shape (no prose, no markdown):
       generatedAt: new Date().toISOString(),
       disclaimers: [
         hasLive
-          ? "Similar videos are live YouTube data. Scores, Google Trends, Reddit and keyword volumes are AI estimates."
-          : "All metrics are AI strategic estimates — live Google Trends, YouTube, and TikTok data are not connected.",
+          ? LIVE_EVIDENCE_NOTE
+          : process.env.YOUTUBE_API_KEY
+            ? "No matching live YouTube videos were found for this topic, so all results are AI estimates."
+            : ESTIMATE_EVIDENCE_NOTE,
         // The model's own "unsure about" notes are working notes, not user copy — not shown.
       ],
     };
@@ -307,6 +309,17 @@ Return EXACTLY this JSON shape (no prose, no markdown):
     }
     return row as unknown as { id: string; findings: ResearchFindings };
   });
+
+/** Which live sources a run will use — so the page can describe them before the run. */
+export const researchSourcesFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => ({ youtube: Boolean(process.env.YOUTUBE_API_KEY) }));
+
+/** One wording for evidence, used above the button and under results. */
+export const LIVE_EVIDENCE_NOTE =
+  "Similar videos are live YouTube results. Scores, Google Trends, Reddit and keyword volumes are AI estimates.";
+export const ESTIMATE_EVIDENCE_NOTE =
+  "All results are AI estimates — live YouTube, Google Trends and TikTok data aren't connected.";
 
 export const listResearchFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

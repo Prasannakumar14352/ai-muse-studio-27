@@ -134,9 +134,15 @@ function CarouselsPage() {
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["carousels"],
     queryFn: async (): Promise<CarouselRow[]> => {
+      // Own carousels only: admins can read every user's projects, which showed other
+      // people's carousels here as empty "0 prompts" drafts (their slides live in their account).
+      const { data: auth } = await supabase.auth.getSession();
+      const userId = auth.session?.user.id;
+      if (!userId) throw new Error("Not signed in yet");
       const { data: projects, error: pErr } = await supabase
         .from("projects")
         .select("id,title,style,platform,tone")
+        .eq("user_id", userId)
         .eq("content_type", "carousel")
         .order("created_at", { ascending: false });
       if (pErr) throw pErr;

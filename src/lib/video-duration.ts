@@ -160,3 +160,75 @@ export function checkDuration(requestedSec: number, actualSec: number): Duration
     shortfallWords: Math.ceil(shortfallSec * WORDS_PER_SECOND),
   };
 }
+
+/** Shortest scene the planner may produce: below this, a line of narration can't fit (≈5 Telugu words at 3s). */
+export const MIN_SCENE_SEC = 3;
+const MAX_SCENE_SEC = 8;
+
+type TimedScene = {
+  n: number;
+  duration: string;
+  time_range?: string;
+  voiceover: string;
+  on_screen_text?: string;
+};
+
+const secOf = (d: string) => {
+  const m = /([\d.]+)/.exec(d ?? "");
+  const n = m ? parseFloat(m[1]) : 3;
+  return Number.isFinite(n) && n > 0 ? n : 3;
+};
+
+/**
+ * Make scene timing consistent and speakable:
+ *  - merges the shortest scenes into a neighbour until every scene can get ≥ MIN_SCENE_SEC,
+ *  - rescales durations to sum to `lenSec` (each between MIN and MAX, 0.5s steps),
+ *  - rewrites `time_range` to match — the blueprint reads time_range first, so a stale
+ *    "28-29 sec" from the model used to produce 1-second scenes.
+ */
+export function normalizeSceneTiming<T extends TimedScene>(scenes: T[], lenSec: number, minSec = MIN_SCENE_SEC): T[] {
+  if (!scenes.length || !(lenSec > 0)) return scenes;
+  let list = scenes.map((s) => ({ ...s }));
+  const maxScenes = Math.max(1, Math.floor(lenSec / minSec));
+  while (list.length > maxScenes) {
+    // Merge the shortest scene (never the hook, scene 1, unless it's all that's left) into its neighbour.
+    let idx = 1;
+    for (let i = 1; i < list.length; i++) if (secOf(list[i].duration) < secOf(list[idx].duration)) idx = i;
+    if (list.length === 1) break;
+    const into = idx === list.length - 1 ? idx - 1 : idx + 1;
+    const [a, b] = into < idx ? [list[into], list[idx]] : [list[idx], list[into]];
+    const merged = {
+      ...(secOf(a.duration) >= secOf(b.duration) ? a : b),
+      voiceover: [a.voiceover, b.voiceover].map((v) => v.trim()).filter(Boolean).join(" "),
+      on_screen_text: a.on_screen_text || b.on_screen_text,
+      duration: `${secOf(a.duration) + secOf(b.duration)}s`,
+    };
+    const lo = Math.min(idx, into);
+    list = [...list.slice(0, lo), merged, ...list.slice(lo + 2)];
+  }
+  // Proportional durations clamped to [min, max], re-normalized until stable.
+  const n = list.length;
+  const hi = Math.max(MAX_SCENE_SEC, Math.ceil(lenSec / n));
+  let durs = list.map((s) => secOf(s.duration));
+  for (let iter = 0; iter < 8; iter++) {
+    const fixed = durs.map((d) => d <= minSec || d >= hi);
+    const fixedSum = durs.reduce((s, d, i) => s + (fixed[i] ? Math.min(hi, Math.max(minSec, d)) : 0), 0);
+    const freeSum = durs.reduce((s, d, i) => s + (fixed[i] ? 0 : d), 0);
+    const target = lenSec - fixedSum;
+    durs = durs.map((d, i) => {
+      const v = fixed[i] ? d : freeSum > 0 ? (d * target) / freeSum : target / n;
+      return Math.min(hi, Math.max(minSec, v));
+    });
+  }
+  durs = durs.map((d) => Math.max(minSec, Math.round(d * 2) / 2));
+  // Put any rounding remainder on the longest scene.
+  const diff = lenSec - durs.reduce((a, b) => a + b, 0);
+  const longest = durs.indexOf(Math.max(...durs));
+  durs[longest] = Math.max(minSec, durs[longest] + diff);
+  let t = 0;
+  return list.map((s, i) => {
+    const start = t;
+    t += durs[i];
+    return { ...s, n: i + 1, duration: `${durs[i]}s`, time_range: `${start}-${t} sec` };
+  });
+}
