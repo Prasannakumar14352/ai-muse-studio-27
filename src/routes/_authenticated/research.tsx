@@ -3,8 +3,8 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  runResearchFn, listResearchFn, deleteResearchFn,
-  recommendationLabel,
+  runResearchFn, listResearchFn, deleteResearchFn, researchSourcesFn,
+  recommendationLabel, LIVE_EVIDENCE_NOTE, ESTIMATE_EVIDENCE_NOTE,
   type ResearchFindings, type ResearchInputs,
 } from "@/lib/research.functions";
 import { ViralResearchView } from "@/components/viral-research-view";
@@ -54,6 +54,8 @@ function ResearchPage() {
   const del = useServerFn(deleteResearchFn);
 
   const { data: reports } = useQuery({ queryKey: ["research"], queryFn: () => list() });
+  const sourcesFn = useServerFn(researchSourcesFn);
+  const { data: sources } = useQuery({ queryKey: ["research-sources"], queryFn: () => sourcesFn(), staleTime: 5 * 60_000 });
 
   const [inputs, setInputs] = useState<ResearchInputs>({
     topic: "", platform: "youtube", country: "Global", audience: "", niche: "",
@@ -144,7 +146,8 @@ function ResearchPage() {
         </div>
         <div className="flex items-center justify-between gap-3">
           <div className="text-[11px] text-amber-300/80">
-            Analysis is an AI strategic estimate. Live public data sources are not connected.
+            {/* Same wording the results use, so the page never contradicts itself. */}
+            {sources ? (sources.youtube ? LIVE_EVIDENCE_NOTE : ESTIMATE_EVIDENCE_NOTE) : ""}
           </div>
           <button disabled={!inputs.topic || m.isPending} onClick={() => m.mutate()}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-pink-500 text-white font-semibold disabled:opacity-50 shadow-lg shadow-pink-500/20">

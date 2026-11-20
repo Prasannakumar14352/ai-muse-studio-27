@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { detectTopicLanguage } from "@/lib/content-language";
+import { detectVideoTitleLanguage } from "@/lib/content-language";
 import {
   AlertTriangle, CheckCircle2, ChevronDown, Sparkles, TrendingUp,
   TrendingDown, Activity, Calendar as CalendarIcon, Info,
@@ -22,9 +22,9 @@ export function ViralResearchView({ findings }: { findings: ResearchFindings }) 
       ? { ...s, url: s.url ?? m[1], whyItWorked: s.whyItWorked.slice(0, m.index).replace(/^Real top result — /, "") }
       : s;
   });
-  const langs = Array.from(new Set(similarAll.map((s) => s.language ?? detectTopicLanguage(s.title))));
+  const langs = Array.from(new Set(similarAll.map((s) => detectVideoTitleLanguage(s.title, s.language))));
   const [langFilter, setLangFilter] = useState<string>("all");
-  const similar = langFilter === "all" ? similarAll : similarAll.filter((s) => (s.language ?? detectTopicLanguage(s.title)) === langFilter);
+  const similar = langFilter === "all" ? similarAll : similarAll.filter((s) => detectVideoTitleLanguage(s.title, s.language) === langFilter);
 
   return (
     <div className="space-y-6">
@@ -91,7 +91,7 @@ export function ViralResearchView({ findings }: { findings: ResearchFindings }) 
             {["all", ...langs].map((l) => (
               <button key={l} type="button" onClick={() => setLangFilter(l)}
                 className={`px-2.5 py-1 rounded-full text-[11px] border ${langFilter === l ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>
-                {l === "all" ? `All languages (${similarAll.length})` : `${l} (${similarAll.filter((s) => (s.language ?? detectTopicLanguage(s.title)) === l).length})`}
+                {l === "all" ? `All languages (${similarAll.length})` : `${l} (${similarAll.filter((s) => detectVideoTitleLanguage(s.title, s.language) === l).length})`}
               </button>
             ))}
           </div>
@@ -107,20 +107,20 @@ export function ViralResearchView({ findings }: { findings: ResearchFindings }) 
                   {s.metric && <span className="text-xs text-emerald-400 shrink-0">{s.metric}</span>}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  {[s.creator, s.platform, s.language, s.length, s.publishedAt].filter(Boolean).join(" · ")}
+                  {[s.creator, s.platform, detectVideoTitleLanguage(s.title, s.language), s.length, s.publishedAt].filter(Boolean).join(" · ")}
                 </div>
                 <div className="text-xs mt-1 italic text-muted-foreground">{s.whyItWorked}</div>
               </div>
             ))}
             {!isLive && (
               <div className="text-[11px] text-amber-300/80 flex items-center gap-1.5">
-                <Info className="w-3 h-3" /> Similar content shown as AI estimates. Live public data is not connected.
+                <Info className="w-3 h-3" /> These videos are AI examples, not live YouTube results.
               </div>
             )}
           </div>
         ) : (
           <div className="text-sm text-muted-foreground">
-            {similarAll.length ? "No videos in this language." : isLive ? "No similar videos found on YouTube for this topic." : "No similar content available. Live public data is not connected."}
+            {similarAll.length ? "No videos in this language." : isLive ? "No similar videos found on YouTube for this topic." : "No similar content available for this report."}
           </div>
         )}
       </Collapsible>
@@ -211,7 +211,7 @@ function VerdictCard({ va, evidenceMode, generatedAt }: { va: ViralAnalysis; evi
           <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
             {/* Without live data an estimate can't be "high" confidence — cap it so the two labels agree. */}
             <span>Confidence: <span className="text-foreground/80 capitalize">{evidenceMode === "live" ? va.confidence : (va.confidence === "high" ? "medium" : va.confidence)}</span>{evidenceMode !== "live" && <span className="text-muted-foreground"> (estimate)</span>}</span>
-            <span>Evidence: <span className="text-amber-300">{evidenceMode === "live" ? "Live data" : evidenceMode === "mixed" ? "Live YouTube + AI estimate" : "AI strategic estimate"}</span></span>
+            <span>Evidence: <span className="text-amber-300">{evidenceMode === "live" ? "Live data" : evidenceMode === "mixed" ? "Live YouTube videos + AI estimates" : "AI estimate"}</span></span>
             {generatedAt && <span>{new Date(generatedAt).toLocaleString()}</span>}
           </div>
         </div>

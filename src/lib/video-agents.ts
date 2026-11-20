@@ -2254,7 +2254,15 @@ export async function runRenderPhase(
 ): Promise<{ job: JobRecord; result: PipelineResult }> {
   setCreditJobTag(jobId);
   try {
-    return await runRenderPhaseInner(jobId, bundle, opts);
+    const out = await runRenderPhaseInner(jobId, bundle, opts);
+    // Video delivered: close any of this job's charges still marked "reserved".
+    try {
+      const { settleVideoJobCredits } = await import("@/lib/video-refund.functions");
+      await settleVideoJobCredits({ data: { jobId } });
+    } catch (settleErr) {
+      console.warn("[video-pipeline] settling job credits did not complete", settleErr);
+    }
+    return out;
   } catch (e) {
     // The user paid for shots and narration but got no usable video —
     // give those credits back automatically.

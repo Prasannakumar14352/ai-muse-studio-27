@@ -813,7 +813,7 @@ function CreditsBuyLine({ credits, free = false }: { credits: number; free?: boo
     return (
       <p className="mt-1.5 text-[11px] text-muted-foreground leading-snug">
         ≈ {credits.toLocaleString()} images · {Math.floor(credits / 8).toLocaleString()} carousels · captions &amp; LinkedIn posts.
-        Video, Research and Thumbnails start on Starter.
+        Research and Thumbnails start on Starter; Video Studio on Creator.
       </p>
     );
   }

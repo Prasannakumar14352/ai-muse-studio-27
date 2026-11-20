@@ -794,7 +794,8 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
   const [style, setStyle] = useState<StyleId>("cinematic");
   const [voice, setVoice] = useState<VoiceId>("documentary_narrator");
   const [ratio, setRatio] = useState<AspectRatio>(initialRatio ?? "9:16");
-  const [sameCharacter, setSameCharacter] = useState(true);
+  // Off by default: it switches character scenes to HD (8 credits each).
+  const [sameCharacter, setSameCharacter] = useState(false);
   const [language, setLanguage] = useState("auto");
   const [motionMode, setMotionMode] = useState<MotionMode>("off");
   const [motionTier, setMotionTier] = useState<MotionTier>("standard");

@@ -28,6 +28,16 @@ export type PricingPlan = {
   badge: string | null;
 };
 
+/** What Free actually unlocks (plan-access gates Video, Research and Thumbnails to Starter+). */
+export const FREE_PLAN_MODULES = "AI images, carousels, captions & LinkedIn posts";
+
+function planFeatures(code: string, raw: unknown): string[] {
+  const list = Array.isArray(raw) ? (raw as string[]) : [];
+  if (code !== "free") return list;
+  // The stored Free list said "All core modules", which contradicted the gating.
+  return list.map((f) => (/^all core modules\b/i.test(f.trim()) ? FREE_PLAN_MODULES : f));
+}
+
 function mapRow(r: Record<string, unknown>): PricingPlan {
   return {
     id: String(r.id),
@@ -41,7 +51,7 @@ function mapRow(r: Record<string, unknown>): PricingPlan {
     discountPct: Number(r.discount_pct ?? 0),
     monthlyCredits: Number(r.monthly_credits ?? 0),
     includedCredits: Number(r.included_credits ?? 0),
-    features: Array.isArray(r.features) ? (r.features as string[]) : [],
+    features: planFeatures(String(r.code), r.features),
     featured: Boolean(r.featured),
     active: Boolean(r.active),
     contactSales: Boolean(r.contact_sales),

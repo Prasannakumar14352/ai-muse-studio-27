@@ -3,6 +3,8 @@
  * Enabled only when the YOUTUBE_API_KEY env var is set in Vercel (server-only).
  * Cost: search.list = 100 quota units + videos.list = 1 → ~100 units/run (10k/day free).
  */
+import { detectVideoTitleLanguage } from "@/lib/content-language";
+
 export interface LiveYouTubeVideo {
   title: string;
   creator: string;
@@ -81,7 +83,8 @@ export async function fetchLiveYouTube(topic: string, country?: string | null): 
       comments: Number(v.statistics?.commentCount ?? 0),
       publishedAt: (v.snippet?.publishedAt ?? "").slice(0, 10),
       durationSec: isoDurationToSec(v.contentDetails?.duration ?? ""),
-      language: videoLanguage(v.snippet?.defaultAudioLanguage ?? v.snippet?.defaultLanguage, v.snippet?.title ?? ""),
+      // YouTube's tag is often the channel default ("en"); the title decides when it disagrees.
+      language: detectVideoTitleLanguage(v.snippet?.title ?? "", videoLanguage(v.snippet?.defaultAudioLanguage ?? v.snippet?.defaultLanguage, v.snippet?.title ?? "")),
     })).sort((a, b) => b.views - a.views);
   } catch (e) {
     console.warn("[youtube-research] failed", e);

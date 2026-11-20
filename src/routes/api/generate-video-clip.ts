@@ -44,7 +44,7 @@ export const Route = createFileRoute("/api/generate-video-clip")({
         try {
           reservation = await chargeCredits({
             userId,
-            projectId: jobTagFromRequest(request),
+            jobTag: jobTagFromRequest(request),
             action: "motion_clip",
             amount: credits,
             description: `Motion clip (${tier}, ${seconds}s)`,

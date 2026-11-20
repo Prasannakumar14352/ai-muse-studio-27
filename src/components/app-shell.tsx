@@ -43,6 +43,12 @@ const CONTENT_TYPE_TO_NAV: Record<string, string> = {
   caption_only: "/captions",
   seo_pack: "/captions",
 };
+// Pages that live under another item's URL but belong to a different sidebar item
+// (e.g. /create/carousel would otherwise light up "AI Studio" via the /create prefix).
+const ROUTE_NAV_ALIASES: Array<[prefix: string, nav: string]> = [
+  ["/create/carousel", "/carousels"],
+];
+
 
 type NavItem = {
   to: string;
@@ -144,7 +150,15 @@ function useModuleCounts() {
   return useQuery({
     queryKey: ["module-counts"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("projects").select("content_type");
+      // Count only the signed-in user's own projects, with the same rules each page's
+      // list uses — admins can read everyone's rows, so an unfiltered count was wrong.
+      const { data: auth } = await supabase.auth.getSession();
+      const userId = auth.session?.user.id;
+      if (!userId) throw new Error("Not signed in yet");
+      const { data, error } = await supabase
+        .from("projects")
+        .select("content_type, thumbnail_url")
+        .eq("user_id", userId);
       if (error) throw error;
       const counts: Record<ModuleId, number> = {
         videos: 0, promo_videos: 0, carousels: 0, images: 0, thumbnails: 0, captions: 0, linkedin: 0,
@@ -155,6 +169,8 @@ function useModuleCounts() {
       });
       for (const row of data ?? []) {
         const m = row.content_type ? inv[row.content_type] : undefined;
+        // /images lists only images that have a file (thumbnail_url).
+        if (m === "images" && !row.thumbnail_url) continue;
         if (m) counts[m] += 1;
       }
       return counts;
@@ -203,7 +219,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     ? (projectData?.project?.content_type
         ? (CONTENT_TYPE_TO_NAV[projectData.project.content_type] ?? "/videos")
         : "/videos")
-    : null;
+    : (ROUTE_NAV_ALIASES.find(([prefix]) => pathname === prefix || pathname.startsWith(prefix + "/"))?.[1] ?? null);
 
   async function signOut() {
     await qc.cancelQueries();

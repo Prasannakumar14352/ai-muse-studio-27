@@ -274,7 +274,8 @@ export function VideoBlueprintEditor({
       if (saveTimer.current) clearTimeout(saveTimer.current);
       setBp(next);
       await commit(next);
-      toast.success(`Shortened ${byN.size} line${byN.size === 1 ? "" : "s"}${byN.size < lines.length ? ` — ${lines.length - byN.size} still need a manual edit` : ""}.`);
+      const trimmed = r.trimmed ?? [];
+      toast.success(`Shortened ${byN.size} line${byN.size === 1 ? "" : "s"}${trimmed.length ? ` — scene${trimmed.length === 1 ? "" : "s"} ${trimmed.join(", ")} had to be cut to fit; give ${trimmed.length === 1 ? "it" : "them"} a quick read` : ""}.`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't shorten lines");
     } finally { setShortening(false); }

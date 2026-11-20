@@ -14,11 +14,38 @@ export type CreditHistoryRow = {
 };
 
 const ACTION_LABEL: Record<string, string> = {
-  script: "Script & captions", image: "AI image", image_hd: "AI image (HD)", image_regen: "Scene image (redo)",
-  carousel: "Carousel", voiceover: "Voiceover", motion_clip: "Motion clip", caption: "Captions",
-  thumbnail: "Thumbnail", research: "Research", seo: "SEO package", linkedin: "LinkedIn post",
-  repurpose: "Repurpose", strategy: "AI strategy", model_studio: "Model Studio",
+  // Media
+  image: "AI image", image_hd: "AI image (HD)", image_regen: "Scene image (redo)", model_image: "Model Studio image",
+  voiceover: "Voiceover", narration: "Narration", motion_clip: "Motion clip", final_export: "Video export",
+  // Video Studio
+  video_script: "Video script", video_scenes: "Video scenes", video_scenes_plan: "Scene plan from script",
+  video_seo: "Video SEO", video_hook: "Video hook", video_chapters: "Video chapters",
+  video_title_variants: "Video title ideas",
+  // Planning & research
+  plan_content: "Content plan", plan_regen_section: "Content plan (section redo)", research: "Topic research",
+  strategy: "AI strategy", agent_campaign: "Agent campaign", creative_director: "Creative director",
+  intent_detect: "Request analysis", ai_edit_text: "AI text edit",
+  // Carousels / LinkedIn / captions
+  carousel: "Carousel", carousel_plan: "Carousel plan", caption: "Captions", script: "Script & captions",
+  linkedin: "LinkedIn post", linkedin_generate: "LinkedIn post", linkedin_regen_section: "LinkedIn post (section redo)",
+  linkedin_score: "LinkedIn post score", linkedin_carousel: "LinkedIn carousel", linkedin_carousel_slide: "LinkedIn carousel slide",
+  // Thumbnails / promo / SEO / publishing
+  thumbnail: "Thumbnail", thumbnail_plan: "Thumbnail plan", thumbnail_analyze: "Thumbnail analysis",
+  thumbnail_reverse: "Thumbnail remix", promo_plan: "Promo video plan", promo_scene_regen: "Promo scene redo",
+  seo: "SEO package", seo_package: "SEO package", seo_regen: "SEO package (redo)",
+  publish_kit: "Publish kit", publish_kit_review: "Publish kit review", repurpose: "Repurpose",
+  model_studio: "Model Studio", generic: "AI generation",
 };
+
+/** Readable name: a real description wins; raw keys map to a label. */
+export function creditActionLabel(action: string, description?: string | null): string {
+  const d = (description ?? "").trim();
+  // chargeMiddleware stores the raw key as the description ("video_hook") — skip those.
+  if (d && !/^[a-z0-9_]+$/.test(d)) return d;
+  if (ACTION_LABEL[action]) return ACTION_LABEL[action];
+  const words = (d || action).replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 export const listMyCreditHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -55,7 +82,7 @@ export const listMyCreditHistory = createServerFn({ method: "GET" })
       rows.push({
         id: l.id,
         at: l.created_at,
-        label: l.description || ACTION_LABEL[l.action] || l.action.replace(/_/g, " "),
+        label: creditActionLabel(l.action, l.description),
         credits: status === "refunded" ? 0 : credits,
         status,
         balanceAfter: l.balance_after,
