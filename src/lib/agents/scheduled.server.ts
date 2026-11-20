@@ -97,9 +97,29 @@ export async function runQaHealthCheck(trigger = "schedule"): Promise<{ ok: bool
   if (postFails.length) problems.push(`${postFails.length} scheduled post(s) failed to publish (${[...new Set(postFails.map((p: { platform: string }) => p.platform))].join(", ")}).`);
 
   // 5. Payments stuck in "pending" for over an hour (webhook not arriving?).
-  const { data: pending } = await db.from("payments").select("id").eq("status", "pending")
-    .lt("created_at", new Date(Date.now() - 3600e3).toISOString()).gte("created_at", new Date(Date.now() - 2 * DAY).toISOString());
-  if ((pending ?? []).length >= 3) problems.push(`${pending.length} payments are stuck in "pending" — check the Razorpay webhook (Admin → Webhooks).`);
+  // Most "pending" rows are just checkouts the buyer closed without paying.
+  // Ask Razorpay: only an order it marks *paid* that we never credited is a
+  // real problem (missed webhook).
+  const { data: pending } = await db.from("payments").select("id,razorpay_order_id").eq("status", "pending")
+    .lt("created_at", new Date(Date.now() - 3600e3).toISOString()).gte("created_at", new Date(Date.now() - 2 * DAY).toISOString())
+    .limit(20);
+  const pendingRows = (pending ?? []) as Array<{ id: string; razorpay_order_id: string | null }>;
+  if (pendingRows.length) {
+    let paidNotCredited = 0;
+    let unchecked = 0;
+    const { razorpayApi } = await import("@/lib/billing.server");
+    for (const p of pendingRows) {
+      if (!p.razorpay_order_id) continue;
+      try {
+        const o = await razorpayApi<{ status?: string }>(`/orders/${p.razorpay_order_id}`);
+        if (o.status === "paid") paidNotCredited++;
+      } catch { unchecked++; }
+    }
+    if (paidNotCredited) problems.push(`${paidNotCredited} payment(s) were paid on Razorpay but never credited — the webhook may not be arriving (Admin → Webhooks).`);
+    const abandoned = pendingRows.length - paidNotCredited - unchecked;
+    if (abandoned) notes.push(`${abandoned} checkout(s) were opened but not paid in the last 2 days (normal — buyers closed the payment window).`);
+    if (unchecked) notes.push(`Couldn't check ${unchecked} pending order(s) with Razorpay.`);
+  }
 
   const ok = problems.length === 0;
   const body = [...problems.map((p) => `❗ ${p}`), ...notes.map((n) => `✓ ${n}`)].join("\n");
