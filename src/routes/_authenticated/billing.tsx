@@ -2,6 +2,8 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMySubscription } from "@/lib/razorpay.functions";
+import { listPricingPlans } from "@/lib/pricing.functions";
+import { CreditHistory } from "@/components/credit-history";
 import { cancelAutopay } from "@/lib/razorpay-autopay.functions";
 import { confirmDialog } from "@/components/confirm-dialog";
 import { toast } from "sonner";
@@ -71,6 +73,10 @@ type Pay = {
 
 function BillingPage() {
   const fn = useServerFn(getMySubscription);
+  // Plan facts come from the same pricing_plans table the Pricing page uses.
+  const plansFn = useServerFn(listPricingPlans);
+  const plansQ = useQuery({ queryKey: ["billing-plans"], queryFn: () => plansFn(), staleTime: 10 * 60_000 });
+  const creatorCredits = plansQ.data?.plans.find((p) => p.code === "creator")?.monthlyCredits ?? null;
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["my-subscription"],
     queryFn: () => fn(),
@@ -267,12 +273,17 @@ function BillingPage() {
             <TopUpPacks />
           </div>
 
+          {/* Credit history (the support bot points users here) */}
+          <div id="credit-history" className="scroll-mt-20">
+            <CreditHistory />
+          </div>
+
           {/* Quick actions */}
           <section className="grid gap-4 md:grid-cols-2">
             <ActionCard
               icon={<Sparkles className="w-5 h-5" />}
               title={planKey === "free" ? "Upgrade to Creator" : "Change subscription"}
-              desc={planKey === "free" ? "Unlock 1,000 monthly credits + priority queue." : "Move up or down anytime."}
+              desc={planKey === "free" ? `Unlock ${creatorCredits ? `${creatorCredits.toLocaleString()} monthly credits` : "monthly credits"} + priority queue.` : "Move up or down anytime."}
               to="/pricing"
               cta={planKey === "free" ? "Upgrade" : "Manage plan"}
             />

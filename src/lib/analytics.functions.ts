@@ -43,7 +43,7 @@ export const getDashboardStatsFn = createServerFn({ method: "GET" })
       context.supabase.from("projects").select("id, title, content_type, created_at").eq("user_id", context.userId).order("created_at", { ascending: false }).limit(10),
       context.supabase.from("usage_history").select("created_at, description, credits_used").eq("user_id", context.userId).order("created_at", { ascending: false }).limit(12),
       context.supabase.from("analytics_events").select("event, meta, occurred_at").eq("user_id", context.userId).gte("occurred_at", d30),
-      context.supabase.from("payments").select("amount_cents, currency, status, created_at").eq("user_id", context.userId).eq("status", "captured"),
+      context.supabase.from("payments").select("amount_cents, currency, status, created_at").eq("user_id", context.userId).eq("status", "success"),
       context.supabase.from("scheduled_posts").select("platform, status").eq("user_id", context.userId),
       context.supabase.from("projects").select("id, title, content_type, created_at, metadata").eq("user_id", context.userId).order("created_at", { ascending: false }).limit(200),
     ]);
