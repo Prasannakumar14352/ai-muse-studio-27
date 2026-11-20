@@ -25,7 +25,10 @@ function CaptionsPage() {
   const initial = loadDraft("caption");
   const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("caption"));
   const [step, setStep] = useState<WizardStep>(initial?.aiPlan ? "review" : "plan");
-  const [topic, setTopic] = useState(handoff?.topic ?? initial?.originalPrompt ?? "");
+  // Drafts from Research store "topic\n\nAngle: …"; a one-line input would run them together.
+  const [topic, setTopic] = useState(firstLine(handoff?.topic ?? initial?.originalPrompt ?? ""));
+  // Topic the current plan was generated for — a changed topic needs a new plan.
+  const [planTopic, setPlanTopic] = useState(firstLine(initial?.originalPrompt ?? ""));
   const [platform, setPlatform] = useState(handoff?.platform ?? "instagram");
   const [plan, setPlan] = useState<ContentPlan | null>(initial?.editedPlan ?? initial?.aiPlan ?? null);
   const [language, setLanguage] = useState<string>("auto");
@@ -38,6 +41,7 @@ function CaptionsPage() {
     mutationFn: () => plan$({ data: { module: "caption", topic, context: `Platform: ${platform}`, strategyContext: getActiveStrategyContext(), language } }),
     onSuccess: (p) => {
       setPlan(p);
+      setPlanTopic(topic.trim());
       setSavedId(null);
       saveDraft({ module: "caption", originalPrompt: topic, aiPlan: p, editedPlan: p, result: null, exports: [], updatedAt: Date.now() });
       setStep("review");
@@ -64,6 +68,8 @@ function CaptionsPage() {
     };
   }, [plan]);
 
+  const topicChanged = !!plan && firstLine(topic) !== firstLine(planTopic);
+
   async function copy(text: string) { await navigator.clipboard.writeText(text); toast.success("Copied"); }
 
   /** Save the finished caption set to the account (shows in "Your caption projects"). */
@@ -75,7 +81,7 @@ function CaptionsPage() {
       if (!u.user) throw new Error("Please sign in again");
       const payload = {
         user_id: u.user.id,
-        title: topic.trim().slice(0, 120) || "Captions",
+        title: firstLine(topic).slice(0, 120) || "Captions",
         topic,
         platform,
         content_type: "caption_only",
@@ -107,7 +113,7 @@ function CaptionsPage() {
         onStepChange={setStep}
         title="Caption & Hashtag Wizard"
         subtitle="Plan → Review → Generate → Preview → Export."
-        canAdvance={step === "plan" ? !!topic.trim() && !!plan : step === "generate" ? !!savedId : true}
+        canAdvance={step === "plan" ? !!topic.trim() && !!plan && !topicChanged : step === "generate" ? !!savedId : true}
       >
         {step === "plan" && (
           <div className="space-y-4">
@@ -140,6 +146,9 @@ function CaptionsPage() {
               {planM.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
               {plan ? "Regenerate plan" : "Generate AI plan"}
             </button>
+            {topicChanged && (
+              <p className="text-xs text-amber-400">The topic changed since this plan was made — regenerate the plan to continue.</p>
+            )}
           </div>
         )}
 
@@ -214,7 +223,7 @@ function CaptionsPage() {
                 else if (a === "history") toast.info("History is stored per project on the server");
               }}
             />
-            <button onClick={() => { clearDraft("caption"); setPlan(null); setStep("plan"); toast.success("New draft"); }}
+            <button onClick={() => { clearDraft("caption"); setPlan(null); setPlanTopic(""); setSavedId(null); setStep("plan"); toast.success("New draft"); }}
               className="text-xs text-muted-foreground underline">Start a new caption</button>
           </div>
         )}
@@ -238,4 +247,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       {children}
     </div>
   );
+}
+
+function firstLine(s: string): string {
+  return (s.split(/\r?\n/).find((l) => l.trim()) ?? "").replace(/\s+/g, " ").trim();
 }

@@ -152,7 +152,8 @@ export const planThumbnailBrief = createServerFn({ method: "POST" })
     return {
       sceneDescription: String(optimized.sceneDescription ?? ""),
       positivePrompt,
-      negativePrompt:   String(optimized.negativePrompt   ?? "blurry, low quality, extra fingers, watermark, text artifacts, misspelled text, distorted face"),
+      // Always forbid text: the headline is an app-drawn overlay, never baked into the image.
+      negativePrompt:   withNoTextNegative(String(optimized.negativePrompt ?? "blurry, low quality, extra fingers, distorted face")),
       thumbnailText,
       textOverlay,
       composition:      String(optimized.composition      ?? format.compositionRule),
@@ -262,3 +263,8 @@ export const reverseEngineerThumbnail = createServerFn({ method: "POST" })
       textPlacement:   String(j.textPlacement ?? ""),
     };
   });
+
+const NO_TEXT_NEGATIVE = "any text, words, letters, numbers, captions, titles, typography, signs, labels, watermark, logo";
+function withNoTextNegative(neg: string): string {
+  return /typography/i.test(neg) ? neg : [neg.trim().replace(/,\s*$/, ""), NO_TEXT_NEGATIVE].filter(Boolean).join(", ");
+}

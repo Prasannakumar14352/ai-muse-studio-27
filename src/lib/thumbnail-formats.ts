@@ -49,7 +49,7 @@ export const THUMBNAIL_FORMATS: ThumbnailFormat[] = [
     compositionRule:
       "Landscape composition. Subject occupies ~60–70% of the frame, positioned off-center to leave a bold negative-space area for large thumbnail text. Rule of thirds.",
     subjectCoverage: 65,
-    textPlacement: "Large text on the opposite side of the subject — never covering the face.",
+    textPlacement: "Leave open space on the opposite side of the subject for a large headline added later — never draw it.",
     mobileOptimized: false,
     primary: true,
     description: "Standard YouTube video thumbnail — 1280×720.",
@@ -65,7 +65,7 @@ export const THUMBNAIL_FORMATS: ThumbnailFormat[] = [
     compositionRule:
       "Vertical composition. Subject occupies ~70% of the frame with the face centered and highly prominent. Optimized for mobile viewing — critical elements inside the safe central column, away from top/bottom UI overlays.",
     subjectCoverage: 70,
-    textPlacement: "Bold text above or below the face — never on top of it. Keep away from top and bottom edges (UI overlay zones).",
+    textPlacement: "Leave open space above or below the face for a headline added later — never draw it. Keep key content away from the top and bottom edges (UI overlay zones).",
     mobileOptimized: true,
     primary: true,
     description: "YouTube Shorts / Reels vertical thumbnail — 1080×1920.",
@@ -81,7 +81,7 @@ export const THUMBNAIL_FORMATS: ThumbnailFormat[] = [
     compositionRule:
       "Square, centered composition. Subject occupies ~65% of the frame with balanced negative space on all sides.",
     subjectCoverage: 65,
-    textPlacement: "Text above or below the subject — never over the face.",
+    textPlacement: "Leave open space above or below the subject for a headline added later — never draw it.",
     mobileOptimized: true,
     primary: false,
     description: "Square Instagram post — 1080×1080.",
@@ -97,7 +97,7 @@ export const THUMBNAIL_FORMATS: ThumbnailFormat[] = [
     compositionRule:
       "Wide landscape composition. Subject occupies ~60% of the frame with clear space for headline text.",
     subjectCoverage: 60,
-    textPlacement: "Text on the opposite side of the subject.",
+    textPlacement: "Leave open space on the opposite side of the subject for a headline added later — never draw it.",
     mobileOptimized: false,
     primary: false,
     description: "Facebook shared-link preview — 1200×630.",
@@ -113,7 +113,7 @@ export const THUMBNAIL_FORMATS: ThumbnailFormat[] = [
     compositionRule:
       "Professional landscape composition. Subject occupies ~60% of the frame with editorial polish.",
     subjectCoverage: 60,
-    textPlacement: "Text on the opposite side of the subject, clean sans-serif.",
+    textPlacement: "Leave open space on the opposite side of the subject for a headline added later — never draw it.",
     mobileOptimized: false,
     primary: false,
     description: "LinkedIn shared-link preview — 1200×627.",
@@ -129,7 +129,7 @@ export const THUMBNAIL_FORMATS: ThumbnailFormat[] = [
     compositionRule:
       "Tall vertical composition. Subject occupies ~65% of the frame with editorial styling.",
     subjectCoverage: 65,
-    textPlacement: "Large text at top or bottom, stacked cleanly, never on the face.",
+    textPlacement: "Leave open space at the top or bottom for a stacked headline added later — never draw it, never over the face.",
     mobileOptimized: true,
     primary: false,
     description: "Pinterest pin — 1000×1500.",
@@ -176,11 +176,12 @@ export type UniversalPromptVars = {
   textOverlay?: boolean;
 };
 
-const UNIVERSAL_TEMPLATE = `Create a highly clickable thumbnail in EXACT {ASPECT_RATIO} aspect ratio for the topic "{TOPIC}".
+// The topic is NOT quoted: image models tend to typeset any quoted string into the picture.
+const UNIVERSAL_TEMPLATE = `Create a highly clickable thumbnail background image in EXACT {ASPECT_RATIO} aspect ratio. Topic (context only, never write it in the image): {TOPIC}.
 
 COMPOSITION RULES ({ASPECT_RATIO}):
 {COMPOSITION_RULE}
-Text placement: {TEXT_PLACEMENT}
+Headline space: {TEXT_PLACEMENT}
 Subject coverage: approximately {SUBJECT_COVERAGE}% of the frame.
 
 SUBJECT:
@@ -191,13 +192,13 @@ SUBJECT:
 BACKGROUND:
 {BACKGROUND_DESCRIPTION}
 
-THUMBNAIL TEXT:
+TEXT:
 {TEXT_SECTION}
 
 QUALITY STANDARDS (non-negotiable):
-Photorealistic, HDR, DSLR quality, ultra-detailed, premium color grading, high contrast, viral YouTube thumbnail style, optimized for maximum click-through rate (CTR). Sharp focus, cinematic lighting, rich saturation.
+Photorealistic, HDR, DSLR quality, ultra-detailed, premium color grading, high contrast, bold eye-catching composition. Sharp focus, cinematic lighting, rich saturation.
 
-STRICT: Output MUST be in {ASPECT_RATIO} aspect ratio. No borders, no watermarks, no logos, no extra UI, no misspelled text.`;
+STRICT: Output MUST be in {ASPECT_RATIO} aspect ratio. The image contains NO text of any kind: no words, letters, numbers, captions, titles, signs, labels, watermarks, logos or UI. The headline is added later by the app as an editable layer.`;
 
 /** Non-Latin scripts image models can't spell (Indic, Arabic). Keep in sync with text-overlay.ts. */
 const OVERLAY_SCRIPT = /[\u0600-\u06FF\u0900-\u0D7F]/;
@@ -206,17 +207,14 @@ export function needsOverlayScript(s: string | null | undefined): boolean {
   return !!s && OVERLAY_SCRIPT.test(s);
 }
 
-function textSection(text: string, overlay = false): string {
-  if (!text && !overlay) return "Do not add any text.";
-  if (overlay || OVERLAY_SCRIPT.test(text)) {
-    // The app draws this text afterwards with a real font; the model must not try.
-    return (
-      "Do NOT draw any text, letters, numbers, captions or logos anywhere in the image. " +
-      "Keep the top 18% and bottom 18% of the frame clean and uncluttered (simple background only, no faces or key objects there) " +
-      "so a text banner can be placed over them later."
-    );
-  }
-  return `Render the text "${text}" clearly, bold, high contrast, 2–4 impactful words, placed as described above and never covering the face.`;
+function textSection(_text: string, _overlay = false): string {
+  // Every headline is drawn by the app afterwards with a real font (editable,
+  // always spelled right, any script). The model never draws text.
+  return (
+    "Do NOT draw any text, letters, numbers, captions or logos anywhere in the image. " +
+    "Keep the top 18% and bottom 18% of the frame clean and uncluttered (simple background only, no faces or key objects there) " +
+    "so the headline can be placed over them later."
+  );
 }
 
 const PRESERVE_CLAUSE =

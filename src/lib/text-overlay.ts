@@ -35,7 +35,7 @@ export function needsTextOverlay(text: string | null | undefined): boolean {
 
 const loaded = new Set<string>();
 
-async function loadFont(family: string): Promise<void> {
+export async function loadFont(family: string): Promise<void> {
   if (typeof document === "undefined" || loaded.has(family)) return;
   const id = `font-${family.replace(/\s+/g, "-")}`;
   if (!document.getElementById(id)) {
@@ -60,6 +60,59 @@ async function loadFont(family: string): Promise<void> {
   loaded.add(family);
 }
 
+/** Load any Google font by name (brand kits can use fonts without 800/900 weights). */
+async function loadBrandFont(family: string): Promise<void> {
+  if (typeof document === "undefined" || loaded.has(family)) return;
+  const id = `font-${family.replace(/\s+/g, "-")}`;
+  if (!document.getElementById(id)) {
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}&family=Noto+Sans:wght@800;900&display=block`;
+    document.head.appendChild(link);
+  }
+  try {
+    await Promise.race([document.fonts.load(`64px "${family}"`), new Promise((r) => setTimeout(r, 6000))]);
+  } catch { /* fall back */ }
+  loaded.add(family);
+}
+
+/** Draw a logo / watermark image into a corner. Returns a PNG data URL. */
+export async function composeBrandMarks(
+  imageSrc: string,
+  marks: { logoUrl?: string | null; watermarkUrl?: string | null },
+): Promise<string> {
+  if (!marks.logoUrl && !marks.watermarkUrl) return imageSrc;
+  const img = await loadImage(imageSrc);
+  const W = img.naturalWidth;
+  const H = img.naturalHeight;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return imageSrc;
+  ctx.drawImage(img, 0, 0);
+  const pad = Math.round(Math.min(W, H) * 0.03);
+  const draw = async (url: string, corner: "br" | "bl", alpha: number) => {
+    try {
+      const m = await loadImage(url);
+      const h = Math.round(Math.min(W, H) * 0.1);
+      const w = Math.round((m.naturalWidth / m.naturalHeight) * h);
+      const x = corner === "br" ? W - w - pad : pad;
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(m, x, H - h - pad, w, h);
+      ctx.globalAlpha = 1;
+    } catch { /* unreachable logo URL: skip it */ }
+  };
+  if (marks.logoUrl) await draw(marks.logoUrl, "br", 1);
+  if (marks.watermarkUrl) await draw(marks.watermarkUrl, "bl", 0.55);
+  try {
+    return canvas.toDataURL("image/png");
+  } catch {
+    return imageSrc; // CORS-tainted logo
+  }
+}
+
 /** Split text into up to two balanced lines (explicit "\n" or " / " wins). */
 export function splitLines(text: string): string[] {
   const explicit = text
@@ -81,7 +134,7 @@ export function splitLines(text: string): string[] {
   return [words.slice(0, best).join(" "), words.slice(best).join(" ")];
 }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -95,10 +148,17 @@ function loadImage(src: string): Promise<HTMLImageElement> {
  * Draw the text onto the image as bold banner bars (line 1 at the top,
  * line 2 at the bottom; a single line goes at the bottom). Returns a PNG data URL.
  */
-export async function composeTextOverlay(imageSrc: string, text: string): Promise<string> {
+export async function composeTextOverlay(
+  imageSrc: string,
+  text: string,
+  opts?: { fontFamily?: string | null },
+): Promise<string> {
   const script = overlayScriptFor(text);
-  const family = script?.family ?? "Noto Sans";
-  await loadFont(family);
+  // A brand font only applies to Latin text — regional scripts keep their Noto font.
+  const brandFont = !script && opts?.fontFamily?.trim() ? opts.fontFamily.trim() : null;
+  const family = script?.family ?? brandFont ?? "Noto Sans";
+  if (brandFont) await loadBrandFont(brandFont);
+  else await loadFont(family);
   const img = await loadImage(imageSrc);
 
   const W = img.naturalWidth;

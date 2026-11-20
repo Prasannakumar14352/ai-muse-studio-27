@@ -62,6 +62,8 @@ export type LocalOutput = {
   scene_images?: (string | null)[] | null;
   carousel_slides?: CarouselSlide[] | null;
   slide_overlays?: Record<number, SlideOverlaySet> | null;
+  /** Text-free slide backgrounds; carousel_images holds them with copy burned in. */
+  carousel_base_images?: (string | null)[] | null;
   aspect_ratio?: string | null;
   slide_count?: number | null;
   video_url?: string | null;
@@ -132,6 +134,7 @@ export async function saveOutput(projectId: string, patch: Partial<LocalOutput>)
     scene_images: existing?.scene_images ?? null,
     carousel_slides: existing?.carousel_slides ?? null,
     slide_overlays: existing?.slide_overlays ?? null,
+    carousel_base_images: existing?.carousel_base_images ?? null,
     aspect_ratio: existing?.aspect_ratio ?? null,
     slide_count: existing?.slide_count ?? null,
     video_url: existing?.video_url ?? null,
