@@ -2,14 +2,15 @@
 // review every draft. Nothing is posted until the admin clicks Approve.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CalendarClock, Copy, ExternalLink, Loader2, Megaphone, Play, Rocket, Send, XCircle } from "lucide-react";
+import { CalendarClock, Copy, ExternalLink, Loader2, Megaphone, Play, Rocket, Send, Sparkles, XCircle } from "lucide-react";
 import { runAgentNow, updateAgentTask, sendPromoToTelegram, type AgentTask } from "@/lib/agent-hq.functions";
 import { listPublishTargets, schedulePost } from "@/lib/publishing.functions";
 import { attachPlanMedia, createPlanMediaUpload } from "@/lib/social-plan.functions";
 import { setResearchPrefill, type ResearchModuleId } from "@/lib/research-prefill";
 import { supabase } from "@/integrations/supabase/client";
+import { canAutoBuild, cancelAutoBuild, clearAutoBuild, estimateMinutes, queueAutoBuild, useAutoBuild } from "@/lib/content-plan-autobuild";
 import { useNavigate } from "@tanstack/react-router";
 
 type PostRef = {
@@ -313,6 +314,27 @@ function BuildAndAttach({ t, ref_, platform, onDone }: { t: AgentTask; ref_: Pos
   const [sameDay, setSameDay] = useState(true);
   const target = BUILD_TARGET[ref_.build ?? "video"] ?? BUILD_TARGET.video;
   const isLongYt = /long/i.test(ref_.format ?? "") && platform === "youtube";
+  const auto = canAutoBuild(ref_);
+  const status = useAutoBuild(t.id);
+  const active = status?.state === "queued" || status?.state === "running";
+
+  // When a build finishes, reload the drafts so the new video shows up.
+  const seen = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (status?.state === "done" && seen.current !== "done") {
+      onDone();
+      toast.success("Video ready for approval", { description: status.title });
+    }
+    if (status?.state === "failed" && seen.current !== "failed") toast.error(`Build failed: ${status.error ?? ""}`);
+    seen.current = status?.state;
+  }, [status?.state, status?.title, status?.error, onDone]);
+
+  function autoBuild() {
+    queueAutoBuild({ taskId: t.id, title: t.title, ref: { ...ref_, platform } });
+    toast.message(`Building — keep this tab open (about ${estimateMinutes({ ...ref_, platform })} min)`, {
+      description: "You can use other pages in the app meanwhile.",
+    });
+  }
 
   function build() {
     setResearchPrefill({
@@ -355,8 +377,31 @@ function BuildAndAttach({ t, ref_, platform, onDone }: { t: AgentTask; ref_: Pos
         {ref_.build_language && <> · {ref_.build_language}</>}
         {isLongYt && <> · long video (16:9)</>}
       </div>
+      {status && (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            {active && <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-300" />}
+            <span className={status.state === "failed" ? "text-red-300" : status.state === "done" ? "text-emerald-300" : "text-foreground"}>{status.step}</span>
+            {active && <button onClick={() => cancelAutoBuild(t.id)} className="ml-auto underline text-muted-foreground">{status.state === "queued" ? "Remove" : "Stop"}</button>}
+            {!active && <button onClick={() => clearAutoBuild(t.id)} className="ml-auto underline text-muted-foreground">Dismiss</button>}
+          </div>
+          {active && (
+            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-full gradient-primary transition-all" style={{ width: `${Math.round(status.progress * 100)}%` }} />
+            </div>
+          )}
+          {active && <div className="text-muted-foreground">Keep this tab open. Moving to other pages in the app is fine; closing or reloading the tab stops it.</div>}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={build} className="rounded-lg glass border border-border px-3 py-1.5 text-sm">Build in {target.label}</button>
+        {auto && (
+          <button onClick={autoBuild} disabled={active}
+            className="rounded-lg gradient-primary text-white px-3 py-1.5 text-sm inline-flex items-center gap-1.5 disabled:opacity-60">
+            <Sparkles className="w-3.5 h-3.5" /> {ref_.media_url ? "Rebuild" : "Build"} {isLongYt ? "long video" : "reel"}
+            <span className="opacity-80">· ~{estimateMinutes({ ...ref_, platform })} min</span>
+          </button>
+        )}
+        <button onClick={build} className="rounded-lg glass border border-border px-3 py-1.5 text-sm">{auto ? `Open in ${target.label}` : `Build in ${target.label}`}</button>
         <label className={`rounded-lg glass border border-border px-3 py-1.5 text-sm cursor-pointer inline-flex items-center gap-1.5 ${busy ? "opacity-60 pointer-events-none" : ""}`}>
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} {ref_.media_url ? "Replace media" : "Attach media"}
           <input type="file" accept="video/mp4,video/quicktime,video/webm,image/png,image/jpeg,image/webp" className="hidden"

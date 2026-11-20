@@ -91,6 +91,10 @@ export const createPlanMediaUpload = createServerFn({ method: "POST" })
     return { path, token: up.token };
   });
 
+function isLongYoutube(ref: Record<string, unknown>): boolean {
+  return ref.platform === "youtube" && /long/i.test(String(ref.format ?? ""));
+}
+
 /** Attach uploaded media to a draft (and, optionally, the same day's other drafts without media). */
 export const attachPlanMedia = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -113,12 +117,15 @@ export const attachPlanMedia = createServerFn({ method: "POST" })
     const ref = (task.source_ref ?? {}) as Record<string, unknown>;
     const mediaType = data.mime.startsWith("video/") ? "video" : "image";
     const ids = [task.id as string];
-    if (data.sameDay && ref.plan_item_id) {
+    // A long YouTube video and the teaser reel for the same day are different
+    // files: never share one into the other's draft.
+    const sourceIsLongYt = isLongYoutube(ref);
+    if (data.sameDay && ref.plan_item_id && !sourceIsLongYt) {
       const { data: sibs } = await d.from("agent_tasks").select("id, source_ref")
         .eq("kind", "social_post").eq("status", "waiting_approval")
         .eq("source_ref->>plan_item_id", String(ref.plan_item_id));
       for (const s of (sibs ?? []) as Array<{ id: string; source_ref: Record<string, unknown> }>) {
-        if (s.id !== task.id && !s.source_ref?.media_url) ids.push(s.id);
+        if (s.id !== task.id && !s.source_ref?.media_url && !isLongYoutube(s.source_ref ?? {})) ids.push(s.id);
       }
     }
     for (const id of ids) {
