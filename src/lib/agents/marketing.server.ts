@@ -42,7 +42,7 @@ export function mediaUrls(id: string): { video: string; poster: string } {
   return { video: `${base}.mp4`, poster: `${base}.jpg` };
 }
 
-const HONESTY_RULES = `HARD RULES
+export const HONESTY_RULES = `HARD RULES
 - Only claim what the product facts say. No invented numbers (users, views, revenue, "10x"), no fake testimonials, no fake urgency or discounts that aren't in the facts.
 - Never say "guaranteed viral" or promise results. Speak to what the tool does.
 - Don't name or disparage competitors.

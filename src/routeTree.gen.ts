@@ -40,6 +40,7 @@ import { Route as AuthenticatedPromoVideosRouteImport } from './routes/_authenti
 import { Route as AuthenticatedRepurposeRouteImport } from './routes/_authenticated/repurpose'
 import { Route as AuthenticatedResearchRouteImport } from './routes/_authenticated/research'
 import { Route as AuthenticatedSeoRouteImport } from './routes/_authenticated/seo'
+import { Route as AuthenticatedSeriesRouteImport } from './routes/_authenticated/series'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedStrategyRouteImport } from './routes/_authenticated/strategy'
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
@@ -233,6 +234,11 @@ const AuthenticatedResearchRoute = AuthenticatedResearchRouteImport.update({
 const AuthenticatedSeoRoute = AuthenticatedSeoRouteImport.update({
   id: '/seo',
   path: '/seo',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSeriesRoute = AuthenticatedSeriesRouteImport.update({
+  id: '/series',
+  path: '/series',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
@@ -464,6 +470,7 @@ export interface FileRoutesByFullPath {
   '/repurpose': typeof AuthenticatedRepurposeRoute
   '/research': typeof AuthenticatedResearchRoute
   '/seo': typeof AuthenticatedSeoRoute
+  '/series': typeof AuthenticatedSeriesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/strategy': typeof AuthenticatedStrategyRoute
   '/templates': typeof AuthenticatedTemplatesRoute
@@ -529,6 +536,7 @@ export interface FileRoutesByTo {
   '/repurpose': typeof AuthenticatedRepurposeRoute
   '/research': typeof AuthenticatedResearchRoute
   '/seo': typeof AuthenticatedSeoRoute
+  '/series': typeof AuthenticatedSeriesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/strategy': typeof AuthenticatedStrategyRoute
   '/templates': typeof AuthenticatedTemplatesRoute
@@ -598,6 +606,7 @@ export interface FileRoutesById {
   '/_authenticated/repurpose': typeof AuthenticatedRepurposeRoute
   '/_authenticated/research': typeof AuthenticatedResearchRoute
   '/_authenticated/seo': typeof AuthenticatedSeoRoute
+  '/_authenticated/series': typeof AuthenticatedSeriesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/strategy': typeof AuthenticatedStrategyRoute
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
@@ -667,6 +676,7 @@ export interface FileRouteTypes {
     | '/repurpose'
     | '/research'
     | '/seo'
+    | '/series'
     | '/settings'
     | '/strategy'
     | '/templates'
@@ -732,6 +742,7 @@ export interface FileRouteTypes {
     | '/repurpose'
     | '/research'
     | '/seo'
+    | '/series'
     | '/settings'
     | '/strategy'
     | '/templates'
@@ -800,6 +811,7 @@ export interface FileRouteTypes {
     | '/_authenticated/repurpose'
     | '/_authenticated/research'
     | '/_authenticated/seo'
+    | '/_authenticated/series'
     | '/_authenticated/settings'
     | '/_authenticated/strategy'
     | '/_authenticated/templates'
@@ -1078,6 +1090,13 @@ declare module '@tanstack/react-router' {
       path: '/seo'
       fullPath: '/seo'
       preLoaderRoute: typeof AuthenticatedSeoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/series': {
+      id: '/_authenticated/series'
+      path: '/series'
+      fullPath: '/series'
+      preLoaderRoute: typeof AuthenticatedSeriesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings': {
@@ -1417,6 +1436,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRepurposeRoute: typeof AuthenticatedRepurposeRoute
   AuthenticatedResearchRoute: typeof AuthenticatedResearchRoute
   AuthenticatedSeoRoute: typeof AuthenticatedSeoRoute
+  AuthenticatedSeriesRoute: typeof AuthenticatedSeriesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedStrategyRoute: typeof AuthenticatedStrategyRoute
   AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
@@ -1449,6 +1469,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedRepurposeRoute: AuthenticatedRepurposeRoute,
   AuthenticatedResearchRoute: AuthenticatedResearchRoute,
   AuthenticatedSeoRoute: AuthenticatedSeoRoute,
+  AuthenticatedSeriesRoute: AuthenticatedSeriesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedStrategyRoute: AuthenticatedStrategyRoute,
   AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
