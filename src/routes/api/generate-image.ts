@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { jobTagFromRequest } from "@/lib/job-credit-tag";
 
 /**
  * Image generation / editing endpoint, served by fal.ai.
@@ -152,6 +153,7 @@ export const Route = createFileRoute("/api/generate-image")({
         try {
           reservation = await chargeCredits({
             userId,
+            projectId: jobTagFromRequest(request),
             action: hd ? "image_hd" : "image",
             amount: credits,
             description: hd ? (isEdit ? `Image ${operation ?? "edit"} (HD)` : "AI image (HD)") : "AI image",

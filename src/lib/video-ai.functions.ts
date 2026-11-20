@@ -1,11 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { languageAndFidelityRules } from "@/lib/content-language";
+import { languageAndFidelityRules, resolveContentLanguage } from "@/lib/content-language";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { chargeMiddleware } from "@/lib/credits-guard.server";
 import { z } from "zod";
 import { parseStructuredJsonResponse } from "@/lib/video-json";
 import { buildFallbackScenesFromScript, buildFallbackVideoScript } from "@/lib/video-fallback";
-import { getDurationTargets, totalVoiceoverWords } from "@/lib/video-duration";
+import { countWords, getDurationTargets, maxWordsForScene, speechWordsPerSecond, totalVoiceoverWords } from "@/lib/video-duration";
 import { aiChatFetch, aiKey, AI_NOT_CONFIGURED } from "@/lib/ai-provider";
 
 
@@ -72,8 +72,11 @@ export const generateAiVideoScript = createServerFn({ method: "POST" })
     const defaultLen = isLong ? 75 : 35;
     const lenSec = Math.max(15, Math.min(1800, data.targetLengthSec ?? defaultLen));
 
-    // DURATION IS THE SOURCE OF TRUTH. Derive word count + scene count from it.
-    const targets = getDurationTargets(lenSec);
+    // DURATION IS THE SOURCE OF TRUTH. Derive word count + scene count from it,
+    // at the speaking speed of the narration language (Telugu ≈ 1.7 w/s, not 2.5).
+    const narrationLang = resolveContentLanguage(data.language, data.topic);
+    const wordsPerSec = speechWordsPerSecond(narrationLang);
+    const targets = getDurationTargets(lenSec, narrationLang);
     const wMin = targets.words.min;
     const wMax = targets.words.max;
     const wTarget = targets.words.target;
@@ -108,7 +111,11 @@ DURATION IS A HARD REQUIREMENT.
 - Total video length: ${targetLen} (${lenSec}s).
 - Total narration MUST be ${wMin}-${wMax} words (target ~${wTarget}). Do NOT stop early.
 - Use ${sMin}-${sMax} scenes (target ~${sceneCount}). Do NOT stop after a handful.
-- Speaking rate is ~2.5 words/second, so ${wTarget} words ~= ${Math.round(wTarget / 2.5)}s of narration.
+- Spoken ${narrationLang} runs ~${wordsPerSec} words/second, so ${wTarget} words ~= ${Math.round(wTarget / wordsPerSec)}s of narration.
+- EVERY scene's voiceover MUST fit that scene's "duration": at most
+  floor(duration_seconds × ${(wordsPerSec * 0.95).toFixed(2)}) words — e.g. ${maxWordsForScene(3, narrationLang)} words for a 3s scene,
+  ${maxWordsForScene(4, narrationLang)} for 4s, ${maxWordsForScene(5, narrationLang)} for 5s. A line that is too long makes the
+  narration overlap the next scene. Split a long thought across two scenes instead.
 - If you would otherwise be short, ADD real substance: more evidence, more
   examples, a deeper "why", a counter-point, a case study — never filler.
 
@@ -342,7 +349,7 @@ Return ONLY this JSON shape with no prose:
       if (have < wMin) {
         const missingWords = wMin - have;
         const extraScenes = Math.max(3, Math.ceil(missingWords / Math.max(1, wpsTarget)));
-        const filler = buildFallbackVideoScript(data.topic, extraScenes, Math.ceil(missingWords / 2.5), ratio, data.styleLabel);
+        const filler = buildFallbackVideoScript(data.topic, extraScenes, Math.ceil(missingWords / wordsPerSec), ratio, data.styleLabel);
         finalOut.scenes = [...finalOut.scenes, ...filler.scenes].map((s, i) => ({ ...s, n: i + 1 }));
         parseErrors.push(`Top-up: appended ${extraScenes} filler scenes to reach word budget`);
       }
@@ -366,6 +373,25 @@ Return ONLY this JSON shape with no prose:
         });
       }
       finalOut.length_sec = finalOut.scenes.reduce((a, s) => a + parseSec(s.duration), 0);
+
+      // SHORTEN PASS — any line longer than its scene can hold gets rewritten
+      // to fit (in the same language). Lines that still don't fit are left for
+      // the blueprint review, which blocks approval until they're fixed.
+      if (!usedFallback) {
+        const tooLong = finalOut.scenes
+          .map((s) => ({ n: s.n, text: s.voiceover, maxWords: maxWordsForScene(parseSec(s.duration), narrationLang) }))
+          .filter((l) => countWords(l.text) > l.maxWords);
+        if (tooLong.length) {
+          try {
+            const { shortenLinesWithAi } = await import("@/lib/voiceover-fit.server");
+            const fixed = await shortenLinesWithAi(key, tooLong, narrationLang);
+            finalOut.scenes = finalOut.scenes.map((s) => (fixed.has(s.n) ? { ...s, voiceover: fixed.get(s.n)! } : s));
+            if (fixed.size < tooLong.length) parseErrors.push(`Shorten pass: ${tooLong.length - fixed.size} line(s) still over their scene's word budget`);
+          } catch (e) {
+            parseErrors.push(`Shorten pass failed: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+      }
     }
 
     if (rawResponses.length > 0 || parseErrors.length > 0) {
@@ -997,3 +1023,19 @@ function timeToSec(t: string): number {
   const parts = t.split(":").map((n) => parseInt(n, 10) || 0);
   return parts.length === 2 ? parts[0] * 60 + parts[1] : parts[0];
 }
+
+
+/** Blueprint review → "Auto-shorten long lines". Rewrites lines to fit their scene, same language. */
+export const shortenVoiceoverLines = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) => z.object({
+    language: z.string().max(40).default("English"),
+    lines: z.array(z.object({ n: z.number().int(), text: z.string().max(2000), maxWords: z.number().int().min(1).max(200) })).min(1).max(120),
+  }).parse(v))
+  .handler(async ({ data }) => {
+    const key = aiKey();
+    if (!key) throw new Error(AI_NOT_CONFIGURED);
+    const { shortenLinesWithAi } = await import("@/lib/voiceover-fit.server");
+    const fixed = await shortenLinesWithAi(key, data.lines, data.language);
+    return { lines: [...fixed.entries()].map(([n, text]) => ({ n, text })) };
+  });

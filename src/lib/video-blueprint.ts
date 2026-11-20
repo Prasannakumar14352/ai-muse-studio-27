@@ -4,6 +4,8 @@
 // Persisted inside `projects.metadata` JSONB (no new tables).
 
 import type { AiVideoScript, AiVideoScene } from "@/lib/video-ai.functions";
+import { maxWordsForScene } from "@/lib/video-duration";
+import { detectTopicLanguage, resolveContentLanguage } from "@/lib/content-language";
 import type {
   VideoType, DurationSec, StyleId, VoiceId, AspectRatio, VideoBrief,
 } from "@/lib/video-agents";
@@ -134,6 +136,8 @@ export type VideoBlueprint = {
   voice: BlueprintVoiceSettings;
   transitionStyle: TransitionStyle;   // default per-scene fallback
   motionIntensity: MotionIntensity;
+  /** Narration language (resolved, e.g. "Telugu"). Sets the words-per-scene budget. */
+  language?: string;
 
   // ----- Extended editorial layers (optional / additive) -----
   music?: MusicTrack | null;
@@ -251,6 +255,7 @@ export function buildBlueprintFromPlanning(
     schemaVersion: BLUEPRINT_SCHEMA_VERSION,
     title: brief.title || script.title,
     totalDurationSec: brief.duration,
+    language: resolveContentLanguage(brief.language, brief.title),
     platform: opts.platform ?? (brief.videoType === "youtube_long" ? "youtube" : "instagram"),
     videoType: brief.videoType,
     aspectRatio: brief.aspectRatio,
@@ -446,6 +451,9 @@ export function validateBlueprint(bp: VideoBlueprint): BlueprintIssue[] {
     });
   }
 
+  // Older blueprints didn't store the language — read it from the narration script.
+  const narrationLang = bp.language ?? detectTopicLanguage(bp.scenes.map((s) => s.voiceover).join(" "));
+
   // Scene-level checks
   let prevEnd = 0;
   for (const s of bp.scenes) {
@@ -474,12 +482,12 @@ export function validateBlueprint(bp: VideoBlueprint): BlueprintIssue[] {
       });
     }
     const vw = s.voiceover.trim().split(/\s+/).filter(Boolean).length;
-    // ~2.5 words / sec at natural pace.
-    const maxWords = Math.ceil(s.durationSec * 3.2);
+    // Budget depends on the narration language (Telugu ≈ 1.7 words/s, English ≈ 2.5).
+    const maxWords = maxWordsForScene(s.durationSec, narrationLang);
     if (vw > maxWords && s.durationSec > 0) {
       issues.push({
         level: "warning", code: "vo_length", sceneId: s.id,
-        message: `Scene ${s.n} voiceover has ${vw} words for ${s.durationSec.toFixed(1)}s (max ≈ ${maxWords}).`,
+        message: `Scene ${s.n} voiceover has ${vw} words for ${s.durationSec.toFixed(1)}s (max ≈ ${maxWords}${narrationLang !== "English" ? ` in ${narrationLang}` : ""}).`,
       });
     }
     prevEnd = s.endSec;

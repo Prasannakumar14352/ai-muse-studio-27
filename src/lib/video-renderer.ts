@@ -71,6 +71,15 @@ export type RenderOptions = {
    * scene sums and transitions cannot independently extend it.
    */
   targetDurationSec?: number;
+  /**
+   * Fixed-length mode: scene durations are final (they already add up to the
+   * requested length). Each beat's narration plays at `audioRates[i]` and is
+   * faded out after `audioCutSec[i]` seconds of timeline when set, so it can
+   * never spill into the next scene.
+   */
+  exactTimeline?: boolean;
+  audioRates?: number[];
+  audioCutSec?: Array<number | null>;
 };
 
 export type RenderResult = {
@@ -487,11 +496,13 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   // Timeline: picture follows the narration so voices never overlap. The
   // requested length is a target — narration may speed up to 1.15× to meet
   // it; past that the video runs slightly long instead of overlapping clips.
-  const { durations, rate: audioPlaybackRate } = computeRenderTimeline(
-    rawDurations,
-    (opts.sceneAudio ?? []).map((b) => b?.duration ?? null),
-    opts.targetDurationSec ?? null,
-  );
+  const { durations, rate: audioPlaybackRate } = opts.exactTimeline
+    ? { durations: [...rawDurations], rate: Math.max(1, ...(opts.audioRates ?? [1])) }
+    : computeRenderTimeline(
+      rawDurations,
+      (opts.sceneAudio ?? []).map((b) => b?.duration ?? null),
+      opts.targetDurationSec ?? null,
+    );
   const totalDuration = durations.reduce((a, b) => a + b, 0);
   const timelineScale = rawTotal > 0 ? totalDuration / rawTotal : 1;
 
@@ -593,8 +604,23 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       if (buf) {
         const src = audioCtx.createBufferSource();
         src.buffer = buf;
-        try { src.playbackRate.value = audioPlaybackRate; } catch { /* noop */ }
-        src.connect(audioDest); src.start(t0 + offset);
+        const rate = opts.exactTimeline ? (opts.audioRates?.[i] ?? 1) : audioPlaybackRate;
+        try { src.playbackRate.value = rate; } catch { /* noop */ }
+        const cut = opts.exactTimeline ? (opts.audioCutSec?.[i] ?? null) : null;
+        const startAt = t0 + offset;
+        if (cut != null && cut > 0) {
+          // Too long even sped up: fade the tail out at the end of its slot.
+          const gain = audioCtx.createGain();
+          const fade = Math.min(0.25, cut / 3);
+          gain.gain.setValueAtTime(1, startAt);
+          gain.gain.setValueAtTime(1, startAt + cut - fade);
+          gain.gain.linearRampToValueAtTime(0, startAt + cut);
+          src.connect(gain); gain.connect(audioDest);
+          src.start(startAt);
+          src.stop(startAt + cut + 0.02);
+        } else {
+          src.connect(audioDest); src.start(startAt);
+        }
       }
       offset += durations[i];
     }

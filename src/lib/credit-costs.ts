@@ -1,3 +1,6 @@
+import { getDurationTargets } from "@/lib/video-duration";
+import { charsPerWord, voiceoverClipCredits } from "@/lib/tts-pricing";
+
 // Single source of truth for how much each generation action costs. Used by
 // the admin "Credits & Pricing Guide" section and safe to reuse elsewhere.
 
@@ -17,7 +20,7 @@ export const CREDIT_COSTS: CreditCostRow[] = [
   { id: "image_regen", label: "Regenerate scene image",           category: "Image",    credits: 1,        unit: "per image",       notes: "Only re-renders the affected scene after you tweak its prompt." },
   { id: "carousel",    label: "Instagram-style carousel",         category: "Carousel", credits: "1 + N",  unit: "1 script + 1 per slide", notes: "1 credit for the AI copy, plus 1 credit per rendered slide image (N = slide count, 3–10)." },
   { id: "voiceover",   label: "Voiceover (any language)",         category: "Audio",    credits: 1,        unit: "per 100 characters", notes: "ElevenLabs multilingual voice. A typical scene (1–2 sentences) is about 2 credits." },
-  { id: "short_reel",  label: "Short reel (≤ 60s)",               category: "Video",    credits: "1 + S + V", unit: "script + scene images + voice", notes: "1 for the script, 1 per scene image, voice per 100 characters. Typical 8-scene reel with voice: about 25 credits." },
+  { id: "short_reel",  label: "Short reel (≤ 60s)",               category: "Video",    credits: "1 + S + V", unit: "script + scene images + voice", notes: "1 for the script, 1 per scene image, voice per 100 characters per scene (2× for Telugu, Kannada, Malayalam, Bengali, Gujarati). A 30-sec reel is about 21 credits in English or 31 in Telugu, plus motion clips if you add them (≈20 each)." },
   { id: "long_video",  label: "Long video (up to 30 min)",        category: "Video",    credits: "1 + S + V", unit: "script + scene images + voice", notes: "About 1 scene per 8s. A 5-min video with voiceover is about 85 credits." },
   { id: "render",      label: "Final video render (in-browser)",  category: "Video",    credits: 0,        unit: "free",            notes: "Rendered in your browser after images and voiceover are ready — no extra credits." },
   { id: "caption_only",label: "Caption pack only",                category: "Text",     credits: 1,        unit: "per pack",        notes: "Caption + hashtag bundle without images or video." },
@@ -73,13 +76,19 @@ export function estimateProjectCredits(opts: {
   contentType: string;
   lengthSec?: number;
   slideCount?: number;
-}): { total: number; parts: string } {
+  /** Narration language — Indian languages use more characters and some cost 2× to voice. */
+  language?: string | null;
+}): { total: number; parts: string; scenes: number; voice: number } {
   if (opts.contentType === "carousel") {
     const n = Math.max(3, Math.min(10, opts.slideCount ?? 7));
-    return { total: 1 + n, parts: `1 for the copy + ${n} slide images` };
+    return { total: 1 + n, parts: `1 for the copy + ${n} slide images`, scenes: n, voice: 0 };
   }
   const len = Math.max(15, opts.lengthSec ?? (opts.contentType === "long_video" ? 90 : 30));
-  const scenes = opts.contentType === "long_video" ? Math.ceil(len / 8) : Math.max(4, Math.ceil(len / 3.5));
-  const voice = Math.ceil((len * 2.5 * 6) / 100); // ~2.5 words/s, ~6 chars/word, 1 credit / 100 chars
-  return { total: 1 + scenes + voice, parts: `1 script + ${scenes} scene images + ~${voice} narration` };
+  // Same targets the script writer uses: scene count and words per scene for this length + language.
+  const t = getDurationTargets(len, opts.language);
+  const scenes = t.scenes.target;
+  // Voice is charged per clip (one per scene): ceil(chars / 100), ×2 on v3 languages.
+  const charsPerScene = t.wordsPerScene.target * charsPerWord(opts.language);
+  const voice = scenes * voiceoverClipCredits(charsPerScene, opts.language);
+  return { total: 1 + scenes + voice, parts: `1 script + ${scenes} scene images + ~${voice} narration`, scenes, voice };
 }

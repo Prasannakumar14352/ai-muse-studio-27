@@ -10,6 +10,8 @@ import {
   type AiVideoScript, type AiVideoScene, type AiVideoSeo,
   type VideoTitleVariants, type VideoHook, type VideoChapters,
 } from "@/lib/video-ai.functions";
+import { fitNarrationToSlots, slotsForTarget, MAX_FIT_SPEEDUP } from "@/lib/render-timeline";
+import { setCreditJobTag } from "@/lib/job-credit-tag";
 import { buildFallbackVideoScript } from "@/lib/video-fallback";
 import { renderVideo, type RenderScene, type CameraMotion, type TransitionStyle } from "@/lib/video-renderer";
 import { planBeatMotion, type SceneType } from "@/lib/motion-director";
@@ -853,19 +855,37 @@ export const RenderAgent = {
       bySceneIdx.set(b.sceneIndex, arr);
     });
 
-    bySceneIdx.forEach((globalBeatIndices, sceneIdx) => {
+    // Fixed length: each scene keeps its planned slot (slots add up to the
+    // requested duration) and its narration is fitted INTO that slot — sped
+    // up to ≤1.3×, tail faded only if still too long. So voices never overlap
+    // the next scene and audio and video end together at brief.duration.
+    const sceneIdxs = [...bySceneIdx.keys()].sort((a, b) => a - b);
+    const planned = sceneIdxs.map((si) => {
+      const d = parseSec(script.scenes[si]?.duration ?? "");
+      return d > 0 ? d : (bySceneIdx.get(si)!.length * TARGET_BEAT_SEC);
+    });
+    const slots = slotsForTarget(planned, brief.duration);
+    const fits = fitNarrationToSlots(slots, sceneIdxs.map((si) => voice[si]?.buffer?.duration ?? null));
+    const beatRates: number[] = new Array(beats.length).fill(1);
+    const beatCut: Array<number | null> = new Array(beats.length).fill(null);
+
+    sceneIdxs.forEach((sceneIdx, k) => {
+      const globalBeatIndices = bySceneIdx.get(sceneIdx)!;
       const sceneBeats = globalBeatIndices.map((i) => beats[i]);
       const vo = voice[sceneIdx];
-      const audioSec = vo?.buffer?.duration ?? vo?.duration_sec ?? sceneBeats.length * TARGET_BEAT_SEC;
-      const durations = distributeAudioAcrossBeats(sceneBeats, audioSec);
-      globalBeatIndices.forEach((gi, k) => {
-        beatDurations[gi] = durations[k];
+      const durations = distributeAudioAcrossBeats(sceneBeats, slots[k]);
+      globalBeatIndices.forEach((gi, j) => {
+        beatDurations[gi] = durations[j];
       });
       // Attach the scene's continuous audio buffer to the FIRST beat only —
       // it plays through the subsequent beats' visuals uninterrupted.
       const firstGi = globalBeatIndices[0];
       beatAudio[firstGi] = vo?.buffer ?? null;
+      beatRates[firstGi] = fits[k].rate;
+      beatCut[firstGi] = fits[k].trimmed ? fits[k].playSec : null;
     });
+    const trimmedScenes = fits.filter((f) => f.trimmed).length;
+    if (trimmedScenes) console.warn(`[render] ${trimmedScenes} scene(s) had narration longer than their slot even at ${MAX_FIT_SPEEDUP}× — tail faded out`);
 
     const scenes: RenderScene[] = beats.map((b, i) => ({
       n: i + 1,
@@ -887,8 +907,11 @@ export const RenderAgent = {
       sceneImages: beatVisuals.map((v) => (v.kind === "image" ? v.url : null)),
       sceneMedia: beatVisuals.map((v) => ({ kind: v.kind, url: v.url })),
       sceneAudio: beatAudio,
-      fitToAudio: false, // durations already sized to the audio timeline
-      targetDurationSec: brief.duration, // hard cap — normalizes any drift
+      fitToAudio: false,
+      targetDurationSec: brief.duration,
+      exactTimeline: true, // slots already add up to brief.duration
+      audioRates: beatRates,
+      audioCutSec: beatCut,
       onProgress,
     });
     return {
@@ -2035,6 +2058,21 @@ export async function runAssetGenerationPhase(
   opts: JobRunOptions,
   editedScript?: AiVideoScript,
 ): Promise<{ job: JobRecord; bundle: AssetGenerationBundle }> {
+  // Every charge made for this job carries its id, so a failed render can be refunded.
+  setCreditJobTag(jobId);
+  try {
+    return await runAssetGenerationPhaseInner(jobId, brief, opts, editedScript);
+  } finally {
+    setCreditJobTag(null);
+  }
+}
+
+async function runAssetGenerationPhaseInner(
+  jobId: string,
+  brief: VideoBrief,
+  opts: JobRunOptions,
+  editedScript?: AiVideoScript,
+): Promise<{ job: JobRecord; bundle: AssetGenerationBundle }> {
   const { onEvent, signal } = opts;
   const job = await getJob(jobId);
   if (!job) throw new Error("Job not found");
@@ -2210,6 +2248,34 @@ export async function runAssetGenerationPhase(
  * Only runs after explicit user approval on the asset-review screen.
  */
 export async function runRenderPhase(
+  jobId: string,
+  bundle: AssetGenerationBundle,
+  opts: Pick<JobRunOptions, "onEvent" | "signal">,
+): Promise<{ job: JobRecord; result: PipelineResult }> {
+  setCreditJobTag(jobId);
+  try {
+    return await runRenderPhaseInner(jobId, bundle, opts);
+  } catch (e) {
+    // The user paid for shots and narration but got no usable video —
+    // give those credits back automatically.
+    if ((e as { name?: string })?.name !== "AbortError") {
+      try {
+        const { refundVideoJobCredits } = await import("@/lib/video-refund.functions");
+        const r = await refundVideoJobCredits({ data: { jobId, reason: `render_failed: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200) } });
+        if (r.refunded > 0) {
+          opts.onEvent({ type: "error", message: `${e instanceof Error ? e.message : "Render failed"} — ${r.refunded} credits were refunded to your account.` });
+        }
+      } catch (refundErr) {
+        console.warn("[video-pipeline] refund after failed render did not complete", refundErr);
+      }
+    }
+    throw e;
+  } finally {
+    setCreditJobTag(null);
+  }
+}
+
+async function runRenderPhaseInner(
   jobId: string,
   bundle: AssetGenerationBundle,
   opts: Pick<JobRunOptions, "onEvent" | "signal">,

@@ -32,8 +32,36 @@ const TABLE: Row[] = [
 
 const round = (n: number) => Math.max(1, Math.round(n));
 
-/** Get word / scene targets for an arbitrary duration in seconds. */
-export function getDurationTargets(sec: number): DurationTargets {
+/**
+ * Natural narration speed (words per second) by language. Indian languages
+ * are agglutinative — one Telugu/Tamil/Malayalam "word" carries what English
+ * says in 2-3 words — so the same number of words takes much longer to speak.
+ * The table above is for English (≈2.5 w/s); other languages scale by this.
+ */
+const SPEECH_WPS: Record<string, number> = {
+  English: 2.5,
+  Hindi: 2.3,
+  Marathi: 1.9,
+  Bengali: 2.0,
+  Gujarati: 2.0,
+  Telugu: 1.7,
+  Kannada: 1.7,
+  Tamil: 1.6,
+  Malayalam: 1.5,
+};
+
+export function speechWordsPerSecond(language?: string | null): number {
+  if (!language) return SPEECH_WPS.English;
+  return SPEECH_WPS[language] ?? SPEECH_WPS.English;
+}
+
+/** Most words a scene of `durationSec` can hold in `language` without running over. */
+export function maxWordsForScene(durationSec: number, language?: string | null): number {
+  return Math.max(2, Math.floor(durationSec * speechWordsPerSecond(language) * 0.95));
+}
+
+/** Get word / scene targets for an arbitrary duration in seconds (and narration language). */
+export function getDurationTargets(sec: number, language?: string | null): DurationTargets {
   const s = Math.max(10, Math.min(1800, Math.round(sec)));
 
   // Below/above table: scale linearly from the nearest endpoint.
@@ -66,18 +94,30 @@ export function getDurationTargets(sec: number): DurationTargets {
     sMax = lerp(lo.sMax, hi.sMax);
   }
 
-  const wordsTarget = Math.round((wMin + wMax) / 2);
+  // The table is English; scale word counts to how fast this language is spoken.
+  const langScale = speechWordsPerSecond(language) / SPEECH_WPS.English;
+  if (langScale !== 1) {
+    wMin = round(wMin * langScale);
+    wMax = round(wMax * langScale);
+  }
+
   const scenesTarget = Math.round((sMin + sMax) / 2);
-  const wpsTarget = Math.max(4, Math.round(wordsTarget / Math.max(1, scenesTarget)));
+  // Never ask for more words than the scenes can physically hold.
+  const avgSceneSec = s / Math.max(1, scenesTarget);
+  const sceneCap = maxWordsForScene(avgSceneSec, language);
+  wMax = Math.min(wMax, sceneCap * scenesTarget);
+  wMin = Math.min(wMin, wMax);
+  const wordsTarget = Math.round((wMin + wMax) / 2);
+  const wpsTarget = Math.max(2, Math.round(wordsTarget / Math.max(1, scenesTarget)));
 
   return {
     seconds: s,
     words: { min: wMin, max: wMax, target: wordsTarget },
     scenes: { min: sMin, max: sMax, target: scenesTarget },
     wordsPerScene: {
-      min: Math.max(3, Math.floor(wpsTarget * 0.7)),
-      max: Math.max(6, Math.ceil(wpsTarget * 1.4)),
-      target: wpsTarget,
+      min: Math.max(2, Math.min(sceneCap, Math.floor(wpsTarget * 0.7))),
+      max: Math.max(2, Math.min(sceneCap, Math.ceil(wpsTarget * 1.2))),
+      target: Math.min(sceneCap, wpsTarget),
     },
   };
 }
