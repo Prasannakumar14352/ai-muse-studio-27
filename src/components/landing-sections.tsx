@@ -567,8 +567,11 @@ function ProductWalkthroughCard({
     return () => io.disconnect();
   }, [w.videoUrl]);
 
+  const playable = !!(w.videoUrl && hasVideo);
+  const open = () => { if (playable) onPlay({ name: w.title, url: w.videoUrl!, type: "mp4" }); };
   return (
-    <div ref={cardRef} className="glass rounded-2xl p-3 flex flex-col w-[320px] sm:w-[380px] shrink-0">
+    // The whole card opens the clip (title/caption clicks used to do nothing).
+    <div ref={cardRef} onClick={open} className={`glass rounded-2xl p-3 flex flex-col w-[320px] sm:w-[380px] shrink-0 ${playable ? "cursor-pointer" : ""}`}>
       <div className="relative aspect-video rounded-xl overflow-hidden bg-[#0a0714]">
         <div
           aria-hidden
@@ -600,7 +603,7 @@ function ProductWalkthroughCard({
         {w.videoUrl && hasVideo && (
           <button
             type="button"
-            onClick={() => onPlay({ name: w.title, url: w.videoUrl!, type: "mp4" })}
+            onClick={(e) => { e.stopPropagation(); open(); }}
             aria-label={`Play ${w.title}`}
             className="absolute inset-0 w-full h-full group/play flex items-center justify-center"
           >
@@ -660,7 +663,7 @@ export function ProductWalkthroughsSection() {
       <div className="relative overflow-hidden group">
         <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-background to-transparent z-10" />
         <div className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-background to-transparent z-10" />
-        <div className="flex gap-5 animate-marquee-slow group-hover:[animation-play-state:paused]" style={{ width: "max-content" }}>
+        <div className="flex gap-5 animate-marquee-slow group-hover:[animation-play-state:paused] active:[animation-play-state:paused]" style={{ width: "max-content" }}>
           {loop.map((w, i) => <ProductWalkthroughCard key={`${w.id}-${i}`} w={w} onPlay={setPlaying} />)}
         </div>
       </div>

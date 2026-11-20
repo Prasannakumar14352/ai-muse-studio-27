@@ -93,15 +93,19 @@ function ImagesPage() {
   const qc = useQueryClient();
   const { data: access } = useAccess();
 
-  const { data: results = [] } = useQuery({
-    queryKey: ["images-library", access?.userId],
-    enabled: !!access?.userId,
+  // Read the session user directly: waiting on useAccess left the first load
+  // showing "No images yet" until something else refetched it.
+  const { data: results = [], isPending: libraryLoading } = useQuery({
+    queryKey: ["images-library"],
     staleTime: 30_000,
     queryFn: async (): Promise<ResultItem[]> => {
+      const { data: auth } = await supabase.auth.getSession();
+      const userId = auth.session?.user.id;
+      if (!userId) throw new Error("Not signed in yet");
       const { data, error } = await supabase
         .from("projects")
         .select("id, topic, style, thumbnail_url, aspect_ratio, created_at")
-        .eq("user_id", access!.userId)
+        .eq("user_id", userId)
         .eq("content_type", "ai_image")
         .not("thumbnail_url", "is", null)
         .order("created_at", { ascending: false })
@@ -144,7 +148,7 @@ function ImagesPage() {
         if (s.prompt) setPrompt(s.prompt);
         if (s.negativePrompt) setNegativePrompt(s.negativePrompt);
         if (s.style) setStyle(s.style);
-        if (s.quality === "hd" || s.quality === "standard") setQuality(s.quality);
+        // quality is not restored: every visit starts on Standard (HD costs more per image).
         if (s.ratio) setRatio(s.ratio);
         if (s.batch) setBatch(s.batch);
         if (s.seed !== undefined) setSeed(s.seed);
@@ -626,6 +630,7 @@ function ImagesPage() {
             )}
           </div>
 
+          {access?.isAdmin && (
           <div className="glass rounded-2xl">
             <button onClick={() => setShowDebug((v) => !v)} className="w-full flex items-center justify-between px-6 py-3 text-sm">
               <span className="flex items-center gap-2">
@@ -665,12 +670,17 @@ function ImagesPage() {
               </div>
             )}
           </div>
+          )}
         </>
       )}
 
       {view === "landing" && (
         <>
-          {results.length === 0 ? (
+          {libraryLoading ? (
+            <div className="glass rounded-2xl p-16 flex items-center justify-center border border-border text-sm text-muted-foreground gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading your images…
+            </div>
+          ) : results.length === 0 ? (
             <div className="glass rounded-2xl p-16 flex flex-col items-center justify-center text-center border border-border">
               <div className="w-14 h-14 rounded-full glass flex items-center justify-center mb-4 border border-border">
                 <ImageIcon className="w-6 h-6 text-muted-foreground" />

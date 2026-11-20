@@ -65,6 +65,8 @@ export type SimilarContent = {
   publishedAt?: string;
   length?: string;
   whyItWorked: string;
+  url?: string;
+  language?: string;
 };
 
 export type ResearchInputs = {
@@ -262,7 +264,9 @@ Return EXACTLY this JSON shape (no prose, no markdown):
         metric: fmtViews(v.views),
         publishedAt: v.publishedAt,
         length: fmtDuration(v.durationSec),
-        whyItWorked: `Real top result — ${v.likes.toLocaleString()} likes, ${v.comments.toLocaleString()} comments. Open: ${v.url}`,
+        whyItWorked: `${v.likes.toLocaleString()} likes · ${v.comments.toLocaleString()} comments`,
+        url: v.url,
+        language: v.language,
       })) as ResearchFindings["similarContent"];
     }
     const findings: ResearchFindings = {
@@ -274,7 +278,7 @@ Return EXACTLY this JSON shape (no prose, no markdown):
         hasLive
           ? "Similar videos are live YouTube data. Scores, Google Trends, Reddit and keyword volumes are AI estimates."
           : "All metrics are AI strategic estimates — live Google Trends, YouTube, and TikTok data are not connected.",
-        ...(ai.disclaimers ?? []),
+        // The model's own "unsure about" notes are working notes, not user copy — not shown.
       ],
     };
 
