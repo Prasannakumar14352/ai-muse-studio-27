@@ -381,7 +381,7 @@ function OneClickActions({ findings, navigate }: { findings: ResearchFindings; n
       if (autogen) {
         toast.success("Opening generator — review & Generate Now", { id: toastId });
       } else {
-        toast.success("Draft created — review and generate", { id: toastId });
+        toast.success(`Opening ${noun.toLowerCase()} — prefilled with this research`, { id: toastId });
       }
       navigate({ to: action.route });
     } catch (e) {

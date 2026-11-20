@@ -72,3 +72,45 @@ export function computeRenderTimeline(
   });
   return { durations, rate };
 }
+
+/** Most a single scene's narration is sped up to fit its slot before the tail is trimmed. */
+export const MAX_FIT_SPEEDUP = 1.3;
+
+export type NarrationFit = {
+  /** Playback rate for this scene's clip (1 = natural). */
+  rate: number;
+  /** Seconds of the timeline the clip occupies (≤ slot − gap). */
+  playSec: number;
+  /** True when even at MAX_FIT_SPEEDUP the clip was longer than its slot and its end is faded out. */
+  trimmed: boolean;
+};
+
+/**
+ * Fixed-length mode: every scene keeps its planned slot (slots sum to the
+ * requested length), and each scene's narration is fitted INTO its slot —
+ * sped up to at most 1.3×, and only if that still isn't enough, its tail is
+ * faded out at the slot end. So narration never overlaps the next scene and
+ * audio and video end together at exactly the requested length.
+ */
+export function fitNarrationToSlots(
+  slotSecs: number[],
+  audioSecs: Array<number | null | undefined>,
+): NarrationFit[] {
+  return slotSecs.map((slot, i) => {
+    const audio = audioSecs[i] ?? 0;
+    if (!(audio > 0)) return { rate: 1, playSec: 0, trimmed: false };
+    const room = Math.max(0.3, slot - SCENE_GAP_SEC);
+    const rate = Math.min(MAX_FIT_SPEEDUP, Math.max(1, audio / room));
+    const natural = audio / rate;
+    return natural <= room + 1e-6
+      ? { rate, playSec: natural, trimmed: false }
+      : { rate, playSec: room, trimmed: true };
+  });
+}
+
+/** Scale planned scene lengths so they add up to exactly `targetSec`. */
+export function slotsForTarget(plannedSecs: number[], targetSec: number): number[] {
+  const total = plannedSecs.reduce((a, b) => a + Math.max(0, b), 0);
+  if (!(targetSec > 0) || total <= 0) return plannedSecs.map((p) => Math.max(0.5, p));
+  return plannedSecs.map((p) => (Math.max(0, p) / total) * targetSec);
+}

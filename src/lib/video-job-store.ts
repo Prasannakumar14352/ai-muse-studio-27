@@ -184,3 +184,28 @@ export async function deleteJob(id: string): Promise<void> {
 export function isResumable(rec: JobRecord): boolean {
   return rec.phase !== "complete" && rec.phase !== "failed";
 }
+
+/**
+ * A job left in "rendering" / "validating" after its tab was closed or
+ * reloaded would show "Validating output" forever. On page load, jobs stuck
+ * there for longer than any real render could take are moved back to the
+ * asset-review step (their shots are kept) with a note, so Resume renders again.
+ */
+export async function recoverInterruptedJobs(): Promise<number> {
+  const jobs = await listJobs();
+  let n = 0;
+  for (const j of jobs) {
+    if (j.phase !== "rendering" && j.phase !== "validating") continue;
+    let durationSec = 60;
+    try { durationSec = Number((JSON.parse(j.briefJson) as { duration?: number }).duration) || 60; } catch { /* keep default */ }
+    // Rendering runs in real time; allow 2× the video length + 10 min before calling it stuck.
+    const staleAfterMs = (durationSec * 2 + 600) * 1000;
+    if (Date.now() - new Date(j.updatedAt).getTime() < staleAfterMs) continue;
+    j.phase = "asset_review";
+    j.renderProgress = 0;
+    j.error = "The last render was interrupted (the tab was closed or reloaded). Your shots are kept — resume to render again.";
+    await saveJob(j);
+    n++;
+  }
+  return n;
+}

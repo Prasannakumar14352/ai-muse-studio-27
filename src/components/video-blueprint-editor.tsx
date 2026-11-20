@@ -4,9 +4,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { creditsLabel } from "@/lib/credits-label";
+import { useServerFn } from "@tanstack/react-start";
+import { shortenVoiceoverLines } from "@/lib/video-ai.functions";
+import { maxWordsForScene } from "@/lib/video-duration";
+import { detectTopicLanguage } from "@/lib/content-language";
 import { toast } from "sonner";
 import {
-  AlertTriangle, Check, Clock, Copy, Plus, RotateCcw, Save, Scissors,
+  AlertTriangle, Loader2, Check, Clock, Copy, Plus, RotateCcw, Save, Scissors,
   Trash2, ArrowUp, ArrowDown, Wand2, Undo2, Film, Mic2, Sparkles, Info,
   FileText, LayoutGrid, Type, Music2, Volume2, Users, History, Camera,
 } from "lucide-react";
@@ -62,10 +66,12 @@ export type VideoBlueprintEditorProps = {
   onRender?: RenderActionHandler;
   onRegenerateScene?: (sceneId: string, blueprint: VideoBlueprint) => void | Promise<void>;
   onCancel?: () => void;
+  /** Called with the number of scenes whose narration is longer than the scene (blocks approval). */
+  onTimingIssuesChange?: (count: number) => void;
 };
 
 export function VideoBlueprintEditor({
-  projectId, initialMetadata, onMetadataChange, onRender, onRegenerateScene, onCancel,
+  projectId, initialMetadata, onMetadataChange, onRender, onRegenerateScene, onCancel, onTimingIssuesChange,
 }: VideoBlueprintEditorProps) {
   const [meta, setMeta] = useState<VideoBlueprintMetadata>(initialMetadata);
   const [bp, setBp] = useState<VideoBlueprint>(initialMetadata.currentBlueprint);
@@ -80,6 +86,11 @@ export function VideoBlueprintEditor({
   const errors = issues.filter((i) => i.level === "error");
   const warnings = issues.filter((i) => i.level === "warning");
   const total = useMemo(() => totalDuration(bp), [bp]);
+  // Narration longer than its scene overlaps the next one — these must be fixed before generating.
+  const timingIssues = useMemo(() => issues.filter((i) => i.code === "vo_length"), [issues]);
+  useEffect(() => { onTimingIssuesChange?.(timingIssues.length); }, [timingIssues.length, onTimingIssuesChange]);
+  const shortenFn = useServerFn(shortenVoiceoverLines);
+  const [shortening, setShortening] = useState(false);
 
   // ----- Autosave -----
   const commit = useCallback(async (next: VideoBlueprint) => {
@@ -236,10 +247,37 @@ export function VideoBlueprintEditor({
       toast.error("Please fix blueprint errors before rendering.");
       return;
     }
+    if (timingIssues.length > 0) {
+      toast.error(`${timingIssues.length} scene(s) have more narration than fits — use "Auto-shorten" or edit them first.`);
+      return;
+    }
     const cost = estimateCredits(bp, action);
     const label = ACTION_LABELS[action];
     if (!confirm(`${label}\n\nEstimated cost: ${creditsLabel(cost)}.\n\nProceed?`)) return;
     await onRender?.(action, { blueprint: bp });
+  };
+
+  const autoShorten = async () => {
+    const lang = bp.language ?? detectTopicLanguage(bp.scenes.map((x) => x.voiceover).join(" "));
+    const ids = new Set(timingIssues.map((i) => i.sceneId));
+    const lines = bp.scenes
+      .filter((x) => ids.has(x.id))
+      .map((x) => ({ n: x.n, text: x.voiceover, maxWords: maxWordsForScene(x.durationSec, lang) }));
+    if (!lines.length) return;
+    setShortening(true);
+    try {
+      const r = await shortenFn({ data: { language: lang, lines } });
+      const byN = new Map(r.lines.map((l) => [l.n, l.text]));
+      if (!byN.size) { toast.error("Couldn't shorten automatically — please edit those lines."); return; }
+      // Save right away (not on the autosave timer) so Approve uses the shortened lines.
+      const next = { ...bp, scenes: bp.scenes.map((x) => (byN.has(x.n) ? { ...x, voiceover: byN.get(x.n)!, edited: true } : x)) };
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      setBp(next);
+      await commit(next);
+      toast.success(`Shortened ${byN.size} line${byN.size === 1 ? "" : "s"}${byN.size < lines.length ? ` — ${lines.length - byN.size} still need a manual edit` : ""}.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't shorten lines");
+    } finally { setShortening(false); }
   };
 
   const regenScene = async (sceneId: string) => {
@@ -304,7 +342,18 @@ export function VideoBlueprintEditor({
           <div className="flex items-center gap-2 font-medium mb-2">
             <AlertTriangle className="h-4 w-4 text-amber-500" />
             {errors.length} error{errors.length === 1 ? "" : "s"} · {warnings.length} warning{warnings.length === 1 ? "" : "s"}
+            {timingIssues.length > 0 && (
+              <Button size="sm" className="ml-auto" disabled={shortening} onClick={() => void autoShorten()}>
+                {shortening ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Wand2 className="h-3 w-3 mr-1" />}
+                Auto-shorten {timingIssues.length} long line{timingIssues.length === 1 ? "" : "s"}
+              </Button>
+            )}
           </div>
+          {timingIssues.length > 0 && (
+            <p className="text-xs text-muted-foreground mb-2">
+              Lines longer than their scene make the narration overlap the next scene and the video run long. Fix them before generating shots.
+            </p>
+          )}
           <ul className="text-xs space-y-1 max-h-32 overflow-auto">
             {[...errors, ...warnings].slice(0, 12).map((i, k) => (
               <li key={k} className={i.level === "error" ? "text-red-400" : "text-amber-400"}>

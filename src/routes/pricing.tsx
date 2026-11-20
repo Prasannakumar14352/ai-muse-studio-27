@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { estimateProjectCredits } from "@/lib/credit-costs";
 import { useMemo, useState, useEffect } from "react";
 import { useSuspenseQuery, useQuery, useQueryClient, queryOptions } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -801,6 +802,9 @@ function CreditPacksSection() {
   );
 }
 
+/** Credits for a 30-sec English reel with voice — same estimate Video Studio shows. */
+const REEL_CREDITS = estimateProjectCredits({ contentType: "short_reel", lengthSec: 30, language: "English" }).total;
+
 /** "What do my credits buy?" — so a 224-credit Seedance video isn't a surprise. */
 function CreditsBuyLine({ credits, free = false }: { credits: number; free?: boolean }) {
   if (!credits || credits <= 0) return null;
@@ -815,7 +819,7 @@ function CreditsBuyLine({ credits, free = false }: { credits: number; free?: boo
   }
   const parts = [
     `${Math.floor(credits / 1).toLocaleString()} images`,
-    `${Math.floor(credits / 25).toLocaleString()} short reels with voice`,
+    `${Math.floor(credits / REEL_CREDITS).toLocaleString()} 30-sec reels with voice`,
     `${Math.floor(credits / 8).toLocaleString()} carousels`,
   ];
   const seedance = Math.floor(credits / 224);

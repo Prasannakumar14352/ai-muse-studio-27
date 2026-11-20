@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { resolveContentLanguage } from "@/lib/content-language";
 import { estimateProjectCredits } from "@/lib/credit-costs";
 import { creditsLabel } from "@/lib/credits-label";
 import { CONTENT_LANGUAGES } from "@/lib/content-language";
@@ -20,7 +21,7 @@ import {
   type AssetGenerationBundle,
 } from "@/lib/video-agents";
 import {
-  listJobs, deleteJob as deleteJobRec, loadShotObjectURL, getJob,
+  listJobs, deleteJob as deleteJobRec, loadShotObjectURL, getJob, recoverInterruptedJobs,
   type JobRecord,
 } from "@/lib/video-job-store";
 import {
@@ -287,7 +288,8 @@ const initialDash: DashState = {
 
 function VideosPage() {
   const [view, setView] = useState<View>("landing");
-  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("video"));
+  // Research hands off as "video" (long) or "short" (reel) — accept both.
+  const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("video") ?? consumeResearchPrefill("short"));
   useEffect(() => {
     if (handoff) setView("input");
   }, [handoff]);
@@ -326,7 +328,8 @@ function VideosPage() {
   useEffect(() => {
     void refreshLibrary();
     void refreshThumbLibrary();
-    void refreshInProgress();
+    // Un-stick jobs left in "Validating output" by a closed tab before listing them.
+    void recoverInterruptedJobs().catch(() => 0).then(() => refreshInProgress());
   }, [refreshLibrary, refreshThumbLibrary, refreshInProgress]);
 
   const handleJobEvent = useCallback((ev: JobEvent) => {
@@ -689,7 +692,14 @@ function VideosPage() {
             </button>
           </div>
           <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
-          <InputScreen onGenerate={start} initialTopic={handoff?.topic} initialRatio={handoff?.aspectRatio as AspectRatio | undefined} autogen={handoff?.autogen} />
+          <InputScreen
+            onGenerate={start}
+            initialTopic={handoff?.titles?.[0] || handoff?.topic}
+            initialRatio={handoff?.aspectRatio as AspectRatio | undefined}
+            initialVideoType={handoffVideoType(handoff)}
+            initialDuration={handoffDuration(handoff)}
+            autogen={handoff?.autogen}
+          />
         </>
       )}
       {view === "processing" && (
@@ -754,17 +764,33 @@ function EmptyLibrary({ onNew }: { onNew: () => void }) {
 
 // ---------------- Input ----------------
 
-function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
+/** Research → Video Studio: reel/short handoffs open as Reels, long ones as YouTube. */
+function handoffVideoType(h: ResearchPrefill | null): VideoType | undefined {
+  if (!h) return undefined;
+  if (h.module === "short" || h.format === "reel" || h.aspectRatio === "9:16") {
+    return /tiktok/i.test(h.platform ?? "") ? "tiktok" : /youtube/i.test(h.platform ?? "") ? "shorts" : "reels";
+  }
+  return "youtube_long";
+}
+function handoffDuration(h: ResearchPrefill | null): DurationSec | undefined {
+  if (!h?.duration) return undefined;
+  const options: DurationSec[] = [30, 60, 180, 300, 540, 720];
+  return options.reduce((best, d) => (Math.abs(d - h.duration!) < Math.abs(best - h.duration!) ? d : best), options[0]);
+}
+
+function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType, initialDuration, autogen }: {
   onGenerate: (args: GenerateArgs) => void;
   initialTopic?: string;
   initialRatio?: AspectRatio;
+  initialVideoType?: VideoType;
+  initialDuration?: DurationSec;
   autogen?: boolean;
 }) {
   const [niche, setNiche] = useState<string>(NICHES[0].id);
   const [customNiche, setCustomNiche] = useState("");
   const [title, setTitle] = useState(initialTopic ?? "");
-  const [videoType, setVideoType] = useState<VideoType>("shorts");
-  const [duration, setDuration] = useState<DurationSec>(60);
+  const [videoType, setVideoType] = useState<VideoType>(initialVideoType ?? "shorts");
+  const [duration, setDuration] = useState<DurationSec>(initialDuration ?? 60);
   const [style, setStyle] = useState<StyleId>("cinematic");
   const [voice, setVoice] = useState<VoiceId>("documentary_narrator");
   const [ratio, setRatio] = useState<AspectRatio>(initialRatio ?? "9:16");
@@ -1012,8 +1038,13 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, autogen }: {
       {/* 12. Generate */}
       <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
         {(() => {
-          const base = estimateProjectCredits({ contentType: duration > 90 ? "long_video" : "short_reel", lengthSec: duration });
-          const scenes = duration > 90 ? Math.ceil(duration / 8) : Math.max(4, Math.ceil(duration / 3.5));
+          // Same scene count + per-clip voice pricing the pipeline actually charges.
+          const base = estimateProjectCredits({
+            contentType: duration > 90 ? "long_video" : "short_reel",
+            lengthSec: duration,
+            language: resolveContentLanguage(language, title),
+          });
+          const scenes = base.scenes;
           // Same-character scenes use HD images (8 instead of 1) for ~70% of shots, plus one portrait.
           const extra = sameCharacter ? Math.round(scenes * 0.7) * 7 + 8 : 0;
           const motion = motionMode === "off" ? 0 : motionEstimate.credits;
@@ -1102,6 +1133,8 @@ function ReviewGate({
 }) {
   const localId = localBlueprintId(jobId);
   const [meta, setMeta] = useState<import("@/lib/video-blueprint").VideoBlueprintMetadata | null>(null);
+  // Scenes whose narration won't fit — approving would overlap voices and overrun the length.
+  const [timingIssues, setTimingIssues] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1147,6 +1180,9 @@ function ReviewGate({
           <p className="text-sm text-muted-foreground">
             Nothing has been generated yet. Edit the script, prompts, timings and voiceover, then approve to start rendering.
           </p>
+          {timingIssues > 0 && (
+            <p className="text-xs text-amber-300 mt-1">{timingIssues} scene{timingIssues === 1 ? " has" : "s have"} more narration than fits — click "Auto-shorten" below to fix before approving.</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={onBack} className="rounded-lg glass border border-border px-3 py-1.5 text-xs">
@@ -1154,7 +1190,9 @@ function ReviewGate({
           </button>
           <button
             onClick={onApprove}
-            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-semibold flex items-center gap-2"
+            disabled={timingIssues > 0}
+            title={timingIssues > 0 ? "Some lines are too long for their scene — use Auto-shorten below first." : undefined}
+            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-semibold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Check className="w-4 h-4" /> Approve & generate shots
           </button>
@@ -1168,6 +1206,7 @@ function ReviewGate({
         <VideoBlueprintEditor
           projectId={localId}
           initialMetadata={meta}
+          onTimingIssuesChange={setTimingIssues}
           onRender={async () => { onApprove(); }}
         />
       ) : (
@@ -1269,7 +1308,13 @@ function AssetReviewGate({
                   }}
                   className="block w-full aspect-video bg-black/40 relative"
                 >
-                  {s.previewUrl ? (
+                  {s.previewUrl && s.kind === "clip" ? (
+                    // Motion clips are video blobs — an <img> can't show them.
+                    <>
+                      <video src={s.previewUrl} muted playsInline loop autoPlay preload="metadata" className="w-full h-full object-cover" />
+                      <span className="absolute top-1 left-1 text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-black/70 text-white">motion</span>
+                    </>
+                  ) : s.previewUrl ? (
                     <img src={s.previewUrl} alt={`Scene ${i + 1}`} className="w-full h-full object-cover" />
                   ) : s.status === "failed" ? (
                     <div className="w-full h-full flex items-center justify-center text-rose-400 text-xs">Failed</div>
@@ -1369,7 +1414,7 @@ function JobDashboard({
           <div>
             <h2 className="font-semibold text-lg">Building your video</h2>
             <p className="text-sm text-muted-foreground">
-              Runs in the background — you can leave this page and come back.
+              Keep this tab open until it finishes — the video is assembled in your browser. If the tab closes, reopen Video Studio and resume it from "In progress".
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1711,6 +1756,7 @@ function InProgressJobs({
                   {PHASE_LABELS[j.phase as JobPhaseId] ?? j.phase} · {j.shotsDone} / {j.shotsTotal} shots
                   {j.shotsFailed > 0 && <span className="text-rose-400"> · {j.shotsFailed} failed</span>}
                 </div>
+                {j.error && <div className="text-[11px] text-amber-300 mt-0.5">{j.error}</div>}
                 <div className="w-full h-1 rounded-full bg-white/5 overflow-hidden mt-2">
                   <div className="h-full gradient-primary" style={{ width: `${pct}%` }} />
                 </div>

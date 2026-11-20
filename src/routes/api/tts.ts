@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { V3_LANGUAGE_CODES, voiceoverClipCredits } from "@/lib/tts-pricing";
+import { jobTagFromRequest } from "@/lib/job-credit-tag";
 import { fetchWithRetry } from "@/lib/fetch-retry";
 
 // Text-to-speech via fal.ai (ElevenLabs Turbo v2.5, multilingual).
@@ -39,12 +41,11 @@ export const Route = createFileRoute("/api/tts")({
         // twice the credits).
         const { detectTopicLanguage } = await import("@/lib/content-language");
         const lang = detectTopicLanguage(clipped);
-        const V3_CODES: Record<string, string> = { Telugu: "te", Kannada: "kn", Malayalam: "ml", Bengali: "bn", Gujarati: "gu" };
-        const v3Code = V3_CODES[lang];
-        const credits = Math.max(1, Math.ceil(clipped.length / 100)) * ACTION_COSTS.tts_per_100_chars * (v3Code ? 2 : 1);
+        const v3Code = V3_LANGUAGE_CODES[lang];
+        const credits = voiceoverClipCredits(clipped.length, lang) * ACTION_COSTS.tts_per_100_chars;
         let reservation: Awaited<ReturnType<typeof chargeCredits>>;
         try {
-          reservation = await chargeCredits({ userId, action: "voiceover", amount: credits, description: "Voiceover" });
+          reservation = await chargeCredits({ userId, action: "voiceover", amount: credits, description: "Voiceover", projectId: jobTagFromRequest(request) });
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           return jsonError(msg.startsWith("insufficient_credits:") ? `Not enough credits: this voiceover needs ${credits}.` : msg, msg.startsWith("insufficient_credits:") ? 402 : 400);

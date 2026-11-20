@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { jobTagFromRequest } from "@/lib/job-credit-tag";
 
 // Real-motion clip for one story beat: animates the beat's still image with an
 // image-to-video model on fal.ai.
@@ -43,6 +44,7 @@ export const Route = createFileRoute("/api/generate-video-clip")({
         try {
           reservation = await chargeCredits({
             userId,
+            projectId: jobTagFromRequest(request),
             action: "motion_clip",
             amount: credits,
             description: `Motion clip (${tier}, ${seconds}s)`,
