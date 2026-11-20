@@ -2247,10 +2247,17 @@ async function runAssetGenerationPhaseInner(
  * runAssetGenerationPhase and produces the final MP4 + thumbnail + SEO.
  * Only runs after explicit user approval on the asset-review screen.
  */
+export type RenderPhaseOptions = Pick<JobRunOptions, "onEvent" | "signal"> & {
+  /** Keep the browser's WebM instead of converting to MP4 on the server.
+   *  Used for long videos headed to YouTube (which accepts WebM): their
+   *  conversion can run past the server's time limit. */
+  skipMp4?: boolean;
+};
+
 export async function runRenderPhase(
   jobId: string,
   bundle: AssetGenerationBundle,
-  opts: Pick<JobRunOptions, "onEvent" | "signal">,
+  opts: RenderPhaseOptions,
 ): Promise<{ job: JobRecord; result: PipelineResult }> {
   setCreditJobTag(jobId);
   try {
@@ -2286,7 +2293,7 @@ export async function runRenderPhase(
 async function runRenderPhaseInner(
   jobId: string,
   bundle: AssetGenerationBundle,
-  opts: Pick<JobRunOptions, "onEvent" | "signal">,
+  opts: RenderPhaseOptions,
 ): Promise<{ job: JobRecord; result: PipelineResult }> {
   const { onEvent } = opts;
   const job = await getJob(jobId);
@@ -2364,7 +2371,7 @@ async function runRenderPhaseInner(
   // Convert the browser recording (720p WebM, no duration header) into a
   // 1080p H.264 MP4 on the server — what Instagram / Shorts expect. Keeps the
   // original if conversion isn't available.
-  if (render.blob && render.blob.size > 0) {
+  if (render.blob && render.blob.size > 0 && !opts.skipMp4) {
     const shape = brief.aspectRatio === "16:9" ? "landscape" : brief.aspectRatio === "1:1" ? "square" : "vertical";
     const mp4 = await convertBlobToMp4(render.blob, shape).catch(() => null);
     if (mp4 && mp4.size > 0) {

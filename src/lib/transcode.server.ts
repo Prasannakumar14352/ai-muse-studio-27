@@ -81,6 +81,9 @@ export async function transcodeToMp4(input: Uint8Array, shape: TranscodeShape): 
   const outPath = join(dir, "out.mp4");
   try {
     await writeFile(inPath, input);
+    // The browser records at ~4 Mbit/s (~30 MB a minute). Past ~2 minutes,
+    // trade a little compression for speed so mid-length videos finish in time.
+    const preset = input.byteLength > 60 * 1024 * 1024 ? "superfast" : "veryfast";
     const bin = await ffmpegPath();
     await run(
       bin,
@@ -92,13 +95,16 @@ export async function transcodeToMp4(input: Uint8Array, shape: TranscodeShape): 
         "-vf",
         `scale=${w}:${h}:force_original_aspect_ratio=decrease:flags=lanczos,` +
           `pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,fps=30,format=yuv420p`,
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-c:v", "libx264", "-preset", preset, "-crf", "20",
         "-profile:v", "high", "-level", "4.1",
         "-c:a", "aac", "-b:a", "160k", "-ar", "48000",
         "-movflags", "+faststart",
         outPath,
       ],
-      240_000,
+      // Stay just under the 300 s default function limit so a slow
+      // conversion fails cleanly (the caller keeps the WebM) instead of the
+      // platform killing the request.
+      285_000,
     );
     return new Uint8Array(await readFile(outPath));
   } finally {
