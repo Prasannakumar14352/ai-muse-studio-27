@@ -89,8 +89,9 @@ export const generateAiCarousel = createServerFn({ method: "POST" })
 (think Ogilvy x Apple x Pentagram). You write RIDICULOUSLY detailed, magazine-quality,
 ready-to-render image prompts for premium Instagram carousels. Every "image_prompt"
 you produce is a full agency brief that a modern text-to-image model (gpt-image-2)
-can execute as a finished, on-brand ad slide with perfectly spelled headline,
-subheadline, badges, and CTA rendered inside the image itself. Return STRICT JSON —
+can execute as a text-free, on-brand slide BACKGROUND. The app adds the headline,
+subheadline, badges and CTA afterwards as editable typography, so the image itself
+must contain NO text at all. Return STRICT JSON —
 no prose, no markdown fences.
 
 You MUST follow the upstream CREATIVE DIRECTOR BRIEF below verbatim. In
@@ -127,8 +128,8 @@ For EACH slide, produce:
 - bullets: 3-5 tight bullets, each 2-6 words
 - bottom_highlight: key takeaway line (max 10 words)
 - visual: 1-line layout description
-- image_prompt: A COMPLETE, SELF-CONTAINED AGENCY BRIEF (600-1000 words) that the
-  image model will render AS A FINISHED, READY-TO-POST INSTAGRAM SLIDE.
+- image_prompt: A COMPLETE, SELF-CONTAINED AGENCY BRIEF (400-800 words) that the
+  image model will render AS A TEXT-FREE SLIDE BACKGROUND (typography is added later by the app).
   It MUST be written as clearly-labeled sections, in this exact order:
 
     Canvas Size: ${sizeHint} Instagram carousel slide
@@ -136,12 +137,8 @@ For EACH slide, produce:
     Design Style: describe the "${data.styleLabel}" aesthetic in detail —
       lighting, mood, color feel, level of polish, references (e.g. Apple keynote,
       luxury magazine ad, editorial poster), glassmorphism / gradients / shadows / spacing.
-    Main Headline: the EXACT headline text, in quotes, with size + placement notes
-    Subheadline: the EXACT body sentence, in quotes, with placement
-    Feature Badges / Bullets: list EACH bullet exactly as written, each with a
-      matching emoji/icon and a rounded pill/card treatment
-    CTA: for Cover use "Swipe →", for content slides use a subtle prompt,
-      for the last slide use a strong CTA button relevant to the topic
+    Text Zones: where the headline, subheadline, bullets and CTA will sit —
+      describe them as calm, empty areas (soft gradient, sky, bokeh). Never write the words.
     Main Visual: a photoreal, magazine-quality hero visual that matches the
       slide's message. Describe the subject, wardrobe, expression, action,
       props, and how it interacts with the layout. Cover slide should feature
@@ -157,22 +154,18 @@ For EACH slide, produce:
     Color Palette: give explicit HEX values that match "${data.styleLabel}":
       primary background, 3-4 accent colors, text color, CTA button color.
       REUSE THE SAME PALETTE ON EVERY SLIDE so the carousel feels like one deck.
-    Typography: premium bold modern sans-serif; headline dominates top,
-      subhead centered under it, bullets in two neat rows, CTA near bottom.
-      Everything mobile-legible.
     Composition: describe hierarchy and eye-flow explicitly
       (headline → hero → bullets → CTA), with generous whitespace.
     Lighting & Photography: cinematic natural light, shallow depth of field,
       commercial magazine photography, ultra-realistic textures, natural skin tones.
     Quality Requirements: ultra realistic, 8K, photorealistic, magazine cover
       quality, luxury digital product marketing, export-ready, no watermarks,
-      no logos except the inferred brand name, NO SPELLING MISTAKES, perfect
-      text alignment, high mobile readability.
+      no logos, no text of any kind.
 
   HARD RULES for image_prompt:
-    * Always include the EXACT headline, subheadline, badge label, every bullet,
-      and CTA text in quotes so the model renders them verbatim.
-    * Always end with: "Spell every word correctly. No lorem ipsum. No gibberish text."
+    * NEVER put the headline, subheadline, labels, bullets or CTA text in the prompt —
+      no quoted words at all. The image must contain no letters, numbers or words.
+    * Always end with: "No text, letters, numbers, logos or watermarks anywhere in the image."
     * Keep brand name, palette, typography, and photographic style IDENTICAL across
       all ${total} slides so the deck feels cohesive.
     * Cover = maximum wow. Content slides = clean, focused, one idea each.

@@ -9,7 +9,7 @@ import {
   Sliders, BarChart3, Rocket, ArrowLeft, Wand,
 } from "lucide-react";
 import { useAccess, canGenerate } from "@/lib/access";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchGeneratedImage } from "@/lib/image-stream";
 import {
   saveGeneratedThumbnail, getGeneratedThumbnails, deleteGeneratedThumbnail,
@@ -32,7 +32,9 @@ import {
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
 import { HandoffBanner } from "@/components/handoff-banner";
 import { useAutogen } from "@/lib/use-autogen";
-import { composeTextOverlay, needsTextOverlay } from "@/lib/text-overlay";
+import { composeBrandMarks, composeTextOverlay, needsTextOverlay } from "@/lib/text-overlay";
+import { getDefaultBrandKitFn, type BrandKit } from "@/lib/brand-kit.functions";
+import { useServerFn } from "@tanstack/react-start";
 import { promptDialog } from "@/components/prompt-dialog";
 
 export const Route = createFileRoute("/_authenticated/thumbnails")({
@@ -85,10 +87,16 @@ async function toDeliverySize(image: string, w: number, h: number): Promise<stri
 }
 
 /** If the text is in a regional script, draw it with a real font on top of the AI image. */
-async function withOverlay(image: string, text: string | undefined, force = false): Promise<Pick<GeneratedItem, "image" | "baseImage" | "overlayText">> {
+/** Matches server pricing in /api/generate-image: HD (Ultra) 8 per image, otherwise 1. */
+function thumbnailCost(brief: ThumbnailBrief): number {
+  const count = CONCEPT_COUNTS.includes(brief.conceptCount) ? brief.conceptCount : 4;
+  return count * (QUALITIES.find((x) => x.id === brief.quality)?.imageQuality === "high" ? 8 : 1);
+}
+
+async function withOverlay(image: string, text: string | undefined, force = false, fontFamily?: string | null): Promise<Pick<GeneratedItem, "image" | "baseImage" | "overlayText">> {
   if (!text || (!force && !needsTextOverlay(text))) return { image };
   try {
-    return { image: await composeTextOverlay(image, text), baseImage: image, overlayText: text };
+    return { image: await composeTextOverlay(image, text, { fontFamily }), baseImage: image, overlayText: text };
   } catch (e) {
     console.warn("text overlay failed", e);
     return { image };
@@ -121,6 +129,13 @@ function ThumbnailsPage() {
   const [libraryUrls, setLibraryUrls] = useState<Record<string, string>>({});
   const [progress, setProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const qc = useQueryClient();
+  const getBrandKit = useServerFn(getDefaultBrandKitFn);
+  const brandKit = useQuery({ queryKey: ["brand-kit-default"], queryFn: () => getBrandKit(), staleTime: 60_000 }).data ?? null;
+  const brandFont = brief.brand.useFont ? brandKit?.font_primary ?? null : null;
+  const brandMarks = {
+    logoUrl: brief.brand.useLogo ? brandKit?.logo_url ?? null : null,
+    watermarkUrl: brief.brand.useWatermark ? brandKit?.watermark_url ?? null : null,
+  };
   const { data: access } = useAccess();
 
   useEffect(() => { void refreshLibrary(); }, []);
@@ -177,10 +192,9 @@ function ThumbnailsPage() {
   async function runGeneration() {
     if (!plan) return;
     const count = CONCEPT_COUNTS.includes(brief.conceptCount) ? brief.conceptCount : 4;
-    // Matches server pricing in /api/generate-image: HD (Ultra) 8, otherwise 1.
-    const costPer = QUALITIES.find((x) => x.id === brief.quality)?.imageQuality === "high" ? 8 : 1;
-    if (access && !canGenerate(access, count * costPer)) {
-      toast.error(`Not enough credits (~${count * costPer} required)`); return;
+    const cost = thumbnailCost(brief);
+    if (access && !canGenerate(access, cost)) {
+      toast.error(`Not enough credits (${cost} required)`); return;
     }
     setGenerating(true);
     setStep(3);
@@ -191,7 +205,11 @@ function ThumbnailsPage() {
 
     for (let i = 0; i < count; i++) {
       const seedTag = ` [variation ${i + 1}/${count}]`;
-      const positive = `${plan.positivePrompt}\nAvoid: ${plan.negativePrompt}${seedTag}`;
+      const colors = brief.brand.useColors && brandKit
+        ? [brandKit.primary_color, brandKit.secondary_color].filter(Boolean).join(" and ")
+        : "";
+      const brandLine = colors ? `\nBrand colors: use ${colors} as the dominant accent colors.` : "";
+      const positive = `${plan.positivePrompt}${brandLine}\nAvoid: ${plan.negativePrompt}${seedTag}`;
       try {
         const { image, error } = await fetchGeneratedImage({
           prompt: positive,
@@ -205,7 +223,7 @@ function ThumbnailsPage() {
           const sized = await toDeliverySize(image, format.outputWidth, format.outputHeight);
           const item: GeneratedItem = {
             id: crypto.randomUUID(),
-            ...(await withOverlay(sized, plan.thumbnailText || brief.customText, plan.textOverlay)),
+            ...(await withOverlay(await composeBrandMarks(sized, brandMarks), plan.thumbnailText || brief.customText, plan.textOverlay, brandFont)),
             prompt: positive,
             ratio: format.ratio,
             createdAt: Date.now(),
@@ -233,7 +251,7 @@ function ThumbnailsPage() {
       quality: QUALITIES.find((x) => x.id === brief.quality)!.imageQuality,
     });
     if (image) {
-      const next = await withOverlay(image, item.overlayText, !!item.baseImage);
+      const next = await withOverlay(image, item.overlayText, !!item.baseImage, brandFont);
       setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, ...next, quality: undefined } : x));
       qc.invalidateQueries({ queryKey: ["access"] });
       toast.success("Regenerated");
@@ -265,8 +283,8 @@ function ThumbnailsPage() {
         qc.invalidateQueries({ queryKey: ["access"] });
       }
       const next = needsTextOverlay(newText)
-        ? await withOverlay(base, newText)
-        : { image: await composeTextOverlay(base, newText), baseImage: base, overlayText: newText };
+        ? await withOverlay(base, newText, false, brandFont)
+        : { image: await composeTextOverlay(base, newText, { fontFamily: brandFont }), baseImage: base, overlayText: newText };
       setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, ...next, quality: undefined } : x));
       toast.success("Text updated");
       return;
@@ -282,7 +300,7 @@ function ThumbnailsPage() {
     });
     toast.dismiss(`edit-${item.id}`);
     if (image) {
-      const next = await withOverlay(image, item.overlayText, !!item.baseImage);
+      const next = await withOverlay(image, item.overlayText, !!item.baseImage, brandFont);
       setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, ...next, quality: undefined } : x));
       qc.invalidateQueries({ queryKey: ["access"] });
       toast.success(`${label} done`);
@@ -387,7 +405,7 @@ function ThumbnailsPage() {
       )}
 
       {mode === "create" && step === 1 && (
-        <PlanningWizard brief={brief} update={updateBrief} onNext={runPlanning} planning={planning} />
+        <PlanningWizard brief={brief} update={updateBrief} onNext={runPlanning} planning={planning} brandKit={brandKit} />
       )}
 
       {mode === "create" && step === 2 && plan && (
@@ -506,8 +524,9 @@ function Chips<T extends string>({ options, value, onChange }: {
   );
 }
 
-function PlanningWizard({ brief, update, onNext, planning }: {
+function PlanningWizard({ brief, update, onNext, planning, brandKit }: {
   brief: ThumbnailBrief;
+  brandKit: BrandKit | null;
   update: <K extends keyof ThumbnailBrief>(k: K, v: ThumbnailBrief[K]) => void;
   onNext: () => void; planning: boolean;
 }) {
@@ -525,7 +544,8 @@ function PlanningWizard({ brief, update, onNext, planning }: {
     else if (id === "pinterest_2_3")  update("platform", "pinterest");
   }
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    // items-start: a collapsed section must not stretch to its neighbour's height (looked like an empty panel).
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
       <div className="lg:col-span-2">
         <FormatSelector activeId={activeFormatId} onSelect={selectFormat} />
       </div>
@@ -659,13 +679,33 @@ function PlanningWizard({ brief, update, onNext, planning }: {
       </Section>
 
       <Section title="Brand Kit" icon={PaletteIcon} defaultOpen={false}>
-        {(["useLogo", "useColors", "useFont", "useWatermark"] as const).map((k) => (
-          <label key={k} className="flex items-center gap-2 text-xs">
-            <input type="checkbox" checked={brief.brand[k]} onChange={(e) => update("brand", { ...brief.brand, [k]: e.target.checked })}
-              className="accent-[color:var(--neon-purple)]" />
-            {k === "useLogo" ? "Apply logo" : k === "useColors" ? "Apply brand colors" : k === "useFont" ? "Use brand font" : "Add watermark"}
-          </label>
-        ))}
+        {!brandKit ? (
+          <p className="text-xs text-muted-foreground">
+            No default brand kit yet. <a href="/brand-kit" className="underline text-primary">Create one</a> to add your logo, colors and font to thumbnails.
+          </p>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-medium">{brandKit.name}</span>
+              {[brandKit.primary_color, brandKit.secondary_color].filter(Boolean).map((c) => (
+                <span key={c} className="w-4 h-4 rounded border border-border" style={{ background: c! }} title={c!} />
+              ))}
+            </div>
+            {([
+              ["useLogo", "Add logo (bottom-right)", brandKit.logo_url],
+              ["useColors", "Use brand colors in the image", brandKit.primary_color || brandKit.secondary_color],
+              ["useFont", `Headline in ${brandKit.font_primary ?? "brand font"}`, brandKit.font_primary],
+              ["useWatermark", "Add watermark (bottom-left)", brandKit.watermark_url],
+            ] as const).map(([k, label, available]) => (
+              <label key={k} className={`flex items-center gap-2 text-xs ${available ? "" : "opacity-50"}`}>
+                <input type="checkbox" disabled={!available} checked={!!available && brief.brand[k]}
+                  onChange={(e) => update("brand", { ...brief.brand, [k]: e.target.checked })}
+                  className="accent-[color:var(--neon-purple)]" />
+                {label}{!available && " — not set in your brand kit"}
+              </label>
+            ))}
+          </>
+        )}
       </Section>
 
       <Section title="Concepts & Quality" icon={Sliders}>
@@ -684,6 +724,7 @@ function PlanningWizard({ brief, update, onNext, planning }: {
           <div className="text-xs text-muted-foreground mb-1.5">Quality</div>
           <Chips options={QUALITIES} value={brief.quality} onChange={(v) => update("quality", v)} />
         </div>
+        <p className="text-[11px] text-muted-foreground">Cost: <span className="text-foreground font-medium">{thumbnailCost(brief)} credits</span> for {brief.conceptCount} {brief.conceptCount === 1 ? "concept" : "concepts"}. Planning is free.</p>
       </Section>
 
       <div className="lg:col-span-2 flex justify-end">
@@ -736,7 +777,7 @@ function PlanReview({ plan, setPlan, brief, onBack, onGenerate }: {
       <div className="flex justify-end">
         <button onClick={onGenerate}
           className="rounded-lg gradient-primary text-white px-6 py-2.5 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)]">
-          <Wand2 className="w-4 h-4" /> Generate {brief.conceptCount} {brief.conceptCount === 1 ? "concept" : "concepts"}
+          <Wand2 className="w-4 h-4" /> Generate {brief.conceptCount} {brief.conceptCount === 1 ? "concept" : "concepts"} · {thumbnailCost(brief)} credits
         </button>
       </div>
     </div>

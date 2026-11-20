@@ -7,6 +7,7 @@ import JSZip from "jszip";
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
+import { autoSlideOverlays, renderSlideWithOverlays, textFreeSlidePrompt } from "@/lib/carousel-compose";
 import { listOutputs, saveOutput, deleteOutput, getOutput, type CarouselSlide, type SlideOverlaySet } from "@/lib/local-store";
 import {
   putDataURL, getObjectURL, getDataURL, deleteBlob, deleteBlobsByPrefix, isBlobKey, makeBlobKey,
@@ -61,6 +62,9 @@ type CarouselRow = {
   carousel_images: (string | null)[] | null;
   display_images: (string | null)[] | null;
   carousel_slides: CarouselSlide[] | null;
+  base_images: (string | null)[] | null;
+  /** Object URLs for base_images — the editor edits overlays on the clean background. */
+  base_display: (string | null)[] | null;
   slide_overlays: Record<number, SlideOverlaySet>;
   slide_diagnostics: SlideDiagMap;
   saved_ratio: LayoutSettings["ratio"] | null;
@@ -155,6 +159,10 @@ function CarouselsPage() {
           carousel_images: stored,
           display_images: display,
           carousel_slides: out?.carousel_slides ?? null,
+          base_images: out?.carousel_base_images ?? null,
+          base_display: out?.carousel_base_images
+            ? await Promise.all(out.carousel_base_images.map(async (v) => (!v ? null : isBlobKey(v) ? await getObjectURL(v) : v)))
+            : null,
           slide_overlays: (out?.slide_overlays ?? {}) as Record<number, SlideOverlaySet>,
           slide_diagnostics: (rd?.slide_diagnostics ?? {}) as SlideDiagMap,
           saved_ratio: (out?.aspect_ratio ?? null) as LayoutSettings["ratio"] | null,
@@ -196,20 +204,38 @@ function CarouselsPage() {
 
   async function generateOneSlide(
     projectId: string, idx: number,
-    prompt: Prompt, styleLabel: string, ratio: string,
-  ): Promise<{ image: string | null; diag: SlideDiag }> {
+    prompt: Prompt, styleLabel: string, ratio: LayoutSettings["ratio"],
+    slide?: CarouselSlide | null,
+  ): Promise<{ image: string | null; base?: string | null; overlays?: SlideOverlaySet | null; diag: SlideDiag }> {
     const { fetchGeneratedImage } = await import("@/lib/image-stream");
     const maxAttempts = 3;
     let last: SlideDiag | null = null;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const start = Date.now();
+      // Background only — image models misspell (and garble Indic) text, so the copy is overlaid by the app.
       const { image, error, status } = await fetchGeneratedImage({
-        prompt: prompt.prompt, style: styleLabel, ratio, quality: "medium",
+        prompt: textFreeSlidePrompt(prompt.prompt), style: styleLabel, ratio, quality: "medium",
       });
       if (image) {
-        const key = await putDataURL(`carousel:${projectId}:${idx}`, image);
+        const base = await putDataURL(`carousel:${projectId}:${idx}:base`, image);
+        let composed = image;
+        let overlaySet: SlideOverlaySet | null = null;
+        if (slide?.headline) {
+          try {
+            const overlays = autoSlideOverlays(ratio, {
+              headline: slide.headline, subhead: slide.body, bullets: slide.bullets ?? [], cta: slide.bottom_highlight,
+            });
+            composed = await renderSlideWithOverlays(image, overlays);
+            overlaySet = { overlays };
+          } catch (e) {
+            console.warn("slide text overlay failed", e);
+          }
+        }
+        const key = await putDataURL(`carousel:${projectId}:${idx}`, composed);
         return {
           image: key,
+          base,
+          overlays: overlaySet,
           diag: {
             at: new Date().toISOString(), ok: true, durationMs: Date.now() - start,
             httpStatus: status || 200, attempts: attempt,
@@ -234,10 +260,15 @@ function CarouselsPage() {
     return { image: null, diag: last ?? { at: new Date().toISOString(), ok: false, durationMs: 0, error: "Image generation failed", attempts: maxAttempts, prompt: prompt.prompt, style: styleLabel, ratio } };
   }
 
-  async function persistSlides(row: CarouselRow, images: (string | null)[], slideDiag: SlideDiagMap) {
+  async function persistSlides(
+    row: CarouselRow, images: (string | null)[], slideDiag: SlideDiagMap,
+    bases?: (string | null)[], overlays?: Record<number, SlideOverlaySet>,
+  ) {
     await saveOutput(row.id, {
       carousel_images: images,
       render_diagnostics: { slide_diagnostics: slideDiag },
+      ...(bases ? { carousel_base_images: bases } : {}),
+      ...(overlays ? { slide_overlays: overlays } : {}),
     });
   }
 
@@ -251,18 +282,22 @@ function CarouselsPage() {
     setProgress({ done: 0, total: slice.length });
     try {
       const results: (string | null)[] = new Array(slice.length).fill(null);
+      const bases: (string | null)[] = new Array(slice.length).fill(null);
+      const overlays: Record<number, SlideOverlaySet> = {};
       const diag: SlideDiagMap = {};
       let done = 0;
       for (let i = 0; i < slice.length; i++) {
-        const r = await generateOneSlide(row.id, i, slice[i], styleLabel, cfg.ratio);
+        const r = await generateOneSlide(row.id, i, slice[i], styleLabel, cfg.ratio, row.carousel_slides?.[i]);
         results[i] = r.image;
+        bases[i] = r.base ?? null;
+        if (r.overlays) overlays[i] = r.overlays;
         diag[String(i)] = r.diag;
         done += 1;
         setProgress({ done, total: slice.length });
-        await persistSlides(row, results, diag);
+        await persistSlides(row, results, diag, bases, overlays);
         qc.invalidateQueries({ queryKey: ["carousels"] });
       }
-      await persistSlides(row, results, diag);
+      await persistSlides(row, results, diag, bases, overlays);
       const okCount = results.filter(Boolean).length;
       toast[okCount === slice.length ? "success" : "warning"](`${okCount}/${slice.length} slides generated`);
       qc.invalidateQueries({ queryKey: ["carousels"] });
@@ -293,18 +328,24 @@ function CarouselsPage() {
     try {
       const nextImages = [...(slides.length ? slides : new Array(row.image_prompts.length).fill(null))];
       const nextDiag: SlideDiagMap = { ...row.slide_diagnostics };
+      const nextBases = [...(row.base_images ?? new Array(nextImages.length).fill(null))];
+      const nextOverlays: Record<number, SlideOverlaySet> = { ...row.slide_overlays };
       let done = 0;
       for (const i of failedIdxs) {
         const prompt = row.image_prompts[i];
-        const r = await generateOneSlide(row.id, i, prompt, styleLabel, cfg.ratio);
+        const r = await generateOneSlide(row.id, i, prompt, styleLabel, cfg.ratio, row.carousel_slides?.[i]);
         nextImages[i] = r.image ?? nextImages[i] ?? null;
+        if (r.image) {
+          nextBases[i] = r.base ?? null;
+          if (r.overlays) nextOverlays[i] = r.overlays; else delete nextOverlays[i];
+        }
         nextDiag[String(i)] = r.diag;
         done += 1;
         setProgress({ done, total: failedIdxs.length });
-        await persistSlides(row, nextImages, nextDiag);
+        await persistSlides(row, nextImages, nextDiag, nextBases, nextOverlays);
         qc.invalidateQueries({ queryKey: ["carousels"] });
       }
-      await persistSlides(row, nextImages, nextDiag);
+      await persistSlides(row, nextImages, nextDiag, nextBases, nextOverlays);
       const okCount = failedIdxs.filter((i) => nextImages[i]).length;
       toast[okCount === failedIdxs.length ? "success" : "warning"](`${okCount}/${failedIdxs.length} slides regenerated`);
       qc.invalidateQueries({ queryKey: ["carousels"] });
@@ -408,11 +449,17 @@ function CarouselsPage() {
     const key = `${row.id}:${idx}`;
     setSlideRetryId(key);
     try {
-      const r = await generateOneSlide(row.id, idx, prompt, styleLabel, cfg.ratio);
+      const r = await generateOneSlide(row.id, idx, prompt, styleLabel, cfg.ratio, row.carousel_slides?.[idx]);
       const nextImages = [...(row.carousel_images ?? new Array(row.image_prompts.length).fill(null))];
       nextImages[idx] = r.image ?? nextImages[idx] ?? null;
       const nextDiag: SlideDiagMap = { ...row.slide_diagnostics, [String(idx)]: r.diag };
-      await persistSlides(row, nextImages, nextDiag);
+      const nextBases = [...(row.base_images ?? new Array(nextImages.length).fill(null))];
+      const nextOverlays: Record<number, SlideOverlaySet> = { ...row.slide_overlays };
+      if (r.image) {
+        nextBases[idx] = r.base ?? null;
+        if (r.overlays) nextOverlays[idx] = r.overlays; else delete nextOverlays[idx];
+      }
+      await persistSlides(row, nextImages, nextDiag, nextBases, nextOverlays);
       if (r.image) toast.success(`Slide ${idx + 1} re-generated`);
       else toast.error(`Slide ${idx + 1} failed: ${r.diag.error ?? "unknown"}`);
       qc.invalidateQueries({ queryKey: ["carousels"] });
@@ -962,7 +1009,8 @@ function CarouselsPage() {
 
       {editingSlide && (() => {
         const row = data?.find((r) => r.id === editingSlide.rowId);
-        const src = row?.display_images?.[editingSlide.idx];
+        // Edit on the text-free background when we have it, so text isn't stacked on burned-in copy.
+        const src = row?.base_display?.[editingSlide.idx] ?? row?.display_images?.[editingSlide.idx];
         if (!row || !src) return null;
         const cfg = getLayout(row);
         const slideNum = row.carousel_slides?.[editingSlide.idx]?.n ?? editingSlide.idx + 1;

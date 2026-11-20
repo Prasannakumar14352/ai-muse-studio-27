@@ -26,7 +26,9 @@ export type ContentPlan = {
   sections: PlanSection[];
 };
 
-const SCHEMAS: Record<PlanModule, Array<{ key: string; label: string; kind: PlanSection["kind"] }>> = {
+export const CAPTION_HASHTAG_COUNT = 30;
+
+const SCHEMAS: Record<PlanModule, Array<{ key: string; label: string; kind: PlanSection["kind"]; hint?: string }>> = {
   video: [
     { key: "outline", label: "Outline", kind: "list" },
     { key: "script", label: "Script", kind: "longtext" },
@@ -71,9 +73,23 @@ const SCHEMAS: Record<PlanModule, Array<{ key: string; label: string; kind: Plan
     { key: "captions", label: "Caption variants", kind: "list" },
     { key: "hooks", label: "Hooks", kind: "list" },
     { key: "ctas", label: "CTAs", kind: "list" },
-    { key: "hashtags", label: "Hashtags", kind: "list" },
+    // The site promises 30 hashtags for captions.
+    { key: "hashtags", label: "Hashtags", kind: "list", hint: `exactly ${CAPTION_HASHTAG_COUNT} distinct hashtags, mixing broad, niche and long-tail; each a single word with no spaces` },
   ],
 };
+
+/** "#tag" form (the system prompt bans "#" in values), deduped, capped. */
+function normalizeHashtags(tags: string[], max?: number): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const t of tags.flatMap((x) => x.split(/\s+/))) {
+    const clean = t.replace(/^#+/, "").replace(/[^\p{L}\p{N}_]/gu, "");
+    if (!clean || seen.has(clean.toLowerCase())) continue;
+    seen.add(clean.toLowerCase());
+    out.push(`#${clean}`);
+  }
+  return max ? out.slice(0, max) : out;
+}
 
 function coerceValue(kind: PlanSection["kind"], raw: unknown): string | string[] {
   if (kind === "list") {
@@ -95,7 +111,7 @@ export const planContentFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { gatewayChatJson } = await import("@/lib/ai-gateway.server");
     const schema = SCHEMAS[data.module];
-    const keys = schema.map((s) => `- ${s.key} (${s.kind}): ${s.label}`).join("\n");
+    const keys = schema.map((s) => `- ${s.key} (${s.kind}): ${s.label}${s.hint ? ` — ${s.hint}` : ""}`).join("\n");
     const strategyBlock = data.strategyContext?.trim()
       ? `\nActive brand strategy (follow positioning, persona, pillars, offer and CTAs from here):\n${data.strategyContext}\n`
       : "";
@@ -161,7 +177,9 @@ export const planContentFn = createServerFn({ method: "POST" })
       key: s.key,
       label: s.label,
       kind: s.kind,
-      value: coerceValue(s.kind, raw?.[s.key]),
+      value: data.module === "caption" && s.key === "hashtags"
+        ? normalizeHashtags(coerceValue(s.kind, raw?.[s.key]) as string[], CAPTION_HASHTAG_COUNT)
+        : coerceValue(s.kind, raw?.[s.key]),
     }));
     const plan: ContentPlan = { module: data.module, topic: data.topic, sections };
 
