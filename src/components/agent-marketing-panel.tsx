@@ -7,11 +7,18 @@ import { toast } from "sonner";
 import { CalendarClock, Copy, ExternalLink, Loader2, Megaphone, Play, Rocket, Send, XCircle } from "lucide-react";
 import { runAgentNow, updateAgentTask, sendPromoToTelegram, type AgentTask } from "@/lib/agent-hq.functions";
 import { listPublishTargets, schedulePost } from "@/lib/publishing.functions";
+import { attachPlanMedia, createPlanMediaUpload } from "@/lib/social-plan.functions";
+import { setResearchPrefill, type ResearchModuleId } from "@/lib/research-prefill";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "@tanstack/react-router";
 
 type PostRef = {
   platform?: "instagram" | "facebook" | "linkedin" | "youtube"; format?: string; hashtags?: string;
   media_url?: string | null; media_type?: "video" | "image" | null; suggested_at?: string;
   youtube_title?: string | null; first_comment?: string | null;
+  // Content-plan drafts
+  plan_item_id?: string; needs_build?: boolean; build?: string; build_topic?: string;
+  build_language?: string | null; build_angle?: string | null; build_headline?: string | null; build_duration?: number | null;
 };
 type PromoRef = { channel?: string; where?: string };
 
@@ -19,7 +26,10 @@ const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", faceboo
 
 function useRefresh() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: ["agent-hq"] });
+  return () => {
+    qc.invalidateQueries({ queryKey: ["agent-hq"] });
+    qc.invalidateQueries({ queryKey: ["social-plan"] });
+  };
 }
 
 /** ISO → value for <input type="datetime-local"> in the viewer's time zone. */
@@ -119,7 +129,7 @@ function RunControls() {
   );
 }
 
-function SocialPostCard({ t }: { t: AgentTask }) {
+export function SocialPostCard({ t }: { t: AgentTask }) {
   const ref = t.source_ref as unknown as PostRef;
   const platform = ref.platform ?? "instagram";
   const refresh = useRefresh();
@@ -169,6 +179,7 @@ function SocialPostCard({ t }: { t: AgentTask }) {
             : <img src={ref.media_url} alt="" className="w-full max-h-64 object-contain" />}
         </div>
       )}
+      {ref.needs_build && <BuildAndAttach t={t} ref_={ref} platform={platform} onDone={refresh} />}
       {platform === "youtube" && (
         <input value={ytTitle} onChange={(e) => setYtTitle(e.target.value)} placeholder="YouTube title"
           className="w-full text-sm bg-black/30 border border-white/10 rounded-lg px-3 py-1.5" />
@@ -199,11 +210,12 @@ function SocialPostCard({ t }: { t: AgentTask }) {
       <div className="flex flex-wrap gap-2">
         {accounts.length > 0 && (
           <>
-            <button disabled={busy !== null || !caption.trim()} onClick={() => approve(false)}
+            <button disabled={busy !== null || !caption.trim() || (!!ref.needs_build && !ref.media_url)} onClick={() => approve(false)}
+              title={ref.needs_build && !ref.media_url ? "Build and attach the media first" : undefined}
               className="rounded-lg gradient-primary text-white px-3 py-1.5 text-sm inline-flex items-center gap-1.5 disabled:opacity-60">
               {busy === "schedule" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CalendarClock className="w-3.5 h-3.5" />} Approve &amp; schedule
             </button>
-            <button disabled={busy !== null || !caption.trim()} onClick={() => approve(true)}
+            <button disabled={busy !== null || !caption.trim() || (!!ref.needs_build && !ref.media_url)} onClick={() => approve(true)}
               className="rounded-lg glass border border-border px-3 py-1.5 text-sm inline-flex items-center gap-1.5 disabled:opacity-60">
               {busy === "now" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Approve &amp; post now
             </button>
@@ -276,4 +288,87 @@ function PromoCard({ t }: { t: AgentTask }) {
 
 function Muted({ text }: { text: string }) {
   return <div className="glass rounded-2xl p-6 border border-border text-sm text-muted-foreground text-center">{text}</div>;
+}
+
+// ---------------------------------------------------------------- Content plan: build + attach
+
+const BUILD_TARGET: Record<string, { module: ResearchModuleId; path: string; label: string }> = {
+  video: { module: "video", path: "/videos", label: "Video Studio" },
+  thumbnail: { module: "thumbnail", path: "/thumbnails", label: "Thumbnail Studio" },
+  carousel: { module: "carousel", path: "/create/carousel", label: "Carousels" },
+  image: { module: "image", path: "/images", label: "Image Studio" },
+};
+
+/**
+ * A content-plan draft whose media is made in a studio: "Build" opens that
+ * studio prefilled with the agent's brief (the studio runs in this browser);
+ * "Attach" uploads the downloaded file straight to Storage and links it to
+ * this draft (and, if ticked, the day's other drafts).
+ */
+function BuildAndAttach({ t, ref_, platform, onDone }: { t: AgentTask; ref_: PostRef; platform: string; onDone: () => void }) {
+  const navigate = useNavigate();
+  const startUpload = useServerFn(createPlanMediaUpload);
+  const attach = useServerFn(attachPlanMedia);
+  const [busy, setBusy] = useState(false);
+  const [sameDay, setSameDay] = useState(true);
+  const target = BUILD_TARGET[ref_.build ?? "video"] ?? BUILD_TARGET.video;
+  const isLongYt = /long/i.test(ref_.format ?? "") && platform === "youtube";
+
+  function build() {
+    setResearchPrefill({
+      module: target.module,
+      sourceLabel: `Content plan · ${ref_.build_topic ?? t.title}`,
+      topic: ref_.build_topic ?? t.title,
+      angle: ref_.build_angle ?? undefined,
+      platform: platform === "youtube" ? (isLongYt ? "YouTube" : "YouTube Shorts") : platform === "instagram" ? "Instagram Reels" : "Facebook",
+      aspectRatio: target.module === "video" ? (isLongYt ? "16:9" : "9:16") : target.module === "thumbnail" ? "16:9" : "4:5",
+      duration: target.module === "video" ? (isLongYt ? (ref_.build_duration ?? 480) : 30) : undefined,
+      format: target.module === "video" ? (isLongYt ? "long" : "reel") : undefined,
+      thumbnailText: ref_.build_headline ?? undefined,
+      titles: ref_.build_headline ? [ref_.build_headline] : undefined,
+    });
+    navigate({ to: target.path });
+  }
+
+  async function onFile(file: File) {
+    setBusy(true);
+    try {
+      const mime = file.type || (file.name.endsWith(".mp4") ? "video/mp4" : "image/png");
+      const { path, token } = await startUpload({ data: { taskId: t.id, mime } });
+      const { error } = await supabase.storage.from("renders").uploadToSignedUrl(path, token, file, { contentType: mime });
+      if (error) throw new Error(error.message);
+      const r = await attach({ data: { taskId: t.id, path, mime, sameDay } });
+      toast.success(r.attached > 1 ? `Attached to ${r.attached} posts for this day` : "Media attached");
+      onDone();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-dashed border-orange-500/40 bg-orange-500/5 p-3 space-y-2 text-xs">
+      <div className="text-muted-foreground">
+        {ref_.media_url ? "Media attached. Replace it if you rebuild." : `Needs media from ${target.label}`}
+        {ref_.build_topic && <> · <span className="text-foreground">{ref_.build_topic}</span></>}
+        {ref_.build_language && <> · {ref_.build_language}</>}
+        {isLongYt && <> · long video (16:9)</>}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={build} className="rounded-lg glass border border-border px-3 py-1.5 text-sm">Build in {target.label}</button>
+        <label className={`rounded-lg glass border border-border px-3 py-1.5 text-sm cursor-pointer inline-flex items-center gap-1.5 ${busy ? "opacity-60 pointer-events-none" : ""}`}>
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} {ref_.media_url ? "Replace media" : "Attach media"}
+          <input type="file" accept="video/mp4,video/quicktime,video/webm,image/png,image/jpeg,image/webp" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void onFile(f); }} />
+        </label>
+        {!isLongYt && (
+          <label className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <input type="checkbox" checked={sameDay} onChange={(e) => setSameDay(e.target.checked)} />
+            use for this day's other posts
+          </label>
+        )}
+      </div>
+    </div>
+  );
 }

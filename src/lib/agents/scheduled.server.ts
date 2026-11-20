@@ -228,7 +228,12 @@ export async function runDailyAgents(): Promise<Record<string, unknown>> {
   // Marketing: social plan + posts on Mondays and Thursdays, promotion ideas on Wednesdays.
   // Everything lands in the approval inbox — nothing is posted automatically.
   const m = await import("@/lib/agents/marketing.server");
-  if (ist.getUTCDay() === 1 || ist.getUTCDay() === 4) out.social = await m.runSocialMediaManager("schedule", { count: 4 }).catch((e) => ({ error: String(e) }));
+  const cp = await import("@/lib/agents/content-plan.server");
+  // Every day: draft the next two days of the content plan.
+  out.contentPlan = await cp.runContentPlanCreator("schedule", { daysAhead: 2 }).catch((e) => ({ error: String(e) }));
+  // The freestyle Mon/Thu social plan only runs when the content plan has nothing for the week.
+  const planned = await cp.planCoversNextWeek().catch(() => false);
+  if (!planned && (ist.getUTCDay() === 1 || ist.getUTCDay() === 4)) out.social = await m.runSocialMediaManager("schedule", { count: 4 }).catch((e) => ({ error: String(e) }));
   if (ist.getUTCDay() === 3) out.promo = await m.runAppPromoter("schedule", { count: 5 }).catch((e) => ({ error: String(e) }));
   return out;
 }

@@ -56,13 +56,9 @@ function ConnectionsPage() {
   const { data: scheduled = [] } = useQuery({ queryKey: ["scheduled_posts"], queryFn: () => list(), refetchInterval: 15_000 });
   const { data: limits } = useQuery({ queryKey: ["account-limits"], queryFn: () => limitsFn() });
   const maxPer = limits?.max ?? null; // null = unlimited (admin)
-  // Users only see platforms the admin has configured and switched on (plus any
-  // they are still connected to, so they can disconnect). Admins see all four.
-  const visibleDefs = DEFS.filter((d) =>
-    isAdmin ||
-    avail.find((x) => x.platform === d.id)?.available ||
-    connections.some((c) => c.platform === d.id),
-  );
+  // Everyone sees all four platforms. One that isn't configured and enabled yet
+  // shows to users as "Coming soon" (no Connect button); admins see why.
+  const visibleDefs = DEFS;
   const labelFor = (id: unknown) => connections.find((c) => c.id === id)?.account_label as string | undefined;
 
   async function handleConnect(platform: PlatformDef["id"]) {
@@ -90,12 +86,6 @@ function ConnectionsPage() {
         )}
       </div>
 
-      {!availLoading && visibleDefs.length === 0 && (
-        <div className="glass rounded-2xl p-6 border border-white/10 text-sm text-muted-foreground">
-          Direct publishing isn't available yet. You can still download anything you create and post it manually.
-        </div>
-      )}
-
       <section className="grid md:grid-cols-2 gap-4">
         {visibleDefs.map(({ id, label, Icon }) => {
           const a = avail.find((x) => x.platform === id);
@@ -103,6 +93,7 @@ function ConnectionsPage() {
           const configured = a?.configured ?? false;
           const enabled = a?.enabled ?? false;
           const canConnect = configured && enabled;
+          const comingSoon = !availLoading && !canConnect && !isAdmin && accounts.length === 0;
           const atLimit = maxPer !== null && accounts.length >= maxPer;
           const hint = id === "youtube"
             ? "To add another channel, click Add account and pick that channel's Google account or Brand Account."
@@ -115,16 +106,21 @@ function ConnectionsPage() {
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center"><Icon className="w-5 h-5" /></div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold">{label}</div>
+                  <div className="font-semibold flex items-center gap-2">
+                    {label}
+                    {comingSoon && <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-200 border border-violet-400/20">Coming soon</span>}
+                  </div>
                   <div className="text-xs text-muted-foreground">
-                    {!canConnect
-                      ? (configured ? "Disabled by admin" : "Not configured by admin")
+                    {comingSoon
+                      ? "Direct posting is coming soon. Download and post manually for now."
+                      : !canConnect
+                      ? (isAdmin ? (configured ? "Disabled by admin" : "Not configured by admin") : "Unavailable right now")
                       : accounts.length === 0
                         ? "Not connected"
                         : `${accounts.length} account${accounts.length === 1 ? "" : "s"}${maxPer !== null ? ` of ${maxPer} on your plan` : ""}`}
                   </div>
                 </div>
-                <button
+                {!comingSoon && <button
                   onClick={() => handleConnect(id)}
                   disabled={!canConnect || atLimit || starting === id}
                   title={!configured ? "OAuth credentials have not been configured by the administrator." : !enabled ? "This provider is currently disabled by the administrator." : atLimit ? "Plan limit reached — disconnect one or upgrade." : ""}
@@ -132,11 +128,11 @@ function ConnectionsPage() {
                 >
                   {starting === id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : accounts.length ? <Plus className="w-3.5 h-3.5" /> : <Plug className="w-3.5 h-3.5" />}
                   {accounts.length ? "Add account" : "Connect"}
-                </button>
+                </button>}
               </div>
 
               {isAdmin && !canConnect && (
-                <p className="text-xs text-amber-400/80">Hidden from users until you configure and enable it in Admin → Social Publishing.</p>
+                <p className="text-xs text-amber-400/80">Users see this as "Coming soon" until you configure and enable it in Admin → Social Publishing.</p>
               )}
 
               {accounts.length > 0 && (

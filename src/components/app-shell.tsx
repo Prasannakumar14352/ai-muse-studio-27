@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
   Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug, Linkedin,
   ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target, Calendar as CalendarIcon, Library, Megaphone, Tag,
-  Bell, User as UserIcon, FolderKanban, Command as CommandIcon, Clapperboard, Lock,
+  Bell, User as UserIcon, FolderKanban, Command as CommandIcon, Clapperboard, Lock, Repeat,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -55,6 +55,8 @@ type NavItem = {
   label: string;
   icon: typeof LayoutDashboard;
   moduleId?: ModuleId;
+  /** Shown with a "Soon" badge: a coming-soon page, not a working feature. */
+  soon?: boolean;
 };
 
 type NavSection = {
@@ -74,6 +76,7 @@ const SECTIONS: readonly NavSection[] = [
     label: "Create",
     items: [
       { to: "/videos", label: "Projects", icon: FolderKanban, moduleId: "videos" },
+      { to: "/series", label: "Series Autopilot", icon: Repeat, soon: true },
       { to: "/create", label: "AI Studio", icon: Bot },
       { to: "/model-studio", label: "Model Studio", icon: Clapperboard },
       { to: "/promo-videos", label: "Promo Video", icon: Megaphone, moduleId: "promo_videos" },
@@ -283,6 +286,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
         <n.icon className={`w-4 h-4 shrink-0 transition-transform duration-200 ${!active ? "group-hover:scale-110" : ""}`} />
         {!collapsed && <span className={`flex-1 truncate ${!lock.allowed ? "opacity-60" : ""}`}>{n.label}</span>}
+        {!collapsed && n.soon && (
+          <span className="ml-auto text-[9px] uppercase tracking-wide font-semibold rounded-full px-1.5 py-0.5 bg-violet-500/15 text-violet-200">Soon</span>
+        )}
         {!lock.allowed && (collapsed ? (
           <Lock className="absolute top-1 right-1 w-2.5 h-2.5 text-muted-foreground" aria-label="Locked" />
         ) : (

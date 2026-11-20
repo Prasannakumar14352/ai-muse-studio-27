@@ -14,6 +14,9 @@ import {
   getPlatformStatus,
 } from "@/lib/publishing.functions";
 import { Button } from "@/components/ui/button";
+import { ContentPlanBoard, usePlanItems } from "@/components/content-plan-board";
+import type { PlanItemRow } from "@/lib/social-plan.functions";
+import { useAccess } from "@/lib/access";
 import { Badge } from "@/components/ui/badge";
 import {
   Calendar as CalendarIcon, ChevronLeft, ChevronRight, RefreshCw,
@@ -47,7 +50,7 @@ export const Route = createFileRoute("/_authenticated/calendar")({
   notFoundComponent: () => <div className="p-8 text-white">Not found</div>,
 });
 
-type Tab = "calendar" | "scheduled" | "queue" | "drafts" | "failed" | "analytics" | "platforms";
+type Tab = "calendar" | "plan" | "scheduled" | "queue" | "drafts" | "failed" | "analytics" | "platforms";
 
 const PLATFORM_ICON: Record<string, typeof Instagram> = {
   instagram: Instagram, facebook: Facebook, youtube: Youtube, linkedin: Linkedin,
@@ -55,6 +58,8 @@ const PLATFORM_ICON: Record<string, typeof Instagram> = {
 
 function CalendarPage() {
   const [tab, setTab] = useState<Tab>("calendar");
+  // Admins also see CreatorFlow's own content plan (agents draft from it).
+  const isAdmin = !!useAccess().data?.isAdmin;
   const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("calendar"));
   const [monthAnchor, setMonthAnchor] = useState(() => {
     const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d;
@@ -89,6 +94,11 @@ function CalendarPage() {
       return out;
     },
   });
+  const planQuery = usePlanItems(isAdmin);
+  const plannedRows = useMemo(
+    () => (planQuery.data?.items ?? []).filter((i) => i.status !== "skipped" && i.status !== "done"),
+    [planQuery.data],
+  );
   const calendarRows = useMemo(() => {
     const seen = new Set(rows.map((r) => String(r.external_post_url ?? "")).filter(Boolean));
     return [...rows, ...(published.data ?? []).filter((r) => !r.external_post_url || !seen.has(String(r.external_post_url)))];
@@ -132,6 +142,7 @@ function CalendarPage() {
         <nav className="flex gap-2 flex-wrap mb-6 border-b border-white/10 pb-3">
           {([
             ["calendar", "Monthly Calendar"],
+            ...(isAdmin ? [["plan", "Content plan"] as [Tab, string]] : []),
             ["scheduled", `Scheduled${counts.scheduled ? ` (${counts.scheduled})` : ""}`],
             ["queue", `Queue${counts.queue ? ` (${counts.queue})` : ""}`],
             ["drafts", `Drafts${counts.drafts ? ` (${counts.drafts})` : ""}`],
@@ -156,9 +167,12 @@ function CalendarPage() {
           <div className="p-12 text-center text-white/50">Loading…</div>
         ) : (
           <>
+            {tab === "plan" && isAdmin && <ContentPlanBoard />}
             {tab === "calendar" && (
               <MonthlyCalendar
                 rows={calendarRows}
+                planned={isAdmin ? plannedRows : []}
+                onOpenPlan={() => setTab("plan")}
                 anchor={monthAnchor}
                 onPrev={() => setMonthAnchor(m => { const n = new Date(m); n.setMonth(n.getMonth() - 1); return n; })}
                 onNext={() => setMonthAnchor(m => { const n = new Date(m); n.setMonth(n.getMonth() + 1); return n; })}
@@ -190,11 +204,18 @@ function CalendarPage() {
 // ---------- Monthly Calendar ----------
 
 function MonthlyCalendar({
-  rows, anchor, onPrev, onNext, onToday, onChange,
+  rows, planned = [], onOpenPlan, anchor, onPrev, onNext, onToday, onChange,
 }: {
   rows: Array<Record<string, unknown>>;
+  planned?: PlanItemRow[];
+  onOpenPlan?: () => void;
   anchor: Date; onPrev: () => void; onNext: () => void; onToday: () => void; onChange: () => void;
 }) {
+  const plannedByDay = useMemo(() => {
+    const map: Record<string, PlanItemRow[]> = {};
+    for (const p of planned) (map[p.plan_date] ??= []).push(p);
+    return map;
+  }, [planned]);
   const first = new Date(anchor);
   const startWeekday = first.getDay();
   const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
@@ -228,6 +249,7 @@ function MonthlyCalendar({
           <Button variant="outline" size="sm" onClick={onToday}>Today</Button>
         </div>
         <div className="text-xs text-white/50 flex items-center gap-3">
+          {planned.length > 0 && <LegendDot color="bg-violet-400" label="planned" />}
           <LegendDot color="bg-blue-400" label="scheduled" />
           <LegendDot color="bg-amber-400" label="queue" />
           <LegendDot color="bg-emerald-400" label="published" />
@@ -264,6 +286,12 @@ function MonthlyCalendar({
                 </div>
               )}
               <div className="flex flex-col gap-1 overflow-hidden">
+                {c.date && (plannedByDay[key] ?? []).map((p) => (
+                  <button key={p.id} type="button" onClick={onOpenPlan} title={`Content plan: ${p.idea}`}
+                    className="text-left truncate rounded px-1.5 py-0.5 text-[10px] bg-violet-500/15 text-violet-200 border border-violet-400/20 hover:bg-violet-500/25">
+                    Plan · {p.idea}
+                  </button>
+                ))}
                 {items.slice(0, 3).map((p) => (
                   <CalendarChip key={String(p.id)} row={p} onChange={onChange} />
                 ))}

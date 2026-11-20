@@ -44,7 +44,7 @@ export const recordAttribution = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-const EVENTS = ["pricing_view", "credits_exhausted"] as const;
+const EVENTS = ["pricing_view", "credits_exhausted", "series_interest"] as const;
 
 /** Funnel step, stored at most once per user per event per day. */
 export const trackFunnelEvent = createServerFn({ method: "POST" })
