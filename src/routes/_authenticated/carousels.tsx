@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import JSZip from "jszip";
 import { jsPDF } from "jspdf";
+import { useAccess } from "@/lib/access";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
 import { autoSlideOverlays, renderSlideWithOverlays, textFreeSlidePrompt } from "@/lib/carousel-compose";
@@ -101,6 +102,7 @@ function CarouselsPage() {
   const [collapsedSlides, setCollapsedSlides] = useState<Record<string, boolean>>({});
   const [editingSlide, setEditingSlide] = useState<{ rowId: string; idx: number } | null>(null);
   const deleteProject = useProjectDelete();
+  const isAdmin = !!useAccess().data?.isAdmin;
 
   async function saveEditedSlide(row: CarouselRow, idx: number, dataUrl: string, overlays: SlideOverlaySet) {
     const versionedId = `carousel:${row.id}:${idx}:v${Date.now()}`;
@@ -587,7 +589,11 @@ function CarouselsPage() {
                     <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
                       <span className="glass px-2 py-0.5 rounded">{row.image_prompts.length} prompts</span>
                       <span className="glass px-2 py-0.5 rounded">{cfg.ratio}</span>
-                      {missingCount > 0 && (
+                      {generating ? (
+                        <span className="bg-primary/15 text-primary px-2 py-0.5 rounded flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Generating{progress ? ` ${progress.done}/${progress.total}` : "…"}
+                        </span>
+                      ) : missingCount > 0 && (
                         <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded flex items-center gap-1">
                           <AlertTriangle className="w-3 h-3" /> {missingCount} missing/failed
                         </span>
@@ -738,7 +744,9 @@ function CarouselsPage() {
                             {row.carousel_slides.slice(0, Math.max(slides.length, row.carousel_slides.length)).map((sl, i) => {
                               const src = slides[i];
                               const diag = row.slide_diagnostics[String(i)];
-                              const failed = !src || (diag && !diag.ok);
+                              // While a run is in progress, a slide without an image yet is pending, not failed.
+                              const pending = generating && (!src || (diag && !diag.ok));
+                              const failed = !pending && (!src || (diag && !diag.ok));
                               const isRetrying = slideRetryId === `${row.id}:${i}`;
                               return (
                                 <div key={sl.n} className={`rounded-xl overflow-hidden border ${failed ? "border-rose-500/40" : "border-border"} bg-black/40`}>
@@ -748,6 +756,11 @@ function CarouselsPage() {
                                         <button onClick={() => setViewer({ images: slides, idx: i, title: row.title })} className="absolute inset-0">
                                           <img src={src} alt={`Slide ${sl.n}`} className="absolute inset-0 w-full h-full object-cover" />
                                         </button>
+                                      ) : pending ? (
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center text-muted-foreground">
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                          <div className="mt-1 text-[9px]">Generating…</div>
+                                        </div>
                                       ) : (
                                         <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center bg-rose-500/10">
                                           <AlertTriangle className="w-4 h-4 text-rose-400" />
@@ -815,7 +828,8 @@ function CarouselsPage() {
                     >
                       {slides.map((src, i) => {
                         const diag = row.slide_diagnostics[String(i)];
-                        const failed = !src || (diag && !diag.ok);
+                        const pending = generating && (!src || (diag && !diag.ok));
+                        const failed = !pending && (!src || (diag && !diag.ok));
                         const isRetrying = slideRetryId === `${row.id}:${i}`;
                         return (
                           <div key={i} className={`shrink-0 w-40 snap-start ${ASPECT_CLASS[cfg.ratio]} relative rounded-lg overflow-hidden border ${failed ? "border-rose-500/60" : "border-border"}`}>
@@ -836,6 +850,11 @@ function CarouselsPage() {
                                   </span>
                                 )}
                               </button>
+                            ) : pending ? (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center text-muted-foreground">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <div className="mt-1 text-[9px]">Generating…</div>
+                              </div>
                             ) : (
                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-rose-500/10 p-2 text-center">
                                 <AlertTriangle className="w-4 h-4 text-rose-400" />
@@ -907,7 +926,7 @@ function CarouselsPage() {
                           loadMedia: async () => (await resolveSlideDataURLs(row)).map((url, i) => ({ url, kind: "image" as const, name: `slide-${i + 1}.png` })),
                         }}
                       />
-                      {missingCount > 0 && (
+                      {!generating && missingCount > 0 && (
                         <button
                           onClick={() => regenerateFailed(row)}
                           disabled={generating}
@@ -919,6 +938,7 @@ function CarouselsPage() {
                       )}
                     </div>
 
+                    {isAdmin && (
                     <details className="rounded-lg border border-border bg-black/30">
                       <summary className="cursor-pointer px-3 py-2 text-xs text-muted-foreground hover:text-white flex items-center justify-between">
                         <span className="flex items-center gap-1.5"><AlertTriangle className="w-3 h-3" /> Slide diagnostics</span>
@@ -952,6 +972,7 @@ function CarouselsPage() {
                         })}
                       </div>
                     </details>
+                    )}
                   </div>
                 ) : (
                   <div className="mx-4 mb-4 rounded-lg border border-dashed border-border py-10 text-center text-xs text-muted-foreground">

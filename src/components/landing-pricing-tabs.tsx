@@ -46,7 +46,7 @@ export function LandingPricingTabs() {
           <p className="mt-4 text-muted-foreground">
             Subscribe for fresh monthly credits — or pay once and own it for life.
           </p>
-          <div className="mt-8 inline-flex items-center gap-1 rounded-full glass p-1 border border-border/60">
+          <div className="mt-8 inline-flex max-w-full items-stretch gap-1 rounded-3xl sm:rounded-full glass p-1 border border-border/60">
             {tabs.map((t) => {
               const active = cycle === t.id;
               return (
@@ -54,13 +54,13 @@ export function LandingPricingTabs() {
                   key={t.id}
                   type="button"
                   onClick={() => setCycle(t.id)}
-                  className={`px-5 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2 ${
+                  className={`px-3 sm:px-5 py-2 rounded-2xl sm:rounded-full text-sm font-semibold transition flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 ${
                     active ? "gradient-primary text-white shadow-lg" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {t.label}
                   {t.hint && (
-                    <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold ${
+                    <span className={`text-[9px] sm:text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold whitespace-nowrap ${
                       active ? "bg-white/20 text-white" : "bg-[color:var(--brand-orange)]/20 text-[color:var(--brand-orange)]"
                     }`}>
                       {t.hint}

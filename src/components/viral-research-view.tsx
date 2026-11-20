@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { detectTopicLanguage } from "@/lib/content-language";
 import {
   AlertTriangle, CheckCircle2, ChevronDown, Sparkles, TrendingUp,
   TrendingDown, Activity, Calendar as CalendarIcon, Info,
@@ -13,7 +14,17 @@ export function ViralResearchView({ findings }: { findings: ResearchFindings }) 
   const breakdown = findings.scoreBreakdown ?? [];
   const trend = findings.trendDirection;
   const act = findings.actionable;
-  const similar = findings.similarContent ?? [];
+  const isLive = findings.evidenceMode === "mixed" || findings.evidenceMode === "live";
+  // Older live reports put the link inside the note ("… Open: https://…").
+  const similarAll = (findings.similarContent ?? []).map((s) => {
+    const m = /\s*Open:\s*(https?:\/\/\S+)\s*$/.exec(s.whyItWorked ?? "");
+    return m
+      ? { ...s, url: s.url ?? m[1], whyItWorked: s.whyItWorked.slice(0, m.index).replace(/^Real top result — /, "") }
+      : s;
+  });
+  const langs = Array.from(new Set(similarAll.map((s) => s.language ?? detectTopicLanguage(s.title))));
+  const [langFilter, setLangFilter] = useState<string>("all");
+  const similar = langFilter === "all" ? similarAll : similarAll.filter((s) => (s.language ?? detectTopicLanguage(s.title)) === langFilter);
 
   return (
     <div className="space-y-6">
@@ -74,27 +85,43 @@ export function ViralResearchView({ findings }: { findings: ResearchFindings }) 
         </section>
       )}
 
-      <Collapsible title={findings.evidenceMode === "mixed" || findings.evidenceMode === "live" ? "Similar content (live YouTube data)" : "Similar content (AI estimate)"} defaultOpen={findings.evidenceMode === "mixed"}>
+      <Collapsible title={isLive ? "Similar content (live YouTube data)" : "Similar content (AI estimate)"} defaultOpen={findings.evidenceMode === "mixed"}>
+        {langs.length > 1 && (
+          <div className="flex flex-wrap gap-1.5 mb-3" role="group" aria-label="Filter by language">
+            {["all", ...langs].map((l) => (
+              <button key={l} type="button" onClick={() => setLangFilter(l)}
+                className={`px-2.5 py-1 rounded-full text-[11px] border ${langFilter === l ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>
+                {l === "all" ? `All languages (${similarAll.length})` : `${l} (${similarAll.filter((s) => (s.language ?? detectTopicLanguage(s.title)) === l).length})`}
+              </button>
+            ))}
+          </div>
+        )}
         {similar.length ? (
           <div className="space-y-2">
             {similar.map((s, i) => (
               <div key={i} className="rounded-xl border border-white/10 p-3 text-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="font-medium truncate">{s.title}</div>
+                  {s.url
+                    ? <a href={s.url} target="_blank" rel="noreferrer" className="font-medium truncate hover:underline">{s.title}</a>
+                    : <div className="font-medium truncate">{s.title}</div>}
                   {s.metric && <span className="text-xs text-emerald-400 shrink-0">{s.metric}</span>}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  {[s.creator, s.platform, s.length, s.publishedAt].filter(Boolean).join(" · ")}
+                  {[s.creator, s.platform, s.language, s.length, s.publishedAt].filter(Boolean).join(" · ")}
                 </div>
                 <div className="text-xs mt-1 italic text-muted-foreground">{s.whyItWorked}</div>
               </div>
             ))}
-            <div className="text-[11px] text-amber-300/80 flex items-center gap-1.5">
-              <Info className="w-3 h-3" /> Similar content shown as AI estimates. Live public data is not connected.
-            </div>
+            {!isLive && (
+              <div className="text-[11px] text-amber-300/80 flex items-center gap-1.5">
+                <Info className="w-3 h-3" /> Similar content shown as AI estimates. Live public data is not connected.
+              </div>
+            )}
           </div>
         ) : (
-          <div className="text-sm text-muted-foreground">No similar content available. Live public data is not connected.</div>
+          <div className="text-sm text-muted-foreground">
+            {similarAll.length ? "No videos in this language." : isLive ? "No similar videos found on YouTube for this topic." : "No similar content available. Live public data is not connected."}
+          </div>
         )}
       </Collapsible>
 
@@ -125,7 +152,7 @@ export function ViralResearchView({ findings }: { findings: ResearchFindings }) 
               </ul>
             ) : <Empty />}
           </Panel>
-          <Panel title="YouTube search patterns (AI estimate)">
+          <Panel title={isLive ? "YouTube search patterns (based on live results)" : "YouTube search patterns (AI estimate)"}>
             {findings.youtubeSearches?.length ? (
               <ul className="text-sm space-y-2">
                 {findings.youtubeSearches.map((y, i) => (
@@ -155,7 +182,8 @@ export function ViralResearchView({ findings }: { findings: ResearchFindings }) 
 
       {findings.disclaimers?.length ? (
         <div className="text-[11px] text-muted-foreground border-t border-white/5 pt-3">
-          {findings.disclaimers.map((d, i) => <div key={i} className="flex gap-1.5"><Info className="w-3 h-3 mt-0.5 shrink-0" /> {d}</div>)}
+          {/* Only the app's own data note; older reports also stored the model's working notes after it. */}
+          {findings.disclaimers.slice(0, 1).map((d, i) => <div key={i} className="flex gap-1.5"><Info className="w-3 h-3 mt-0.5 shrink-0" /> {d}</div>)}
         </div>
       ) : null}
     </div>

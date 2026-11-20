@@ -12,6 +12,27 @@ export interface LiveYouTubeVideo {
   comments: number;
   publishedAt: string;
   durationSec: number;
+  /** Display name, e.g. "Telugu" — from YouTube's language tags, else the title's script. */
+  language: string;
+}
+
+const LANG_CODES: Record<string, string> = {
+  en: "English", hi: "Hindi", te: "Telugu", ta: "Tamil", kn: "Kannada", ml: "Malayalam",
+  bn: "Bengali", gu: "Gujarati", mr: "Marathi", pa: "Punjabi", ur: "Urdu", es: "Spanish",
+  pt: "Portuguese", fr: "French", de: "German", id: "Indonesian", ar: "Arabic", ja: "Japanese", ko: "Korean",
+};
+
+function videoLanguage(code: string | undefined, title: string): string {
+  const base = (code ?? "").toLowerCase().split("-")[0];
+  if (LANG_CODES[base]) return LANG_CODES[base];
+  if (/[ఀ-౿]/.test(title)) return "Telugu";
+  if (/[஀-௿]/.test(title)) return "Tamil";
+  if (/[ಀ-೿]/.test(title)) return "Kannada";
+  if (/[ഀ-ൿ]/.test(title)) return "Malayalam";
+  if (/[ঀ-৿]/.test(title)) return "Bengali";
+  if (/[઀-૿]/.test(title)) return "Gujarati";
+  if (/[ऀ-ॿ]/.test(title)) return "Hindi";
+  return /^[\x00-\x7F\u2000-\u2BFF\u{1F000}-\u{1FFFF}]*$/u.test(title) ? "English" : "Other";
 }
 
 function isoDurationToSec(iso: string): number {
@@ -47,7 +68,7 @@ export async function fetchLiveYouTube(topic: string, country?: string | null): 
     if (!vRes.ok) { console.warn("[youtube-research] videos", vRes.status); return null; }
     const vJson = (await vRes.json()) as { items?: Array<{
       id: string;
-      snippet?: { title?: string; channelTitle?: string; publishedAt?: string };
+      snippet?: { title?: string; channelTitle?: string; publishedAt?: string; defaultAudioLanguage?: string; defaultLanguage?: string };
       statistics?: { viewCount?: string; likeCount?: string; commentCount?: string };
       contentDetails?: { duration?: string };
     }> };
@@ -60,6 +81,7 @@ export async function fetchLiveYouTube(topic: string, country?: string | null): 
       comments: Number(v.statistics?.commentCount ?? 0),
       publishedAt: (v.snippet?.publishedAt ?? "").slice(0, 10),
       durationSec: isoDurationToSec(v.contentDetails?.duration ?? ""),
+      language: videoLanguage(v.snippet?.defaultAudioLanguage ?? v.snippet?.defaultLanguage, v.snippet?.title ?? ""),
     })).sort((a, b) => b.views - a.views);
   } catch (e) {
     console.warn("[youtube-research] failed", e);

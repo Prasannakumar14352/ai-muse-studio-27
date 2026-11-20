@@ -230,7 +230,7 @@ export const TOOL_CAPABILITY_STATUSES: ToolCapabilityStatus[] = [
   S("capcut", "social_planning", "limited", "Planning is not a core feature."),
 
   // 20. Social publish
-  S("creatorflow", "social_publish", "coming_soon", "OAuth connections and scheduled-publish pipeline exist; end-to-end publishing is still stabilising."),
+  S("creatorflow", "social_publish", "beta", "Connect YouTube, Instagram Business, Facebook Pages and LinkedIn, then publish now or schedule. In beta."),
   S("chatgpt", "social_publish", "not_core", "Not a publishing tool."),
   S("canva", "social_publish", "available", "Direct publishing via Content Planner.", "canva.com"),
   S("invideo", "social_publish", "limited", "Publishing is limited."),
