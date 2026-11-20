@@ -7,7 +7,7 @@ import { Zap, Loader2, Crown, Infinity as InfinityIcon } from "lucide-react";
 import { CREDIT_PACKS, type CreditPack } from "@/lib/constants";
 import { createRazorpayOrder, verifyRazorpayPayment } from "@/lib/razorpay.functions";
 import { useAccess } from "@/lib/access";
-import { OfferCodeBox, useOfferPreview, useSavedOfferCode } from "@/components/offer-code";
+import { OfferCodeBox, PackPrice, useOfferPreview, usePackOfferPrices, useSavedOfferCode } from "@/components/offer-code";
 
 declare global {
   interface Window {
@@ -44,6 +44,7 @@ export function TopUpPacks({ compact = false }: { compact?: boolean }) {
   const offerQ = useOfferPreview(CREDIT_PACKS[0] ? { kind: "pack", packId: CREDIT_PACKS[0].id } : null, offerCode, !!access?.email);
   const packQuote = offerQ.data?.quote ?? null;
   const offerError = offerQ.data?.error ?? null;
+  const packPrices = usePackOfferPrices(offerCode && !offerError ? offerCode : "", !!access?.email);
 
   async function handleBuy(pack: CreditPack) {
     setBuyingId(pack.id);
@@ -157,7 +158,7 @@ export function TopUpPacks({ compact = false }: { compact?: boolean }) {
                 {pack.credits.toLocaleString()}
                 <span className="text-xs text-muted-foreground font-normal ml-1">credits</span>
               </div>
-              <div className="mt-2 text-2xl font-bold gradient-text">${pack.priceUSD.toFixed(2)}</div>
+              <PackPrice priceUSD={pack.priceUSD} offer={packPrices.data?.packs.find((p) => p.packId === pack.id)} />
               <div className="text-[10px] text-muted-foreground">≈ ${per100} / 100</div>
               <button
                 onClick={() => handleBuy(pack)}

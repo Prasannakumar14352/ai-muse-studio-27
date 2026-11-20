@@ -9,7 +9,7 @@ import {
 } from "@/lib/pricing.functions";
 import { createRazorpayOrder, verifyRazorpayPayment, createRazorpayPlanOrder, getUsdInrRate } from "@/lib/razorpay.functions";
 import { getAutopayOptions, createAutopaySubscription, verifyAutopaySubscription } from "@/lib/razorpay-autopay.functions";
-import { OfferCodeBox, useOfferPreview, useSavedOfferCode, type OfferTarget } from "@/components/offer-code";
+import { OfferCodeBox, PackPrice, useOfferPreview, usePackOfferPrices, useSavedOfferCode, type OfferTarget } from "@/components/offer-code";
 import { CREDIT_PACKS, type CreditPack } from "@/lib/constants";
 import { useAccess } from "@/lib/access";
 import { toast } from "sonner";
@@ -249,7 +249,7 @@ function PricingCard({
                   ? <>Includes <strong className="text-foreground">{plan.includedCredits.toLocaleString()}</strong> signup credits.</>
                   : "Free to start — no card required."}
         </p>
-        <CreditsBuyLine credits={plan.monthlyCredits || plan.includedCredits} />
+        <CreditsBuyLine credits={plan.monthlyCredits || plan.includedCredits} free={plan.code === "free"} />
       </div>
 
       <ul className="mt-6 space-y-3 flex-1">
@@ -434,10 +434,15 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
   const [mode, setMode] = useState<"autopay" | "once">("autopay");
   const useAutopay = !!autopay && mode === "autopay";
   const [offerCode, setOfferCode] = useSavedOfferCode();
-  const offerTarget: OfferTarget = useAutopay
-    ? { kind: "autopay", planCode: plan.code, cycle: effective as "monthly" | "yearly" }
-    : { kind: "plan", planId: plan.id, cycle: effective };
-  const offerQ = useOfferPreview(offerTarget, offerCode, !!access?.email);
+  // Price both payment types up front so each option shows its real
+  // (offer-adjusted) price — an offer may cover "pay once" but not auto-renew.
+  const onceTarget: OfferTarget = { kind: "plan", planId: plan.id, cycle: effective };
+  const autoTarget: OfferTarget | null = autopay ? { kind: "autopay", planCode: plan.code, cycle: effective as "monthly" | "yearly" } : null;
+  const onceQ = useOfferPreview(onceTarget, offerCode, !!access?.email);
+  const autoQ = useOfferPreview(autoTarget, offerCode, !!access?.email && !!autoTarget);
+  const offerQ = useAutopay ? autoQ : onceQ;
+  const onceQuote = onceQ.data?.quote ?? null;
+  const autoQuote = autoQ.data?.quote ?? null;
   const quote = offerQ.data?.quote ?? null;
   const offerError = offerQ.data?.error ?? null;
   // A code that doesn't fit this purchase isn't sent, so checkout still works.
@@ -637,14 +642,27 @@ function CheckoutModal({ plan, cycle, onClose }: { plan: PricingPlan; cycle: Bil
         {autopay && (
           <div className="mb-3 space-y-2" role="radiogroup" aria-label="Payment type">
             {([
-              { id: "autopay" as const, title: `Auto-renew · ${inr(autopay.amountPaise / 100)} / ${effective === "yearly" ? "year" : "month"}`, desc: "Approve UPI AutoPay or card once — renews automatically. Cancel anytime from Billing." },
-              { id: "once" as const, title: `Pay once · ${inrPreview !== null ? inr(inrPreview) : "…"}`, desc: `One ${effective === "yearly" ? "year" : "month"}, no auto-renew. Works with international cards.` },
+              {
+                id: "autopay" as const,
+                title: `Auto-renew · ${autoQuote && autoQuote.discountPaise > 0 ? `${inr(autoQuote.finalPaise / 100)} first ${effective === "yearly" ? "year" : "month"}, then ` : ""}${inr(autopay.amountPaise / 100)} / ${effective === "yearly" ? "year" : "month"}`,
+                desc: "Approve UPI AutoPay or card once — renews automatically. Cancel anytime from Billing."
+                  + (onceQuote && onceQuote.discountPaise > 0 && !(autoQuote && autoQuote.discountPaise > 0) ? ` ${onceQuote.title} applies to Pay once only.` : ""),
+                was: null as number | null,
+              },
+              {
+                id: "once" as const,
+                title: `Pay once · ${onceQuote && onceQuote.discountPaise > 0 ? inr(onceQuote.finalPaise / 100) : inrPreview !== null ? inr(inrPreview) : "…"}`,
+                desc: `One ${effective === "yearly" ? "year" : "month"}, no auto-renew. Works with international cards.`
+                  + (onceQuote && onceQuote.discountPaise > 0 ? ` Includes ${onceQuote.title} (${onceQuote.label}).` : ""),
+                was: onceQuote && onceQuote.discountPaise > 0 ? onceQuote.originalPaise : null,
+              },
             ]).map((o) => (
               <button key={o.id} type="button" role="radio" aria-checked={mode === o.id} onClick={() => setMode(o.id)}
                 className={`w-full text-left rounded-xl border p-3 transition ${mode === o.id ? "border-[color:var(--brand-orange)] bg-[color:var(--brand-orange)]/10" : "border-border/60 hover:bg-white/5"}`}>
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <span className={`w-3.5 h-3.5 rounded-full border-2 ${mode === o.id ? "border-[color:var(--brand-orange)] bg-[color:var(--brand-orange)]" : "border-white/40"}`} />
                   {o.title}
+                  {o.was !== null && <span className="text-xs text-muted-foreground line-through">{inr(o.was / 100)}</span>}
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-1 pl-5">{o.desc}</div>
               </button>
@@ -690,6 +708,7 @@ function CreditPacksSection() {
   const [offerCode, setOfferCode] = useSavedOfferCode();
   const packQ = useOfferPreview(CREDIT_PACKS[0] ? { kind: "pack", packId: CREDIT_PACKS[0].id } : null, offerCode, !!access?.email);
   const packQuote = packQ.data?.quote ?? null;
+  const packPrices = usePackOfferPrices(offerCode && !packQ.data?.error ? offerCode : "", !!access?.email);
   const packError = packQ.data?.error ?? null;
   const createOrder = useServerFn(createRazorpayOrder);
   const verifyPayment = useServerFn(verifyRazorpayPayment);
@@ -767,7 +786,7 @@ function CreditPacksSection() {
             </div>
             <div className="mt-3 text-3xl font-extrabold">{pack.credits.toLocaleString()}</div>
             <div className="text-xs text-muted-foreground">credits</div>
-            <div className="mt-3 text-lg font-bold gradient-text">${pack.priceUSD.toFixed(2)}</div>
+            <PackPrice priceUSD={pack.priceUSD} offer={packPrices.data?.packs.find((p) => p.packId === pack.id)} />
             <button
               onClick={() => handleBuy(pack)}
               disabled={buyingId === pack.id}
@@ -783,8 +802,17 @@ function CreditPacksSection() {
 }
 
 /** "What do my credits buy?" — so a 224-credit Seedance video isn't a surprise. */
-function CreditsBuyLine({ credits }: { credits: number }) {
+function CreditsBuyLine({ credits, free = false }: { credits: number; free?: boolean }) {
   if (!credits || credits <= 0) return null;
+  if (free) {
+    // Free unlocks only the ungated tools — say exactly that.
+    return (
+      <p className="mt-1.5 text-[11px] text-muted-foreground leading-snug">
+        ≈ {credits.toLocaleString()} images · {Math.floor(credits / 8).toLocaleString()} carousels · captions &amp; LinkedIn posts.
+        Video, Research and Thumbnails start on Starter.
+      </p>
+    );
+  }
   const parts = [
     `${Math.floor(credits / 1).toLocaleString()} images`,
     `${Math.floor(credits / 25).toLocaleString()} short reels with voice`,

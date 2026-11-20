@@ -382,7 +382,7 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     return { ok: true, ...result };
   });
 
-/** List the current user's payments (for the invoices page). */
+/** List the current user's PAID payments (for the invoices page). Unpaid checkouts never get an invoice. */
 export const listMyPayments = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -390,6 +390,7 @@ export const listMyPayments = createServerFn({ method: "GET" })
       .from("payments")
       .select("id, razorpay_order_id, razorpay_payment_id, pack_id, credits, amount_cents, currency, status, receipt_number, created_at, price_usd_cents, conversion_rate, amount_inr_paise")
       .eq("user_id", context.userId)
+      .eq("status", "success")
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) throw error;
@@ -415,10 +416,14 @@ export const getMySubscription = createServerFn({ method: "GET" })
       .eq("id", context.userId)
       .maybeSingle();
 
+    // Paid payments, plus a checkout opened in the last 30 minutes (may still be
+    // completing). Older unpaid checkouts were abandoned — don't list them.
+    const recentCutoff = new Date(Date.now() - 30 * 60e3).toISOString();
     const { data: recent } = await context.supabase
       .from("payments")
       .select("id, razorpay_order_id, pack_id, credits, amount_cents, currency, status, created_at, price_usd_cents, conversion_rate, amount_inr_paise")
       .eq("user_id", context.userId)
+      .or(`status.neq.pending,created_at.gte.${recentCutoff}`)
       .order("created_at", { ascending: false })
       .limit(10);
 
@@ -488,4 +493,27 @@ export const previewOffer = createServerFn({ method: "POST" })
       if (!data.code) return { ok: true as const, quote: null, error: null };
       return { ok: false as const, quote: null, error: "Couldn't check that code right now." };
     }
+  });
+
+/** Offer-adjusted INR price for every credit pack, for the pack cards. Display only. */
+export const previewPackOffers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { code?: string }) => ({ code: typeof input?.code === "string" ? input.code.trim().slice(0, 40) : "" }))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { quoteOffer, OfferError } = await import("@/lib/offers.server");
+    const { rate } = await resolveRate();
+    const packs: Array<{ packId: string; originalPaise: number; finalPaise: number; bonusCredits: number; label: string | null; title: string | null }> = [];
+    let error: string | null = null;
+    for (const pack of CREDIT_PACKS) {
+      const originalPaise = usdToInrPaise(pack.priceUSD, rate).inrPaise;
+      let q: Awaited<ReturnType<typeof quoteOffer>> = null;
+      try {
+        q = await quoteOffer(supabaseAdmin, { code: data.code, userId: context.userId, kind: "packs", amountPaise: originalPaise, credits: pack.credits });
+      } catch (e) {
+        if (e instanceof OfferError) error = e.message;
+      }
+      packs.push({ packId: pack.id, originalPaise, finalPaise: q?.finalPaise ?? originalPaise, bonusCredits: q?.bonusCredits ?? 0, label: q?.label ?? null, title: q?.title ?? null });
+    }
+    return { packs, error };
   });

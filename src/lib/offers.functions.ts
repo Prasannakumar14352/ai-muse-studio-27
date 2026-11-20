@@ -131,6 +131,18 @@ export const deleteOffer = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+function offerScope(kinds: string[]): string | null {
+  const all = ["packs", "monthly", "yearly", "lifetime", "autopay"];
+  if (all.every((k) => kinds.includes(k))) return null; // everything — no qualifier needed
+  const names: Record<string, string> = { packs: "credit packs", monthly: "monthly", yearly: "yearly", lifetime: "lifetime", autopay: "auto-renew" };
+  const plans = ["monthly", "yearly", "lifetime"].filter((k) => kinds.includes(k)).map((k) => names[k]);
+  const parts: string[] = [];
+  if (plans.length) parts.push(`${plans.join(" / ")} plans${kinds.includes("autopay") ? "" : " (pay once)"}`);
+  if (kinds.includes("autopay") && !plans.length) parts.push("auto-renew plans");
+  if (kinds.includes("packs")) parts.push("credit packs");
+  return parts.length ? `on ${parts.join(" & ")}` : null;
+}
+
 /** Public: the festival banner to show on the landing / pricing pages, if one is live. */
 export const getOfferBanner = createServerFn({ method: "GET" }).handler(async () => {
   try {
@@ -146,6 +158,8 @@ export const getOfferBanner = createServerFn({ method: "GET" }).handler(async ()
       code: o.auto_apply ? null : o.code,
       autoApply: o.auto_apply,
       endsAt: o.ends_at,
+      // What it really covers, so the banner never promises more than checkout gives.
+      scope: offerScope(o.applies_to ?? []),
     };
   } catch {
     return null; // never break the landing page over a banner

@@ -170,7 +170,7 @@ export const PLANS: PlanDef[] = [
     monthlyCredits: 0,
     signupCredits: 50,
     includedCredits: 50,
-    features: ["50 signup credits", "Basic captions & images", "Community styles", "Uses credit balance only"],
+    features: ["50 signup credits", "AI images, carousels, captions & LinkedIn posts", "Video, Research & Thumbnails need Starter or above", "Uses credit balance only"],
     cta: "Current plan",
   },
   {

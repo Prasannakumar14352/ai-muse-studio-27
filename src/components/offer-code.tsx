@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { Check, Copy, Tag, X } from "lucide-react";
 import { toast } from "sonner";
-import { previewOffer } from "@/lib/razorpay.functions";
+import { previewOffer, previewPackOffers } from "@/lib/razorpay.functions";
 import { getOfferBanner } from "@/lib/offers.functions";
 
 const KEY = "cf:offer-code";
@@ -57,6 +57,41 @@ export function useOfferPreview(target: OfferTarget | null, code: string, enable
   });
 }
 
+/** Offer-adjusted INR prices for all credit packs (for the pack cards). */
+export function usePackOfferPrices(code: string, enabled = true) {
+  const fn = useServerFn(previewPackOffers);
+  return useQuery({
+    queryKey: ["pack-offer-prices", code],
+    queryFn: () => fn({ data: { code: code || undefined } }),
+    enabled,
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+/** Price line for one pack card: discounted INR with the list price struck through. */
+export function PackPrice({ priceUSD, offer }: {
+  priceUSD: number;
+  offer?: { originalPaise: number; finalPaise: number; bonusCredits: number; label: string | null } | null;
+}) {
+  if (!offer || (offer.finalPaise >= offer.originalPaise && !offer.bonusCredits)) {
+    return <div className="mt-2 text-2xl font-bold gradient-text">${priceUSD.toFixed(2)}</div>;
+  }
+  return (
+    <div className="mt-2">
+      {offer.finalPaise < offer.originalPaise ? (
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-2xl font-bold gradient-text">{inr(offer.finalPaise)}</span>
+          <span className="text-sm text-muted-foreground line-through">{inr(offer.originalPaise)}</span>
+        </div>
+      ) : (
+        <div className="text-2xl font-bold gradient-text">{inr(offer.originalPaise)}</div>
+      )}
+      <div className="text-[11px] text-emerald-300">{offer.label}{offer.bonusCredits ? ` · +${offer.bonusCredits.toLocaleString()} credits` : ""} · list ${priceUSD.toFixed(2)}</div>
+    </div>
+  );
+}
+
 const inr = (paise: number) => `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
 
 /** Code input + the applied-offer summary, for a checkout. */
@@ -85,9 +120,10 @@ export function OfferCodeBox({ code, setCode, quote, error, loading }: {
         </div>
       )}
       {!open ? (
-        !quote && (
+        // Shown even when an automatic offer is applied — a typed code may be better.
+        !code && (
           <button type="button" onClick={() => setOpen(true)} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
-            <Tag className="w-3.5 h-3.5" /> Have an offer code?
+            <Tag className="w-3.5 h-3.5" /> {quote ? "Have a different offer code?" : "Have an offer code?"}
           </button>
         )
       ) : (
@@ -124,6 +160,7 @@ export function OfferBanner() {
     <div className="w-full gradient-primary text-white text-sm">
       <div className="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
         <span className="font-semibold">{b.text || `${b.title} — ${b.label}`}</span>
+        {b.scope && <span className="text-white/85 text-xs">({b.scope})</span>}
         {b.code ? (
           <button type="button" onClick={async () => {
             setCode(b.code!);
