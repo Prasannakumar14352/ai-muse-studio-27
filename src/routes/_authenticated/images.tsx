@@ -19,13 +19,14 @@ import { useProjectDelete } from "@/hooks/use-project-delete";
 import {
   Loader2, Wand2, Download, Image as ImageIcon, RefreshCw, Bug, Copy, Trash2, FileDown,
   Maximize2, X, ChevronLeft, ChevronRight, Plus, ArrowLeft, Upload, Sparkles, Scissors,
-  Eraser, Expand, PaintBucket, History, ChevronDown,
+  Eraser, Expand, PaintBucket, History, ChevronDown, Search,
 } from "lucide-react";
 import type { GenerateImageRequest } from "@/lib/image-stream";
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
 import { HandoffBanner } from "@/components/handoff-banner";
 import { useAutogen } from "@/lib/use-autogen";
 import { promptDialog } from "@/components/prompt-dialog";
+import { StockMediaPicker, type PickedStock } from "@/components/stock-media-picker";
 
 /** Matches ACTION_COSTS.image_hd on the server. */
 const HD_CREDITS = 8;
@@ -70,6 +71,7 @@ function ImagesPage() {
   const [cfg, setCfg] = useState(7);
   const [styleStrength, setStyleStrength] = useState(70);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
+  const [stockTarget, setStockTarget] = useState<"ref" | "style" | null>(null);
   const [styleImages, setStyleImages] = useState<string[]>([]);
   // HD (Nano Banana) also runs whenever reference/style images are attached.
   const usesHdModel = quality === "hd" || referenceImages.length > 0 || styleImages.length > 0;
@@ -180,6 +182,16 @@ function ImagesPage() {
     } catch {
       toast.error("Could not read image");
     }
+  }
+
+  async function addStockImage(kind: "ref" | "style", item: PickedStock) {
+    // Generation expects data URLs (same as uploads), so inline our stored copy.
+    const res = await fetch(item.url);
+    if (!res.ok) throw new Error("Couldn't load the stock image");
+    const file = new File([await res.blob()], "stock.jpg", { type: item.mimeType });
+    const dataUrl = await fileToDataUrl(file);
+    if (kind === "ref") setReferenceImages((prev) => [...prev, dataUrl].slice(0, 4));
+    else setStyleImages((prev) => [...prev, dataUrl].slice(0, 4));
   }
 
   async function runGeneration(p: string, s: string, r: string, count: number) {
@@ -599,6 +611,7 @@ function ImagesPage() {
                     hint="Guide the subject, pose, or composition."
                     images={referenceImages}
                     onAdd={(f) => addUploads("ref", f)}
+                    onStock={() => setStockTarget("ref")}
                     onRemove={(i) => setReferenceImages((prev) => prev.filter((_, k) => k !== i))}
                   />
                   <UploadPanel
@@ -606,9 +619,17 @@ function ImagesPage() {
                     hint="Guide the color palette, lighting, and look."
                     images={styleImages}
                     onAdd={(f) => addUploads("style", f)}
+                    onStock={() => setStockTarget("style")}
                     onRemove={(i) => setStyleImages((prev) => prev.filter((_, k) => k !== i))}
                   />
                 </div>
+                <StockMediaPicker
+                  open={stockTarget !== null}
+                  onOpenChange={(o) => { if (!o) setStockTarget(null); }}
+                  types={["photo", "illustration", "vector"]}
+                  title={stockTarget === "style" ? "Free stock — style image" : "Free stock — reference image"}
+                  onPicked={(item) => (stockTarget ? addStockImage(stockTarget, item) : undefined)}
+                />
               </div>
             )}
 
@@ -769,11 +790,12 @@ function ImagesPage() {
 }
 
 function UploadPanel({
-  title, hint, images, onAdd, onRemove,
+  title, hint, images, onAdd, onRemove, onStock,
 }: {
   title: string; hint: string; images: string[];
   onAdd: (files: FileList | null) => void;
   onRemove: (idx: number) => void;
+  onStock?: () => void;
 }) {
   return (
     <div className="rounded-lg border border-border bg-black/30 p-3">
@@ -782,11 +804,19 @@ function UploadPanel({
           <div className="text-xs font-semibold text-white">{title}</div>
           <div className="text-[10px] text-muted-foreground">{hint}</div>
         </div>
-        <label className="rounded-md glass border border-border px-2 py-1 text-xs flex items-center gap-1 cursor-pointer hover:border-white/20">
-          <Upload className="w-3 h-3" /> Upload
-          <input type="file" accept="image/*" multiple className="hidden"
-            onChange={(e) => { onAdd(e.target.files); e.currentTarget.value = ""; }} />
-        </label>
+        <div className="flex items-center gap-1.5">
+          {onStock && (
+            <button type="button" onClick={onStock}
+              className="rounded-md glass border border-border px-2 py-1 text-xs flex items-center gap-1 hover:border-white/20">
+              <Search className="w-3 h-3" /> Free stock
+            </button>
+          )}
+          <label className="rounded-md glass border border-border px-2 py-1 text-xs flex items-center gap-1 cursor-pointer hover:border-white/20">
+            <Upload className="w-3 h-3" /> Upload
+            <input type="file" accept="image/*" multiple className="hidden"
+              onChange={(e) => { onAdd(e.target.files); e.currentTarget.value = ""; }} />
+          </label>
+        </div>
       </div>
       {images.length === 0 ? (
         <div className="text-[10px] text-muted-foreground italic">No images. Up to 4.</div>
