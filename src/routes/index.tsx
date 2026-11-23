@@ -17,6 +17,7 @@ import { LandingPricingTabs } from "@/components/landing-pricing-tabs";
 import { ComparisonSection } from "@/components/comparison/ComparisonSection";
 import { EXTRA_FAQ } from "@/lib/landing-content";
 import { ComingSoonToolsSection } from "@/components/coming-soon-tools-section";
+import { BusinessPromoSection } from "@/components/business-promo-section";
 
 
 
@@ -37,6 +38,7 @@ const FAQ = [
   { q: "Which platforms are supported?", a: "Content is written for YouTube, Instagram, TikTok, Facebook and LinkedIn, with platform-specific tone and formatting. Direct publishing is live for YouTube; Instagram, Facebook and LinkedIn publishing are coming soon." },
   { q: "Can I use my own brand style?", a: "Yes. Save brand presets in Settings, and every generation adapts to your defaults." },
   { q: "Is there a free plan?", a: "Yes — you get 50 free credits once when you sign up. When they run out, buy a credit pack or pick a plan." },
+  { q: "Can I use CreatorFlow to promote my shop or business?", a: "Yes. Ad Creatives makes ready-to-post Facebook and Instagram ads from your product photos, offer and contact details, and Business Promo makes short promo videos that show your real product. Ad Creatives is on every plan; Business Promo videos are on the Creator plan and above." },
   ...EXTRA_FAQ,
 ];
 
@@ -54,6 +56,7 @@ function Landing() {
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <Link to="/features" className="hover:text-foreground">Features</Link>
             <Link to="/how-it-works" className="hover:text-foreground">How it works</Link>
+            <a href="#for-business" className="hover:text-foreground">For Business</a>
             <Link to="/pricing" className="hover:text-foreground">Pricing</Link>
             <a href="#comparison" className="hover:text-foreground hidden xl:inline">Compare</a>
             <Link to="/contact" className="hover:text-foreground">Contact</Link>
@@ -124,6 +127,9 @@ function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Small businesses: ads + promo videos */}
+      <BusinessPromoSection />
 
       {/* Upcoming tools (clearly marked Coming soon) */}
       <ComingSoonToolsSection />

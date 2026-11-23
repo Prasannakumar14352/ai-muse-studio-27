@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
 import { ComingSoonToolsSection } from "@/components/coming-soon-tools-section";
+import { BusinessPromoSection } from "@/components/business-promo-section";
 
 export const Route = createFileRoute("/features")({
   head: () => ({
@@ -131,6 +132,8 @@ function FeaturesPage() {
         <FeatureGroup title="AI engines under the hood" items={ENGINES} />
         <FeatureGroup title="Platform delivery" items={PLATFORM} />
       </section>
+
+      <BusinessPromoSection />
 
       <ComingSoonToolsSection />
 
