@@ -3,6 +3,9 @@ import { resolveContentLanguage } from "@/lib/content-language";
 import { estimateProjectCredits } from "@/lib/credit-costs";
 import { creditsLabel } from "@/lib/credits-label";
 import { LanguagePicker, VoiceFallbackNotice, needsVoiceChoice } from "@/components/language-picker";
+import { ScriptRewritePanel } from "@/components/script-rewrite-panel";
+import { SCRIPT_MAX_CHARS, estimateScriptSeconds, splitScriptIntoLines } from "@/lib/script-to-video";
+import { findLanguage } from "@/lib/languages";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { estimateMotionCredits, motionClipCredits, keyMomentClipCount, MOTION_MODELS, KEY_MOMENT_EVERY_SEC, FULL_MOTION_MAX_SEC, type MotionMode, type MotionTier } from "@/lib/motion-clips";
 import { toast } from "sonner";
@@ -811,9 +814,18 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
   const [voiceLanguage, setVoiceLanguage] = useState("");
   const [motionMode, setMotionMode] = useState<MotionMode>("off");
   const [motionTier, setMotionTier] = useState<MotionTier>("standard");
+  // "idea" = AI researches and writes the script; "script" = the creator's own script, word for word.
+  const [mode, setMode] = useState<"idea" | "script">("idea");
+  const [script, setScript] = useState("");
+  const [scriptTitle, setScriptTitle] = useState("");
+  const scriptLang = resolveContentLanguage(language, script);
+  const scriptSec = mode === "script" ? estimateScriptSeconds(script, scriptLang) : 0;
+  const scriptScenes = mode === "script" ? splitScriptIntoLines(script).length : 0;
+  /** Length used for estimates: the chosen preset, or the script's spoken length. */
+  const effDuration = mode === "script" ? Math.max(5, scriptSec) : duration;
   // Full motion animates every beat — offered up to 5 minutes.
-  const fullMotionAllowed = duration <= FULL_MOTION_MAX_SEC;
-  const motionBeats = Math.max(4, Math.ceil(duration / 3.5));
+  const fullMotionAllowed = effDuration <= FULL_MOTION_MAX_SEC;
+  const motionBeats = Math.max(4, Math.ceil(effDuration / 3.5));
   const motionEstimate = estimateMotionCredits(motionBeats, 3.5, motionMode === "full" && !fullMotionAllowed ? "key" : motionMode, motionTier);
 
   const autoFiredRef = useRef(false);
@@ -836,6 +848,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
   );
 
   function submit() {
+    if (mode === "script") return submitScript();
     if (!title.trim()) return toast.error("Enter a video title or idea");
     if (isCustom && !customNiche.trim()) return toast.error("Describe your custom niche or topic area");
     if (needsVoiceChoice(language, voiceLanguage)) return toast.error("Choose a voice language (or no voiceover) for this language first.");
@@ -851,8 +864,70 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     });
   }
 
+  function submitScript() {
+    const text = script.trim();
+    if (!text) return toast.error("Paste your script first");
+    if (text.length > SCRIPT_MAX_CHARS) return toast.error(`Scripts can be up to ${SCRIPT_MAX_CHARS.toLocaleString()} characters`);
+    if (needsVoiceChoice(language, voiceLanguage)) return toast.error("Choose a voice language (or no voiceover) for this language first.");
+    const firstLine = splitScriptIntoLines(text)[0] ?? "My video";
+    const videoTitle = (scriptTitle.trim() || firstLine).slice(0, 100);
+    onGenerate({
+      brief: {
+        title: videoTitle, videoType, duration: Math.max(5, scriptSec) as DurationSec, style, voice, aspectRatio: ratio, sameCharacter,
+        language: language === "auto" ? scriptLang : language,
+        ...(voiceLanguage ? { voiceLanguage } : {}),
+        sourceScript: text,
+        motionMode: motionMode === "full" && !fullMotionAllowed ? "key" : motionMode,
+        motionTier,
+      },
+      niche: "script",
+      topic: videoTitle,
+    });
+  }
+
   return (
     <div className="glass rounded-2xl p-6 space-y-8">
+      {/* Mode tabs */}
+      <div className="inline-flex rounded-xl border border-white/10 p-1 bg-black/20" role="tablist" aria-label="How to make the video">
+        {([["idea", "💡 Idea → Video"], ["script", "📝 Script → Video"]] as const).map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={mode === id} type="button" onClick={() => setMode(id)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${mode === id ? "gradient-primary text-white" : "text-muted-foreground hover:text-foreground"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "script" && (
+        <Section index={1} title="Your script">
+          <p className="text-xs text-muted-foreground mb-2">
+            Paste your script. Every word is kept exactly as you wrote it — each line becomes a scene, and the AI only creates the visuals.
+          </p>
+          <textarea value={script} onChange={(e) => setScript(e.target.value.slice(0, SCRIPT_MAX_CHARS))} rows={12}
+            placeholder={"One line per scene works best.\ne.g. Imagine waking up tomorrow… and it's the year 2100."}
+            className="w-full glass rounded-lg px-4 py-3 outline-none focus:border-white/30 border border-border text-base leading-relaxed" />
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>{script.length.toLocaleString()} / {SCRIPT_MAX_CHARS.toLocaleString()} characters</span>
+            {script.trim() && <>
+              <span>Language: <span className="text-foreground">{findLanguage(scriptLang)?.id ?? scriptLang}</span>{language === "auto" ? " (detected)" : ""}</span>
+              <span>{scriptScenes} scene{scriptScenes === 1 ? "" : "s"}</span>
+              <span>≈ <span className="text-foreground">{scriptSec}s</span> video</span>
+            </>}
+          </div>
+          {script.trim() && (
+            <div className="mt-3">
+              <ScriptRewritePanel script={script} language={scriptLang} onUse={setScript} />
+            </div>
+          )}
+          <div className="mt-4">
+            <label className="text-xs text-muted-foreground block mb-1">Video title (optional — the first line is used if empty)</label>
+            <input value={scriptTitle} onChange={(e) => setScriptTitle(e.target.value)} maxLength={100}
+              placeholder="e.g. 2100లో ఒక రోజు"
+              className="w-full glass rounded-lg px-4 py-2.5 outline-none focus:border-white/30 border border-border text-sm" />
+          </div>
+        </Section>
+      )}
+
+      {mode === "idea" && <>
       {/* 1. Niche */}
       <Section index={1} title="Pick a niche / category">
         <div className="flex flex-wrap gap-2">
@@ -924,6 +999,8 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
         />
       </Section>
 
+      </>}
+
       {/* 4. Video type */}
       <Section index={4} title="Video type">
         <ChipRow
@@ -933,10 +1010,18 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
         />
       </Section>
 
-      {/* 5. Duration */}
-      <Section index={5} title="Duration">
-        <ChipRow options={DURATIONS} value={duration} onChange={setDuration} />
-      </Section>
+      {/* 5. Duration (Script → Video: set by the script itself) */}
+      {mode === "idea" ? (
+        <Section index={5} title="Duration">
+          <ChipRow options={DURATIONS} value={duration} onChange={setDuration} />
+        </Section>
+      ) : (
+        <Section index={5} title="Duration">
+          <p className="text-sm text-muted-foreground">
+            Set by your script: about <span className="text-foreground font-medium">{scriptSec || 0}s</span>. The final video matches the real voiceover length.
+          </p>
+        </Section>
+      )}
 
       {/* 6. Visual style — card grid */}
       <Section index={6} title="Visual style">
@@ -1049,8 +1134,8 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
         {(() => {
           // Same scene count + per-clip voice pricing the pipeline actually charges.
           const base = estimateProjectCredits({
-            contentType: duration > 90 ? "long_video" : "short_reel",
-            lengthSec: duration,
+            contentType: effDuration > 90 ? "long_video" : "short_reel",
+            lengthSec: effDuration,
             language: voiceLanguage && voiceLanguage !== "none" ? voiceLanguage : resolveContentLanguage(language, title),
           });
           const scenes = base.scenes;

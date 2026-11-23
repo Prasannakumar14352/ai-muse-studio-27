@@ -1036,3 +1036,163 @@ export const shortenVoiceoverLines = createServerFn({ method: "POST" })
     const fixed = await shortenLinesWithAi(key, data.lines, data.language, 3, trimmed);
     return { lines: [...fixed.entries()].map(([n, text]) => ({ n, text })), trimmed: [...trimmed] };
   });
+
+
+// ---------------------------------------------------------------------------
+// Script → Video. The creator's own script is split into scenes in code
+// (src/lib/script-to-video.ts) so every word is kept; the AI only adds the
+// visuals, short captions, and the title / caption / hashtags.
+// ---------------------------------------------------------------------------
+
+const ScriptToVideoInput = z.object({
+  lines: z.array(z.string().min(1).max(1200)).min(1).max(120),
+  language: z.string().max(40).default("English"),
+  styleLabel: z.string().max(60).default("Cinematic"),
+  contentType: z.string().max(40).default("short_reel"),
+  aspectRatio: z.string().max(10).default("9:16"),
+  niche: z.string().max(200).optional().default(""),
+});
+
+export const planScriptToVideo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, chargeMiddleware("video_scenes_plan")])
+  .inputValidator((v: unknown) => ScriptToVideoInput.parse(v))
+  .handler(async ({ data }): Promise<AiVideoScript> => {
+    const { lineSeconds } = await import("@/lib/script-to-video");
+    const { gatewayChatJson } = await import("@/lib/ai-gateway.server");
+    type Planned = {
+      title?: string; reel_title?: string; style_note?: string; caption?: string; hashtags?: string[];
+      scenes?: Array<{ n?: number; role?: string; on_screen_text?: string; visual?: string; image_prompt?: string }>;
+    };
+    const numbered = data.lines.map((l, i) => `${i + 1}. ${l}`).join("\n");
+    let planned: Planned = {};
+    try {
+      planned = await gatewayChatJson<Planned>({
+        messages: [
+          {
+            role: "system",
+            content: "You are a senior short-form video creative director. You plan visuals for a script the creator already wrote. You NEVER rewrite, translate or reorder the script. Return ONLY valid JSON.",
+          },
+          {
+            role: "user",
+            content: `The creator's script, already split into ${data.lines.length} numbered scenes (language: ${data.language}):
+"""
+${numbered}
+"""
+${data.niche ? `NICHE: ${data.niche}\n` : ""}VISUAL STYLE: ${data.styleLabel}
+FORMAT: ${data.contentType} (${data.aspectRatio})
+
+Return JSON:
+{
+  "title": "video title in ${data.language}, max 70 chars, based on the script",
+  "reel_title": "short title for the cover, max 40 chars, in ${data.language}",
+  "style_note": "one line describing the visual look shared by every scene",
+  "caption": "social caption in ${data.language}, 2-3 lines",
+  "hashtags": ["8-12 relevant hashtags"],
+  "scenes": [
+    {
+      "n": 1,
+      "role": "Hook | Beat | CTA",
+      "on_screen_text": "0-6 word caption taken from that scene's own words (same language), or an empty string",
+      "visual": "one line in English: what is on screen",
+      "image_prompt": "rich English prompt for an AI image model showing exactly what this scene's line talks about. Include: ${data.styleLabel} style, ${data.aspectRatio}, cinematic lighting, sharp detail. Same characters and look across scenes. NEVER put words, letters, captions or signs in the image."
+    }
+  ]
+}
+Give exactly ${data.lines.length} scenes, one per numbered line, in the same order.`,
+          },
+        ],
+        temperature: 0.6,
+        maxTokens: Math.min(8000, 900 + data.lines.length * 220),
+      });
+    } catch (e) {
+      console.warn("[script-to-video] visual planning failed, using simple prompts", e);
+    }
+
+    const ai = Array.isArray(planned.scenes) ? planned.scenes : [];
+    let t = 0;
+    const scenes: AiVideoScene[] = data.lines.map((line, i) => {
+      const p = ai.find((s) => Number(s?.n) === i + 1) ?? ai[i] ?? {};
+      const sec = Math.round(lineSeconds(line, data.language) * 10) / 10;
+      const start = t;
+      t += sec;
+      return {
+        n: i + 1,
+        time_range: `${Math.round(start)}-${Math.round(t)} sec`,
+        role: String(p.role || (i === 0 ? "Hook" : i === data.lines.length - 1 ? "CTA" : `Beat ${i}`)),
+        // The creator's exact words — never the AI's.
+        voiceover: line,
+        on_screen_text: String(p.on_screen_text ?? "").slice(0, 60),
+        visual: String(p.visual || line).slice(0, 300),
+        image_prompt: String(
+          p.image_prompt ||
+            `${data.styleLabel} style, ${data.aspectRatio}, cinematic lighting, sharp detail. A scene that shows: ${line}. No text in the image.`,
+        ),
+        duration: `${sec}s`,
+      };
+    });
+    const first = data.lines[0] ?? "";
+    return {
+      title: String(planned.title || first).slice(0, 100),
+      reel_title: String(planned.reel_title || first).slice(0, 60),
+      length_sec: Math.round(t),
+      style_note: String(planned.style_note || `${data.styleLabel} look, consistent across scenes`),
+      scenes,
+      caption: String(planned.caption || ""),
+      hashtags: Array.isArray(planned.hashtags) ? planned.hashtags.map(String).slice(0, 15) : [],
+    };
+  });
+
+const RewriteInput = z.object({
+  script: z.string().min(1).max(5000),
+  goal: z.enum(["hook", "tighter", "emotional", "simpler", "fit"]),
+  targetSec: z.number().int().min(15).max(600).optional(),
+  language: z.string().max(40).default("English"),
+});
+
+const GOAL_TEXT: Record<z.infer<typeof RewriteInput>["goal"], string> = {
+  hook: "Make the opening line a much stronger hook that stops the scroll in the first 3 seconds. Keep the rest close to the original, only smoothing the flow.",
+  tighter: "Make it shorter and tighter: remove filler and repetition, keep every real point and the ending call-to-action.",
+  emotional: "Make it warmer and more emotional so viewers feel it, without exaggerating facts.",
+  simpler: "Use simpler, everyday words so anyone can follow it easily.",
+  fit: "Adjust the length to fit the target duration, keeping the main points and the ending call-to-action.",
+};
+
+/** Optional AI rewrite of a creator's script. Returns a suggestion; nothing is applied automatically. */
+export const rewriteScriptFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, chargeMiddleware("script_rewrite")])
+  .inputValidator((v: unknown) => RewriteInput.parse(v))
+  .handler(async ({ data }): Promise<{ script: string }> => {
+    const { gatewayChatJson } = await import("@/lib/ai-gateway.server");
+    const { speechWordsPerSecond } = await import("@/lib/video-duration");
+    const words = data.targetSec ? Math.round(data.targetSec * speechWordsPerSecond(data.language)) : null;
+    const out = await gatewayChatJson<{ script?: string }>({
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert short-video scriptwriter. You improve a creator's script while keeping their voice. Return ONLY valid JSON.",
+        },
+        {
+          role: "user",
+          content: `Rewrite this video script.
+GOAL: ${GOAL_TEXT[data.goal]}${words ? `\nTARGET: about ${data.targetSec} seconds when spoken (~${words} words).` : ""}
+RULES:
+- Same language and the same mix of languages as the original (${data.language}). If it mixes English words into ${data.language}, keep that natural mix. Do not translate it.
+- Keep names, brand names and channel names exactly as written (e.g. channel names in capitals).
+- Keep the meaning and facts; do not invent statistics or claims.
+- One spoken line per line (separate lines with newlines), no stage directions, no emojis, no hashtags.
+
+ORIGINAL SCRIPT:
+"""
+${data.script}
+"""
+
+Return JSON: { "script": "the rewritten script" }`,
+        },
+      ],
+      temperature: 0.7,
+      maxTokens: 3000,
+    });
+    const script = String(out?.script ?? "").trim();
+    if (!script) throw new Error("The AI didn't return a rewrite. Please try again — your credit was refunded.");
+    return { script: script.slice(0, 5000) };
+  });

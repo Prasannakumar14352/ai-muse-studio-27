@@ -268,6 +268,12 @@ export type VideoBrief = {
    * "Hindi"), or "none" for no voiceover. Omitted = same as `language`.
    */
   voiceLanguage?: string;
+  /**
+   * Script → Video: the creator's own script. When set, research and AI
+   * script-writing are skipped and every scene's voiceover is the creator's
+   * exact words; `duration` is fitted to the real narration length.
+   */
+  sourceScript?: string;
   /** Real motion: animate key beats (or all) into AI video clips. Default "off". */
   motionMode?: MotionMode;
   /** "standard" = MiniMax H3 Turbo, "premium" = Kling 2.5 Turbo Pro. */
@@ -716,6 +722,26 @@ export const ScriptAgent = {
       ...fallback,
       debug_json: { raw_responses: [], parse_errors: ["Script generation used a structured fallback after 3 failed attempts."], attempts: 3, used_repair: false, used_fallback: true },
     };
+  },
+};
+
+/** Script → Video: scenes from the creator's own script (exact words; AI adds visuals only). */
+export const UserScriptAgent = {
+  async run(brief: VideoBrief): Promise<AiVideoScript> {
+    const { splitScriptIntoLines } = await import("@/lib/script-to-video");
+    const { resolveContentLanguage } = await import("@/lib/content-language");
+    const { planScriptToVideo } = await import("@/lib/video-ai.functions");
+    const lines = splitScriptIntoLines(brief.sourceScript ?? "");
+    if (!lines.length) throw new Error("Your script is empty.");
+    return planScriptToVideo({
+      data: {
+        lines,
+        language: resolveContentLanguage(brief.language, brief.sourceScript ?? brief.title),
+        styleLabel: STYLE_LABEL[brief.style],
+        contentType: contentTypeFor(brief),
+        aspectRatio: brief.aspectRatio,
+      },
+    });
   },
 };
 
@@ -2023,7 +2049,9 @@ export async function runPlanningPhase(
   const creativeBrief = buildBriefFromIntent(brief.title, cdIntent.intent, cdIntent.confidence);
   const research = await ResearchAgent.run(brief);
   const retentionEngine = await RetentionEngineAgent.run(brief, research);
-  const script = await ScriptAgent.run(brief, research, undefined, retentionEngine);
+  const script = brief.sourceScript?.trim()
+    ? await UserScriptAgent.run(brief)
+    : await ScriptAgent.run(brief, research, undefined, retentionEngine);
   const shots = planShots(script, brief.style, brief.title, creativeBrief);
 
   const job = await createJob({
@@ -2093,7 +2121,9 @@ async function runAssetGenerationPhaseInner(
   const creativeBrief = buildBriefFromIntent(brief.title, cdIntent.intent, cdIntent.confidence);
   const research = await ResearchAgent.run(brief);
   const retentionEngine = await RetentionEngineAgent.run(brief, research);
-  const script = editedScript ?? await ScriptAgent.run(brief, research, undefined, retentionEngine);
+  const script = editedScript ?? (brief.sourceScript?.trim()
+    ? await UserScriptAgent.run(brief)
+    : await ScriptAgent.run(brief, research, undefined, retentionEngine));
   const storyboard = await StoryboardAgent.run(script);
   const direction = await DirectorAgent.run(brief, storyboard);
 
@@ -2234,6 +2264,19 @@ async function runAssetGenerationPhaseInner(
   const voiceover = await VoiceoverAgent.run(brief, script, (d, t) =>
     onEvent({ type: "voiceover", done: d, total: t }),
   );
+  // Script → Video: the video is as long as the creator's narration, not a
+  // preset length — give every scene the time its voiceover actually needs.
+  if (brief.sourceScript?.trim()) {
+    let total = 0;
+    script.scenes = script.scenes.map((s, i) => {
+      const spoken = voiceover[i]?.duration_sec ?? 0;
+      const planned = parseFloat(s.duration) || 3;
+      const sec = Math.max(2.5, spoken > 0 ? spoken + 0.4 : planned);
+      total += sec;
+      return { ...s, duration: `${sec.toFixed(1)}s` };
+    });
+    brief = { ...brief, duration: Math.max(5, Math.ceil(total)) as DurationSec };
+  }
   const subtitles = await SubtitleAgent.run(script, voiceover);
   const timeline = await VideoEditingAgent.run(script, voiceover);
   const music = await MusicAgent.run(brief, timeline.total_sec);

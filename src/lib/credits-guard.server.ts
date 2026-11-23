@@ -49,6 +49,8 @@ export const ACTION_COSTS = {
   // Video AI (plans; scene image renders billed separately at asset level)
   video_script: 1,
   video_scenes_plan: 1,
+  // Script → Video: optional AI rewrite of the creator's own script
+  script_rewrite: 1,
   video_seo: 1,
   video_title_variants: 1,
   video_hook: 1,
