@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
   Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug, Linkedin,
   ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target, Calendar as CalendarIcon, Library, Megaphone, Tag,
-  Bell, User as UserIcon, FolderKanban, Command as CommandIcon, Clapperboard, Lock, Repeat, Wand2,
+  Bell, User as UserIcon, FolderKanban, Command as CommandIcon, Clapperboard, Lock, Repeat, Wand2, ChevronDown, Home,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -138,6 +138,9 @@ const SECTIONS: readonly NavSection[] = [
       { to: "/admin/payments", label: "Payment Settings", icon: CreditCard },
       { to: "/admin/offers", label: "Offers & Codes", icon: Tag },
       { to: "/admin/agents", label: "Agent HQ", icon: Bot },
+      { to: "/admin/landing", label: "Landing Media", icon: ImageIcon },
+      { to: "/admin/currency", label: "Currency", icon: Wallet },
+      { to: "/admin/webhooks", label: "Webhooks", icon: Zap },
     ],
   },
   {
@@ -150,6 +153,8 @@ const SECTIONS: readonly NavSection[] = [
 
 
 const SIDEBAR_COLLAPSED_KEY = "cvai:sidebar:collapsed";
+const SIDEBAR_OPEN_SECTIONS_KEY = "cvai:sidebar:open-sections";
+const DEFAULT_OPEN_SECTIONS = ["Home", "Create"];
 
 function useModuleCounts() {
   return useQuery({
@@ -192,6 +197,21 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
   });
+  // Which sidebar groups are expanded. The group holding the current page is always open.
+  const [openSections, setOpenSections] = useState<string[]>(() => {
+    if (typeof window === "undefined") return DEFAULT_OPEN_SECTIONS;
+    try {
+      const raw = window.localStorage.getItem(SIDEBAR_OPEN_SECTIONS_KEY);
+      return raw ? (JSON.parse(raw) as string[]) : DEFAULT_OPEN_SECTIONS;
+    } catch { return DEFAULT_OPEN_SECTIONS; }
+  });
+  function toggleSection(label: string) {
+    setOpenSections((prev) => {
+      const next = prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label];
+      try { window.localStorage.setItem(SIDEBAR_OPEN_SECTIONS_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -373,23 +393,39 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         {/* Navigation */}
         <nav className={`flex-1 overflow-y-auto ${collapsed ? "px-2" : "px-3"} pb-3 space-y-4 scrollbar-thin`}>
-          {sections.map((section) => (
-            <div key={section.label} className="space-y-1">
-              {!collapsed && (
-                <div className="px-3 pt-2 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase text-muted-foreground/60">
-                  {section.label}
-                </div>
-              )}
-              {collapsed && <div className="mx-3 my-2 h-px bg-border/40" />}
-              <div className="space-y-0.5">
-                {section.items.map((n) => renderNavItem(n))}
+          {sections.filter((s) => s.items.length > 0).map((section) => {
+            const hasActive = section.items.some((n) => isActive(n.to));
+            const isOpen = collapsed || hasActive || openSections.includes(section.label);
+            return (
+              <div key={section.label} className="space-y-1">
+                {!collapsed && (
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(section.label)}
+                    aria-expanded={isOpen}
+                    className="w-full flex items-center justify-between px-3 pt-2 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase text-muted-foreground/70 hover:text-foreground transition"
+                  >
+                    <span>{section.label}</span>
+                    <span className="flex items-center gap-1 normal-case tracking-normal">
+                      {!isOpen && <span className="text-[10px] text-muted-foreground/60">{section.items.length}</span>}
+                      <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? "" : "-rotate-90"}`} />
+                    </span>
+                  </button>
+                )}
+                {collapsed && <div className="mx-3 my-2 h-px bg-border/40" />}
+                {isOpen && (
+                  <div className="space-y-0.5">
+                    {section.items.map((n) => renderNavItem(n))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
         {/* Bottom */}
-        <div className={`${collapsed ? "px-2" : "px-3"} pb-4 pt-3 border-t border-border/40`}>
+        <div className={`${collapsed ? "px-2" : "px-3"} pb-4 pt-3 border-t border-border/40 space-y-2`}>
+          {!collapsed && <SidebarCredits />}
           <button
             onClick={signOut}
             title={collapsed ? "Sign out" : undefined}
@@ -402,7 +438,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-40 grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-5 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+      <div className="md:hidden fixed top-0 inset-x-0 z-40 grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-2.5 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <Link
           to="/dashboard"
           aria-label="CreatorFlow AI home"
@@ -435,7 +471,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Mobile sheet */}
       {open && (
         <div className="md:hidden fixed inset-0 z-30 pt-14 bg-background/95 backdrop-blur-xl overflow-y-auto">
-          <nav className="p-4 space-y-5">
+          <nav className="p-4 pb-28 space-y-5">
             {sections.map((section) => (
               <div key={section.label} className="space-y-1">
                 <div className="px-3 text-[10px] font-semibold tracking-[0.14em] uppercase text-muted-foreground/60">
@@ -499,17 +535,18 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
           <Link
             to="/create"
-            className="hidden lg:inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-white gradient-primary shadow-[var(--shadow-glow)] hover:opacity-95"
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white gradient-primary shadow-[var(--shadow-glow)] hover:brightness-110 transition"
           >
-            <Plus className="w-4 h-4" /> New
+            <Plus className="w-4 h-4" /> Create
           </Link>
           <NotificationsMenu />
           <CreditsChip />
           <ProfileMenu onSignOut={signOut} />
         </div>
         {/* Extra bottom padding so the floating support button never covers the last action on a page. */}
-        <div className="max-w-7xl mx-auto p-6 md:p-10 pb-28 md:pb-28">{children}</div>
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-10 pb-32 md:pb-28">{children}</div>
       </main>
+      <MobileTabBar isActive={isActive} onMore={() => setOpen(true)} />
       <ConfirmDialogHost />
       <PromptDialogHost />
       <CommandPalette />
@@ -690,5 +727,58 @@ function NotificationsMenu() {
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/** Credits left this cycle, shown at the bottom of the sidebar. */
+function SidebarCredits() {
+  const { data: access } = useAccess();
+  if (!access || access.unlimited) return null;
+  const total = getAvailableCredits(access);
+  const limit = Math.max(access.monthlyLimit, total, 1);
+  const pct = Math.max(2, Math.min(100, Math.round((total / limit) * 100)));
+  return (
+    <Link to="/billing" className="block rounded-xl border border-border bg-card px-3 py-2.5 hover:border-primary/50 transition">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">Credits</span>
+        <span className="font-semibold">{total.toLocaleString()}<span className="text-muted-foreground font-normal"> / {limit.toLocaleString()}</span></span>
+      </div>
+      <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
+        <div className="h-full rounded-full gradient-primary" style={{ width: `${pct}%` }} />
+      </div>
+    </Link>
+  );
+}
+
+/** Phone-only bottom bar: the four most-used places plus a big Create button. */
+function MobileTabBar({ isActive, onMore }: { isActive: (to: string) => boolean; onMore: () => void }) {
+  const tabs: Array<{ to: string; label: string; icon: typeof Home }> = [
+    { to: "/dashboard", label: "Home", icon: Home },
+    { to: "/videos", label: "Projects", icon: FolderKanban },
+  ];
+  const right: Array<{ to: string; label: string; icon: typeof Home }> = [
+    { to: "/calendar", label: "Planner", icon: CalendarIcon },
+  ];
+  const item = (t: { to: string; label: string; icon: typeof Home }) => {
+    const active = isActive(t.to);
+    return (
+      <Link key={t.to} to={t.to} className={`flex flex-col items-center gap-0.5 min-w-[56px] text-[10px] font-medium ${active ? "text-primary" : "text-muted-foreground"}`}>
+        <t.icon className="w-5 h-5" />
+        {t.label}
+      </Link>
+    );
+  };
+  return (
+    <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 flex items-start justify-around border-t border-border bg-[#14141D]/95 backdrop-blur-xl px-2 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      {tabs.map(item)}
+      <Link to="/create" aria-label="Create" className="-mt-6 grid h-12 w-12 place-items-center rounded-full gradient-primary text-white shadow-[var(--shadow-glow)]">
+        <Plus className="w-6 h-6" />
+      </Link>
+      {right.map(item)}
+      <button type="button" onClick={onMore} className="flex flex-col items-center gap-0.5 min-w-[56px] text-[10px] font-medium text-muted-foreground">
+        <Menu className="w-5 h-5" />
+        More
+      </button>
+    </nav>
   );
 }

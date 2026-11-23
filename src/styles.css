@@ -43,64 +43,70 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* CreatorFlow AI — Dark brand: near-black warm + brand orange (#f06000) with hot-pink accent */
+/* CreatorFlow AI — 2026 redesign: cool near-black + orange→pink brand gradient.
+   Same token names as before, so every existing page picks up the new look. */
 :root {
-  --radius: 0.85rem;
+  --radius: 0.9rem;
 
-  --background: oklch(0.10 0.008 40);
-  --foreground: oklch(0.97 0.005 60);
+  --background: #0B0B12;
+  --foreground: #F5F5F7;
 
-  --card: oklch(0.15 0.012 40 / 0.6);
-  --card-foreground: oklch(0.97 0.005 60);
+  --card: #14141D;
+  --card-foreground: #F5F5F7;
 
-  --popover: oklch(0.14 0.012 40);
-  --popover-foreground: oklch(0.97 0.005 60);
+  --popover: #161620;
+  --popover-foreground: #F5F5F7;
 
-  --primary: oklch(0.68 0.19 55);            /* brand orange #f06000 */
-  --primary-foreground: oklch(0.12 0.01 40);
+  --primary: #F97316;
+  --primary-foreground: #FFFFFF;
 
-  --secondary: oklch(0.20 0.02 40);
-  --secondary-foreground: oklch(0.97 0.005 60);
+  --secondary: #1C1C28;
+  --secondary-foreground: #F5F5F7;
 
-  --muted: oklch(0.18 0.015 40);
-  --muted-foreground: oklch(0.72 0.015 55);
+  --muted: #1C1C28;
+  --muted-foreground: #9A9AAE;
 
-  --accent: oklch(0.32 0.12 35);
-  --accent-foreground: oklch(0.98 0.005 60);
+  --accent: #23232F;
+  --accent-foreground: #F5F5F7;
 
-  --destructive: oklch(0.62 0.24 20);
-  --destructive-foreground: oklch(0.98 0 0);
+  --destructive: #F43F5E;
+  --destructive-foreground: #FFFFFF;
 
-  --border: oklch(0.35 0.03 45 / 0.35);
-  --input: oklch(0.24 0.02 40 / 0.5);
-  --ring: oklch(0.68 0.19 55);
+  --border: #2A2A38;
+  --input: #2A2A38;
+  --ring: #F97316;
 
-  /* Brand accent trio — kept as variables so existing components auto-rebrand */
-  --brand-orange: oklch(0.68 0.19 55);
-  --brand-orange-glow: oklch(0.78 0.20 65);
-  --brand-pink: oklch(0.68 0.26 15);          /* hot pink for CTA endpoint */
-  --brand-amber: oklch(0.82 0.18 80);
+  /* Brand accents */
+  --brand-orange: #F97316;
+  --brand-orange-glow: #FB923C;
+  --brand-pink: #EC4899;
+  --brand-amber: #F59E0B;
+  --surface: #14141D;
+  --surface-raised: #1C1C28;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --info: #38BDF8;
 
-  /* Legacy alias tokens re-pointed at brand hues so old class refs stay on-brand */
-  --neon-purple: oklch(0.68 0.19 55);         /* was purple → now orange */
-  --neon-pink:   oklch(0.68 0.26 15);         /* was neon-pink → warmer brand pink */
-  --neon-blue:   oklch(0.72 0.15 65);         /* was blue → amber */
+  /* Legacy alias tokens kept so old class refs stay on-brand */
+  --neon-purple: #F97316;
+  --neon-pink:   #EC4899;
+  --neon-blue:   #F59E0B;
 
-  --gradient-primary: linear-gradient(135deg, oklch(0.68 0.19 55), oklch(0.68 0.26 15));
-  --gradient-hero: radial-gradient(ellipse at top, oklch(0.6 0.20 45 / 0.35), transparent 60%),
-                   radial-gradient(ellipse at bottom right, oklch(0.55 0.24 20 / 0.28), transparent 60%);
-  --gradient-card: linear-gradient(135deg, oklch(0.18 0.02 40 / 0.7), oklch(0.12 0.015 40 / 0.5));
-  --shadow-glow: 0 0 60px -10px oklch(0.68 0.19 55 / 0.55);
-  --shadow-glow-pink: 0 0 60px -10px oklch(0.68 0.26 15 / 0.5);
+  --gradient-primary: linear-gradient(90deg, #F97316, #EC4899);
+  --gradient-hero: radial-gradient(ellipse at top, rgb(249 115 22 / 0.22), transparent 60%),
+                   radial-gradient(ellipse at bottom right, rgb(236 72 153 / 0.18), transparent 60%);
+  --gradient-card: linear-gradient(180deg, #15151F, #13131B);
+  --shadow-glow: 0 8px 24px -8px rgb(236 72 153 / 0.55);
+  --shadow-glow-pink: 0 8px 28px -8px rgb(236 72 153 / 0.6);
 
-  --sidebar: oklch(0.12 0.012 40);
-  --sidebar-foreground: oklch(0.95 0.005 60);
-  --sidebar-primary: oklch(0.68 0.19 55);
-  --sidebar-primary-foreground: oklch(0.12 0.01 40);
-  --sidebar-accent: oklch(0.20 0.03 40);
-  --sidebar-accent-foreground: oklch(0.97 0.005 60);
-  --sidebar-border: oklch(0.28 0.03 45 / 0.4);
-  --sidebar-ring: oklch(0.68 0.19 55);
+  --sidebar: #12121A;
+  --sidebar-foreground: #F5F5F7;
+  --sidebar-primary: #F97316;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1C1C28;
+  --sidebar-accent-foreground: #F5F5F7;
+  --sidebar-border: #2A2A38;
+  --sidebar-ring: #F97316;
 }
 
 @layer base {
@@ -120,8 +126,8 @@
   }
   body {
     background-image:
-      radial-gradient(ellipse 80% 60% at 50% -10%, oklch(0.55 0.22 45 / 0.28), transparent 60%),
-      radial-gradient(ellipse 60% 50% at 90% 10%, oklch(0.55 0.24 15 / 0.18), transparent 60%);
+      radial-gradient(ellipse 70% 45% at 50% -15%, rgb(249 115 22 / 0.10), transparent 60%),
+      radial-gradient(ellipse 50% 40% at 95% 0%, rgb(236 72 153 / 0.08), transparent 60%);
     background-attachment: fixed;
   }
   h1, h2, h3, h4 {
@@ -133,16 +139,15 @@
 
 @utility glass {
   background: var(--gradient-card);
-  backdrop-filter: blur(18px);
-  border: 1px solid oklch(1 0 0 / 0.08);
+  border: 1px solid var(--border);
 }
 
 @utility input-base {
   width: 100%;
   padding: 0.5rem 0.75rem;
   border-radius: 0.75rem;
-  background: oklch(1 0 0 / 0.03);
-  border: 1px solid oklch(1 0 0 / 0.10);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
   color: var(--foreground);
   font-size: 0.875rem;
   outline: none;
@@ -150,7 +155,7 @@
 
   &:focus {
     border-color: var(--primary);
-    background: oklch(1 0 0 / 0.05);
+    box-shadow: 0 0 0 3px rgb(249 115 22 / 0.15);
   }
 }
 
