@@ -44,7 +44,13 @@ export const recordAttribution = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-const EVENTS = ["pricing_view", "credits_exhausted", "series_interest"] as const;
+const EVENTS = [
+  "pricing_view", "credits_exhausted", "series_interest",
+  // "Notify me" clicks on the coming-soon AI Tools page (one event per tool,
+  // because events are de-duplicated per user per event per day).
+  "tool_subtitles_interest", "tool_bg_remove_interest", "tool_upscale_interest",
+  "tool_talking_photo_interest", "tool_scene_stitch_interest",
+] as const;
 
 /** Funnel step, stored at most once per user per event per day. */
 export const trackFunnelEvent = createServerFn({ method: "POST" })

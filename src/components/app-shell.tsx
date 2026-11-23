@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Plus, Image as ImageIcon, Type,
   Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug, Linkedin,
   ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target, Calendar as CalendarIcon, Library, Megaphone, Tag,
-  Bell, User as UserIcon, FolderKanban, Command as CommandIcon, Clapperboard, Lock, Repeat,
+  Bell, User as UserIcon, FolderKanban, Command as CommandIcon, Clapperboard, Lock, Repeat, Wand2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -77,6 +77,7 @@ const SECTIONS: readonly NavSection[] = [
     items: [
       { to: "/videos", label: "Projects", icon: FolderKanban, moduleId: "videos" },
       { to: "/series", label: "Series Autopilot", icon: Repeat, soon: true },
+      { to: "/tools", label: "AI Tools", icon: Wand2, soon: true },
       { to: "/create", label: "AI Studio", icon: Bot },
       { to: "/model-studio", label: "Model Studio", icon: Clapperboard },
       { to: "/promo-videos", label: "Promo Video", icon: Megaphone, moduleId: "promo_videos" },
