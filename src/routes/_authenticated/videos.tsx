@@ -62,6 +62,8 @@ import styleDark from "@/assets/style-dark.jpg";
 import styleAncient from "@/assets/style-ancient.jpg";
 import styleCyberpunk from "@/assets/style-cyberpunk.jpg";
 import styleMinimal from "@/assets/style-minimal.jpg";
+import styleFuturistic from "@/assets/style-futuristic.jpg";
+import { VoicePicker } from "@/components/voice-picker";
 
 /** Turn low-level failures into something a creator can act on. */
 function friendlyVideoError(e: unknown, fallback: string): string {
@@ -256,7 +258,7 @@ const STYLE_CARDS: StyleCard[] = [
   { id: "luxury", label: "Luxury", image: styleAncient },
   { id: "cyberpunk", label: "Cyberpunk", image: styleCyberpunk },
   { id: "minimal_product", label: "Minimal Product", image: styleMinimal },
-  { id: "futuristic", label: "Futuristic", image: style3d },
+  { id: "futuristic", label: "Futuristic", image: styleFuturistic },
 ];
 
 type View = "landing" | "input" | "processing" | "review" | "asset_review" | "result" | "library";
@@ -806,7 +808,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
   const [videoType, setVideoType] = useState<VideoType>(initialVideoType ?? "shorts");
   const [duration, setDuration] = useState<DurationSec>(initialDuration ?? 60);
   const [style, setStyle] = useState<StyleId>("cinematic");
-  const [voice, setVoice] = useState<VoiceId>("documentary_narrator");
+  const [voice, setVoice] = useState<VoiceId>("George");
   const [ratio, setRatio] = useState<AspectRatio>(initialRatio ?? "9:16");
   // Off by default: it switches character scenes to HD (8 credits each).
   const [sameCharacter, setSameCharacter] = useState(false);
@@ -1025,14 +1027,14 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
 
       {/* 6. Visual style — card grid */}
       <Section index={6} title="Visual style">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 xl:grid-cols-10 gap-2.5">
           {STYLE_CARDS.map((s) => {
             const selected = style === s.id;
             return (
               <button
                 key={s.id}
                 onClick={() => setStyle(s.id)}
-                className={`group relative aspect-[4/5] rounded-xl overflow-hidden border transition transform hover:scale-[1.03] ${
+                className={`group relative aspect-[4/5] rounded-xl overflow-hidden border transition transform hover:scale-[1.04] ${
                   selected
                     ? "border-transparent ring-2 ring-offset-2 ring-offset-background"
                     : "border-border hover:border-white/20"
@@ -1042,11 +1044,11 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
                 <img src={s.image} alt={s.label} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
                 {selected && (
-                  <div className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg,#f97316,#ec4899)" }}>
-                    <Check className="w-4 h-4" />
+                  <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg,#f97316,#ec4899)" }}>
+                    <Check className="w-3 h-3" />
                   </div>
                 )}
-                <div className="absolute bottom-2 left-3 right-3 text-white text-sm font-semibold drop-shadow-md">
+                <div className="absolute bottom-1.5 left-2 right-2 text-white text-xs font-semibold leading-tight drop-shadow-md text-center">
                   {s.label}
                 </div>
               </button>
@@ -1057,7 +1059,8 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
 
       {/* 7. Voice */}
       <Section index={7} title="Voice">
-        <ChipRow options={VOICES} value={voice} onChange={setVoice} />
+        <VoicePicker value={voice} onChange={setVoice}
+          language={mode === "script" ? scriptLang : resolveContentLanguage(language, title)} />
       </Section>
 
       {/* 8. Aspect ratio */}

@@ -199,6 +199,16 @@ export function OfferBanner() {
     const t = setInterval(() => setNow(Date.now()), fast ? 1000 : 60_000);
     return () => clearInterval(t);
   }, [fast]);
+  // When the banner scrolls out of view, a small floating timer keeps the offer visible.
+  const [bannerEl, setBannerEl] = useState<HTMLDivElement | null>(null);
+  const [offscreen, setOffscreen] = useState(false);
+  const [pillHidden, setPillHidden] = useState(false);
+  useEffect(() => {
+    if (!bannerEl) return;
+    const io = new IntersectionObserver(([e]) => setOffscreen(!e.isIntersecting), { threshold: 0 });
+    io.observe(bannerEl);
+    return () => io.disconnect();
+  }, [bannerEl]);
   if (!b) return null;
   if (b.flash && flashEndsAt === null) return null; // window not worked out yet
   const ends = [b.endsAt ? new Date(b.endsAt).getTime() : null, flashEndsAt].filter((x): x is number => x !== null);
@@ -206,7 +216,23 @@ export function OfferBanner() {
   if (left !== null && left <= 0) return null;
   const countdown = left === null ? null : formatLeft(left);
   return (
-    <div className="w-full gradient-primary text-white text-sm">
+    <>
+    {offscreen && countdown && !pillHidden && (
+      <div role="status" className="fixed left-4 bottom-4 z-[55] max-w-[calc(100vw-6rem)] animate-in fade-in slide-in-from-bottom-2">
+        <div className="relative rounded-2xl gradient-primary text-white shadow-2xl pl-3.5 pr-8 py-2.5 text-xs">
+          <a href="/pricing" className="block">
+            <div className="font-semibold text-sm leading-tight">{b.label} · {b.title}</div>
+            <div className="text-white/90 mt-0.5 font-mono">⏳ {countdown}</div>
+          </a>
+          <button type="button" aria-label="Hide offer timer" onClick={() => setPillHidden(true)}
+            className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/25 hover:bg-black/40 flex items-center justify-center">
+            <X className="w-3 h-3" />
+          </button>
+          <span className="absolute -bottom-1.5 left-6 w-3 h-3 rotate-45 gradient-primary" aria-hidden />
+        </div>
+      </div>
+    )}
+    <div ref={setBannerEl} className="w-full gradient-primary text-white text-sm">
       <div className="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
         <span className="font-semibold">{b.text || `${b.title} — ${b.label}`}</span>
         {b.scope && <span className="text-white/85 text-xs">({b.scope})</span>}
@@ -225,5 +251,6 @@ export function OfferBanner() {
         <a href="/pricing" className="underline text-xs">See plans</a>
       </div>
     </div>
+    </>
   );
 }

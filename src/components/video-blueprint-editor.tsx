@@ -2,6 +2,7 @@
 // Renders the current blueprint from projects.metadata, autosaves edits,
 // and exposes render actions with credit estimates + pre-render validation.
 
+import { VOICE_CATALOG } from "@/lib/voice-catalog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { creditsLabel } from "@/lib/credits-label";
 import { useServerFn } from "@tanstack/react-start";
@@ -445,9 +446,12 @@ export function VideoBlueprintEditor({
               <Select value={bp.voice.voiceId} onValueChange={(v) => patchGlobal({ voice: { ...bp.voice, voiceId: v as VideoBlueprint["voice"]["voiceId"] } })}>
                 <SelectTrigger><SelectValue placeholder="Voice" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="documentary_narrator">Documentary narrator</SelectItem>
+                  {VOICE_CATALOG.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>{v.label} · {v.gender === "male" ? "Male" : "Female"} · {v.vibe}</SelectItem>
+                  ))}
+                  {["male", "female", "documentary_narrator"].includes(bp.voice.voiceId) && (
+                    <SelectItem value={bp.voice.voiceId}>{bp.voice.voiceId.replace("_", " ")}</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
               <Select value={bp.voice.pace} onValueChange={(v) => patchGlobal({ voice: { ...bp.voice, pace: v as VideoBlueprint["voice"]["pace"] } })}>

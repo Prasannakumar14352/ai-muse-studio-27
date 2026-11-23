@@ -249,7 +249,8 @@ export type DurationSec = 30 | 60 | 180 | 300 | 540 | 720;
 export type StyleId =
   | "3d" | "ghibli" | "anime" | "realistic" | "pixar" | "cinematic"
   | "documentary" | "dark_mystery" | "luxury" | "cyberpunk" | "minimal_product" | "futuristic";
-export type VoiceId = "male" | "female" | "documentary_narrator";
+/** "male" | "female" | "documentary_narrator" (older choices) or an ElevenLabs voice name from VOICE_CATALOG. */
+export type VoiceId = string;
 export type AspectRatio = "16:9" | "9:16" | "1:1";
 
 export type VideoBrief = {
@@ -493,7 +494,7 @@ const STYLE_ACCENT: Record<StyleId, string> = {
 };
 
 // Map our voice ids to the TTS provider voices (/api/tts -> openai gpt-4o-mini-tts).
-const VOICE_MAP: Record<VoiceId, string> = {
+const VOICE_MAP: Record<string, string> = {
   male: "onyx",
   female: "nova",
   documentary_narrator: "ash",
@@ -968,7 +969,7 @@ function briefVoiceLanguage(brief: VideoBrief): string | undefined {
 async function fetchSceneAudio(text: string, voice: VoiceId, ctx: AudioContext, language?: string | null): Promise<{ blobUrl: string; buffer: AudioBuffer } | null> {
   if (language === "none" || !text?.trim()) return null;
   try {
-    const res = await ttsFetch(text, VOICE_MAP[voice], language);
+    const res = await ttsFetch(text, VOICE_MAP[voice] ?? voice, language);
     if (!res.ok) return null;
     const bytes = await res.arrayBuffer();
     const buffer = await ctx.decodeAudioData(bytes.slice(0));
