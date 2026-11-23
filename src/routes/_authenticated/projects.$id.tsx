@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { celebrate } from "@/components/celebrate";
+import { PROJECT_STATUS_BADGE, PROJECT_TYPE_LABEL } from "@/lib/project-status";
 import { convertRenderToMp4 } from "@/lib/transcode-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -284,7 +285,7 @@ function ProjectView() {
     return <div className="flex items-center justify-center h-96"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
   }
   if (!project) {
-    return <div className="glass rounded-2xl p-12 text-center">Project not found. <Link to="/videos" className="text-[color:var(--neon-purple)]">Back to projects</Link></div>;
+    return <div className="glass rounded-2xl p-12 text-center">Project not found. <Link to="/videos" className="text-primary font-semibold">Back to projects</Link></div>;
   }
 
   return (
@@ -300,24 +301,34 @@ function ProjectView() {
       )}
 
       {/* Header */}
-      <div className="glass rounded-2xl p-6 md:p-8">
+      <div className="glass rounded-2xl p-5 md:p-7">
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="gradient-primary text-white px-2.5 py-1 rounded-full">{project.content_type}</span>
-          {project.platform && <span className="glass px-2.5 py-1 rounded-full">{project.platform}</span>}
-          {project.tone && <span className="glass px-2.5 py-1 rounded-full">{project.tone}</span>}
-          {project.style && <span className="glass px-2.5 py-1 rounded-full">{project.style}</span>}
+          <span className="rounded-full bg-primary/15 text-primary font-semibold px-2.5 py-1">{PROJECT_TYPE_LABEL[project.content_type ?? ""] ?? project.content_type}</span>
+          {PROJECT_STATUS_BADGE[project.status ?? ""] && (
+            <span className={`rounded-full font-semibold px-2.5 py-1 ${PROJECT_STATUS_BADGE[project.status ?? ""].cls}`}>● {PROJECT_STATUS_BADGE[project.status ?? ""].short}</span>
+          )}
+          {project.platform && <span className="rounded-full bg-secondary border border-border px-2.5 py-1 capitalize">{project.platform}</span>}
+          {project.style && <span className="rounded-full bg-secondary border border-border px-2.5 py-1">{project.style}</span>}
+          {project.tone && <span className="rounded-full bg-secondary border border-border px-2.5 py-1">{project.tone}</span>}
         </div>
         <h1 className="mt-4 text-2xl md:text-3xl font-bold">{output?.title ?? project.title}</h1>
-        {output?.hook && <p className="mt-3 text-lg text-muted-foreground italic">"{output.hook}"</p>}
+        {output?.hook && <p className="mt-2 text-base md:text-lg text-muted-foreground italic">"{output.hook}"</p>}
 
         <div className="mt-6 flex flex-wrap gap-2">
-          {output?.script && <button onClick={() => copy(output.script!, "Script")} className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5"><Copy className="w-4 h-4" /> Copy Script</button>}
-          {output?.captions && <button onClick={() => copy(output.captions!, "Caption")} className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5"><Copy className="w-4 h-4" /> Copy Caption</button>}
+          {project.content_type !== "carousel" && (
+            <button
+              type="button"
+              onClick={() => document.getElementById("video-preview")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              className="rounded-xl gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-2 shadow-[var(--shadow-glow)] hover:brightness-110 transition"
+            >
+              <Play className="w-4 h-4" /> {output?.video_url ? "Watch & download video" : "Go to render"}
+            </button>
+          )}
           <button
             data-testid="copy-post-text"
             onClick={copyPostText}
             disabled={!output?.captions && (output?.hashtags?.length ?? 0) === 0}
-            className="rounded-lg glass px-4 py-2 text-sm flex items-center gap-2 hover:bg-white/5 disabled:opacity-60"
+            className="rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm font-medium flex items-center gap-2 hover:bg-accent transition disabled:opacity-60"
             title="Copy caption + hashtags in ready-to-paste format"
           >
             <Copy className="w-4 h-4" /> Copy post text
@@ -326,27 +337,30 @@ function ProjectView() {
             data-testid="ready-to-post"
             onClick={readyToPost}
             disabled={bundling || !output}
-            className="rounded-lg glass border border-[color:var(--neon-purple)]/50 hover:bg-white/5 px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-60"
+            className="rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm font-medium flex items-center gap-2 hover:bg-accent transition disabled:opacity-60"
             title="Bundle script, captions, hashtags, images, and diagnostics into one ZIP"
           >
             {bundling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
-            Ready to Post
+            Ready-to-post ZIP
           </button>
+          {output?.script && <button onClick={() => copy(output.script!, "Script")} className="rounded-xl px-3 py-2.5 text-sm text-muted-foreground flex items-center gap-2 hover:text-foreground hover:bg-accent transition"><Copy className="w-4 h-4" /> Script</button>}
+          {output?.captions && <button onClick={() => copy(output.captions!, "Caption")} className="rounded-xl px-3 py-2.5 text-sm text-muted-foreground flex items-center gap-2 hover:text-foreground hover:bg-accent transition"><Copy className="w-4 h-4" /> Caption</button>}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-secondary/60 border border-border px-3 py-2.5">
+          <span className="text-xs font-semibold text-muted-foreground mr-1">Regenerate with AI:</span>
           <button
             onClick={() => regenerate("all")}
             disabled={!!regenerating}
-            className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)] disabled:opacity-60">
-            {regenerating === "all" ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            Regenerate All
+            className="rounded-full gradient-primary text-white px-3 py-1 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-60">
+            {regenerating === "all" ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            Everything
           </button>
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-2">
           {(["script", "scenes", "captions", "images"] as const).map((k) => (
             <button key={k} onClick={() => regenerate(k)} disabled={!!regenerating}
-              className="rounded-full glass px-3 py-1 text-xs hover:bg-white/5 flex items-center gap-1.5 disabled:opacity-60">
+              className="rounded-full border border-border bg-card px-3 py-1 text-xs capitalize hover:border-primary/50 flex items-center gap-1.5 disabled:opacity-60">
               {regenerating === k ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-              Re-run {k}
+              {k}
             </button>
           ))}
         </div>
@@ -420,9 +434,9 @@ function ProjectView() {
           <Link to="/carousels" className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-medium">Open in Carousels</Link>
         </div>
       ) : (
-        <div className="glass rounded-2xl p-4 border border-[color:var(--neon-purple)]/30">
+        <div className="rounded-2xl p-4 border border-sky-500/35 bg-sky-500/[0.07]">
           <div className="flex items-start gap-3">
-            <Sparkles className="w-5 h-5 text-[color:var(--neon-purple)] mt-0.5 shrink-0" />
+            <Sparkles className="w-5 h-5 text-sky-400 mt-0.5 shrink-0" />
             <div className="text-sm">
               <div className="font-semibold">Review before rendering</div>
               <div className="text-muted-foreground mt-0.5">
@@ -451,6 +465,7 @@ function ProjectView() {
 
 
       {project.content_type !== "carousel" && (
+        <div id="video-preview" className="scroll-mt-24">
         <VideoPreview
           scenes={scenes}
           title={output?.title ?? project.title}
@@ -472,6 +487,7 @@ function ProjectView() {
           fallbackCaption={output?.captions ?? ""}
           fallbackHashtags={(output?.hashtags ?? []).map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ")}
         />
+        </div>
       )}
 
       {project.content_type !== "carousel" && (

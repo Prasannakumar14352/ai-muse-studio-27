@@ -12,6 +12,7 @@ import { Loader2, FolderOpen, RefreshCw, Sparkles, AlertTriangle, Plus, Trash2 }
 import { ProjectThumbnail } from "@/components/project-thumbnail";
 import { CONTENT_TYPES_BY_ID, PROJECT_STATUSES, type ContentTypeId } from "@/lib/content-types";
 import { useProjectDelete } from "@/hooks/use-project-delete";
+import { PROJECT_STATUS_BADGE } from "@/lib/project-status";
 
 type Props = {
   /** Content-type values in the `projects.content_type` column. */
@@ -133,7 +134,7 @@ export function ProjectsSection({
   const Header = (
     <div className="flex items-center justify-between">
       <h2 className="text-lg font-semibold flex items-center gap-2">
-        <FolderOpen className="w-4 h-4 text-[color:var(--neon-pink)]" /> {title}
+        <FolderOpen className="w-4 h-4 text-primary" /> {title}
       </h2>
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         {data && <span>{data.length} saved</span>}
@@ -141,7 +142,7 @@ export function ProjectsSection({
           type="button"
           onClick={() => refetch()}
           disabled={isFetching}
-          className="glass px-2 py-1 rounded hover:bg-white/5 disabled:opacity-60 inline-flex items-center gap-1"
+          className="rounded-lg border border-border bg-secondary px-2.5 py-1.5 hover:bg-accent disabled:opacity-60 inline-flex items-center gap-1"
           title="Refresh"
         >
           <RefreshCw className={`w-3 h-3 ${isFetching ? "animate-spin" : ""}`} /> Refresh
@@ -189,9 +190,11 @@ export function ProjectsSection({
     return (
       <section className="space-y-3">
         {Header}
-        <div className="glass rounded-2xl p-8 text-center border border-dashed border-white/10">
-          <Sparkles className="w-6 h-6 mx-auto mb-2 text-[color:var(--neon-purple)]" />
-          <div className="font-semibold">No projects here yet</div>
+        <div className="rounded-2xl p-10 text-center border border-dashed border-border bg-card">
+          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-primary/15">
+            <Sparkles className="w-6 h-6 text-primary" />
+          </div>
+          <div className="text-lg font-semibold">No projects here yet</div>
           <div className="text-sm text-muted-foreground mt-1">
             Anything you create for this category will show up here and on the dashboard.
           </div>
@@ -217,7 +220,7 @@ export function ProjectsSection({
           No projects match these filters.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {rows.map((p) => {
             const ct = (p.content_type ?? "").toLowerCase();
             const cardAspect: "portrait" | "landscape" | "square" =
@@ -234,7 +237,7 @@ export function ProjectsSection({
             return (
               <div
                 key={p.id}
-                className="glass rounded-xl overflow-hidden hover:border-white/20 transition border border-border group relative"
+                className="glass rounded-2xl overflow-hidden hover:border-primary/50 hover:-translate-y-0.5 transition border border-border group relative"
               >
                 <button
                   type="button"
@@ -245,7 +248,7 @@ export function ProjectsSection({
                   }}
                   aria-label="Delete project"
                   title="Delete project"
-                  className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition rounded-lg bg-black/70 hover:bg-rose-600 text-white p-1.5"
+                  className="absolute top-2 right-2 z-10 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition rounded-lg bg-black/70 hover:bg-rose-600 text-white p-1.5"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -263,11 +266,16 @@ export function ProjectsSection({
                     status={(p as { status?: string | null }).status}
                     aspect={cardAspect}
                   />
-                  <div className="p-3">
+                  <div className="p-3 space-y-1.5">
+                    {PROJECT_STATUS_BADGE[(p as { status?: string | null }).status ?? ""] && (
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${PROJECT_STATUS_BADGE[(p as { status?: string | null }).status ?? ""].cls}`}>
+                        ● {PROJECT_STATUS_BADGE[(p as { status?: string | null }).status ?? ""].short}
+                      </span>
+                    )}
                     <div className="font-semibold line-clamp-2 text-sm">{p.title}</div>
-                    <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
-                      {p.style && <span className="glass px-1.5 py-0.5 rounded">{p.style}</span>}
-                      <span className="ml-auto">
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                      {p.style && <span className="truncate">{p.style}</span>}
+                      <span className="ml-auto shrink-0">
                         {new Date(p.updated_at ?? p.created_at).toLocaleDateString()}
                       </span>
                     </div>
@@ -289,10 +297,10 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`px-2.5 py-1 rounded-full text-xs transition border ${
+      className={`px-3 py-1.5 rounded-full text-xs font-medium transition border ${
         active
-          ? "bg-[color:var(--neon-pink)]/20 border-[color:var(--neon-pink)]/50 text-white"
-          : "glass border-white/10 hover:border-white/20 text-muted-foreground hover:text-foreground"
+          ? "bg-primary/15 border-primary text-primary"
+          : "bg-secondary border-border hover:border-primary/40 text-muted-foreground hover:text-foreground"
       }`}
     >
       {children}

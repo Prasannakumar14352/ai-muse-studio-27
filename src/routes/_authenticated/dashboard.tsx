@@ -7,6 +7,7 @@ import { useProjectDelete } from "@/hooks/use-project-delete";
 import { getDefaultBrandKitFn } from "@/lib/brand-kit.functions";
 import { listMyConnections } from "@/lib/oauth-user.functions";
 import { ProjectThumbnail } from "@/components/project-thumbnail";
+import { PROJECT_STATUS_BADGE, PROJECT_TYPE_LABEL } from "@/lib/project-status";
 import { OfferCard } from "@/components/offer-code";
 import { openCreateMenu } from "@/components/create-menu";
 import { isHiddenPath, CONNECTIONS_PATH } from "@/lib/hidden-features";
@@ -29,22 +30,9 @@ const QUICK_ACTIONS = [
   { to: "/thumbnails", gate: "/thumbnails", label: "Thumbnail", desc: "High-CTR YouTube covers", icon: Sparkles, tone: "bg-sky-500/15 text-sky-400" },
 ];
 
-/** How each project status reads to the user, with its colour. */
-const STATUS: Record<string, { label: string; cls: string }> = {
-  draft: { label: "Draft — waiting for you", cls: "bg-amber-500/15 text-amber-400" },
-  generating: { label: "Generating…", cls: "bg-orange-500/15 text-orange-400" },
-  rendering: { label: "Rendering…", cls: "bg-orange-500/15 text-orange-400" },
-  generated: { label: "Ready", cls: "bg-emerald-500/15 text-emerald-400" },
-  completed: { label: "Ready", cls: "bg-emerald-500/15 text-emerald-400" },
-  fallback_ready: { label: "Ready", cls: "bg-emerald-500/15 text-emerald-400" },
-  failed: { label: "Failed — credits refunded", cls: "bg-rose-500/15 text-rose-400" },
-};
+const STATUS = PROJECT_STATUS_BADGE;
 
-const TYPE_LABEL: Record<string, string> = {
-  long_video: "Video", short_reel: "Short / Reel", documentary: "Documentary", talking_object: "Video",
-  product_promo: "Product promo", promo_video: "Business promo", ugc: "UGC video", ai_image: "Image",
-  carousel: "Carousel", thumbnail: "Thumbnail", caption_only: "Captions", seo_pack: "SEO package", linkedin_post: "LinkedIn post",
-};
+const TYPE_LABEL = PROJECT_TYPE_LABEL;
 
 const PORTRAIT = new Set(["short_reel", "ugc", "talking_object"]);
 
@@ -428,7 +416,7 @@ function RecentProjectCard({ project }: { project: RecentProject }) {
         <div className="p-3 space-y-1">
           <div className="text-sm font-semibold line-clamp-1">{project.title}</div>
           <div className="text-[11px] text-muted-foreground">
-            {st ? st.label.split(" —")[0] : TYPE_LABEL[project.content_type ?? ""] ?? "Project"}
+            {st ? st.short : TYPE_LABEL[project.content_type ?? ""] ?? "Project"}
           </div>
         </div>
       </Link>

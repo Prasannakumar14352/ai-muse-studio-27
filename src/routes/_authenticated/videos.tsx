@@ -8,6 +8,7 @@ import { LanguagePicker, VoiceFallbackNotice, needsVoiceChoice } from "@/compone
 import { ScriptRewritePanel } from "@/components/script-rewrite-panel";
 import { SCRIPT_MAX_CHARS, estimateScriptSeconds, splitScriptIntoLines } from "@/lib/script-to-video";
 import { findLanguage } from "@/lib/languages";
+import { useAccess, getAvailableCredits } from "@/lib/access";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { estimateMotionCredits, motionClipCredits, keyMomentClipCount, MOTION_MODELS, KEY_MOMENT_EVERY_SEC, FULL_MOTION_MAX_SEC, type MotionMode, type MotionTier } from "@/lib/motion-clips";
 import { toast } from "sonner";
@@ -676,16 +677,14 @@ function VideosPage() {
                 AI <span className="gradient-text">Video Studio</span>
               </h1>
               <p className="text-muted-foreground mt-1">
-                One idea in, a ready-to-post video out — script, visuals, voice, music, subtitles, thumbnail, SEO.
+                You review the script and every scene before media credits are spent.
               </p>
             </>
           ) : (
             <>
-              <h1 className="text-3xl md:text-4xl font-bold">
-                Your <span className="gradient-text">Videos</span>
-              </h1>
+              <h1 className="text-3xl md:text-4xl font-bold">Projects</h1>
               <p className="text-muted-foreground mt-1">
-                AI-generated shorts and long-form videos with thumbnails, subtitles, and SEO.
+                Every video and short you've made — open one to edit, download or schedule it.
               </p>
             </>
           )}
@@ -693,7 +692,7 @@ function VideosPage() {
         {showHeaderNewBtn && (
           <button
             onClick={() => setView("input")}
-            className="rounded-lg gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-2 shrink-0"
+            className="rounded-xl gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-2 shrink-0 shadow-[var(--shadow-glow)] hover:brightness-110 transition"
           >
             <Plus className="w-4 h-4" /> New video
           </button>
@@ -722,6 +721,10 @@ function VideosPage() {
             <ThumbnailLibrarySection items={thumbLibrary} onDelete={removeThumb} />
           )}
         </>
+      )}
+
+      {(view === "input" || view === "processing" || view === "review" || view === "asset_review" || view === "result") && (
+        <StudioStepper view={view} phase={dash.phase} />
       )}
 
       {view === "input" && (
@@ -788,6 +791,35 @@ function VideosPage() {
     </div>
   );
 }
+/** Where the user is in the video flow: Brief → Script → Scenes → Render. */
+function StudioStepper({ view, phase }: { view: View; phase: JobPhaseId }) {
+  const steps = ["Your brief", "Review script", "Review scenes", "Render"];
+  let current = 0;
+  if (view === "review" || (view === "processing" && phase === "planning")) current = 1;
+  if (view === "asset_review" || (view === "processing" && (phase === "generating_shots" || phase === "voiceover"))) current = 2;
+  if (view === "processing" && (phase === "rendering" || phase === "validating")) current = 3;
+  if (view === "result") current = 4;
+  return (
+    <ol className="flex items-center gap-2 overflow-x-auto pb-1" aria-label="Progress">
+      {steps.map((label, i) => {
+        const done = i < current;
+        const on = i === current;
+        return (
+          <li key={label} className="flex items-center gap-2 shrink-0">
+            {i > 0 && <span className={`h-0.5 w-6 sm:w-12 rounded-full ${done || on ? "bg-emerald-500/70" : "bg-border"}`} aria-hidden />}
+            <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${
+              done ? "bg-emerald-500 text-white" : on ? "gradient-primary text-white shadow-[var(--shadow-glow)]" : "bg-secondary text-muted-foreground"
+            }`}>
+              {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
+            </span>
+            <span className={`text-sm font-medium ${done || on ? "text-foreground" : "text-muted-foreground"}`} aria-current={on ? "step" : undefined}>{label}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 function EmptyLibrary({ onNew }: { onNew: () => void }) {
   return (
     <div className="glass rounded-2xl p-16 flex flex-col items-center justify-center text-center border border-border">
@@ -918,20 +950,82 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     });
   }
 
-  return (
-    <div className="glass rounded-2xl p-6 space-y-8">
-      {/* Mode tabs */}
-      <div className="inline-flex rounded-xl border border-white/10 p-1 bg-black/20" role="tablist" aria-label="How to make the video">
-        {([["idea", "💡 Idea → Video"], ["script", "📝 Script → Video"]] as const).map(([id, label]) => (
-          <button key={id} role="tab" aria-selected={mode === id} type="button" onClick={() => setMode(id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${mode === id ? "gradient-primary text-white" : "text-muted-foreground hover:text-foreground"}`}>
-            {label}
-          </button>
-        ))}
+  // Running number for the form sections, so they stay 1, 2, 3… in both modes.
+  let sectionNo = 0;
+  const next = () => ++sectionNo;
+
+  // Same scene count + per-clip voice pricing the pipeline actually charges.
+  const estimate = (() => {
+    const base = estimateProjectCredits({
+      contentType: effDuration > 90 ? "long_video" : "short_reel",
+      lengthSec: effDuration,
+      language: voiceLanguage && voiceLanguage !== "none" ? voiceLanguage : resolveContentLanguage(language, title),
+    });
+    // Same-character scenes use HD images (8 instead of 1) for ~70% of shots, plus one portrait.
+    const extra = sameCharacter ? Math.round(base.scenes * 0.7) * 7 + 8 : 0;
+    const motion = motionMode === "off" ? 0 : motionEstimate.credits;
+    return { total: base.total + extra + motion, parts: base.parts, extra, motion, scenes: base.scenes };
+  })();
+  const { data: access } = useAccess();
+  const available = access ? getAvailableCredits(access) : null;
+  const enough = available === null || available >= estimate.total;
+  const langCode = mode === "script" ? scriptLang : resolveContentLanguage(language, title);
+  const styleLabel = STYLE_CARDS.find((x) => x.id === style)?.label ?? style;
+  const typeLabel = VIDEO_TYPES.find((x) => x.id === videoType)?.label ?? videoType;
+  const ready = mode === "script" ? !!script.trim() : !!title.trim();
+
+  const summary = (
+    <div className="glass rounded-2xl p-5 space-y-3">
+      <div className="font-semibold">Summary</div>
+      <SummaryRow label="Mode" value={mode === "script" ? "Script → Video" : "Idea → Video"} />
+      <SummaryRow label="Language" value={findLanguage(langCode)?.id ?? langCode} />
+      <SummaryRow label="Format" value={`${typeLabel} · ${ratio} · ~${effDuration}s`} />
+      <SummaryRow label="Style" value={styleLabel} />
+      <SummaryRow label="Voice" value={voiceLanguage === "none" ? "No voiceover" : String(voice)} />
+      <SummaryRow label="Motion" value={motionMode === "off" ? "Camera moves" : motionMode === "key" ? "Key moments" : "Full motion"} />
+      <div className="h-px bg-border" />
+      <div className="text-xs text-muted-foreground leading-relaxed">
+        {estimate.parts}{estimate.extra ? ` + ${estimate.extra} for the same character` : ""}{estimate.motion ? ` + ${estimate.motion} for motion clips` : ""}
       </div>
+      <div className="flex items-baseline justify-between">
+        <span className="font-semibold">Estimated total</span>
+        <span className="text-2xl font-bold text-primary [font-family:'Space_Grotesk',Inter,sans-serif]">≈ {creditsLabel(estimate.total)}</span>
+      </div>
+      {available !== null && Number.isFinite(available) && (
+        <div className={`rounded-xl px-3 py-2 text-xs font-medium ${enough ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>
+          {enough
+            ? `✓ You have ${available.toLocaleString()} credits — enough for this video`
+            : `You have ${available.toLocaleString()} credits — top up before you start`}
+        </div>
+      )}
+      <button
+        onClick={submit}
+        disabled={!ready}
+        className="w-full rounded-xl gradient-primary text-white px-6 py-3 text-sm font-semibold flex items-center justify-center gap-2 shadow-[var(--shadow-glow)] hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Wand2 className="w-4 h-4" /> {mode === "script" ? "Plan scenes from my script" : "Generate video"}
+      </button>
+      <p className="text-[11px] text-muted-foreground leading-relaxed">
+        🛡 You review the script and every scene before images, voice and render are made. Anything that fails is refunded automatically.
+      </p>
+    </div>
+  );
+
+  return (
+    <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+      <div className="space-y-5 min-w-0">
+        {/* Mode tabs */}
+        <div className="inline-flex rounded-xl border border-border bg-card p-1" role="tablist" aria-label="How to make the video">
+          {([["idea", "💡 From an idea"], ["script", "📝 From my script"]] as const).map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={mode === id} type="button" onClick={() => setMode(id)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${mode === id ? "gradient-primary text-white shadow-[var(--shadow-glow)]" : "text-muted-foreground hover:text-foreground"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
 
       {mode === "script" && (
-        <Section index={1} title="Your script">
+        <Section index={next()} title="Your script">
           <p className="text-xs text-muted-foreground mb-2">
             Paste your script. Every word is kept exactly as you wrote it — each line becomes a scene, and the AI only creates the visuals.
           </p>
@@ -962,7 +1056,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
 
       {mode === "idea" && <>
       {/* 1. Niche */}
-      <Section index={1} title="Pick a niche / category">
+      <Section index={next()} title="Pick a niche / category">
         <div className="flex flex-wrap gap-2">
           {NICHES.map((n) => (
             <button
@@ -1005,7 +1099,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
 
       {/* 2. Suggested topics */}
       {!isCustom && (
-        <Section index={2} title="Suggested topics">
+        <Section index={next()} title="Suggested topics">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {currentNiche.topics.map((t) => (
               <button
@@ -1023,7 +1117,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
       )}
 
       {/* 3. Title */}
-      <Section index={3} title="Video title / idea">
+      <Section index={next()} title="Video title / idea">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -1035,7 +1129,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
       </>}
 
       {/* 4. Video type */}
-      <Section index={4} title="Video type">
+      <Section index={next()} title="Video type">
         <ChipRow
           options={VIDEO_TYPES}
           value={videoType}
@@ -1045,11 +1139,11 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
 
       {/* 5. Duration (Script → Video: set by the script itself) */}
       {mode === "idea" ? (
-        <Section index={5} title="Duration">
+        <Section index={next()} title="Duration">
           <ChipRow options={DURATIONS} value={duration} onChange={setDuration} />
         </Section>
       ) : (
-        <Section index={5} title="Duration">
+        <Section index={next()} title="Duration">
           <p className="text-sm text-muted-foreground">
             Set by your script: about <span className="text-foreground font-medium">{scriptSec || 0}s</span>. The final video matches the real voiceover length.
           </p>
@@ -1057,7 +1151,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
       )}
 
       {/* 6. Visual style — card grid */}
-      <Section index={6} title="Visual style">
+      <Section index={next()} title="Visual style">
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 xl:grid-cols-10 gap-2.5">
           {STYLE_CARDS.map((s) => {
             const selected = style === s.id;
@@ -1089,25 +1183,25 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
       </Section>
 
       {/* 7. Voice */}
-      <Section index={7} title="Voice">
+      <Section index={next()} title="Voice">
         <VoicePicker value={voice} onChange={setVoice}
           language={mode === "script" ? scriptLang : resolveContentLanguage(language, title)} />
       </Section>
 
       {/* 8. Aspect ratio */}
-      <Section index={8} title={`Aspect ratio${ratio !== suggestedRatio ? ` (suggested: ${suggestedRatio})` : ""}`}>
+      <Section index={next()} title={`Aspect ratio${ratio !== suggestedRatio ? ` (suggested: ${suggestedRatio})` : ""}`}>
         <ChipRow options={ASPECT_RATIOS.map((r) => ({ id: r, label: r }))} value={ratio} onChange={setRatio} />
       </Section>
 
       {/* Language */}
-      <Section index={9} title="Language">
+      <Section index={next()} title="Language">
         <p className="text-xs text-muted-foreground mb-2">Script, subtitles and narration. "Same as topic" follows the language of your title.</p>
         <LanguagePicker allowAuto showVoice value={language} onChange={(v) => { setLanguage(v); setVoiceLanguage(""); }} />
         <VoiceFallbackNotice language={language} voiceLanguage={voiceLanguage} onChange={setVoiceLanguage} />
       </Section>
 
       {/* 9. Character consistency */}
-      <Section index={10} title="Main character">
+      <Section index={next()} title="Main character">
         <label className="flex items-start gap-3 cursor-pointer glass rounded-xl p-3 border border-border">
           <input
             type="checkbox"
@@ -1125,7 +1219,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
       </Section>
 
       {/* 10. Motion */}
-      <Section index={11} title="Motion">
+      <Section index={next()} title="Motion">
         <div className="space-y-3">
           <div className="grid sm:grid-cols-3 gap-2">
             {([
@@ -1163,46 +1257,47 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
         </div>
       </Section>
 
-      {/* 12. Generate */}
-      <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
-        {(() => {
-          // Same scene count + per-clip voice pricing the pipeline actually charges.
-          const base = estimateProjectCredits({
-            contentType: effDuration > 90 ? "long_video" : "short_reel",
-            lengthSec: effDuration,
-            language: voiceLanguage && voiceLanguage !== "none" ? voiceLanguage : resolveContentLanguage(language, title),
-          });
-          const scenes = base.scenes;
-          // Same-character scenes use HD images (8 instead of 1) for ~70% of shots, plus one portrait.
-          const extra = sameCharacter ? Math.round(scenes * 0.7) * 7 + 8 : 0;
-          const motion = motionMode === "off" ? 0 : motionEstimate.credits;
-          return (
-            <div className="text-xs text-muted-foreground text-right">
-              Estimated cost: <span className="font-semibold text-foreground">≈ {creditsLabel(base.total + extra + motion)}</span>
-              <div className="text-[11px]">{base.parts}{extra ? ` + ${extra} for the same character` : ""}{motion ? ` + ${motion} for motion clips` : ""}</div>
-            </div>
-          );
-        })()}
-        <button
-          onClick={submit}
-          className="rounded-lg gradient-primary text-white px-6 py-3 text-sm font-semibold flex items-center gap-2"
-        >
-          <Wand2 className="w-4 h-4" /> Generate video
+      </div>
+
+      {/* Summary + cost — stays in view while scrolling on desktop */}
+      <div className="lg:sticky lg:top-20 space-y-4">
+        {summary}
+      </div>
+
+      {/* Phone: cost and the main button stay reachable above the tab bar */}
+      <div className="lg:hidden fixed left-3 right-[76px] bottom-[84px] z-30 flex items-center gap-3 rounded-2xl border border-border bg-[#14141D]/95 backdrop-blur-xl px-4 py-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.45)]">
+        <div className="flex-1 min-w-0">
+          <div className="text-[11px] text-muted-foreground">Estimated</div>
+          <div className="text-base font-bold text-primary">≈ {creditsLabel(estimate.total)}</div>
+        </div>
+        <button onClick={submit} disabled={!ready}
+          className="rounded-xl gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50">
+          <Wand2 className="w-4 h-4" /> {mode === "script" ? "Plan scenes" : "Generate"}
         </button>
       </div>
+      <div className="h-14 lg:hidden" aria-hidden />
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-right truncate">{value}</span>
     </div>
   );
 }
 
 function Section({ index, title, children }: { index: number; title: string; children: React.ReactNode }) {
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-3">
-        <span className="w-6 h-6 rounded-full text-xs font-semibold flex items-center justify-center gradient-primary text-white">{index}</span>
-        <h2 className="text-sm font-semibold">{title}</h2>
+    <section className="glass rounded-2xl p-5">
+      <div className="flex items-center gap-2.5 mb-3.5">
+        <span className="w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center bg-primary/15 text-primary">{index}</span>
+        <h2 className="text-base font-semibold">{title}</h2>
       </div>
       {children}
-    </div>
+    </section>
   );
 }
 
