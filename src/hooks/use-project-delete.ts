@@ -20,6 +20,8 @@ const UNDO_MS = 6000;
 // Every list/counter that could contain (or count) the deleted project.
 const INVALIDATION_KEYS: QueryKey[] = [
   ["recent-projects"],
+  ["dashboard-recent-projects"],
+  ["dashboard-counts"],
   ["stats"],
   ["module-counts"],
   ["projects-section"],

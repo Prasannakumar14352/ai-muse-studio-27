@@ -254,3 +254,30 @@ export function OfferBanner() {
     </>
   );
 }
+
+/** Compact offer card for the signed-in dashboard. Same countdown rules as the banner. */
+export function OfferCard() {
+  const fn = useServerFn(getOfferBanner);
+  const q = useQuery({ queryKey: ["offer-banner"], queryFn: () => fn(), staleTime: 5 * 60_000 });
+  const b = q.data;
+  const flashEndsAt = useFlashWindow(b?.offerId, b?.flash);
+  const [now, setNow] = useState(() => Date.now());
+  const fast = !!b?.flash;
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), fast ? 1000 : 60_000);
+    return () => clearInterval(t);
+  }, [fast]);
+  if (!b) return null;
+  if (b.flash && flashEndsAt === null) return null;
+  const ends = [b.endsAt ? new Date(b.endsAt).getTime() : null, flashEndsAt].filter((x): x is number => x !== null);
+  const left = ends.length ? Math.min(...ends) - now : null;
+  if (left !== null && left <= 0) return null;
+  return (
+    <a href="/pricing" className="block rounded-2xl gradient-primary p-5 text-white shadow-[var(--shadow-glow)] transition hover:brightness-110">
+      <div className="text-base font-bold">🎉 {b.label} · {b.title}</div>
+      {b.scope && <div className="mt-0.5 text-sm text-white/90">{b.scope}</div>}
+      {left !== null && <div className="mt-2 text-2xl font-bold [font-family:'Space_Grotesk',Inter,sans-serif]">⏳ {formatLeft(left)}</div>}
+      <div className="mt-3 inline-flex rounded-xl bg-black/25 px-3 py-1.5 text-sm font-semibold">See plans →</div>
+    </a>
+  );
+}

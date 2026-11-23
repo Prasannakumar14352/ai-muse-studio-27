@@ -1,195 +1,279 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { useAccess } from "@/lib/access";
+import { useAccess, getAvailableCredits } from "@/lib/access";
 import { useProjectDelete } from "@/hooks/use-project-delete";
 import { getDefaultBrandKitFn } from "@/lib/brand-kit.functions";
-import { openCommandPalette } from "@/components/command-palette";
-
+import { listMyConnections } from "@/lib/oauth-user.functions";
+import { ProjectThumbnail } from "@/components/project-thumbnail";
+import { OfferCard } from "@/components/offer-code";
+import { openCreateMenu } from "@/components/create-menu";
+import { isHiddenPath, CONNECTIONS_PATH } from "@/lib/hidden-features";
+import { useSocialPublishingAvailable } from "@/lib/use-social-publishing";
+import { usePlanAccess, useUpgradeDialog } from "@/lib/use-plan-access";
+import { TIER_LABEL } from "@/lib/plan-access";
 import {
-  Plus, Video, Film, Image as ImageIcon, Type, Sparkles, Layers, Megaphone,
-  Linkedin, Crown, Zap, Calendar as CalendarIcon, ArrowUpRight, Trash2,
-  Palette as PaletteIcon, TrendingUp, Search, Bot, Command as CommandIcon,
-  CheckCircle2, AlertCircle,
+  ArrowRight, Calendar as CalendarIcon, Check, Crown, FileText, Layers, Lightbulb, Lock, Megaphone,
+  Palette as PaletteIcon, Plus, Sparkles, Target, Trash2, TrendingUp, Zap,
 } from "lucide-react";
-import { isHiddenPath } from "@/lib/hidden-features";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
 
 const QUICK_ACTIONS = [
-  { to: "/videos", label: "Long Video", desc: "YouTube-length", icon: Video, hue: "from-pink-500 to-rose-600" },
-  { to: "/videos", label: "Short / Reel", desc: "9:16 vertical", icon: Film, hue: "from-fuchsia-500 to-purple-600" },
-  { to: "/promo-videos", label: "Business Promo", desc: "Promo videos with your real product", icon: Megaphone, hue: "from-amber-400 to-orange-500" },
-  { to: "/carousels", label: "Carousel", desc: "Slides deck", icon: Layers, hue: "from-indigo-500 to-purple-600" },
-  { to: "/images", label: "AI Image", desc: "Batch + edit", icon: ImageIcon, hue: "from-emerald-400 to-teal-500" },
-  { to: "/thumbnails", label: "Thumbnail", desc: "CTR-optimized", icon: Sparkles, hue: "from-orange-400 to-pink-500" },
-  { to: "/linkedin-posts", label: "LinkedIn Post", desc: "Content studio", icon: Linkedin, hue: "from-sky-500 to-indigo-600" },
-  { to: "/captions", label: "Captions", desc: "Hooks & hashtags", icon: Type, hue: "from-violet-500 to-fuchsia-500" },
+  { to: "/videos", search: { new: "script" as const }, gate: "/videos", label: "Script → Video", desc: "Paste your script, keep every word", icon: FileText, tone: "bg-orange-500/15 text-orange-400" },
+  { to: "/videos", search: { new: "idea" as const }, gate: "/videos", label: "Idea → Video", desc: "One idea in, full video out", icon: Lightbulb, tone: "bg-orange-500/15 text-orange-400" },
+  { to: "/promo-videos", gate: "/promo-videos", label: "Business Promo", desc: "Promo video with your real product", icon: Megaphone, tone: "bg-pink-500/15 text-pink-400" },
+  { to: "/ad-creatives", gate: "/ad-creatives", label: "Ad Creative", desc: "Ready-to-post Meta ads", icon: Target, tone: "bg-pink-500/15 text-pink-400" },
+  { to: "/carousels", gate: "/carousels", label: "Carousel", desc: "Swipeable slides with your brand", icon: Layers, tone: "bg-sky-500/15 text-sky-400" },
+  { to: "/thumbnails", gate: "/thumbnails", label: "Thumbnail", desc: "High-CTR YouTube covers", icon: Sparkles, tone: "bg-sky-500/15 text-sky-400" },
 ];
+
+/** How each project status reads to the user, with its colour. */
+const STATUS: Record<string, { label: string; cls: string }> = {
+  draft: { label: "Draft — waiting for you", cls: "bg-amber-500/15 text-amber-400" },
+  generating: { label: "Generating…", cls: "bg-orange-500/15 text-orange-400" },
+  rendering: { label: "Rendering…", cls: "bg-orange-500/15 text-orange-400" },
+  generated: { label: "Ready", cls: "bg-emerald-500/15 text-emerald-400" },
+  completed: { label: "Ready", cls: "bg-emerald-500/15 text-emerald-400" },
+  fallback_ready: { label: "Ready", cls: "bg-emerald-500/15 text-emerald-400" },
+  failed: { label: "Failed — credits refunded", cls: "bg-rose-500/15 text-rose-400" },
+};
+
+const TYPE_LABEL: Record<string, string> = {
+  long_video: "Video", short_reel: "Short / Reel", documentary: "Documentary", talking_object: "Video",
+  product_promo: "Product promo", promo_video: "Business promo", ugc: "UGC video", ai_image: "Image",
+  carousel: "Carousel", thumbnail: "Thumbnail", caption_only: "Captions", seo_pack: "SEO package", linkedin_post: "LinkedIn post",
+};
+
+const PORTRAIT = new Set(["short_reel", "ugc", "talking_object"]);
+
+type RecentProject = {
+  id: string; title: string; content_type: string | null; status: string | null; updated_at: string | null;
+  style: string | null; platform: string | null; thumbnail_url: string | null; cover_image_url: string | null; poster_url: string | null;
+};
+
+function timeGreeting() {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
 
 function Dashboard() {
   const { data: access, isLoading } = useAccess();
-  const { data: brandKit } = useQuery({
-    queryKey: ["default-brand-kit"],
-    queryFn: () => getDefaultBrandKitFn(),
-  });
+  const userId = access?.userId;
+  const socialAvailable = useSocialPublishingAvailable();
+  const myConns = useServerFn(listMyConnections);
+  const showConnect = !isHiddenPath(CONNECTIONS_PATH) && (socialAvailable || !!access?.isAdmin);
+
+  const { data: brandKit } = useQuery({ queryKey: ["default-brand-kit"], queryFn: () => getDefaultBrandKitFn() });
 
   const { data: recent } = useQuery({
-    queryKey: ["dashboard-recent-projects"],
+    queryKey: ["dashboard-recent-projects", userId],
+    enabled: !!userId,
     queryFn: async () => {
       const { data } = await supabase
         .from("projects")
-        .select("id, title, content_type, updated_at, created_at")
+        .select("id, title, content_type, status, updated_at, style, platform, thumbnail_url, cover_image_url, poster_url")
+        .eq("user_id", userId!)
         .order("updated_at", { ascending: false })
-        .limit(8);
-      return data ?? [];
+        .limit(5);
+      return (data ?? []) as RecentProject[];
     },
   });
 
   const { data: usage } = useQuery({
-    queryKey: ["dashboard-usage"],
+    queryKey: ["dashboard-usage", userId],
+    enabled: !!userId,
     queryFn: async () => {
       const { data } = await supabase
         .from("usage_history")
         .select("*")
+        .eq("user_id", userId!)
         .order("created_at", { ascending: false })
-        .limit(6);
+        .limit(5);
       return data ?? [];
     },
   });
 
   const { data: counts } = useQuery({
-    queryKey: ["dashboard-counts"],
+    queryKey: ["dashboard-counts", userId],
+    enabled: !!userId,
     queryFn: async () => {
-      const [{ count: projects }, { count: assets }, { count: scheduled }] = await Promise.all([
-        supabase.from("projects").select("*", { count: "exact", head: true }),
-        supabase.from("asset_library").select("*", { count: "exact", head: true }),
-        supabase.from("scheduled_posts").select("*", { count: "exact", head: true }).eq("status", "scheduled"),
+      const [{ count: projects }, { count: scheduled }] = await Promise.all([
+        supabase.from("projects").select("*", { count: "exact", head: true }).eq("user_id", userId!),
+        supabase.from("scheduled_posts").select("*", { count: "exact", head: true }).eq("user_id", userId!),
       ]);
-      return { projects: projects ?? 0, assets: assets ?? 0, scheduled: scheduled ?? 0 };
+      return { projects: projects ?? 0, scheduled: scheduled ?? 0 };
     },
+  });
+
+  const { data: connections } = useQuery({
+    queryKey: ["platform_connections"],
+    enabled: showConnect,
+    queryFn: () => myConns(),
   });
 
   if (isLoading || !access) {
     return (
       <div className="space-y-4">
-        <div className="glass rounded-2xl h-32 animate-pulse" />
-        <div className="glass rounded-2xl h-48 animate-pulse" />
+        <div className="glass rounded-2xl h-24 animate-pulse" />
+        <div className="glass rounded-2xl h-40 animate-pulse" />
+        <div className="glass rounded-2xl h-56 animate-pulse" />
       </div>
     );
   }
 
   const firstName = (access.email ?? "").split("@")[0].split(/[._-]/)[0];
-  const greeting = firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1) : "creator";
-  const monthlyLeft = access.unlimited ? Infinity : access.monthlyRemaining;
-  const monthlyLimit = access.unlimited ? Infinity : access.monthlyLimit;
-  const pct = access.unlimited || monthlyLimit === 0 ? 100 : Math.round((monthlyLeft / monthlyLimit) * 100);
+  const name = firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1) : "creator";
+  const latest = recent?.[0];
+  const others = (recent ?? []).slice(1, 5);
+  const latestStatus = latest ? STATUS[latest.status ?? ""] : undefined;
+
+  const steps = [
+    { label: "Create your account", done: true, to: undefined },
+    { label: "Make your first project", done: (counts?.projects ?? 0) > 0, to: "/videos" },
+    { label: "Set up your Brand Kit", done: !!brandKit, to: "/brand-kit" },
+    ...(showConnect ? [{ label: "Connect a channel", done: (connections?.length ?? 0) > 0, to: "/connections" }] : []),
+    ...(!isHiddenPath("/calendar") ? [{ label: "Schedule your first post", done: (counts?.scheduled ?? 0) > 0, to: "/calendar" }] : []),
+  ];
+  const doneCount = steps.filter((s) => s.done).length;
+  const allDone = doneCount === steps.length;
 
   return (
-    <div className="space-y-8">
-      {/* Hero / Welcome */}
-      <div className="glass rounded-3xl p-6 md:p-8 relative overflow-hidden">
-        <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-gradient-to-br from-[color:var(--brand-orange)]/20 to-[color:var(--neon-pink)]/20 blur-3xl pointer-events-none" />
-        <div className="relative flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-          <div className="min-w-0">
-            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Welcome back</div>
-            <h1 className="mt-1 text-3xl md:text-4xl font-bold">
-              Hey {greeting} <span className="gradient-text">✨</span>
-            </h1>
-            <p className="text-muted-foreground mt-2 max-w-xl">
-              Your AI Content OS. Plan, research, generate, edit, and publish — all from one workspace.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={openCommandPalette}
-              className="inline-flex items-center gap-2 rounded-xl border border-border/60 bg-white/[0.04] hover:bg-white/[0.08] px-3 py-2 text-sm transition"
-            >
-              <CommandIcon className="w-4 h-4" /> Command palette
-              <span className="ml-1 rounded border border-border/60 bg-white/[0.04] px-1.5 py-0.5 text-[10px]">{typeof navigator !== "undefined" && /mac|iphone|ipad/i.test(navigator.platform) ? "⌘K" : "Ctrl+K"}</span>
-            </button>
-            <Link
-              to="/create"
-              className="inline-flex items-center gap-2 rounded-xl gradient-primary text-white px-4 py-2 text-sm font-medium shadow-[var(--shadow-glow)]"
-            >
-              <Plus className="w-4 h-4" /> New project
-            </Link>
-          </div>
+    <div className="space-y-7">
+      {/* Greeting */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-3xl md:text-4xl font-bold">{timeGreeting()}, {name} 👋</h1>
+          <p className="text-muted-foreground mt-1.5">
+            {latest
+              ? <>Pick up where you left off — <span className="text-foreground">{latest.title}</span>.</>
+              : "Let's make your first video. It takes about 3 minutes."}
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={openCreateMenu}
+          className="inline-flex items-center gap-2 self-start sm:self-auto rounded-xl gradient-primary text-white px-4 py-2.5 text-sm font-semibold shadow-[var(--shadow-glow)] hover:brightness-110 transition"
+        >
+          <Plus className="w-4 h-4" /> Create
+        </button>
       </div>
 
-      {/* Quick actions */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">Quick actions</h2>
-          <Link to="/create" className="text-sm text-[color:var(--neon-purple)] hover:underline">See all →</Link>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {QUICK_ACTIONS.filter((q) => !isHiddenPath(q.to)).map((q) => (
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+        {/* Left column */}
+        <div className="space-y-7 min-w-0">
+          {latest ? (
             <Link
-              key={q.label}
-              to={q.to}
-              className="glass rounded-2xl p-4 hover:border-white/20 transition group"
+              to="/projects/$id"
+              params={{ id: latest.id }}
+              className="glass rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 hover:border-primary/50 transition group"
             >
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${q.hue} flex items-center justify-center mb-3 group-hover:scale-110 transition`}>
-                <q.icon className="w-5 h-5 text-white" />
+              <div className="w-24 sm:w-28 shrink-0 overflow-hidden rounded-xl">
+                <ProjectThumbnail
+                  title={latest.title}
+                  contentType={latest.content_type}
+                  style={latest.style}
+                  platform={latest.platform}
+                  thumbnailUrl={latest.thumbnail_url ?? latest.cover_image_url ?? latest.poster_url}
+                  status={latest.status}
+                  aspect={PORTRAIT.has(latest.content_type ?? "") ? "portrait" : "landscape"}
+                />
               </div>
-              <div className="text-sm font-medium">{q.label}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{q.desc}</div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* Overview grid */}
-      <section className="grid lg:grid-cols-3 gap-5">
-        {/* Credits */}
-        <div className="glass rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">Credits</div>
-            {access.unlimited ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-200">
-                <Crown className="w-3 h-3" /> Unlimited
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Continue</div>
+                {latestStatus && (
+                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${latestStatus.cls}`}>● {latestStatus.label}</span>
+                )}
+                <div className="text-lg font-semibold line-clamp-2">{latest.title}</div>
+                <div className="text-xs text-muted-foreground">
+                  {TYPE_LABEL[latest.content_type ?? ""] ?? "Project"}
+                  {latest.updated_at ? ` · updated ${new Date(latest.updated_at).toLocaleDateString()}` : ""}
+                </div>
+              </div>
+              <span className="inline-flex items-center justify-center gap-1.5 rounded-xl gradient-primary text-white px-4 py-2.5 text-sm font-semibold shadow-[var(--shadow-glow)] group-hover:brightness-110">
+                Open <ArrowRight className="w-4 h-4" />
               </span>
-            ) : (
-              <Link to="/pricing" className="text-xs text-[color:var(--neon-pink)] hover:underline">Upgrade</Link>
-            )}
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <div className="text-3xl font-bold">
-              {access.unlimited ? "∞" : monthlyLeft.toLocaleString()}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              of {access.unlimited ? "∞" : monthlyLimit.toLocaleString()} monthly
-            </div>
-          </div>
-          {!access.unlimited && (
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/5">
-              <div
-                className="h-full gradient-primary transition-[width]"
-                style={{ width: `${Math.max(2, pct)}%` }}
-              />
+            </Link>
+          ) : (
+            <div className="glass rounded-2xl p-8 text-center">
+              <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-primary/15">
+                <Sparkles className="h-7 w-7 text-primary" />
+              </div>
+              <h2 className="mt-4 text-xl font-bold">No projects yet</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Paste a script or type one idea — your first video takes about 3 minutes.</p>
+              <Link
+                to="/videos"
+                search={{ new: "idea" }}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl gradient-primary px-5 py-2.5 text-sm font-semibold text-white shadow-[var(--shadow-glow)]"
+              >
+                <Plus className="w-4 h-4" /> Create my first video
+              </Link>
             </div>
           )}
-          {access.balance > 0 && (
-            <div className="mt-2 text-xs text-muted-foreground">+ {access.balance.toLocaleString()} bonus balance</div>
+
+          <section>
+            <h2 className="text-lg font-semibold mb-3">Create something</h2>
+            <QuickActions />
+          </section>
+
+          {others.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">Recent projects</h2>
+                <Link to="/videos" className="text-sm font-medium text-primary hover:underline">View all →</Link>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {others.map((p) => <RecentProjectCard key={p.id} project={p} />)}
+              </div>
+            </section>
           )}
-          <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-            <CalendarIcon className="w-3.5 h-3.5" />
-            {access.renewsAt ? `Renews ${new Date(access.renewsAt).toLocaleDateString()}` : "Auto-renew off"}
-          </div>
         </div>
 
-        {/* Brand status */}
-        <div className="glass rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">Brand Kit</div>
-            <Link to="/brand-kit" className="text-xs text-[color:var(--neon-pink)] hover:underline">Manage</Link>
-          </div>
-          <div className="mt-3 flex items-center gap-3">
+        {/* Right column */}
+        <div className="space-y-5">
+          {!allDone && (
+            <div className="glass rounded-2xl p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="font-semibold">Getting started</div>
+                <div className="text-sm font-semibold text-primary">{doneCount} / {steps.length}</div>
+              </div>
+              <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                <div className="h-full gradient-primary rounded-full" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
+              </div>
+              <ul className="space-y-1">
+                {steps.map((s) => {
+                  const row = (
+                    <>
+                      <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${s.done ? "bg-emerald-500 text-white" : "border-2 border-border"}`}>
+                        {s.done && <Check className="h-3 w-3" />}
+                      </span>
+                      <span className={`flex-1 text-sm ${s.done ? "text-muted-foreground line-through decoration-muted-foreground/40" : ""}`}>{s.label}</span>
+                      {!s.done && s.to && <ArrowRight className="h-3.5 w-3.5 text-primary" />}
+                    </>
+                  );
+                  return (
+                    <li key={s.label}>
+                      {!s.done && s.to ? (
+                        <Link to={s.to} className="flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 hover:bg-white/[0.04] transition">{row}</Link>
+                      ) : (
+                        <div className="flex items-center gap-2.5 px-1.5 py-1.5">{row}</div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          <OfferCard />
+
+          <CreditsCard />
+
+          <Link to="/brand-kit" className="glass rounded-2xl p-5 flex items-center gap-3 hover:border-primary/50 transition">
             <div
-              className="w-12 h-12 rounded-xl border border-border/60 grid place-items-center overflow-hidden"
-              style={{ background: brandKit?.primary_color ?? "rgba(255,255,255,0.04)" }}
+              className="w-12 h-12 rounded-xl border border-border grid place-items-center overflow-hidden shrink-0"
+              style={{ background: brandKit?.primary_color ?? "var(--surface-raised)" }}
             >
               {brandKit?.logo_url ? (
                 <img src={brandKit.logo_url} alt="" className="w-full h-full object-contain" />
@@ -197,141 +281,130 @@ function Dashboard() {
                 <PaletteIcon className="w-5 h-5 text-white/80" />
               )}
             </div>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold truncate">{brandKit?.name ?? "No default brand kit"}</div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold truncate">{brandKit?.name ?? "Set up your Brand Kit"}</div>
               <div className="text-xs text-muted-foreground truncate">
-                {brandKit ? "Auto-applied to new generations" : "Set a default to auto-apply"}
+                {brandKit ? "Used automatically in new creations" : "Logo, colours and tone — used everywhere"}
               </div>
             </div>
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2 text-[10px]">
-            <BrandCheck ok={!!brandKit?.logo_url} label="Logo" />
-            <BrandCheck ok={!!brandKit?.primary_color} label="Colors" />
-            <BrandCheck ok={!!brandKit?.brand_voice} label="Voice" />
-          </div>
-        </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
 
-        {/* Workspace stats */}
-        <div className="glass rounded-2xl p-5">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">Workspace</div>
-          <div className="mt-3 grid grid-cols-3 gap-3">
-            <StatMini label="All content" value={counts?.projects ?? 0} to="/videos" />
-            <StatMini label="Library items" value={counts?.assets ?? 0} to="/library" />
-            <StatMini label="Scheduled" value={counts?.scheduled ?? 0} to="/calendar" />
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <Link to="/research" className="glass rounded-xl p-2.5 text-xs flex items-center gap-2 hover:border-white/20 transition">
-              <Search className="w-3.5 h-3.5 text-[color:var(--neon-pink)]" /> Research
-            </Link>
-            {!isHiddenPath("/agents") && (
-              <Link to="/agents" className="glass rounded-xl p-2.5 text-xs flex items-center gap-2 hover:border-white/20 transition">
-                <Bot className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" /> AI Agents
-              </Link>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Continue working + recent generations */}
-      <section className="grid lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">Continue working</h2>
-            <Link to="/videos" className="text-sm text-[color:var(--neon-purple)] hover:underline">All projects →</Link>
-          </div>
-          {recent && recent.length > 0 ? (
-            <div className="grid sm:grid-cols-2 gap-4">
-              {recent.slice(0, 6).map((p) => (
-                <RecentProjectCard key={p.id} project={p} />
-              ))}
-            </div>
-          ) : (
-            <EmptyProjects />
-          )}
-        </div>
-
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Recent activity</h2>
-          <div className="glass rounded-2xl p-2">
-            {usage?.length ? usage.map((u: { id: string; description: string | null; credits_used: number; created_at: string; source: string | null }) => (
-              <div key={u.id} className="text-sm p-3 border-b border-border/40 last:border-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate">{u.description ?? "Generation"}</span>
-                  <span className="text-xs text-rose-300 shrink-0 inline-flex items-center gap-1">
-                    <Zap className="w-3 h-3" />−{u.credits_used}
-                  </span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  {new Date(u.created_at).toLocaleDateString()}
-                  {SOURCE_LABEL[u.source ?? ""] ? ` · ${SOURCE_LABEL[u.source ?? ""]}` : ""}
-                </div>
-              </div>
-            )) : (
-              <div className="p-6 text-center">
-                <TrendingUp className="w-8 h-8 mx-auto text-muted-foreground/60" />
+          <div className="glass rounded-2xl p-5">
+            <div className="font-semibold mb-2">Recent activity</div>
+            {usage?.length ? (
+              <ul className="divide-y divide-border">
+                {usage.map((u: { id: string; description: string | null; credits_used: number; created_at: string }) => (
+                  <li key={u.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <div className="truncate">{u.description ?? "Generation"}</div>
+                      <div className="text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <span className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-rose-400">
+                      <Zap className="w-3 h-3" />−{u.credits_used}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="py-6 text-center">
+                <TrendingUp className="w-7 h-7 mx-auto text-muted-foreground/60" />
                 <p className="text-sm text-muted-foreground mt-2">No activity yet.</p>
               </div>
             )}
           </div>
         </div>
-      </section>
-    </div>
-  );
-}
-
-/** Plain-language names for where a generation's credits came from. */
-const SOURCE_LABEL: Record<string, string> = {
-  subscription: "plan credits",
-  monthly: "plan credits",
-  wallet: "top-up credits",
-  topup: "top-up credits",
-  lifetime: "lifetime credits",
-  bonus: "bonus credits",
-};
-
-function BrandCheck({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <div className={`flex items-center gap-1 rounded-lg border px-2 py-1 ${
-      ok ? "border-emerald-500/40 bg-emerald-500/[0.08] text-emerald-200" : "border-border/60 bg-white/[0.03] text-muted-foreground"
-    }`}>
-      {ok ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function StatMini({ label, value, to }: { label: string; value: number; to: string }) {
-  return (
-    <Link to={to} className="glass rounded-xl p-3 hover:border-white/20 transition block group">
-      <div className="text-xl font-bold">{value}</div>
-      <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-0.5">
-        {label} <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition" />
       </div>
-    </Link>
+    </div>
   );
 }
 
-function EmptyProjects() {
+function QuickActions() {
+  const { canPath } = usePlanAccess();
+  const openUpgrade = useUpgradeDialog();
   return (
-    <div className="glass rounded-2xl p-10 text-center">
-      <Sparkles className="w-10 h-10 mx-auto text-[color:var(--neon-purple)]" />
-      <h3 className="mt-3 font-semibold">Your vault is empty</h3>
-      <p className="text-sm text-muted-foreground mt-1">Create your first AI project.</p>
-      <Link to="/create" className="mt-5 inline-flex rounded-lg gradient-primary px-5 py-2.5 text-sm text-white font-medium">
-        <Plus className="w-4 h-4 mr-2" /> New project
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      {QUICK_ACTIONS.filter((q) => !isHiddenPath(q.gate)).map((q) => {
+        const lock = canPath(q.gate);
+        return (
+          <Link
+            key={q.label}
+            to={q.to}
+            search={"search" in q ? q.search : undefined}
+            onClick={(e) => {
+              if (!lock.allowed) {
+                e.preventDefault();
+                openUpgrade({ label: q.label, required: lock.required });
+              }
+            }}
+            className="glass relative rounded-2xl p-4 flex flex-col gap-2 hover:border-primary/50 hover:-translate-y-0.5 transition"
+          >
+            <span className={`grid h-10 w-10 place-items-center rounded-xl ${q.tone}`}>
+              <q.icon className="h-5 w-5" />
+            </span>
+            <span className="text-sm font-semibold">{q.label}</span>
+            <span className="text-xs text-muted-foreground leading-snug">{q.desc}</span>
+            {!lock.allowed && (
+              <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                <Lock className="h-3 w-3" /> {TIER_LABEL[lock.required]}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+function CreditsCard() {
+  const { data: access } = useAccess();
+  if (!access) return null;
+  if (access.unlimited) {
+    return (
+      <div className="glass rounded-2xl p-5 flex items-center gap-3">
+        <Crown className="w-5 h-5 text-amber-400" />
+        <div className="text-sm"><span className="font-semibold">Unlimited credits</span> <span className="text-muted-foreground">— create freely.</span></div>
+      </div>
+    );
+  }
+  const total = getAvailableCredits(access);
+  const limit = Math.max(access.monthlyLimit, 1);
+  const pct = Math.max(2, Math.min(100, Math.round((access.monthlyRemaining / limit) * 100)));
+  return (
+    <div className="glass rounded-2xl p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="font-semibold">Credits</div>
+        <Link to="/pricing" className="text-xs font-semibold text-primary hover:underline">Upgrade</Link>
+      </div>
+      <div className="flex items-baseline gap-2">
+        <span className="text-3xl font-bold [font-family:'Space_Grotesk',Inter,sans-serif]">{total.toLocaleString()}</span>
+        <span className="text-xs text-muted-foreground">credits to use</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+        <div className="h-full gradient-primary rounded-full" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="text-xs text-muted-foreground space-y-0.5">
+        <div>{access.monthlyRemaining.toLocaleString()} of {access.monthlyLimit.toLocaleString()} monthly left{access.balance > 0 ? ` · + ${access.balance.toLocaleString()} top-up` : ""}</div>
+        <div className="flex items-center gap-1.5">
+          <CalendarIcon className="w-3 h-3" />
+          {access.renewsAt ? `Renews ${new Date(access.renewsAt).toLocaleDateString()}` : "Auto-renew off"}
+        </div>
+      </div>
+      <Link to="/billing" className="block text-center rounded-xl border border-border bg-secondary py-2 text-sm font-semibold hover:bg-accent transition">
+        Top up credits
       </Link>
     </div>
   );
 }
 
-function RecentProjectCard({ project }: { project: { id: string; title: string; content_type: string | null; updated_at?: string | null } }) {
+function RecentProjectCard({ project }: { project: RecentProject }) {
   const deleteProject = useProjectDelete();
   async function del(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     await deleteProject({ id: project.id, title: project.title });
   }
-  const when = project.updated_at ? new Date(project.updated_at).toLocaleDateString() : null;
+  const st = STATUS[project.status ?? ""];
   return (
     <div className="relative group">
       <button
@@ -342,12 +415,22 @@ function RecentProjectCard({ project }: { project: { id: string; title: string; 
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
-      <Link to="/projects/$id" params={{ id: project.id }} className="glass rounded-xl p-5 hover:border-white/20 transition block">
-        <div className="flex items-center justify-between">
-          <div className="text-xs text-muted-foreground uppercase tracking-wider">{project.content_type ?? "project"}</div>
-          {when && <div className="text-[10px] text-muted-foreground">{when}</div>}
+      <Link to="/projects/$id" params={{ id: project.id }} className="glass rounded-2xl overflow-hidden block hover:border-primary/50 transition">
+        <ProjectThumbnail
+          title={project.title}
+          contentType={project.content_type}
+          style={project.style}
+          platform={project.platform}
+          thumbnailUrl={project.thumbnail_url ?? project.cover_image_url ?? project.poster_url}
+          status={project.status}
+          aspect="landscape"
+        />
+        <div className="p-3 space-y-1">
+          <div className="text-sm font-semibold line-clamp-1">{project.title}</div>
+          <div className="text-[11px] text-muted-foreground">
+            {st ? st.label.split(" —")[0] : TYPE_LABEL[project.content_type ?? ""] ?? "Project"}
+          </div>
         </div>
-        <div className="mt-2 font-semibold line-clamp-2">{project.title}</div>
       </Link>
     </div>
   );
