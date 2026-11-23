@@ -138,7 +138,16 @@ export async function deleteGeneratedThumbnail(id: string): Promise<void> {
   const uid = await currentUserId();
   if (!uid) return;
   const rec = readJson<LocalThumbnail | null>(metaKey(uid, id), null);
-  if (rec) await deleteBlob(rec.image_blob_key).catch(() => {});
+  if (rec) {
+    await deleteBlob(rec.image_blob_key).catch(() => {});
+    // Also remove the cloud copy and its Media Library entry, so replaced/deleted
+    // thumbnails don't pile up there.
+    void import("@/lib/cloud-sync").then(async ({ blobStoragePath }) => {
+      const path = blobStoragePath(uid, `thumbnail:${uid}:${id}`);
+      await supabase.from("asset_library").delete().eq("user_id", uid).eq("storage_path", path);
+      await supabase.storage.from("library").remove([path]);
+    }).catch(() => {});
+  }
   localStorage.removeItem(metaKey(uid, id));
   const idx = readJson<string[]>(indexKey(uid), []);
   writeJson(indexKey(uid), idx.filter((x) => x !== id));
