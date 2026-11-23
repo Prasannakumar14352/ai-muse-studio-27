@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { TimedSteps, CAROUSEL_STEPS, SCRIPT_STEPS } from "@/components/timed-steps";
 import { estimateProjectCredits } from "@/lib/credit-costs";
 import { creditsLabel } from "@/lib/credits-label";
-import { CONTENT_LANGUAGES } from "@/lib/content-language";
+import { LanguagePicker, VoiceFallbackNotice, needsVoiceChoice } from "@/components/language-picker";
 import { CONTENT_TYPES, PLATFORMS, TONES, STYLES, VOICES, NICHES } from "@/lib/constants";
 import { Loader2, Wand2, ArrowRight, Volume2, Square } from "lucide-react";
 
@@ -29,6 +29,8 @@ export type ProjectBrief = {
   reel_length_sec: number;
   /** Script / caption / voice language ("auto" = same as the topic). */
   language: string;
+  /** Voice language when `language` has no AI voice ("none" = no voiceover). */
+  voiceLanguage?: string;
 };
 
 export const DEFAULT_BRIEF: ProjectBrief = {
@@ -71,8 +73,13 @@ export function ProjectBriefForm({
     setForm((f) => ({ ...f, [k]: v }));
   }
 
+  const hasVoice = form.content_type !== "carousel";
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (hasVoice && needsVoiceChoice(form.language, form.voiceLanguage)) {
+      toast.error("Choose a voice language (or no voiceover) for this language first.");
+      return;
+    }
     await onSubmit(form);
   }
 
@@ -159,14 +166,12 @@ export function ProjectBriefForm({
 
       <Section title="Language">
         <p className="text-xs text-muted-foreground mb-3">Script, on-screen text, caption and voiceover are written in this language.</p>
-        <div className="flex flex-wrap gap-2">
-          {CONTENT_LANGUAGES.map((l) => (
-            <button key={l.id} type="button" onClick={() => update("language", l.id)}
-              className={`px-3 py-1.5 rounded-full text-sm border transition ${
-                form.language === l.id ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-white/20"
-              }`}>{l.label}</button>
-          ))}
-        </div>
+        <LanguagePicker allowAuto showVoice={hasVoice} size="md" value={form.language}
+          onChange={(v) => setForm((f) => ({ ...f, language: v, voiceLanguage: "" }))} />
+        {hasVoice && (
+          <VoiceFallbackNotice language={form.language} voiceLanguage={form.voiceLanguage ?? ""}
+            onChange={(v) => update("voiceLanguage", v)} />
+        )}
       </Section>
 
       <Section title="Platform & tone">

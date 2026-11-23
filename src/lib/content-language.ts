@@ -1,22 +1,16 @@
+import { ALL_LANGUAGES, languageLabel } from "@/lib/languages";
 /**
  * Output languages for scripts, captions and voiceovers. The script/caption
  * text is written in the language's own script; image prompts stay English
  * because image models follow English best.
  */
-export const CONTENT_LANGUAGES = [
-  { id: "auto", label: "Same as topic" },
-  { id: "English", label: "English" },
-  { id: "Telugu", label: "తెలుగు Telugu" },
-  { id: "Hindi", label: "हिन्दी Hindi" },
-  { id: "Tamil", label: "தமிழ் Tamil" },
-  { id: "Kannada", label: "ಕನ್ನಡ Kannada" },
-  { id: "Malayalam", label: "മലയാളം Malayalam" },
-  { id: "Marathi", label: "मराठी Marathi" },
-  { id: "Bengali", label: "বাংলা Bengali" },
-  { id: "Gujarati", label: "ગુજરાતી Gujarati" },
-] as const;
 
-export type ContentLanguage = (typeof CONTENT_LANGUAGES)[number]["id"];
+export const CONTENT_LANGUAGES: ReadonlyArray<{ id: string; label: string }> = [
+  { id: "auto", label: "Same as topic" },
+  ...ALL_LANGUAGES.map((l) => ({ id: l.id, label: languageLabel(l) })),
+];
+
+export type ContentLanguage = string;
 
 /** Guess the language from the script a topic is written in ("auto"). */
 export function detectTopicLanguage(text: string): string {
@@ -24,9 +18,19 @@ export function detectTopicLanguage(text: string): string {
   if (/[஀-௿]/.test(text)) return "Tamil";
   if (/[ಀ-೿]/.test(text)) return "Kannada";
   if (/[ഀ-ൿ]/.test(text)) return "Malayalam";
-  if (/[ঀ-৿]/.test(text)) return "Bengali";
+  if (/[ঀ-৿]/.test(text)) return /[ৰৱ]/.test(text) ? "Assamese" : "Bengali";
   if (/[઀-૿]/.test(text)) return "Gujarati";
-  if (/[ऀ-ॿ]/.test(text)) return "Hindi";
+  if (/[਀-੿]/.test(text)) return "Punjabi";
+  if (/[଀-୿]/.test(text)) return "Odia";
+  if (/[ऀ-ॿ]/.test(text)) return /ळ/.test(text) ? "Marathi" : "Hindi";
+  if (/[؀-ۿ]/.test(text)) return /[ٹڈڑںےھ]/.test(text) ? "Urdu" : /[پچژگ]/.test(text) ? "Persian" : "Arabic";
+  if (/[֐-׿]/.test(text)) return "Hebrew";
+  if (/[฀-๿]/.test(text)) return "Thai";
+  if (/[぀-ヿ]/.test(text)) return "Japanese";
+  if (/[가-힯]/.test(text)) return "Korean";
+  if (/[一-鿿]/.test(text)) return "Chinese";
+  if (/[Ѐ-ӿ]/.test(text)) return "Russian";
+  if (/[Ͱ-Ͽ]/.test(text)) return "Greek";
   return "English";
 }
 

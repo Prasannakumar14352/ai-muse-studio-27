@@ -455,6 +455,7 @@ function ProjectView() {
           title={output?.title ?? project.title}
           styleImage={getStyleImage(project.style)}
           styleId={project.style}
+          voiceLanguage={projectVoiceLanguage(project)}
           platform={project.platform}
           contentType={project.content_type}
           music={project.music}
@@ -601,7 +602,7 @@ type Scene = { n: number; visual: string; voiceover: string; duration: string; o
 function VideoPreview({
   scenes, title, styleImage, styleId, platform, contentType, music,
   projectId, userId, outputId, existingVideoUrl, existingDiagnostics, imagePrompts, publishKit, publishStatus,
-  fallbackCaption, fallbackHashtags, voiceId,
+  fallbackCaption, fallbackHashtags, voiceId, voiceLanguage,
 }: {
   scenes: Scene[]; title: string; styleImage: string;
   styleId?: string | null;
@@ -616,6 +617,8 @@ function VideoPreview({
   fallbackHashtags?: string;
   /** The brief's narrator choice (e.g. "calm_storyteller"). */
   voiceId?: string | null;
+  /** Voice language (fallback chosen at create time, else the script language). */
+  voiceLanguage?: string | null;
 }) {
   const qc = useQueryClient();
   const [idx, setIdx] = useState(0);
@@ -953,7 +956,7 @@ function VideoPreview({
     try {
       if (audioElRef.current) { audioElRef.current.pause(); audioElRef.current = null; }
       setPlayingScene(i);
-      const res = await ttsFetch(text, ttsVoiceFor(voiceId));
+      const res = await ttsFetch(text, ttsVoiceFor(voiceId), voiceLanguage);
       if (!res.ok) throw new Error(await res.text() || `TTS ${res.status}`);
       const blob = await res.blob();
       qc.invalidateQueries({ queryKey: ["access"] });
@@ -1089,6 +1092,7 @@ function VideoPreview({
         projectId,
         showOnScreenText,
         voice: ttsVoiceFor(voiceId),
+        voiceLanguage,
         onStage: setUgcStage,
         signal: controller.signal,
         preferredContainer: container,
@@ -2425,3 +2429,10 @@ function EditableSections({
   );
 }
 
+
+/** Voice language stored on the project: the fallback chosen at create time, else the script language. */
+function projectVoiceLanguage(project: { language?: string | null; metadata?: unknown }): string | null {
+  const meta = (project.metadata ?? {}) as { voice_language?: string | null };
+  if (meta.voice_language) return meta.voice_language;
+  return project.language && project.language !== "auto" ? project.language : null;
+}

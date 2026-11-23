@@ -1,3 +1,4 @@
+import { VOICE_LANGUAGES } from "@/lib/languages";
 // Character lip-sync + dialogue narration — shared types.
 // Foundation only. Real provider work is gated behind the abstraction in
 // ./provider.ts; the wizard talks to these types, not to Supabase columns.
@@ -58,16 +59,8 @@ export const EMOTIONS: Emotion[] = [
   "surprised", "confident", "calm", "friendly", "devotional", "serious",
 ];
 
-export const LIPSYNC_LANGUAGES: ReadonlyArray<{ id: string; label: string }> = [
-  { id: "en", label: "English" },
-  { id: "hi", label: "Hindi" },
-  { id: "te", label: "Telugu" },
-  { id: "ta", label: "Tamil" },
-  { id: "kn", label: "Kannada" },
-  { id: "ml", label: "Malayalam" },
-  { id: "mr", label: "Marathi" },
-  { id: "bn", label: "Bengali" },
-];
+/** Lip-sync follows the voiceover, so it supports every language that has an AI voice. */
+export const LIPSYNC_LANGUAGES: ReadonlyArray<{ id: string; label: string }> = VOICE_LANGUAGES.map((l) => ({ id: l.code, label: l.id }));
 
 export type DialogueLine = {
   id: string;

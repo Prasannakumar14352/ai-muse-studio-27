@@ -263,6 +263,11 @@ export type VideoBrief = {
   sameCharacter?: boolean;
   /** Script / subtitle / narration language ("auto" = same as the title). */
   language?: string;
+  /**
+   * Voice language when the script language has no AI voice (e.g. Sanskrit →
+   * "Hindi"), or "none" for no voiceover. Omitted = same as `language`.
+   */
+  voiceLanguage?: string;
   /** Real motion: animate key beats (or all) into AI video clips. Default "off". */
   motionMode?: MotionMode;
   /** "standard" = MiniMax H3 Turbo, "premium" = Kling 2.5 Turbo Pro. */
@@ -928,9 +933,16 @@ export const RenderAgent = {
 
 // ---------- Voiceover (real TTS per scene, continuous narration) ----------
 
-async function fetchSceneAudio(text: string, voice: VoiceId, ctx: AudioContext): Promise<{ blobUrl: string; buffer: AudioBuffer } | null> {
+/** Voice language for a brief: the chosen fallback, else the script language ("auto" → guessed per clip). */
+function briefVoiceLanguage(brief: VideoBrief): string | undefined {
+  if (brief.voiceLanguage) return brief.voiceLanguage;
+  return brief.language && brief.language !== "auto" ? brief.language : undefined;
+}
+
+async function fetchSceneAudio(text: string, voice: VoiceId, ctx: AudioContext, language?: string | null): Promise<{ blobUrl: string; buffer: AudioBuffer } | null> {
+  if (language === "none" || !text?.trim()) return null;
   try {
-    const res = await ttsFetch(text, VOICE_MAP[voice]);
+    const res = await ttsFetch(text, VOICE_MAP[voice], language);
     if (!res.ok) return null;
     const bytes = await res.arrayBuffer();
     const buffer = await ctx.decodeAudioData(bytes.slice(0));
@@ -954,7 +966,7 @@ export const VoiceoverAgent = {
     onProgress?.(0, total);
     const results = await Promise.all(
       script.scenes.map(async (s) => {
-        const audio = await fetchSceneAudio(s.voiceover, brief.voice, ctx);
+        const audio = await fetchSceneAudio(s.voiceover, brief.voice, ctx, briefVoiceLanguage(brief));
         done += 1;
         onProgress?.(done, total);
         if (audio) {

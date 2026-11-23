@@ -3,6 +3,7 @@
 // edits an existing brief. After generation we hand off to that editor —
 // create and edit share both the form component AND the destination.
 
+import { resolveContentLanguage } from "@/lib/content-language";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -129,6 +130,8 @@ function CreatePage() {
         voice: form.voice,
         music: form.music,
         status: "generated",
+        language: resolveContentLanguage(form.language, form.topic),
+        ...(form.voiceLanguage ? { metadata: { voice_language: form.voiceLanguage } } : {}),
       }).select().single();
       if (pErr) throw pErr;
 

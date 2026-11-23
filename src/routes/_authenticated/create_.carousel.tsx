@@ -5,7 +5,7 @@ import { creditsLabel } from "@/lib/credits-label";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { CONTENT_LANGUAGES } from "@/lib/content-language";
+import { LanguagePicker } from "@/components/language-picker";
 import { generateAiCarousel } from "@/lib/carousel-ai.functions";
 import { PLATFORMS, TONES, STYLES, NICHES, GENERATION_COST } from "@/lib/constants";
 import { getAccessInfo, canGenerate } from "@/lib/access";
@@ -205,14 +205,7 @@ function CreateCarouselPage() {
               className="mt-3 w-full bg-input/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:border-[color:var(--neon-purple)]" />
             <div className="mt-4">
               <div className="text-xs text-muted-foreground mb-2">Language (slide text and caption)</div>
-              <div className="flex flex-wrap gap-2">
-                {CONTENT_LANGUAGES.map((l) => (
-                  <button key={l.id} type="button" onClick={() => set("language", l.id)}
-                    className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                      form.language === l.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"
-                    }`}>{l.label}</button>
-                ))}
-              </div>
+              <LanguagePicker allowAuto value={form.language} onChange={(v) => set("language", v)} />
             </div>
           </Section>
 

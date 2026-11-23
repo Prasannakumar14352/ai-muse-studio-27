@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { LanguagePicker } from "@/components/language-picker";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -552,8 +553,7 @@ function NewLinkedinPostPage() {
                 className="w-full bg-input/50 border border-border rounded-lg px-4 py-2.5" />
             </Field>
             <Field label="Language">
-              <input value={language} onChange={(e) => setLanguage(e.target.value)}
-                className="w-full bg-input/50 border border-border rounded-lg px-4 py-2.5" />
+              <LanguagePicker value={language} onChange={setLanguage} />
             </Field>
           </div>
 

@@ -10,6 +10,8 @@ import { useCreditGuard } from "@/lib/use-credit-guard";
 import { writeAdCopyFn, type AdCopy } from "@/lib/ad-creative.functions";
 import { fetchGeneratedImage } from "@/lib/image-stream";
 import { shrinkForVision } from "@/lib/image-shrink";
+import { ensureFontsForText } from "@/lib/text-overlay";
+import { LanguagePicker } from "@/components/language-picker";
 import {
   AD_SIZES, imageRatioFor, loadAdFonts, loadImage, renderAd,
   type AdFormat, type AdLayout, type AdSpec,
@@ -25,7 +27,6 @@ const LAYOUTS: Array<{ id: AdLayout; label: string; hint: string }> = [
   { id: "photo", label: "Full photo", hint: "Photo fills the ad, text at the bottom" },
   { id: "product", label: "Product card", hint: "Brand colours, product on a white card" },
 ];
-const LANGUAGES = ["English", "Telugu", "Hindi", "Tamil", "Kannada", "Malayalam", "Marathi", "Bengali"];
 const PALETTES: Array<[string, string]> = [
   ["#f97316", "#ec4899"], ["#7c3aed", "#06b6d4"], ["#16a34a", "#84cc16"],
   ["#dc2626", "#f59e0b"], ["#0ea5e9", "#6366f1"], ["#be185d", "#7c2d12"],
@@ -93,7 +94,14 @@ function AdCreativesPage() {
     return () => { live = false; };
   }, [logo]);
   useEffect(() => {
-    if (canvasRef.current) renderAd(canvasRef.current, spec, { image: imgEl, logo: logoEl });
+    if (!canvasRef.current) return;
+    const c = canvasRef.current;
+    renderAd(c, spec, { image: imgEl, logo: logoEl });
+    // Load the font for any non-Latin script in the ad, then redraw with it.
+    const text = [spec.brandName, spec.headline, spec.subline, ...spec.tags, spec.cta, spec.footer, spec.badge].join(" ");
+    let live = true;
+    ensureFontsForText(text).then(() => { if (live) renderAd(c, spec, { image: imgEl, logo: logoEl }); });
+    return () => { live = false; };
   }, [spec, imgEl, logoEl, fontsReady]);
 
   const usingPhotos = photos.length > 0;
@@ -205,14 +213,10 @@ function AdCreativesPage() {
           {/* 1. Brief */}
           <div className={section}>
             <div className="font-semibold">1 · What are you promoting?</div>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div><label className={label}>Business / brand name *</label>
-                <input value={business} onChange={(e) => setBusiness(e.target.value)} placeholder="Sri Gifts & Prints" className={input} /></div>
-              <div><label className={label}>Ad language</label>
-                <select value={language} onChange={(e) => setLanguage(e.target.value)} className={input}>
-                  {LANGUAGES.map((l) => <option key={l}>{l}</option>)}
-                </select></div>
-            </div>
+            <div><label className={label}>Business / brand name *</label>
+              <input value={business} onChange={(e) => setBusiness(e.target.value)} placeholder="Sri Gifts & Prints" className={input} /></div>
+            <div><label className={label}>Ad language</label>
+              <LanguagePicker value={language} onChange={setLanguage} /></div>
             <div><label className={label}>Product or service *</label>
               <textarea value={product} onChange={(e) => setProduct(e.target.value)} rows={2} placeholder="Custom photo mugs, T-shirts and keychains — printed with your photo or name" className={input} /></div>
             <div className="grid sm:grid-cols-3 gap-3">

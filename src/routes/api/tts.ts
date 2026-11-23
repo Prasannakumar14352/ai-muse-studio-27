@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { V3_LANGUAGE_CODES, voiceoverClipCredits } from "@/lib/tts-pricing";
+import { voiceoverClipCredits } from "@/lib/tts-pricing";
+import { findLanguage } from "@/lib/languages";
 import { jobTagFromRequest } from "@/lib/job-credit-tag";
 import { fetchWithRetry } from "@/lib/fetch-retry";
 
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/api/tts")({
         const { getUserIdFromRequest, unauthorized } = await import("@/lib/route-auth.server");
         const userId = await getUserIdFromRequest(request);
         if (!userId) return unauthorized();
-        const { text, voice } = (await request.json()) as { text: string; voice?: string };
+        const { text, voice, language } = (await request.json()) as { text: string; voice?: string; language?: string };
 
         const key = process.env.FAL_KEY;
         if (!key) return jsonError("Voice generation is not configured (missing FAL_KEY).", 500);
@@ -36,12 +37,17 @@ export const Route = createFileRoute("/api/tts")({
         const elevenVoice = VOICE_MAP[(voice ?? "alloy").toLowerCase()] ?? voice ?? "Aria";
 
         const { ACTION_COSTS, chargeCredits } = await import("@/lib/credits-guard.server");
-        // Turbo v2.5 can't speak Telugu, Kannada, Malayalam, Bengali or
-        // Gujarati — those go to Eleven v3 (twice the provider price, so
-        // twice the credits).
+        // Voice language: the one the user chose, else guessed from the script.
+        // Turbo v2.5 covers 32 languages; the rest go to Eleven v3 (twice the
+        // provider price, so twice the credits). Some languages have no AI
+        // voice at all — say so instead of reading them wrongly.
         const { detectTopicLanguage } = await import("@/lib/content-language");
-        const lang = detectTopicLanguage(clipped);
-        const v3Code = V3_LANGUAGE_CODES[lang];
+        const langInfo = findLanguage(language) ?? findLanguage(detectTopicLanguage(clipped));
+        if (!langInfo?.voice) {
+          return jsonError(`No AI voice is available for ${langInfo?.id ?? "this language"} yet. Pick a voice language or turn voiceover off.`, 422);
+        }
+        const lang = langInfo.id;
+        const v3Code = langInfo.voice === "v3" ? langInfo.code : null;
         const credits = voiceoverClipCredits(clipped.length, lang) * ACTION_COSTS.tts_per_100_chars;
         let reservation: Awaited<ReturnType<typeof chargeCredits>>;
         try {
@@ -54,16 +60,19 @@ export const Route = createFileRoute("/api/tts")({
         // The voice provider rate-limits bursts (a 12-scene video asks for 12
         // clips at once). Retry 429/5xx a few times with backoff before
         // giving up and refunding.
-        const upstream = await fetchWithRetry(
-          v3Code ? "https://fal.run/fal-ai/elevenlabs/tts/eleven-v3" : "https://fal.run/fal-ai/elevenlabs/tts/turbo-v2.5",
-          {
-            method: "POST",
-            headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
-            body: JSON.stringify(v3Code
-              ? { text: clipped, voice: elevenVoice, language_code: v3Code }
-              : { text: clipped, voice: elevenVoice }),
-          },
-        );
+        const endpoint = v3Code ? "https://fal.run/fal-ai/elevenlabs/tts/eleven-v3" : "https://fal.run/fal-ai/elevenlabs/tts/turbo-v2.5";
+        const codeForModel = v3Code ?? (langInfo.code !== "en" ? langInfo.code : null);
+        const call = (withCode: boolean) => fetchWithRetry(endpoint, {
+          method: "POST",
+          headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ text: clipped, voice: elevenVoice, ...(withCode && codeForModel ? { language_code: codeForModel } : {}) }),
+        });
+        let upstream = await call(true);
+        // A model can reject a language code it spells differently; it still
+        // detects the language from the text, so retry once without the code.
+        if (!upstream.ok && codeForModel && (upstream.status === 400 || upstream.status === 422)) {
+          upstream = await call(false);
+        }
         const out = (await upstream.json().catch(() => ({}))) as { audio?: { url?: string }; detail?: unknown };
         if (!upstream.ok || !out.audio?.url) {
           await reservation.refund(`provider_${upstream.status}`);

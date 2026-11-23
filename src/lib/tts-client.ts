@@ -21,7 +21,8 @@ function release() {
 }
 
 /** POST /api/tts through the shared queue; retries busy/5xx responses twice. */
-export async function ttsFetch(text: string, voice: string | undefined): Promise<Response> {
+/** `language`: the voice language (English name, e.g. "Telugu"); omitted = guessed from the text. */
+export async function ttsFetch(text: string, voice: string | undefined, language?: string | null): Promise<Response> {
   await acquire();
   try {
     let res: Response | null = null;
@@ -29,7 +30,7 @@ export async function ttsFetch(text: string, voice: string | undefined): Promise
       res = await authFetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice }),
+        body: JSON.stringify({ text, voice, ...(language ? { language } : {}) }),
       });
       if (![429, 502, 503, 504].includes(res.status)) return res;
       await new Promise((r) => setTimeout(r, 1500 * (attempt + 1) + Math.random() * 500));

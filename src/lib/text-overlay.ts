@@ -8,7 +8,7 @@
  * spelled correctly. Browser-only.
  */
 
-type ScriptFont = { name: string; family: string; test: RegExp; rtl?: boolean };
+type ScriptFont = { name: string; family: string; test: RegExp; rtl?: boolean; /** Google Fonts weights to load (default 800;900). */ weights?: string };
 
 const SCRIPTS: ScriptFont[] = [
   { name: "Telugu", family: "Noto Sans Telugu", test: /[ఀ-౿]/ },
@@ -21,7 +21,30 @@ const SCRIPTS: ScriptFont[] = [
   { name: "Gurmukhi", family: "Noto Sans Gurmukhi", test: /[਀-੿]/ },
   { name: "Odia", family: "Noto Sans Oriya", test: /[଀-୿]/ },
   { name: "Arabic", family: "Noto Sans Arabic", test: /[؀-ۿ]/, rtl: true },
+  { name: "Hebrew", family: "Noto Sans Hebrew", test: /[֐-׿]/, rtl: true },
+  { name: "Thai", family: "Noto Sans Thai", test: /[฀-๿]/ },
+  { name: "Lao", family: "Noto Sans Lao", test: /[຀-໿]/ },
+  { name: "Khmer", family: "Noto Sans Khmer", test: /[ក-៿]/ },
+  { name: "Myanmar", family: "Noto Sans Myanmar", test: /[က-႟]/ },
+  { name: "Sinhala", family: "Noto Sans Sinhala", test: /[඀-෿]/ },
+  { name: "Georgian", family: "Noto Sans Georgian", test: /[Ⴀ-ჿ]/ },
+  { name: "Armenian", family: "Noto Sans Armenian", test: /[԰-֏]/ },
+  { name: "Ethiopic", family: "Noto Sans Ethiopic", test: /[ሀ-፿]/ },
+  { name: "Meetei Mayek", family: "Noto Sans Meetei Mayek", test: /[ꯀ-꯿]/ },
+  { name: "Ol Chiki", family: "Noto Sans Ol Chiki", test: /[᱐-᱿]/, weights: "700" },
+  { name: "Japanese", family: "Noto Sans JP", test: /[぀-ヿ]/ },
+  { name: "Korean", family: "Noto Sans KR", test: /[가-힯ᄀ-ᇿ]/ },
+  { name: "Chinese", family: "Noto Sans SC", test: /[一-鿿]/ },
 ];
+
+/** Every script font, as a canvas font-stack tail, so mixed-script text always finds a glyph. */
+export const SCRIPT_FONT_STACK = SCRIPTS.map((s) => `"${s.family}"`).join(", ");
+
+/** Load the Noto font for every script that appears in `text` (no-op for Latin-only text). */
+export async function ensureFontsForText(text: string | null | undefined): Promise<void> {
+  if (!text) return;
+  await Promise.all(SCRIPTS.filter((s) => s.test.test(text)).map((s) => loadFont(s.family)));
+}
 
 /** Script that needs a real-font overlay, or null for Latin-only text (the model can draw it). */
 export function overlayScriptFor(text: string | null | undefined): ScriptFont | null {
@@ -36,6 +59,7 @@ export function needsTextOverlay(text: string | null | undefined): boolean {
 const loaded = new Set<string>();
 
 export async function loadFont(family: string): Promise<void> {
+  const weights = SCRIPTS.find((s) => s.family === family)?.weights ?? "800;900";
   if (typeof document === "undefined" || loaded.has(family)) return;
   const id = `font-${family.replace(/\s+/g, "-")}`;
   if (!document.getElementById(id)) {
@@ -43,13 +67,13 @@ export async function loadFont(family: string): Promise<void> {
     link.id = id;
     link.rel = "stylesheet";
     // Noto Sans (Latin) is loaded too so mixed text like "2100లో THEATRE" matches.
-    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@800;900&family=Noto+Sans:wght@800;900&display=block`;
+    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@${weights}&family=Noto+Sans:wght@800;900&display=block`;
     document.head.appendChild(link);
   }
   try {
     await Promise.race([
       Promise.all([
-        document.fonts.load(`900 64px "${family}"`),
+        document.fonts.load(`${weights.split(";").pop()} 64px "${family}"`),
         document.fonts.load(`900 64px "Noto Sans"`),
       ]),
       new Promise((r) => setTimeout(r, 6000)),

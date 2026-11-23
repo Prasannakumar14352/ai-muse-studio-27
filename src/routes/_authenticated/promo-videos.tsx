@@ -35,6 +35,7 @@ import {
 } from "@/lib/promo-video.functions";
 import { fetchGeneratedImage } from "@/lib/image-stream";
 import { shrinkForVision } from "@/lib/image-shrink";
+import { LanguagePicker } from "@/components/language-picker";
 import { renderVideo, type RenderScene, type CameraMotion, type TransitionStyle } from "@/lib/video-renderer";
 
 export const Route = createFileRoute("/_authenticated/promo-videos")({
@@ -58,7 +59,6 @@ const TONE_OPTIONS = [
   "Emotional", "Educational", "Funny", "Bold", "Minimal",
 ];
 const DURATION_OPTIONS = [10, 15, 30, 45, 60, 90];
-const LANGUAGE_OPTIONS = ["English", "Hindi", "Spanish", "French", "German", "Portuguese", "Arabic", "Japanese"];
 const VOICE_OPTIONS: Array<{ value: PromoBrief["voiceover"]; label: string }> = [
   { value: "none", label: "No voiceover" },
   { value: "auto", label: "AI-picked voice" },
@@ -573,7 +573,7 @@ function DetailsStep({
           <CreatorFlowSelect value={brief.tone} onValueChange={(v) => setBrief({ tone: v })} options={TONE_OPTIONS} ariaLabel="Tone" />
         </Field>
         <Field label="Language">
-          <CreatorFlowSelect value={brief.language} onValueChange={(v) => setBrief({ language: v })} options={LANGUAGE_OPTIONS} ariaLabel="Language" />
+          <LanguagePicker value={brief.language} onChange={(v) => setBrief({ language: v })} />
         </Field>
         <Field label="Voiceover">
           <CreatorFlowSelect

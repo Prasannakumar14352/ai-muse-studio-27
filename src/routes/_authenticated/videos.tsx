@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { resolveContentLanguage } from "@/lib/content-language";
 import { estimateProjectCredits } from "@/lib/credit-costs";
 import { creditsLabel } from "@/lib/credits-label";
-import { CONTENT_LANGUAGES } from "@/lib/content-language";
+import { LanguagePicker, VoiceFallbackNotice, needsVoiceChoice } from "@/components/language-picker";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { estimateMotionCredits, motionClipCredits, keyMomentClipCount, MOTION_MODELS, KEY_MOMENT_EVERY_SEC, FULL_MOTION_MAX_SEC, type MotionMode, type MotionTier } from "@/lib/motion-clips";
 import { toast } from "sonner";
@@ -808,6 +808,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
   // Off by default: it switches character scenes to HD (8 credits each).
   const [sameCharacter, setSameCharacter] = useState(false);
   const [language, setLanguage] = useState("auto");
+  const [voiceLanguage, setVoiceLanguage] = useState("");
   const [motionMode, setMotionMode] = useState<MotionMode>("off");
   const [motionTier, setMotionTier] = useState<MotionTier>("standard");
   // Full motion animates every beat — offered up to 5 minutes.
@@ -837,9 +838,11 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
   function submit() {
     if (!title.trim()) return toast.error("Enter a video title or idea");
     if (isCustom && !customNiche.trim()) return toast.error("Describe your custom niche or topic area");
+    if (needsVoiceChoice(language, voiceLanguage)) return toast.error("Choose a voice language (or no voiceover) for this language first.");
     onGenerate({
       brief: {
         title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio, sameCharacter, language,
+        ...(voiceLanguage ? { voiceLanguage } : {}),
         motionMode: motionMode === "full" && !fullMotionAllowed ? "key" : motionMode,
         motionTier,
       },
@@ -980,14 +983,8 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
       {/* Language */}
       <Section index={9} title="Language">
         <p className="text-xs text-muted-foreground mb-2">Script, subtitles and narration. "Same as topic" follows the language of your title.</p>
-        <div className="flex flex-wrap gap-2">
-          {CONTENT_LANGUAGES.map((l) => (
-            <button key={l.id} type="button" onClick={() => setLanguage(l.id)}
-              className={`px-3 py-1.5 rounded-full text-xs border transition ${language === l.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"}`}>
-              {l.label}
-            </button>
-          ))}
-        </div>
+        <LanguagePicker allowAuto showVoice value={language} onChange={(v) => { setLanguage(v); setVoiceLanguage(""); }} />
+        <VoiceFallbackNotice language={language} voiceLanguage={voiceLanguage} onChange={setVoiceLanguage} />
       </Section>
 
       {/* 9. Character consistency */}
@@ -1054,7 +1051,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
           const base = estimateProjectCredits({
             contentType: duration > 90 ? "long_video" : "short_reel",
             lengthSec: duration,
-            language: resolveContentLanguage(language, title),
+            language: voiceLanguage && voiceLanguage !== "none" ? voiceLanguage : resolveContentLanguage(language, title),
           });
           const scenes = base.scenes;
           // Same-character scenes use HD images (8 instead of 1) for ~70% of shots, plus one portrait.

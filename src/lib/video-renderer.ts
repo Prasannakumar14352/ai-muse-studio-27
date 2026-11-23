@@ -741,6 +741,8 @@ export type UgcStage =
 
 export type UgcOptions = {
   title: string;
+  /** Voice language for narration (English name). "none" = no voiceover. Omitted = guessed from the text. */
+  voiceLanguage?: string | null;
   platform?: string | null;
   contentType?: string | null;
   styleId?: string | null;
@@ -778,9 +780,10 @@ async function fetchSceneImage(prompt: string, style: string, ratio: string, pro
   return image;
 }
 
-async function fetchSceneAudio(text: string, voice: string, ctx: AudioContext): Promise<AudioBuffer | null> {
+async function fetchSceneAudio(text: string, voice: string, ctx: AudioContext, language?: string | null): Promise<AudioBuffer | null> {
+  if (language === "none" || !text?.trim()) return null;
   try {
-    const res = await ttsFetch(text, voice);
+    const res = await ttsFetch(text, voice, language);
     if (!res.ok) return null;
     const arr = await res.arrayBuffer();
     // decodeAudioData mutates the buffer in some browsers — copy first.
@@ -827,7 +830,7 @@ export async function renderUgcVideo(opts: UgcOptions): Promise<RenderResult> {
   const voice = opts.voice || "alloy";
   const sceneAudio = await Promise.all(
     opts.scenes.map(async (scene) => {
-      const buf = await fetchSceneAudio(scene.voiceover, voice, decodeCtx);
+      const buf = await fetchSceneAudio(scene.voiceover, voice, decodeCtx, opts.voiceLanguage);
       audDone += 1;
       opts.onStage?.({ kind: "audio", done: audDone, total });
       return buf;

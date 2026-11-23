@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { CONTENT_LANGUAGES } from "@/lib/content-language";
+import { LanguagePicker } from "@/components/language-picker";
 import { Copy, Loader2, Wand2 } from "lucide-react";
 import { ProjectsSection } from "@/components/projects-section";
 import { PLATFORMS } from "@/lib/constants";
@@ -131,12 +131,7 @@ function CaptionsPage() {
             </div>
             <div>
               <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1.5">Language</div>
-              <div className="flex flex-wrap gap-2">
-                {CONTENT_LANGUAGES.map((l) => (
-                  <button key={l.id} type="button" onClick={() => setLanguage(l.id)}
-                    className={`px-3 py-1.5 rounded-full text-xs border ${language === l.id ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>{l.label}</button>
-                ))}
-              </div>
+              <LanguagePicker allowAuto value={language} onChange={setLanguage} />
             </div>
             <button
               onClick={() => topic.trim() ? planM.mutate() : toast.error("Enter a topic")}

@@ -1,6 +1,8 @@
 // Draws an ad creative on a <canvas>. All text is real text (never AI-drawn),
 // so spelling is always exact and every word stays editable.
 
+import { SCRIPT_FONT_STACK } from "@/lib/text-overlay";
+
 export type AdFormat = "4:5" | "1:1" | "9:16";
 export type AdLayout = "poster" | "photo" | "product";
 
@@ -27,8 +29,9 @@ export type AdSpec = {
 
 export type AdImages = { image?: HTMLImageElement | null; logo?: HTMLImageElement | null };
 
-const HEAD = '"Space Grotesk", "Inter", "Noto Sans Telugu", "Noto Sans Devanagari", sans-serif';
-const BODY = '"Inter", "Noto Sans Telugu", "Noto Sans Devanagari", sans-serif';
+// Latin brand fonts first, then a Noto font for every other script.
+const HEAD = `"Space Grotesk", "Inter", "Noto Sans", ${SCRIPT_FONT_STACK}, sans-serif`;
+const BODY = `"Inter", "Noto Sans", ${SCRIPT_FONT_STACK}, sans-serif`;
 
 /** Which part of the ad the main image fills — used to pick the AI image ratio. */
 export function imageRatioFor(layout: AdLayout, format: AdFormat): string {
