@@ -6,7 +6,7 @@ import {
   Loader2, Wand2, Download, RefreshCw, Trash2, Sparkles,
   Image as ImageIcon, Eye, ChevronDown, ChevronRight, Copy,
   Upload, Maximize2, Eraser, Scissors, X, Palette as PaletteIcon,
-  Sliders, BarChart3, Rocket, ArrowLeft, Wand, Check,
+  Sliders, BarChart3, Rocket, ArrowLeft, Wand, Check, Plus,
 } from "lucide-react";
 import { useAccess, canGenerate } from "@/lib/access";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -399,6 +399,19 @@ function ThumbnailsPage() {
     void toPng; void toJpeg;
   }
 
+  /** Start a fresh thumbnail: clear the brief, plan and on-screen concepts (they're already saved). */
+  function startNew() {
+    if (generating) { toast.error("Wait for the current generation to finish"); return; }
+    setItems([]);
+    setSelectedId(null);
+    setPlan(null);
+    setBrief(defaultBrief());
+    setProgress({ done: 0, total: 0 });
+    setMode("create");
+    setStep(1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function saveItemToLibrary(item: GeneratedItem) {
     if (savedRef.current[item.id]?.image === item.image && savedRef.current[item.id]?.savedId) {
       toast.success("Already saved — see My thumbnails");
@@ -435,6 +448,12 @@ function ThumbnailsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {(step > 1 || items.length > 0 || mode === "library") && (
+            <button onClick={startNew} disabled={generating}
+              className="px-3 py-1.5 rounded-lg text-sm gradient-primary text-white flex items-center gap-1.5 disabled:opacity-50">
+              <Plus className="w-3.5 h-3.5" /> New thumbnail
+            </button>
+          )}
           <button onClick={() => setMode("create")}
             className={`px-3 py-1.5 rounded-lg text-sm ${mode === "create" ? "gradient-primary text-white" : "glass border border-border"}`}>
             Create
@@ -474,7 +493,7 @@ function ThumbnailsPage() {
           progress={progress} generating={generating}
           onRegenerate={regenerateItem} onDuplicate={duplicateItem} onRemove={removeItem}
           onAnalyze={analyzeItem} onDownload={download} onSave={saveItemToLibrary}
-          onEdit={editItem} onBack={() => setStep(2)}
+          onEdit={editItem} onBack={() => setStep(2)} onNew={startNew}
           selectedItem={selectedItem}
         />
       )}
@@ -879,6 +898,7 @@ function GenerationGrid(props: {
   onSave: (item: GeneratedItem) => void;
   onEdit: (item: GeneratedItem, instruction: string, label: string, newText?: string) => void;
   onBack: () => void;
+  onNew: () => void;
   selectedItem: GeneratedItem | null;
 }) {
   const { items, selectedId, setSelectedId, progress, generating, selectedItem } = props;
@@ -886,10 +906,14 @@ function GenerationGrid(props: {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <button onClick={props.onBack} className="text-xs text-muted-foreground hover:text-white flex items-center gap-1"><ArrowLeft className="w-3 h-3" /> Back to plan</button>
-        {generating && (
+        {generating ? (
           <div className="text-xs text-muted-foreground flex items-center gap-2">
             <Loader2 className="w-3 h-3 animate-spin" /> Generating {progress.done}/{progress.total}…
           </div>
+        ) : items.length > 0 && (
+          <button onClick={props.onNew} className="rounded-lg gradient-primary text-white px-3 py-1.5 text-xs flex items-center gap-1.5">
+            <Plus className="w-3.5 h-3.5" /> Create new thumbnail
+          </button>
         )}
       </div>
 
