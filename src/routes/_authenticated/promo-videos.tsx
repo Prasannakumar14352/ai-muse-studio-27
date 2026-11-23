@@ -11,7 +11,6 @@ import {
   Megaphone, Sparkles, ChevronLeft, ChevronRight, Upload, Wand2,
   Play, Download, Copy, RotateCcw, CheckCircle2, X, Loader2, ImagePlus, Trash2,
 } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -406,8 +405,9 @@ function PromoVideosPage() {
     return false;
   };
 
+  // The signed-in layout (_authenticated/route.tsx) already provides the sidebar and top bar.
   return (
-    <AppShell>
+    <>
       <div className="mx-auto max-w-6xl space-y-6">
         <Stepper current={draft.step} onGoto={(s) => stepValid(s) && goto(s)} />
 
@@ -471,7 +471,7 @@ function PromoVideosPage() {
         )}
       </div>
       {InsufficientDialog}
-    </AppShell>
+    </>
   );
 }
 

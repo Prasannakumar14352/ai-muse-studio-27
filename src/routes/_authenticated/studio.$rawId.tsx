@@ -26,7 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 import { toast } from "sonner";
-import { AppShell } from "@/components/app-shell";
 import { MUSIC_LIBRARY } from "@/lib/video-blueprint";
 import { SUBTITLE_STYLE_PRESETS, getStylePreset } from "@/lib/subtitle-style-presets";
 import {
@@ -104,11 +103,11 @@ function StudioPage() {
   };
 
   if (raw.isLoading) {
-    return <AppShell><div className="p-8 text-muted-foreground">Loading raw master…</div></AppShell>;
+    return <><div className="p-8 text-muted-foreground">Loading raw master…</div></>;
   }
   if (!raw.data) {
     return (
-      <AppShell>
+      <>
         <div className="p-8 space-y-4">
           <div className="text-lg font-medium">Raw master unavailable</div>
           <p className="text-sm text-muted-foreground max-w-lg">
@@ -117,12 +116,12 @@ function StudioPage() {
           </p>
           <Button asChild variant="outline"><Link to="/videos">Back to Videos</Link></Button>
         </div>
-      </AppShell>
+      </>
     );
   }
 
   return (
-    <AppShell>
+    <>
       <div className="p-4 md:p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -199,7 +198,7 @@ function StudioPage() {
           </Card>
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }
 
