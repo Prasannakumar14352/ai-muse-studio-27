@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Video, Image as ImageIcon, Layers, Type, Mic, Music2, Sparkles,
-  Film, Palette, Users, Wand2, Zap, ArrowRight, Camera, Target, LineChart,
+  Film, Palette, Users, Wand2, Zap, ArrowRight, Camera, Target, LineChart, CalendarCheck,
 } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
 import { ComingSoonToolsSection } from "@/components/coming-soon-tools-section";
@@ -94,6 +94,11 @@ const PLATFORM: Feature[] = [
     icon: Type, title: "Captions & Hashtags",
     desc: "Platform-optimized captions with 30 hashtags for every platform.",
     bullets: ["YouTube, IG, TikTok, FB, LinkedIn", "Copy-ready, auto-publish to YouTube", "SEO-tuned"],
+  },
+  {
+    icon: CalendarCheck, title: "Planner & Auto-Publish",
+    desc: "Plan your content on a calendar and schedule finished projects to go live on their own.",
+    bullets: ["Monthly content calendar", "Scheduled auto-publishing to YouTube", "Instagram, Facebook & LinkedIn coming soon"],
   },
 ];
 
