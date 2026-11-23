@@ -416,7 +416,7 @@ function PromoVideosPage() {
             brief={draft.brief}
             setBrief={setBrief}
             onNext={() => goto(1)}
-            onPreset={applyPreset}
+            onPreset={access?.isAdmin ? applyPreset : undefined}
             estimatedCredits={estimatedCredits}
             estimatedSceneCount={estimatedSceneCount}
           />
@@ -514,7 +514,8 @@ function DetailsStep({
   brief: PromoBrief;
   setBrief: (p: Partial<PromoBrief>) => void;
   onNext: () => void;
-  onPreset: () => void;
+  /** Admin-only: fill the form with CreatorFlow AI's own details. */
+  onPreset?: () => void;
   estimatedCredits: number;
   estimatedSceneCount: number;
 }) {
@@ -531,9 +532,9 @@ function DetailsStep({
             <p className="text-xs text-muted-foreground">Tell us what to promote and where it will run.</p>
           </div>
         </div>
-        <Button size="sm" variant="outline" onClick={onPreset} className="gap-2">
+        {onPreset && <Button size="sm" variant="outline" onClick={onPreset} className="gap-2">
           <Sparkles className="h-3.5 w-3.5" /> Promote CreatorFlow AI
-        </Button>
+        </Button>}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
