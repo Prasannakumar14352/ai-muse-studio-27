@@ -4,6 +4,7 @@ import {
   Film, Palette, Users, Wand2, Zap, ArrowRight, Camera, Target, LineChart,
 } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
+import { ComingSoonToolsSection } from "@/components/coming-soon-tools-section";
 
 export const Route = createFileRoute("/features")({
   head: () => ({
@@ -92,7 +93,7 @@ const PLATFORM: Feature[] = [
   {
     icon: Type, title: "Captions & Hashtags",
     desc: "Platform-optimized captions with 30 hashtags for every platform.",
-    bullets: ["YouTube, IG, TikTok, FB, LinkedIn", "Copy-ready or auto-published", "SEO-tuned"],
+    bullets: ["YouTube, IG, TikTok, FB, LinkedIn", "Copy-ready, auto-publish to YouTube", "SEO-tuned"],
   },
 ];
 
@@ -125,6 +126,8 @@ function FeaturesPage() {
         <FeatureGroup title="AI engines under the hood" items={ENGINES} />
         <FeatureGroup title="Platform delivery" items={PLATFORM} />
       </section>
+
+      <ComingSoonToolsSection />
 
       <section className="max-w-4xl mx-auto px-6 py-16 text-center">
         <h2 className="text-3xl md:text-4xl font-bold">Ready to see it in action?</h2>

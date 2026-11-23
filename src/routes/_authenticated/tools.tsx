@@ -4,64 +4,20 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Bell, Captions, Check, Clapperboard, Eraser, MonitorUp, Mic, Wand2 } from "lucide-react";
+import { Bell, Check, Wand2 } from "lucide-react";
 import { trackFunnelEvent } from "@/lib/tracking.functions";
+import { COMING_SOON_TOOLS, type ToolInterestEvent } from "@/lib/coming-soon-tools";
 
 export const Route = createFileRoute("/_authenticated/tools")({
   head: () => ({ meta: [{ title: "AI Tools — coming soon · CreatorFlow AI" }] }),
   component: ToolsComingSoon,
 });
 
-type ToolEvent =
-  | "tool_subtitles_interest"
-  | "tool_bg_remove_interest"
-  | "tool_upscale_interest"
-  | "tool_talking_photo_interest"
-  | "tool_scene_stitch_interest";
-
-const TOOLS: ReadonlyArray<{ id: ToolEvent; icon: typeof Wand2; title: string; text: string; points: string[] }> = [
-  {
-    id: "tool_subtitles_interest",
-    icon: Captions,
-    title: "Auto Subtitles",
-    text: "Upload a video or use one from your projects — we transcribe the speech and burn in styled, word-by-word captions.",
-    points: ["Telugu, Hindi, English and more", "Reel-style animated caption themes", "Download .srt or burned-in MP4"],
-  },
-  {
-    id: "tool_bg_remove_interest",
-    icon: Eraser,
-    title: "Background Remover",
-    text: "Cut out the subject of any image in one click — ready for thumbnails, product posts and carousels.",
-    points: ["Transparent PNG output", "Swap in a colour or new background", "Works with your Media Library"],
-  },
-  {
-    id: "tool_upscale_interest",
-    icon: MonitorUp,
-    title: "HD Upscaler",
-    text: "Sharpen low-resolution images and videos up to Full HD (1080p) and beyond without losing detail.",
-    points: ["Images up to 4×", "Videos to 1080p", "One click from any project"],
-  },
-  {
-    id: "tool_talking_photo_interest",
-    icon: Mic,
-    title: "Talking Photo",
-    text: "Turn a single photo into a speaking avatar, lip-synced to your script or AI voiceover in any language.",
-    points: ["Use your own or an AI voice", "Multilingual lip-sync", "Perfect for faceless channels"],
-  },
-  {
-    id: "tool_scene_stitch_interest",
-    icon: Clapperboard,
-    title: "Scene Stitcher",
-    text: "Join several clips with a voiceover and music into one finished 30–60 second video, assembled automatically.",
-    points: ["Auto timing to the voiceover", "Transitions and captions included", "Publish straight to YouTube"],
-  },
-];
-
 function ToolsComingSoon() {
   const track = useServerFn(trackFunnelEvent);
   const [saved, setSaved] = useState<Record<string, boolean>>({});
 
-  async function notify(id: ToolEvent, title: string) {
+  async function notify(id: ToolInterestEvent, title: string) {
     try {
       await track({ data: { event: id, meta: { page: "tools" } } });
       setSaved((s) => ({ ...s, [id]: true }));
@@ -85,7 +41,7 @@ function ToolsComingSoon() {
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {TOOLS.map((t) => {
+        {COMING_SOON_TOOLS.map((t) => {
           const done = !!saved[t.id];
           return (
             <div key={t.id} className="glass rounded-2xl p-5 border border-white/10 flex flex-col gap-3">

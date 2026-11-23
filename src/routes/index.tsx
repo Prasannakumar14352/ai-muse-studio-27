@@ -16,6 +16,7 @@ import {
 import { LandingPricingTabs } from "@/components/landing-pricing-tabs";
 import { ComparisonSection } from "@/components/comparison/ComparisonSection";
 import { EXTRA_FAQ } from "@/lib/landing-content";
+import { ComingSoonToolsSection } from "@/components/coming-soon-tools-section";
 
 
 
@@ -33,7 +34,7 @@ const FEATURES = [
 const FAQ = [
   { q: "What is CreatorFlow AI?", a: "A premium AI content platform that generates full creator-ready projects — scripts, scenes, images, captions, hashtags — in one flow." },
   { q: "Do I need any editing experience?", a: "No. You describe the topic and pick a style. We generate the entire project blueprint." },
-  { q: "Which platforms are supported?", a: "YouTube, Instagram, TikTok, Facebook and LinkedIn — with platform-specific tone and formatting." },
+  { q: "Which platforms are supported?", a: "Content is written for YouTube, Instagram, TikTok, Facebook and LinkedIn, with platform-specific tone and formatting. Direct publishing is live for YouTube; Instagram, Facebook and LinkedIn publishing are coming soon." },
   { q: "Can I use my own brand style?", a: "Yes. Save brand presets in Settings, and every generation adapts to your defaults." },
   { q: "Is there a free plan?", a: "Yes — you get 50 free credits once when you sign up. When they run out, buy a credit pack or pick a plan." },
   ...EXTRA_FAQ,
@@ -124,6 +125,9 @@ function Landing() {
         </div>
       </section>
 
+      {/* Upcoming tools (clearly marked Coming soon) */}
+      <ComingSoonToolsSection />
+
       {/* Product walkthroughs (not testimonials) */}
       <ProductWalkthroughsSection />
 
@@ -171,7 +175,7 @@ function Landing() {
           <div className="relative">
             <Rocket className="w-12 h-12 mx-auto text-white" />
             <h2 className="mt-4 text-3xl md:text-4xl font-bold">Ready to fill your content vault?</h2>
-            <p className="mt-3 text-muted-foreground">Join thousands of creators shipping content 10x faster.</p>
+            <p className="mt-3 text-muted-foreground">Turn one idea into a finished, ready-to-post project in minutes.</p>
             <Link to="/auth" className="mt-8 inline-flex rounded-xl gradient-primary px-8 py-3.5 text-sm font-semibold text-white shadow-[var(--shadow-glow)]">
               Start free <Wand2 className="w-4 h-4 ml-2" />
             </Link>
