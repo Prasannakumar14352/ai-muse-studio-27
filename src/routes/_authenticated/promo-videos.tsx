@@ -35,6 +35,7 @@ import {
   type PromoScene,
 } from "@/lib/promo-video.functions";
 import { fetchGeneratedImage } from "@/lib/image-stream";
+import { shrinkForVision } from "@/lib/image-shrink";
 import { renderVideo, type RenderScene, type CameraMotion, type TransitionStyle } from "@/lib/video-renderer";
 
 export const Route = createFileRoute("/_authenticated/promo-videos")({
@@ -188,7 +189,10 @@ function PromoVideosPage() {
 
   // ---- Estimates ----
   const estimatedSceneCount = Math.max(3, Math.min(9, Math.round(draft.brief.durationSec / 5)));
-  const estimatedCredits = 2 + estimatedSceneCount * 2; // 2 for plan, 2 per scene image
+  // Plan (2) + scene step (2 per scene) + each scene image, which /api/generate-image
+  // charges itself: 1 credit normally, HD price when real product photos are used.
+  const sceneImageCost = draft.productImages.length ? 8 : 1;
+  const estimatedCredits = 2 + estimatedSceneCount * (2 + sceneImageCost);
 
   // ---- Step actions ----
   const detailsReady =
@@ -316,8 +320,18 @@ function PromoVideosPage() {
       if (abortRef.current?.signal.aborted) throw new Error("Cancelled");
       if (stills[i]) { done++; setRenderProgress(done / totalSteps * 0.7); continue; }
       const s = plan.scenes[i];
-      const prompt = `${s.visual_prompt}. ${fmtLocal.composition} Cinematic, photorealistic, HDR, DSLR quality, ${draft.brief.tone.toLowerCase()} mood. Product/brand focus: ${draft.brief.productName}. On-screen safe zone: ${fmtLocal.safeZone}.`;
-      const res = await fetchGeneratedImage({ prompt, ratio, quality: "medium", signal: abortRef.current?.signal });
+      // Real product photos: every scene shows the seller's actual product.
+      const refs = draft.productImages.slice(0, 3);
+      const productLock = refs.length
+        ? `Use the exact product shown in the reference photo${refs.length > 1 ? "s" : ""} — keep its shape, colours, printed design, text and logo exactly as they are; do not redesign it. Place it naturally in this scene: `
+        : "";
+      const prompt = `${productLock}${s.visual_prompt}. ${fmtLocal.composition} Cinematic, photorealistic, HDR, DSLR quality, ${draft.brief.tone.toLowerCase()} mood. Product/brand focus: ${draft.brief.productName}. On-screen safe zone: ${fmtLocal.safeZone}. No text or captions in the image.`;
+      const res = await fetchGeneratedImage({
+        prompt, ratio, quality: "medium", signal: abortRef.current?.signal,
+        ...(refs.length ? { referenceImages: refs } : {}),
+      });
+      // Out of credits mid-render: stop instead of rendering a video with blank scenes.
+      if (!res.image && res.status === 402) throw new Error(res.error ?? "Not enough credits for the scene images.");
       if (res.image) stills[i] = res.image;
       done++;
       setRenderProgress(done / totalSteps * 0.7);
@@ -642,8 +656,10 @@ function BrandStep({
     if (!files) return;
     const next: string[] = [];
     for (const f of Array.from(files).slice(0, 6)) {
-      if (f.size > 5_000_000) { toast.error(`${f.name} exceeds 5 MB — skipped`); continue; }
-      next.push(await readFile(f));
+      if (f.size > 10_000_000) { toast.error(`${f.name} exceeds 10 MB — skipped`); continue; }
+      // Phone photos are several MB; 1024 px is plenty for the AI and keeps
+      // requests under the server's upload limit.
+      next.push(await shrinkForVision(await readFile(f), 1024, 0.85));
     }
     setDraft((d) => {
       const merged = [...d.productImages, ...next].slice(0, 8);
@@ -661,7 +677,7 @@ function BrandStep({
     <Card className="p-6 space-y-5 bg-white/[0.02] backdrop-blur border border-white/10">
       <div>
         <h2 className="text-lg font-semibold">Brand assets</h2>
-        <p className="text-xs text-muted-foreground">Optional — helps the AI keep your product consistent across scenes.</p>
+        <p className="text-xs text-muted-foreground">Optional — add clear photos of your real product (mug, T-shirt, keychain…) and every scene will show it exactly as it is. Scenes with product photos use HD images, so they cost more credits.</p>
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
@@ -708,7 +724,7 @@ function BrandStep({
         </div>
 
         <div className="space-y-2 md:col-span-2">
-          <Label className="text-xs text-muted-foreground">Product screenshots / images ({draft.productImages.length}/8)</Label>
+          <Label className="text-xs text-muted-foreground">Product photos ({draft.productImages.length}/8) — the first 3 are used in every scene</Label>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {draft.productImages.map((src, i) => (
               <div key={i} className="group relative aspect-square overflow-hidden rounded-xl border border-white/10 bg-white/5">

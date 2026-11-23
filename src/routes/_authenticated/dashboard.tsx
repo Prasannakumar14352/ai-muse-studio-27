@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({ component: D
 const QUICK_ACTIONS = [
   { to: "/videos", label: "Long Video", desc: "YouTube-length", icon: Video, hue: "from-pink-500 to-rose-600" },
   { to: "/videos", label: "Short / Reel", desc: "9:16 vertical", icon: Film, hue: "from-fuchsia-500 to-purple-600" },
-  { to: "/promo-videos", label: "Promo Video", desc: "Ads & launches", icon: Megaphone, hue: "from-amber-400 to-orange-500" },
+  { to: "/promo-videos", label: "Business Promo", desc: "Promo videos with your real product", icon: Megaphone, hue: "from-amber-400 to-orange-500" },
   { to: "/carousels", label: "Carousel", desc: "Slides deck", icon: Layers, hue: "from-indigo-500 to-purple-600" },
   { to: "/images", label: "AI Image", desc: "Batch + edit", icon: ImageIcon, hue: "from-emerald-400 to-teal-500" },
   { to: "/thumbnails", label: "Thumbnail", desc: "CTR-optimized", icon: Sparkles, hue: "from-orange-400 to-pink-500" },

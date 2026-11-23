@@ -117,6 +117,13 @@ export const FEATURES: FeatureDef[] = [
     group: "page",
   },
   {
+    id: "ad_creatives",
+    label: "Ad Creatives",
+    paths: ["/ad-creatives"],
+    defaultTier: "free",
+    group: "page",
+  },
+  {
     id: "promo_videos",
     label: "Promo Video",
     paths: ["/promo-videos"],

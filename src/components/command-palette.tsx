@@ -45,7 +45,8 @@ const NAV: Intent[] = [
 const CREATE: Intent[] = [
   { label: "Create Video", hint: "Long-form YouTube video", icon: Film, to: "/videos", keywords: "youtube long video generate" },
   { label: "Create Reel / Short", hint: "9:16 short video", icon: Film, to: "/videos", keywords: "short reel tiktok instagram" },
-  { label: "Create Promo Video", hint: "Ad / promo clip", icon: Megaphone, to: "/promo-videos", keywords: "ad promo commercial" },
+  { label: "Make an Ad Creative", hint: "Facebook / Instagram ad image", icon: Megaphone, to: "/ad-creatives", keywords: "ad poster creative facebook instagram meta banner" },
+  { label: "Create Business Promo", hint: "Promo video with your product photos", icon: Megaphone, to: "/promo-videos", keywords: "ad promo commercial" },
   { label: "Create Carousel", hint: "LinkedIn / IG carousel", icon: Layers, to: "/carousels", keywords: "carousel slides linkedin instagram" },
   { label: "Create Thumbnail", hint: "YouTube thumbnail", icon: Sparkles, to: "/thumbnails", keywords: "thumbnail youtube ctr" },
   { label: "Generate Image", hint: "AI image generation", icon: ImageIcon, to: "/images", keywords: "image ai generate" },

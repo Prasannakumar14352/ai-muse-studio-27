@@ -186,7 +186,9 @@ Return ONLY valid JSON with EXACTLY this shape (no commentary):
 Rules:
 - Every scene visual must feature THIS product/brand ("${brief.productName}") consistently.
 - Scenes must sum to exactly ${brief.durationSec} seconds.
-- Do not mention CreatorFlow AI unless it IS the product.
+- Do not mention CreatorFlow AI unless it IS the product.${brief.hasProductImages ? `
+- The seller uploaded REAL photos of the product. Every visual_prompt must show that exact product (call it "the product") in a fitting setting — lifestyle, gifting, festival or close-up shots — and must NOT describe a different design, colour or logo for it.
+- Do not put text, captions or prices inside visual_prompt; on_screen_text is added separately.` : ""}
 - Output valid JSON. No trailing commas. No markdown fences.`;
 }
 

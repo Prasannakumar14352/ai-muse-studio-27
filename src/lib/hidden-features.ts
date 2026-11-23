@@ -7,9 +7,8 @@
  *
  *   /marketplace  — no items to sell yet
  *   /agents       — thin wrapper over the same text AI as AI Strategy
- *   /promo-videos — overlaps with Video studio and Model Studio
  */
-export const HIDDEN_PATHS: readonly string[] = ["/marketplace", "/agents", "/promo-videos"];
+export const HIDDEN_PATHS: readonly string[] = ["/marketplace", "/agents"];
 
 /**
  * Connected Accounts (/connections) shows in the sidebar only once an admin
