@@ -8,7 +8,7 @@ import {
   Upload, Maximize2, Eraser, Scissors, X, Palette as PaletteIcon,
   Sliders, BarChart3, Rocket, ArrowLeft, Wand, Check, Plus,
 } from "lucide-react";
-import { useAccess, canGenerate } from "@/lib/access";
+import { useAccess, canGenerate, getAvailableCredits } from "@/lib/access";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchGeneratedImage } from "@/lib/image-stream";
 import {
@@ -438,43 +438,72 @@ function ThumbnailsPage() {
   return (
     <div className="space-y-6 max-w-7xl">
       <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl md:text-4xl font-bold">
-            AI <span className="gradient-text">Thumbnail Studio</span>
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Plan, generate, edit and export professional high-CTR thumbnails for every platform.
+          <h1 className="text-3xl md:text-4xl font-bold">Thumbnails</h1>
+          <p className="text-muted-foreground mt-1.5">
+            High-CTR covers for every platform — plan for free, then generate and edit.
           </p>
         </div>
-        <div className="flex gap-2">
-          {(step > 1 || items.length > 0 || mode === "library") && (
-            <button onClick={startNew} disabled={generating}
-              className="px-3 py-1.5 rounded-lg text-sm gradient-primary text-white flex items-center gap-1.5 disabled:opacity-50">
-              <Plus className="w-3.5 h-3.5" /> New thumbnail
-            </button>
-          )}
-          <button onClick={() => setMode("create")}
-            className={`px-3 py-1.5 rounded-lg text-sm ${mode === "create" ? "gradient-primary text-white" : "glass border border-border"}`}>
-            Create
+        {(step > 1 || items.length > 0 || mode === "library") && (
+          <button onClick={startNew} disabled={generating}
+            className="rounded-xl gradient-primary text-white px-4 py-2.5 text-sm font-semibold flex items-center gap-1.5 shadow-[var(--shadow-glow)] hover:brightness-110 transition disabled:opacity-50">
+            <Plus className="w-4 h-4" /> New thumbnail
           </button>
-          <button onClick={() => setMode("reverse")}
-            className={`px-3 py-1.5 rounded-lg text-sm ${mode === "reverse" ? "gradient-primary text-white" : "glass border border-border"}`}>
-            Reverse Engineer
-          </button>
-          <button onClick={() => { setMode("library"); void refreshLibrary(); }}
-            className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 ${mode === "library" ? "gradient-primary text-white" : "glass border border-border"}`}>
-            <ImageIcon className="w-3.5 h-3.5" /> My thumbnails{library.length ? ` (${library.length})` : ""}
-          </button>
-        </div>
+        )}
       </div>
 
-      {mode === "create" && (
-        <StepIndicator step={step} onStep={(s) => { if (s < step) setStep(s); }} />
-      )}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-xl border border-border bg-card p-1" role="tablist" aria-label="Thumbnail tools">
+          {([
+            ["create", "✨ Create"],
+            ["reverse", "🔍 Copy a style"],
+            ["library", `🖼️ My thumbnails${library.length ? ` (${library.length})` : ""}`],
+          ] as const).map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={mode === id} type="button"
+              onClick={() => { setMode(id); if (id === "library") void refreshLibrary(); }}
+              className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${mode === id ? "gradient-primary text-white shadow-[var(--shadow-glow)]" : "text-muted-foreground hover:text-foreground"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {mode === "create" && (
+          <StepIndicator step={step} onStep={(s) => { if (s < step) setStep(s); }} />
+        )}
+      </div>
 
       {mode === "create" && step === 1 && (
-        <PlanningWizard brief={brief} update={updateBrief} onNext={runPlanning} planning={planning} brandKit={brandKit} />
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
+          <PlanningWizard brief={brief} update={updateBrief} onNext={runPlanning} planning={planning} brandKit={brandKit} />
+          <aside className="lg:sticky lg:top-20 space-y-4">
+            <div className="glass rounded-2xl p-5 space-y-3">
+              <div className="font-semibold">Summary</div>
+              <ThumbRow label="Title" value={brief.title || "—"} />
+              <ThumbRow label="Format" value={getFormat(formatFromAspectRatio(brief.aspectRatio, brief.platform)).label} />
+              <ThumbRow label="Concepts" value={String(brief.conceptCount)} />
+              <ThumbRow label="Quality" value={QUALITIES.find((q) => q.id === brief.quality)?.label ?? brief.quality} />
+              <div className="h-px bg-border" />
+              <ThumbRow label="AI plan" value="Free" />
+              <div className="flex items-baseline justify-between">
+                <span className="font-semibold">Generating</span>
+                <span className="text-2xl font-bold text-primary [font-family:'Space_Grotesk',Inter,sans-serif]">{thumbnailCost(brief)} cr</span>
+              </div>
+              {access && Number.isFinite(getAvailableCredits(access)) && (
+                <div className={`rounded-xl px-3 py-2 text-xs font-medium ${getAvailableCredits(access) >= thumbnailCost(brief) ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>
+                  {getAvailableCredits(access) >= thumbnailCost(brief)
+                    ? `✓ You have ${getAvailableCredits(access).toLocaleString()} credits — enough`
+                    : `You have ${getAvailableCredits(access).toLocaleString()} credits — top up before generating`}
+                </div>
+              )}
+              <button onClick={runPlanning} disabled={planning}
+                className="w-full rounded-xl gradient-primary text-white px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2 shadow-[var(--shadow-glow)] hover:brightness-110 transition disabled:opacity-50">
+                {planning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {planning ? "Planning…" : "Make the AI plan (free)"}
+              </button>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">You review the AI brief before any credits are used.</p>
+            </div>
+          </aside>
+        </div>
       )}
 
       {mode === "create" && step === 2 && plan && (
@@ -552,23 +581,37 @@ function ThumbnailsPage() {
 function StepIndicator({ step, onStep }: { step: Step; onStep: (s: Step) => void }) {
   const steps = [
     { n: 1 as const, label: "Plan" },
-    { n: 2 as const, label: "AI Brief" },
+    { n: 2 as const, label: "Review brief" },
     { n: 3 as const, label: "Generate" },
   ];
   return (
-    <div className="flex items-center gap-2">
-      {steps.map((s, i) => (
-        <div key={s.n} className="flex items-center gap-2">
-          <button onClick={() => onStep(s.n)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs transition ${
-              step === s.n ? "gradient-primary text-white" : step > s.n ? "glass border border-border" : "glass border border-border opacity-50"
-            }`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= s.n ? "bg-white/20" : "bg-white/10"}`}>{s.n}</span>
-            {s.label}
-          </button>
-          {i < steps.length - 1 && <ChevronRight className="w-3 h-3 text-muted-foreground" />}
-        </div>
-      ))}
+    <ol className="flex items-center gap-2" aria-label="Progress">
+      {steps.map((s, i) => {
+        const done = step > s.n;
+        const on = step === s.n;
+        return (
+          <li key={s.n} className="flex items-center gap-2">
+            {i > 0 && <span className={`h-0.5 w-5 sm:w-8 rounded-full ${done || on ? "bg-emerald-500/70" : "bg-border"}`} aria-hidden />}
+            <button type="button" onClick={() => onStep(s.n)} aria-current={on ? "step" : undefined} className="flex items-center gap-2">
+              <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${
+                done ? "bg-emerald-500 text-white" : on ? "gradient-primary text-white shadow-[var(--shadow-glow)]" : "bg-secondary text-muted-foreground"
+              }`}>
+                {done ? <Check className="h-3.5 w-3.5" /> : s.n}
+              </span>
+              <span className={`text-sm font-medium hidden sm:inline ${done || on ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function ThumbRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className="font-medium text-right truncate">{value}</span>
     </div>
   );
 }
@@ -628,8 +671,8 @@ function PlanningWizard({ brief, update, onNext, planning, brandKit }: {
   }
   return (
     // items-start: a collapsed section must not stretch to its neighbour's height (looked like an empty panel).
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-      <div className="lg:col-span-2">
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+      <div className="xl:col-span-2">
         <FormatSelector activeId={activeFormatId} onSelect={selectFormat} />
       </div>
 
@@ -810,7 +853,7 @@ function PlanningWizard({ brief, update, onNext, planning, brandKit }: {
         <p className="text-[11px] text-muted-foreground">Cost: <span className="text-foreground font-medium">{thumbnailCost(brief)} credits</span> for {brief.conceptCount} {brief.conceptCount === 1 ? "concept" : "concepts"}. Planning is free.</p>
       </Section>
 
-      <div className="lg:col-span-2 flex justify-end">
+      <div className="xl:col-span-2 flex justify-end lg:hidden">
         <button onClick={onNext} disabled={planning}
           className="rounded-lg gradient-primary text-white px-6 py-2.5 text-sm font-medium flex items-center gap-2 shadow-[var(--shadow-glow)] disabled:opacity-40">
           {planning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}

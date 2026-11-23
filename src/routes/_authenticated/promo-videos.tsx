@@ -22,7 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 import { supabase } from "@/integrations/supabase/client";
-import { useAccess } from "@/lib/access";
+import { useAccess, getAvailableCredits } from "@/lib/access";
+import { findLanguage } from "@/lib/languages";
 import { useCreditGuard } from "@/lib/use-credit-guard";
 import {
   PROMO_FORMATS,
@@ -422,9 +423,21 @@ function PromoVideosPage() {
   // The signed-in layout (_authenticated/route.tsx) already provides the sidebar and top bar.
   return (
     <>
-      <div className="mx-auto max-w-6xl space-y-6">
-        <Stepper current={draft.step} onGoto={(s) => stepValid(s) && goto(s)} />
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold">Business Promo</h1>
+            <p className="text-muted-foreground mt-1.5">A promo video built around your real product photos — you approve the plan before anything is made.</p>
+          </div>
+          {(draft.step > 0 || draft.brief.productName) && (
+            <Button variant="ghost" size="sm" onClick={resetAll}>Start over</Button>
+          )}
+        </div>
 
+        <Stepper current={draft.step} onGoto={(s) => stepValid(s) && goto(s)} canGo={stepValid} />
+
+        <div className={draft.step <= 2 ? "grid lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start" : ""}>
+        <div className="min-w-0 space-y-6">
         {draft.step === 0 && (
           <DetailsStep
             brief={draft.brief}
@@ -483,6 +496,55 @@ function PromoVideosPage() {
             onReset={resetAll}
           />
         )}
+        </div>
+
+        {draft.step <= 2 && (
+          <aside className="lg:sticky lg:top-20 space-y-4">
+            <div className="glass rounded-2xl p-5 space-y-3">
+              <div className="font-semibold">Your promo</div>
+              <div className="flex items-center gap-3">
+                {draft.productImages[0] ? (
+                  <img src={draft.productImages[0]} alt="" className="h-14 w-14 rounded-xl object-cover border border-border" />
+                ) : (
+                  <div className="grid h-14 w-14 place-items-center rounded-xl bg-secondary border border-dashed border-border text-muted-foreground"><Megaphone className="h-5 w-5" /></div>
+                )}
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold truncate">{draft.brief.productName || "Your product"}</div>
+                  <div className="text-xs text-muted-foreground line-clamp-2">{draft.brief.topic || "What you're promoting"}</div>
+                </div>
+              </div>
+              <PromoRow label="Format" value={fmt ? `${fmt.label} · ${fmt.aspect}` : "—"} />
+              <PromoRow label="Length" value={`${draft.brief.durationSec}s · ~${estimatedSceneCount} scenes`} />
+              <PromoRow label="Language" value={findLanguage(draft.brief.language)?.id ?? draft.brief.language} />
+              <PromoRow label="Voiceover" value={VOICE_OPTIONS.find((v) => v.value === draft.brief.voiceover)?.label ?? String(draft.brief.voiceover)} />
+              <PromoRow label="Product photos" value={draft.productImages.length ? `${draft.productImages.length} added ✓` : "None yet"} />
+              <PromoRow label="Logo" value={draft.logo ? "Added ✓" : "None"} />
+              <div className="h-px bg-border" />
+              <div className="flex items-baseline justify-between">
+                <span className="font-semibold">Estimated total</span>
+                <span className="text-2xl font-bold text-primary [font-family:'Space_Grotesk',Inter,sans-serif]">≈ {estimatedCredits} cr</span>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Plan 2 cr · {estimatedSceneCount} scenes × {2 + sceneImageCost} cr{draft.productImages.length ? " (HD images with your photos)" : ""}
+              </div>
+              {(() => {
+                const available = access ? getAvailableCredits(access) : null;
+                if (available === null || !Number.isFinite(available)) return null;
+                const ok = available >= estimatedCredits;
+                return (
+                  <div className={`rounded-xl px-3 py-2 text-xs font-medium ${ok ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>
+                    {ok ? `✓ You have ${available.toLocaleString()} credits — enough` : `You have ${available.toLocaleString()} credits — top up before generating`}
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="glass rounded-2xl p-4 text-xs text-muted-foreground leading-relaxed">
+              <div className="font-semibold text-sky-400 mb-1">💡 Tip</div>
+              Add 3 clear product photos on the Brand step — every scene then shows your real product instead of an AI look-alike.
+            </div>
+          </aside>
+        )}
+        </div>
       </div>
       {InsufficientDialog}
     </>
@@ -491,31 +553,42 @@ function PromoVideosPage() {
 
 // ---------- Stepper ----------
 
-function Stepper({ current, onGoto }: { current: StepId; onGoto: (s: StepId) => void }) {
+function Stepper({ current, onGoto, canGo }: { current: StepId; onGoto: (s: StepId) => void; canGo: (s: StepId) => boolean }) {
   return (
-    <div className="flex items-center gap-2 overflow-x-auto py-1">
+    <ol className="flex items-center gap-2 overflow-x-auto pb-1" aria-label="Progress">
       {STEPS.map((label, i) => {
-        const active = i === current;
+        const on = i === current;
         const done = i < current;
+        const reachable = canGo(i as StepId);
         return (
-          <button
-            key={label}
-            onClick={() => onGoto(i as StepId)}
-            className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              active
-                ? "bg-gradient-to-r from-pink-500/20 to-orange-500/20 border border-pink-500/40 text-white"
-                : done
-                ? "border border-emerald-500/40 text-emerald-300"
-                : "border border-border text-muted-foreground hover:text-white"
-            }`}
-          >
-            <span className="grid h-5 w-5 place-items-center rounded-full bg-white/5 text-[10px]">
-              {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
-            </span>
-            {label}
-          </button>
+          <li key={label} className="flex items-center gap-2 shrink-0">
+            {i > 0 && <span className={`h-0.5 w-5 sm:w-10 rounded-full ${done || on ? "bg-emerald-500/70" : "bg-border"}`} aria-hidden />}
+            <button
+              type="button"
+              onClick={() => onGoto(i as StepId)}
+              disabled={!reachable && !on}
+              aria-current={on ? "step" : undefined}
+              className="flex items-center gap-2 disabled:cursor-not-allowed"
+            >
+              <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${
+                done ? "bg-emerald-500 text-white" : on ? "gradient-primary text-white shadow-[var(--shadow-glow)]" : "bg-secondary text-muted-foreground"
+              }`}>
+                {done ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
+              </span>
+              <span className={`text-sm font-medium ${done || on ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+            </button>
+          </li>
         );
       })}
+    </ol>
+  );
+}
+
+function PromoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-right truncate">{value}</span>
     </div>
   );
 }
@@ -535,10 +608,10 @@ function DetailsStep({
 }) {
   const ready = !!brief.productName.trim() && !!brief.topic.trim();
   return (
-    <Card className="p-6 space-y-5 bg-white/[0.02] backdrop-blur border border-border">
+    <Card className="p-5 sm:p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-pink-500 to-orange-500">
+          <div className="grid h-10 w-10 place-items-center rounded-xl gradient-primary">
             <Megaphone className="h-5 w-5 text-white" />
           </div>
           <div>
@@ -606,14 +679,14 @@ function DetailsStep({
         <Field label="Offer / price / discount" htmlFor="offer">
           <Input id="offer" value={brief.offer ?? ""} onChange={(e) => setBrief({ offer: e.target.value })} placeholder="e.g. 40% off — this week only" maxLength={160} />
         </Field>
-        <div className="flex items-center justify-between rounded-xl border border-border bg-white/[0.02] p-3">
+        <div className="flex items-center justify-between rounded-xl border border-border bg-secondary p-3">
           <div>
             <div className="text-sm font-medium">Captions on video</div>
             <div className="text-xs text-muted-foreground">Burned-in text overlays per scene</div>
           </div>
           <Switch checked={brief.captions} onCheckedChange={(v) => setBrief({ captions: v })} />
         </div>
-        <div className="flex items-center justify-between rounded-xl border border-border bg-white/[0.02] p-3">
+        <div className="flex items-center justify-between rounded-xl border border-border bg-secondary p-3">
           <div>
             <div className="text-sm font-medium">Background music</div>
             <div className="text-xs text-muted-foreground">Auto-suggest a mood</div>
@@ -624,9 +697,9 @@ function DetailsStep({
 
       <div className="flex items-center justify-between border-t border-border pt-4">
         <p className="text-xs text-muted-foreground">
-          ~{estimatedSceneCount} scenes · est. <span className="text-white font-medium">{estimatedCredits} credits</span>
+          ~{estimatedSceneCount} scenes · est. <span className="text-foreground font-medium">{estimatedCredits} credits</span>
         </p>
-        <Button onClick={onNext} disabled={!ready} className="gap-2 bg-gradient-to-r from-pink-500 to-orange-500">
+        <Button onClick={onNext} disabled={!ready} className="gap-2">
           Next: Brand assets <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
@@ -689,7 +762,7 @@ function BrandStep({
   const addColor = (v: string) => setDraft((d) => ({ ...d, brandColors: [...d.brandColors, v].slice(0, 5), brief: { ...d.brief, brandColors: [...d.brandColors, v].slice(0, 5) } }));
 
   return (
-    <Card className="p-6 space-y-5 bg-white/[0.02] backdrop-blur border border-border">
+    <Card className="p-5 sm:p-6 space-y-5">
       <div>
         <h2 className="text-lg font-semibold">Brand assets</h2>
         <p className="text-xs text-muted-foreground">Optional — add clear photos of your real product (mug, T-shirt, keychain…) and every scene will show it exactly as it is. Scenes with product photos use HD images, so they cost more credits.</p>
@@ -771,8 +844,8 @@ function BrandStep({
       <div className="flex items-center justify-between border-t border-border pt-4">
         <Button variant="ghost" onClick={onBack} className="gap-2"><ChevronLeft className="h-4 w-4" /> Back</Button>
         <div className="flex items-center gap-3">
-          <p className="text-xs text-muted-foreground">Est. <span className="text-white font-medium">{estimatedCredits} credits</span></p>
-          <Button onClick={onNext} disabled={planning} className="gap-2 bg-gradient-to-r from-pink-500 to-orange-500">
+          <p className="text-xs text-muted-foreground">Est. <span className="text-foreground font-medium">{estimatedCredits} credits</span></p>
+          <Button onClick={onNext} disabled={planning} className="gap-2">
             {planning ? <><Loader2 className="h-4 w-4 animate-spin" /> Planning…</> : <><Wand2 className="h-4 w-4" /> Generate AI plan</>}
           </Button>
         </div>
@@ -798,7 +871,7 @@ function PlanStep({
 }) {
   return (
     <div className="space-y-5">
-      <Card className="p-5 space-y-3 bg-white/[0.02] backdrop-blur border border-border">
+      <Card className="p-5 space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">{plan.title}</h2>
@@ -854,7 +927,7 @@ function PlanStep({
 
       <div className="flex items-center justify-between border-t border-border pt-4">
         <Button variant="ghost" onClick={onBack} className="gap-2"><ChevronLeft className="h-4 w-4" /> Back</Button>
-        <Button onClick={onNext} className="gap-2 bg-gradient-to-r from-pink-500 to-orange-500">
+        <Button onClick={onNext} className="gap-2">
           Generate video <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
@@ -874,7 +947,7 @@ function onEditSceneMeta(_plan: PromoPlan, _field: keyof PromoPlan, _value: stri
 
 function PlanBlock({ title, text, onChange }: { title: string; text: string; onChange: (v: string) => void }) {
   return (
-    <div className="rounded-xl border border-border bg-white/[0.02] p-3">
+    <div className="rounded-xl border border-border bg-secondary p-3">
       <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
       <Textarea rows={2} value={text} onChange={(e) => onChange(e.target.value)} className="border-0 bg-transparent p-0 focus-visible:ring-0" />
     </div>
@@ -894,7 +967,7 @@ function GenerateStep({
   sceneImages: (string | null)[];
 }) {
   return (
-    <Card className="p-6 space-y-5 bg-white/[0.02] backdrop-blur border border-border">
+    <Card className="p-5 sm:p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Generating your promo</h2>
@@ -973,7 +1046,7 @@ function ReviewStep({
 
   return (
     <div className="space-y-5">
-      <Card className="p-5 bg-white/[0.02] backdrop-blur border border-border">
+      <Card className="p-5">
         <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_320px]">
           <div className="rounded-xl overflow-hidden border border-border bg-black">
             {videoUrl ? (
@@ -989,7 +1062,7 @@ function ReviewStep({
               <h2 className="text-lg font-semibold">{plan.title}</h2>
               <p className="text-xs text-muted-foreground">{fmt.label} · {fmt.aspect} · {plan.duration_sec}s</p>
             </div>
-            <Button onClick={download} disabled={!videoUrl} className="w-full gap-2 bg-gradient-to-r from-pink-500 to-orange-500">
+            <Button onClick={download} disabled={!videoUrl} className="w-full gap-2">
               <Download className="h-4 w-4" /> Download MP4
             </Button>
             <Button onClick={downloadThumb} disabled={!sceneImages[0]} variant="outline" className="w-full gap-2">
@@ -1035,7 +1108,7 @@ function ReviewStep({
 
 function CopyBlock({ label, value, onCopy }: { label: string; value: string; onCopy: (v: string, l: string) => void }) {
   return (
-    <div className="rounded-xl border border-border bg-white/[0.02] p-3">
+    <div className="rounded-xl border border-border bg-secondary p-3">
       <div className="mb-1 flex items-center justify-between">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
         <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => onCopy(value, label)}>
