@@ -18,6 +18,7 @@ import { ComparisonSection } from "@/components/comparison/ComparisonSection";
 import { EXTRA_FAQ } from "@/lib/landing-content";
 import { ComingSoonToolsSection } from "@/components/coming-soon-tools-section";
 import { BusinessPromoSection } from "@/components/business-promo-section";
+import { SiteLanguageSwitcher } from "@/components/site-language-switcher";
 
 
 
@@ -62,6 +63,7 @@ function Landing() {
             <Link to="/contact" className="hover:text-foreground">Contact</Link>
           </nav>
           <div className="flex items-center gap-3">
+            <SiteLanguageSwitcher />
             <Link to="/auth" className="text-sm text-muted-foreground hover:text-foreground">Sign in</Link>
             <Link to="/auth" className="rounded-lg gradient-primary px-4 py-2 text-sm font-medium text-white shadow-lg">
               Get Started

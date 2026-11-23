@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SiteTranslateGuard } from "@/components/site-language-switcher";
 import {
   Outlet, Link, createRootRouteWithContext, useRouter,
   HeadContent, Scripts,
@@ -110,6 +111,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
+      <SiteTranslateGuard />
       <Toaster theme="dark" richColors position="top-right" />
     </QueryClientProvider>
   );

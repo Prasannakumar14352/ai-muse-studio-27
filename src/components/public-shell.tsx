@@ -3,6 +3,7 @@ import { OfferBanner } from "@/components/offer-code";
 import { BrandLogo } from "@/components/brand-logo";
 import { useAccess } from "@/lib/access";
 import type { ReactNode } from "react";
+import { SiteLanguageSwitcher } from "@/components/site-language-switcher";
 
 /**
  * Marketing shell for public pages (pricing, features, how-it-works).
@@ -27,6 +28,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
             <Link to="/contact" className="hover:text-foreground" activeProps={{ className: "text-foreground" }}>Contact</Link>
           </nav>
           <div className="flex items-center gap-3">
+            <SiteLanguageSwitcher />
             {authed ? (
               <Link to="/dashboard" className="rounded-lg gradient-primary px-4 py-2 text-sm font-medium text-white shadow-lg">
                 Open app
