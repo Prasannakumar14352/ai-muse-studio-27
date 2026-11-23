@@ -3,9 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Copy, Loader2, Pencil, Plus, Tag, Trash2, X } from "lucide-react";
+import { Copy, Loader2, Pencil, Plus, RotateCcw, Tag, Trash2, X } from "lucide-react";
 import { useAccess } from "@/lib/access";
-import { listOffers, saveOffer, setOfferActive, deleteOffer, type AdminOffer } from "@/lib/offers.functions";
+import { listOffers, saveOffer, setOfferActive, deleteOffer, restartOfferFlash, type AdminOffer } from "@/lib/offers.functions";
 import { listPricingPlans } from "@/lib/pricing.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/offers")({
@@ -32,6 +32,7 @@ type Form = {
   startsAt: string; endsAt: string;
   maxRedemptions: string; perUserLimit: string; minAmountInr: string;
   active: boolean; showBanner: boolean; bannerText: string; autoApply: boolean;
+  flashOn: boolean; flashMinutes: string; flashRepeatDays: string;
 };
 
 const EMPTY: Form = {
@@ -40,6 +41,7 @@ const EMPTY: Form = {
   recurring: "first", recurringCycles: "3", razorpayOfferId: "",
   startsAt: "", endsAt: "", maxRedemptions: "", perUserLimit: "1", minAmountInr: "0",
   active: true, showBanner: false, bannerText: "", autoApply: false,
+  flashOn: false, flashMinutes: "60", flashRepeatDays: "",
 };
 
 /** ISO → <input type="datetime-local"> in the admin's time zone. */
@@ -121,6 +123,8 @@ function fromOffer(o: AdminOffer): Form {
     maxRedemptions: o.max_redemptions ? String(o.max_redemptions) : "", perUserLimit: String(o.per_user_limit),
     minAmountInr: String(o.min_amount_inr), active: o.active, showBanner: o.show_banner,
     bannerText: o.banner_text ?? "", autoApply: o.auto_apply,
+    flashOn: !!o.flash_minutes, flashMinutes: String(o.flash_minutes ?? 60),
+    flashRepeatDays: o.flash_repeat_days ? String(o.flash_repeat_days) : "",
   };
 }
 
@@ -128,6 +132,7 @@ function OfferRowCard({ o, onEdit }: { o: AdminOffer; onEdit: () => void }) {
   const qc = useQueryClient();
   const toggle = useServerFn(setOfferActive);
   const del = useServerFn(deleteOffer);
+  const restart = useServerFn(restartOfferFlash);
   const [busy, setBusy] = useState(false);
   const st = status(o);
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin-offers"] });
@@ -143,6 +148,12 @@ function OfferRowCard({ o, onEdit }: { o: AdminOffer; onEdit: () => void }) {
             <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full font-semibold ${st.cls}`}>{st.text}</span>
             {o.auto_apply && <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300">auto-applies</span>}
             {o.show_banner && <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300">banner</span>}
+            {!!o.flash_minutes && (
+              <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300">
+                flash {o.flash_minutes >= 60 && o.flash_minutes % 60 === 0 ? `${o.flash_minutes / 60}h` : `${o.flash_minutes}m`} per visitor
+                {o.flash_repeat_days ? ` · repeats every ${o.flash_repeat_days}d` : ""}
+              </span>
+            )}
           </div>
           {o.title && <div className="text-sm mt-0.5">{o.title}</div>}
           <div className="text-xs text-muted-foreground mt-1">{describe(o)}</div>
@@ -164,6 +175,14 @@ function OfferRowCard({ o, onEdit }: { o: AdminOffer; onEdit: () => void }) {
           try { await toggle({ data: { id: o.id, active: !o.active } }); toast.success(o.active ? "Offer switched off" : "Offer switched on"); refresh(); }
           catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } finally { setBusy(false); }
         }} className="rounded-lg glass border border-border px-3 py-1.5 text-sm">{o.active ? "Switch off" : "Switch on"}</button>
+        {!!o.flash_minutes && (
+          <button disabled={busy} onClick={async () => {
+            if (!window.confirm(`Give every visitor a fresh ${o.flash_minutes}-minute window for ${o.code}, starting now?`)) return;
+            setBusy(true);
+            try { await restart({ data: { id: o.id } }); toast.success("Flash timer restarted for everyone"); refresh(); }
+            catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } finally { setBusy(false); }
+          }} className="rounded-lg glass border border-border px-3 py-1.5 text-sm inline-flex items-center gap-1.5"><RotateCcw className="w-3.5 h-3.5" /> Restart timer for everyone</button>
+        )}
         {o.redeemed + o.pending === 0 && (
           <button disabled={busy} onClick={async () => {
             setBusy(true);
@@ -203,6 +222,8 @@ function OfferEditor({ initial, onClose }: { initial: Form; onClose: () => void 
         maxRedemptions: num(f.maxRedemptions), perUserLimit: Number(f.perUserLimit || 1),
         minAmountInr: Number(f.minAmountInr || 0), active: f.active,
         showBanner: f.showBanner, bannerText: f.bannerText.trim() || null, autoApply: f.autoApply,
+        flashMinutes: f.flashOn ? Number(f.flashMinutes || 60) : null,
+        flashRepeatDays: f.flashOn ? num(f.flashRepeatDays) : null,
       } });
       toast.success(f.id ? "Offer updated" : "Offer created");
       await qc.invalidateQueries({ queryKey: ["admin-offers"] });
@@ -316,6 +337,26 @@ function OfferEditor({ initial, onClose }: { initial: Form; onClose: () => void 
           {f.showBanner && (
             <input value={f.bannerText} onChange={(e) => set("bannerText", e.target.value)} maxLength={160}
               placeholder="🪔 Diwali offer — 30% off every plan" className={input} />
+          )}
+        </div>
+
+        <div className="rounded-xl border border-white/10 p-4 space-y-3">
+          <Check label="Flash timer — each visitor gets their own countdown" value={f.flashOn} onChange={(v) => set("flashOn", v)} />
+          {f.flashOn && (
+            <>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div><label className={label}>Minutes per visitor (5 or more)</label>
+                  <input type="number" min={5} max={10080} value={f.flashMinutes} onChange={(e) => set("flashMinutes", e.target.value)} className={input} /></div>
+                <div><label className={label}>Offer again after (days, empty = never)</label>
+                  <input type="number" min={1} max={365} value={f.flashRepeatDays} onChange={(e) => set("flashRepeatDays", e.target.value)} placeholder="Never" className={input} /></div>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                The countdown starts the first time someone sees the offer and keeps running when they refresh or come back.
+                When it reaches zero the banner disappears and checkout stops giving them the discount.
+                They only get a new window if you set "Offer again after", or click <i>Restart timer for everyone</i> on the offer.
+                The offer's own end date above still applies.
+              </p>
+            </>
           )}
         </div>
 

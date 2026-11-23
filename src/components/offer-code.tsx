@@ -6,7 +6,9 @@ import { useEffect, useState } from "react";
 import { Check, Copy, Tag, X } from "lucide-react";
 import { toast } from "sonner";
 import { previewOffer, previewPackOffers } from "@/lib/razorpay.functions";
-import { getOfferBanner } from "@/lib/offers.functions";
+import { getOfferBanner, syncFlashWindow } from "@/lib/offers.functions";
+import { flashEnd, flashStart, type FlashConfig } from "@/lib/flash-window";
+import { supabase } from "@/integrations/supabase/client";
 
 const KEY = "cf:offer-code";
 
@@ -142,20 +144,67 @@ export function OfferCodeBox({ code, setCode, quote, error, loading }: {
   );
 }
 
+/**
+ * This visitor's flash window for an offer, in this browser. It starts the first
+ * time they see the offer and survives refreshes. Signed-in visitors also get it
+ * stored on the server, which is what checkout enforces.
+ */
+function useFlashWindow(offerId: string | undefined, cfg: FlashConfig | null | undefined): number | null {
+  const sync = useServerFn(syncFlashWindow);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const cfgKey = cfg ? `${cfg.minutes}|${cfg.repeatDays}|${cfg.epoch}` : "";
+  useEffect(() => {
+    if (!offerId || !cfg) { setStartedAt(null); return; }
+    const key = `cf:flash:${offerId}`;
+    let rec: { startedAt: number; epoch: number } | null = null;
+    try { rec = JSON.parse(localStorage.getItem(key) || "null"); } catch { rec = null; }
+    const save = (start: number) => {
+      setStartedAt(start);
+      try { localStorage.setItem(key, JSON.stringify({ startedAt: start, epoch: new Date(cfg.epoch).getTime() })); } catch { /* private mode */ }
+    };
+    const local = flashStart(cfg, rec, Date.now());
+    save(local.startedAt);
+    let cancelled = false;
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!data.session || cancelled) return;
+      try {
+        const w = await sync({ data: { offerId, startedAt: local.startedAt } });
+        if (w && !cancelled) save(w.startedAt);
+      } catch { /* the local countdown is still right */ }
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offerId, cfgKey]);
+  return cfg && startedAt ? flashEnd(cfg, startedAt) : null;
+}
+
+function formatLeft(ms: number): string {
+  if (ms > 864e5) return `${Math.floor(ms / 864e5)}d ${Math.floor((ms % 864e5) / 36e5)}h left`;
+  if (ms > 36e5) return `${Math.floor(ms / 36e5)}h ${Math.floor((ms % 36e5) / 6e4)}m left`;
+  const m = Math.floor(ms / 6e4);
+  const sec = Math.floor((ms % 6e4) / 1e3);
+  return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")} left`;
+}
+
 /** Thin festival banner shown on the landing and pricing pages while an offer is live. */
 export function OfferBanner() {
   const fn = useServerFn(getOfferBanner);
   const q = useQuery({ queryKey: ["offer-banner"], queryFn: () => fn(), staleTime: 5 * 60_000 });
   const [, setCode] = useSavedOfferCode();
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
   const b = q.data;
+  const flashEndsAt = useFlashWindow(b?.offerId, b?.flash);
+  const [now, setNow] = useState(() => Date.now());
+  const fast = !!b?.flash;
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), fast ? 1000 : 60_000);
+    return () => clearInterval(t);
+  }, [fast]);
   if (!b) return null;
-  const left = b.endsAt ? new Date(b.endsAt).getTime() - now : null;
+  if (b.flash && flashEndsAt === null) return null; // window not worked out yet
+  const ends = [b.endsAt ? new Date(b.endsAt).getTime() : null, flashEndsAt].filter((x): x is number => x !== null);
+  const left = ends.length ? Math.min(...ends) - now : null;
   if (left !== null && left <= 0) return null;
-  const countdown = left === null ? null
-    : left > 864e5 ? `${Math.floor(left / 864e5)}d ${Math.floor((left % 864e5) / 36e5)}h left`
-    : `${Math.floor(left / 36e5)}h ${Math.floor((left % 36e5) / 6e4)}m left`;
+  const countdown = left === null ? null : formatLeft(left);
   return (
     <div className="w-full gradient-primary text-white text-sm">
       <div className="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">

@@ -15,6 +15,12 @@ export type OfferRow = {
   starts_at: string | null; ends_at: string | null;
   max_redemptions: number | null; per_user_limit: number; min_amount_inr: number;
   active: boolean; show_banner: boolean; banner_text: string | null; auto_apply: boolean;
+  /** Flash timer: per-visitor window length in minutes (null = off). */
+  flash_minutes?: number | null;
+  /** Open a new window this many days after the last one started (null = never). */
+  flash_repeat_days?: number | null;
+  /** Bumped by "Restart for everyone". */
+  flash_epoch?: string;
   created_at: string; updated_at: string;
 };
 
@@ -122,6 +128,10 @@ export async function quoteOffer(admin: Admin, args: {
 }
 
 async function whyNot(admin: Admin, o: OfferRow, args: { userId: string; kind: OfferKind; planCode?: string | null; amountPaise: number }): Promise<string | null> {
+  if (o.flash_minutes) {
+    const w = await flashWindowFor(admin, o, args.userId);
+    if (w && Date.now() >= w.endsAt) return "This offer has ended.";
+  }
   if (!(o.applies_to ?? []).includes(args.kind)) {
     const names: Record<OfferKind, string> = { packs: "credit packs", monthly: "monthly plans", yearly: "yearly plans", lifetime: "lifetime plans", autopay: "auto-renew plans" };
     const ok = (o.applies_to ?? []).map((k) => names[k]).filter(Boolean);
@@ -221,4 +231,27 @@ export async function addBonusCredits(admin: Admin, userId: string, credits: num
   const { data: profile } = await admin.from("profiles").select("user_credits").eq("id", userId).maybeSingle();
   const current = (profile as { user_credits?: number } | null)?.user_credits ?? 0;
   await admin.from("profiles").update({ user_credits: current + credits }).eq("id", userId);
+}
+
+/**
+ * This buyer's flash window for an offer (null when the offer has no flash timer).
+ * Opens and stores a window the first time; never restarts it on later calls.
+ */
+export async function flashWindowFor(admin: Admin, o: OfferRow, userId: string, hint?: number | null): Promise<{ startedAt: number; endsAt: number } | null> {
+  if (!o.flash_minutes) return null;
+  const { flashStart, flashEnd } = await import("@/lib/flash-window");
+  const cfg = { minutes: o.flash_minutes, repeatDays: o.flash_repeat_days ?? null, epoch: o.flash_epoch ?? o.created_at };
+  const { data } = await admin.from("offer_flash_windows").select("started_at, epoch").eq("offer_id", o.id).eq("user_id", userId).maybeSingle();
+  const row = data as { started_at: string; epoch: string } | null;
+  const rec = row ? { startedAt: new Date(row.started_at).getTime(), epoch: new Date(row.epoch).getTime() } : null;
+  const now = Date.now();
+  const { startedAt, isNew } = flashStart(cfg, rec, now, hint);
+  if (isNew) {
+    const { error } = await admin.from("offer_flash_windows").upsert({
+      offer_id: o.id, user_id: userId,
+      started_at: new Date(startedAt).toISOString(), epoch: new Date(cfg.epoch).toISOString(),
+    }, { onConflict: "offer_id,user_id" });
+    if (error) console.error("flash window upsert failed", error.message);
+  }
+  return { startedAt, endsAt: flashEnd(cfg, startedAt) };
 }

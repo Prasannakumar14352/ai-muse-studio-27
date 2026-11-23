@@ -66,6 +66,8 @@ const offerInput = z.object({
   showBanner: z.boolean().default(false),
   bannerText: z.string().trim().max(160).nullable().optional(),
   autoApply: z.boolean().default(false),
+  flashMinutes: z.number().int().min(5).max(10080).nullable().optional(),
+  flashRepeatDays: z.number().int().min(1).max(365).nullable().optional(),
 }).superRefine((v, ctx) => {
   if (v.discountType === "percent" && v.discountValue > 90) ctx.addIssue({ code: "custom", message: "Percent off can be at most 90%", path: ["discountValue"] });
   if (v.discountType === "bonus_credits" && v.discountValue > 500) ctx.addIssue({ code: "custom", message: "Bonus credits can be at most +500%", path: ["discountValue"] });
@@ -97,6 +99,8 @@ export const saveOffer = createServerFn({ method: "POST" })
       show_banner: data.showBanner,
       banner_text: data.bannerText || null,
       auto_apply: data.autoApply,
+      flash_minutes: data.flashMinutes ?? null,
+      flash_repeat_days: data.flashMinutes ? data.flashRepeatDays ?? null : null,
       updated_at: new Date().toISOString(),
     };
     const q = data.id ? db.from("offers").update(row).eq("id", data.id) : db.from("offers").insert(row);
@@ -116,6 +120,35 @@ export const setOfferActive = createServerFn({ method: "POST" })
     const { error } = await db.from("offers").update({ active: data.active, updated_at: new Date().toISOString() }).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+/** Flash timer: give every visitor a fresh window from now (old windows stop counting). */
+export const restartOfferFlash = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const db = await adminDb(context as unknown as Ctx);
+    const { error } = await db.from("offers").update({ flash_epoch: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/**
+ * Signed-in visitor: store their flash window on the server so checkout
+ * honours exactly the countdown the banner showed. `startedAt` is the start the
+ * browser already displayed; the server only accepts it if it is in the past.
+ */
+export const syncFlashWindow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ offerId: z.string().uuid(), startedAt: z.number().int().positive().nullable().optional() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { flashWindowFor } = await import("@/lib/offers.server");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabaseAdmin as any;
+    const { data: o } = await db.from("offers").select("*").eq("id", data.offerId).maybeSingle();
+    if (!o || !o.flash_minutes) return null;
+    return await flashWindowFor(db, o, (context as unknown as Ctx).userId, data.startedAt ?? null);
   });
 
 /** Delete an offer nobody has used yet (used offers are switched off instead, to keep invoices intact). */
@@ -160,6 +193,11 @@ export const getOfferBanner = createServerFn({ method: "GET" }).handler(async ()
       endsAt: o.ends_at,
       // What it really covers, so the banner never promises more than checkout gives.
       scope: offerScope(o.applies_to ?? []),
+      offerId: o.id,
+      // Per-visitor countdown (null = the banner counts down to endsAt only).
+      flash: o.flash_minutes
+        ? { minutes: o.flash_minutes, repeatDays: o.flash_repeat_days ?? null, epoch: o.flash_epoch ?? o.created_at }
+        : null,
     };
   } catch {
     return null; // never break the landing page over a banner
