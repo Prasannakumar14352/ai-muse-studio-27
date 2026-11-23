@@ -30,6 +30,7 @@ Add to **Production**, **Preview**, and **Development**:
 | `RAZORPAY_WEBHOOK_SECRET` | Razorpay dashboard → Webhooks |
 | `OPENROUTER_API_KEY` | **Required for all text AI** (captions, scripts, SEO, research, strategy…). openrouter.ai → Keys |
 | `FAL_KEY` | **Required for images, voice and Model Studio.** fal.ai → Dashboard → Keys |
+| `PIXABAY_API_KEY` | Optional — enables free stock photos & videos (0 credits) in the Asset Library and Image studio. Free key: pixabay.com/api/docs (sign in, key is shown on the page) |
 | `AI_MODEL_MAP` | Optional JSON to swap text models, e.g. `{"openai/gpt-5.5":"openai/gpt-5.5"}` |
 | `LOVABLE_API_KEY` | Not needed on Vercel. Only used as a fallback when hosted on Lovable |
 

@@ -15,6 +15,7 @@ import {
   Film, Music, Mic, User, Layers, FileText, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { StockMediaPicker } from "@/components/stock-media-picker";
 
 export const Route = createFileRoute("/_authenticated/library")({ component: LibraryPage });
 
@@ -57,6 +58,7 @@ function LibraryPage() {
     onSuccess: invalidate,
   });
 
+  const [stockOpen, setStockOpen] = useState(false);
   const [uploadingKind, setUploadingKind] = useState<AssetKind>("image");
   const [tagInput, setTagInput] = useState("");
   const [titleInput, setTitleInput] = useState("");
@@ -138,7 +140,18 @@ function LibraryPage() {
             </Button>
           </label>
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-white/15 p-3">
+          <div className="flex-1 min-w-[200px]">
+            <div className="text-sm font-medium">Free stock photos & videos</div>
+            <div className="text-xs text-muted-foreground">Millions of royalty-free images and clips from Pixabay — 0 credits.</div>
+          </div>
+          <Button type="button" variant="outline" onClick={() => setStockOpen(true)}>
+            <ImageIcon className="w-4 h-4 mr-1" /> Browse free stock
+          </Button>
+        </div>
       </section>
+
+      <StockMediaPicker open={stockOpen} onOpenChange={setStockOpen} onPicked={() => invalidate()} />
 
       {/* Filters */}
       <section className="flex flex-wrap gap-3 items-center">
