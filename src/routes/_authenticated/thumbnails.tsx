@@ -323,14 +323,19 @@ function ThumbnailsPage() {
   async function analyzeItem(item: GeneratedItem) {
     toast.loading("Analyzing…", { id: `q-${item.id}` });
     try {
+      const { shrinkForVision } = await import("@/lib/image-shrink");
+      const imageDataUrl = await shrinkForVision(item.image);
       const q = await analyzeThumbnailQuality({ data: {
-        imageDataUrl: item.image, title: brief.title, text: plan?.thumbnailText ?? brief.customText,
+        imageDataUrl, title: brief.title, text: plan?.thumbnailText ?? brief.customText ?? "",
       }});
       setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, quality: q } : x));
       toast.success("Quality analyzed", { id: `q-${item.id}` });
     } catch (e) {
       console.warn(e);
-      toast.error("Analyze failed", { id: `q-${item.id}` });
+      toast.error("Analyze failed", {
+        id: `q-${item.id}`,
+        description: e instanceof Error ? e.message.slice(0, 160) : undefined,
+      });
     }
   }
 
@@ -972,10 +977,12 @@ function ReverseEngineerPanel({ onUseBrief }: { onUseBrief: (b: ThumbnailBrief) 
     if (!image) return;
     setBusy(true);
     try {
-      const r = await reverseEngineerThumbnail({ data: { imageDataUrl: image } });
+      const { shrinkForVision } = await import("@/lib/image-shrink");
+      const r = await reverseEngineerThumbnail({ data: { imageDataUrl: await shrinkForVision(image) } });
       setResult(r);
     } catch (e) {
-      console.warn(e); toast.error("Reverse-engineer failed");
+      console.warn(e);
+      toast.error("Reverse-engineer failed", { description: e instanceof Error ? e.message.slice(0, 160) : undefined });
     } finally { setBusy(false); }
   }
 

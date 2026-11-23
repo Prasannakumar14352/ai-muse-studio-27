@@ -5,6 +5,7 @@
 // stripped from client bundles). No .server.ts imports at module scope.
 
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { gatewayChatJson } from "@/lib/ai-gateway.server";
 import type {
   ThumbnailBrief,
@@ -170,8 +171,21 @@ export const planThumbnailBrief = createServerFn({ method: "POST" })
   });
 
 
+/** Turn a failed AI response into a short, readable reason (logged in full server-side). */
+async function aiErrorMessage(res: Response, label: string): Promise<string> {
+  const text = await res.text().catch(() => "");
+  console.error(`[thumbnail] ${label} failed`, res.status, text.slice(0, 500));
+  if (res.status === 402) return "AI credits on the provider are exhausted.";
+  if (res.status === 429) return "AI is busy right now — try again in a minute.";
+  if (res.status === 413) return "Image is too large to analyze.";
+  let detail = "";
+  try { detail = String((JSON.parse(text) as { error?: { message?: string } }).error?.message ?? ""); } catch { /* not JSON */ }
+  return `${label} failed (${res.status})${detail ? `: ${detail.slice(0, 120)}` : ""}`;
+}
+
 /** Score a rendered thumbnail across CTR heuristics. */
 export const analyzeThumbnailQuality = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: { imageDataUrl: string; title: string; text: string }) => data)
   .handler(async ({ data }): Promise<ThumbnailQualityReport> => {
     const key = aiKey();
@@ -201,7 +215,7 @@ export const analyzeThumbnailQuality = createServerFn({ method: "POST" })
         ],
       }),
     });
-    if (!res.ok) throw new Error(`Analyze failed ${res.status}`);
+    if (!res.ok) throw new Error(await aiErrorMessage(res, "Analyze"));
     const body = await res.json();
     const raw = body?.choices?.[0]?.message?.content ?? "{}";
     const j = JSON.parse((raw.match(/\{[\s\S]*\}/)?.[0]) ?? "{}");
@@ -223,6 +237,7 @@ export const analyzeThumbnailQuality = createServerFn({ method: "POST" })
 
 /** Analyze an uploaded thumbnail image and return a ready-to-render brief. */
 export const reverseEngineerThumbnail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: { imageDataUrl: string }) => data)
   .handler(async ({ data }): Promise<ReverseEngineered> => {
     const key = aiKey();
@@ -252,7 +267,7 @@ export const reverseEngineerThumbnail = createServerFn({ method: "POST" })
         ],
       }),
     });
-    if (!res.ok) throw new Error(`Reverse-engineer failed ${res.status}`);
+    if (!res.ok) throw new Error(await aiErrorMessage(res, "Reverse-engineer"));
     const body = await res.json();
     const raw = body?.choices?.[0]?.message?.content ?? "{}";
     const j = JSON.parse((raw.match(/\{[\s\S]*\}/)?.[0]) ?? "{}");
