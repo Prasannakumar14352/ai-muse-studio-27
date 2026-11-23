@@ -124,7 +124,7 @@ function CalendarPage() {
             <div className="flex items-center gap-2 mb-1 text-xs uppercase tracking-widest text-pink-300/70">
               <CalendarIcon className="w-3.5 h-3.5" /> Publishing
             </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-pink-300 to-orange-300 bg-clip-text text-transparent">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-pink-300 to-orange-300 bg-clip-text text-transparent">
               Content Calendar
             </h1>
             <p className="text-white/60 text-sm mt-1">
@@ -139,7 +139,7 @@ function CalendarPage() {
         <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
 
 
-        <nav className="flex gap-2 flex-wrap mb-6 border-b border-white/10 pb-3">
+        <nav className="flex gap-2 flex-wrap mb-6 border-b border-border pb-3">
           {([
             ["calendar", "Monthly Calendar"],
             ...(isAdmin ? [["plan", "Content plan"] as [Tab, string]] : []),
@@ -240,7 +240,7 @@ function MonthlyCalendar({
   const openItems = openDay ? (byDay[localDayKey(openDay)] ?? []) : [];
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-4">
+    <section className="rounded-2xl border border-border bg-white/[0.03] backdrop-blur-xl p-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={onPrev}><ChevronLeft className="w-4 h-4" /></Button>
@@ -249,7 +249,7 @@ function MonthlyCalendar({
           <Button variant="outline" size="sm" onClick={onToday}>Today</Button>
         </div>
         <div className="text-xs text-white/50 flex items-center gap-3">
-          {planned.length > 0 && <LegendDot color="bg-violet-400" label="planned" />}
+          {planned.length > 0 && <LegendDot color="bg-sky-400" label="planned" />}
           <LegendDot color="bg-blue-400" label="scheduled" />
           <LegendDot color="bg-amber-400" label="queue" />
           <LegendDot color="bg-emerald-400" label="published" />
@@ -288,7 +288,7 @@ function MonthlyCalendar({
               <div className="flex flex-col gap-1 overflow-hidden">
                 {c.date && (plannedByDay[key] ?? []).map((p) => (
                   <button key={p.id} type="button" onClick={onOpenPlan} title={`Content plan: ${p.idea}`}
-                    className="text-left truncate rounded px-1.5 py-0.5 text-[10px] bg-violet-500/15 text-violet-200 border border-violet-400/20 hover:bg-violet-500/25">
+                    className="text-left truncate rounded px-1.5 py-0.5 text-[10px] bg-sky-500/15 text-sky-200 border border-sky-400/20 hover:bg-sky-500/25">
                     Plan · {p.idea}
                   </button>
                 ))}
@@ -305,7 +305,7 @@ function MonthlyCalendar({
       </div>
       {openDay && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setOpenDay(null)}>
-          <div role="dialog" aria-label={openDay.toDateString()} className="w-full max-w-md rounded-2xl border border-white/10 bg-[#120a08] p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+          <div role="dialog" aria-label={openDay.toDateString()} className="w-full max-w-md rounded-2xl border border-border bg-[#120a08] p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">{openDay.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</h3>
               <button onClick={() => setOpenDay(null)} aria-label="Close" className="text-white/60 hover:text-white"><XCircle className="w-5 h-5" /></button>
@@ -315,7 +315,7 @@ function MonthlyCalendar({
             ) : (
               <div className="space-y-2">
                 {openItems.map((p) => (
-                  <div key={String(p.id)} className="rounded-lg border border-white/10 p-2.5 text-sm flex items-center gap-2">
+                  <div key={String(p.id)} className="rounded-lg border border-border p-2.5 text-sm flex items-center gap-2">
                     <span className="capitalize text-white/60 text-xs w-20 shrink-0">{String(p.platform)}</span>
                     <span className="flex-1 truncate">{String(p.caption ?? p.title ?? "Post")}</span>
                     <span className="text-[11px] text-white/50">{String(p.status).replace("_", " ")}</span>
@@ -381,10 +381,10 @@ function PostsTable({
   const update = useServerFn(updateScheduledPost);
 
   if (rows.length === 0) {
-    return <div className="p-12 text-center text-white/50 rounded-2xl border border-white/10 bg-white/[0.03]">{emptyLabel}</div>;
+    return <div className="p-12 text-center text-white/50 rounded-2xl border border-border bg-white/[0.03]">{emptyLabel}</div>;
   }
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden">
+    <div className="rounded-2xl border border-border bg-white/[0.03] overflow-hidden">
       <table className="w-full text-sm">
         <thead className="bg-white/5 text-white/60 text-xs uppercase tracking-wider">
           <tr>
@@ -406,7 +406,7 @@ function PostsTable({
                 <td className="px-4 py-3">
                   <StatusBadge status={String(r.status)} />
                   {r.external_post_url ? (
-                    <a href={String(r.external_post_url)} target="_blank" rel="noreferrer" className="block text-xs text-[color:var(--neon-purple)] hover:underline mt-1">View post</a>
+                    <a href={String(r.external_post_url)} target="_blank" rel="noreferrer" className="block text-xs text-primary hover:underline mt-1">View post</a>
                   ) : r.last_error && r.status !== "published" ? (
                     <div className="text-xs text-red-300/80 mt-1 max-w-xs truncate" title={String(r.last_error)}>{String(r.last_error)}</div>
                   ) : null}
@@ -484,7 +484,7 @@ function FailedPanel({ rows, onChange }: { rows: Array<Record<string, unknown>>;
         )}
       </div>
       {rows.length === 0 ? (
-        <div className="p-12 text-center text-white/50 rounded-2xl border border-white/10 bg-white/[0.03]">No failed posts</div>
+        <div className="p-12 text-center text-white/50 rounded-2xl border border-border bg-white/[0.03]">No failed posts</div>
       ) : (
         <div className="space-y-2">
           {rows.map((r) => {
@@ -530,7 +530,7 @@ function AnalyticsPanel({ data, loading }: { data: Awaited<ReturnType<typeof get
         <Metric label="Failed" value={data.failed} accent="text-red-300" />
         <Metric label="Success rate" value={`${data.successRate}%`} accent="text-pink-300" />
       </div>
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="rounded-2xl border border-border bg-white/[0.03] p-4">
         <div className="text-sm font-semibold mb-3">By platform</div>
         <div className="grid gap-2 md:grid-cols-2">
           {Object.entries(data.byPlatform).map(([p, s]) => {
@@ -549,7 +549,7 @@ function AnalyticsPanel({ data, loading }: { data: Awaited<ReturnType<typeof get
           {Object.keys(data.byPlatform).length === 0 && <div className="text-sm text-white/50">No posts yet</div>}
         </div>
       </div>
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="rounded-2xl border border-border bg-white/[0.03] p-4">
         <div className="text-sm font-semibold mb-3">Last 30 days · published</div>
         <Sparkline data={data.last30} />
       </div>
@@ -559,7 +559,7 @@ function AnalyticsPanel({ data, loading }: { data: Awaited<ReturnType<typeof get
 
 function Metric({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+    <div className="rounded-2xl border border-border bg-white/[0.03] p-4">
       <div className="text-xs uppercase tracking-wider text-white/50">{label}</div>
       <div className={cn("text-3xl font-bold mt-2", accent ?? "text-white")}>{value}</div>
     </div>
@@ -597,7 +597,7 @@ function PlatformsPanel({ data, loading }: { data: Awaited<ReturnType<typeof get
         return (
           <div key={p.platform} className={cn(
             "rounded-2xl border p-4 backdrop-blur-xl",
-            ok ? "border-emerald-500/30 bg-emerald-500/[0.04]" : "border-white/10 bg-white/[0.03]",
+            ok ? "border-emerald-500/30 bg-emerald-500/[0.04]" : "border-border bg-white/[0.03]",
           )}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

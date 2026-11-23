@@ -59,7 +59,7 @@ function SectionCard({
   const m = useMutation({ mutationFn: async (ins: string) => onRegenerate(ins || undefined) });
 
   return (
-    <div className="rounded-xl border border-white/10 bg-card/40 p-4 space-y-2">
+    <div className="rounded-xl border border-border bg-card/40 p-4 space-y-2">
       <div className="flex items-center justify-between">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">{section.label}</div>
         <div className="flex items-center gap-1.5">
@@ -72,7 +72,7 @@ function SectionCard({
           <button
             onClick={() => m.mutate(instruction)}
             disabled={m.isPending}
-            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-white/15 hover:border-primary/50 disabled:opacity-50"
+            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-border hover:border-primary/50 disabled:opacity-50"
           >
             {m.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
             Regenerate
@@ -117,7 +117,7 @@ function ListEditor({ items, onChange }: { items: string[]; onChange: (next: str
           />
           <button
             onClick={() => onChange(items.filter((_, j) => j !== i))}
-            className="px-2 rounded-lg border border-white/10 text-muted-foreground hover:text-red-300"
+            className="px-2 rounded-lg border border-border text-muted-foreground hover:text-red-300"
             title="Delete"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -126,7 +126,7 @@ function ListEditor({ items, onChange }: { items: string[]; onChange: (next: str
       ))}
       <button
         onClick={() => onChange([...items, ""])}
-        className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-white/10 hover:border-primary/50"
+        className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-border hover:border-primary/50"
       >
         <Plus className="w-3 h-3" /> Add item
       </button>

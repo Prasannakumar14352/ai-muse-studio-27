@@ -9,7 +9,7 @@ export function ComingSoonToolsSection({ id = "coming-soon" }: { id?: string }) 
     <section id={id} className="py-20 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
-          <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-semibold rounded-full px-2.5 py-1 bg-violet-500/15 text-violet-200 border border-violet-400/20">
+          <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-semibold rounded-full px-2.5 py-1 bg-white/[0.06] text-muted-foreground border border-border">
             <Wand2 className="w-3.5 h-3.5" /> Coming soon
           </span>
           <h2 className="mt-4 text-3xl md:text-4xl font-bold">More one-click <span className="gradient-text">AI tools</span> on the way</h2>
@@ -19,12 +19,12 @@ export function ComingSoonToolsSection({ id = "coming-soon" }: { id?: string }) 
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {COMING_SOON_TOOLS.map((t) => (
-            <div key={t.id} className="glass rounded-2xl p-5 border border-white/10 flex flex-col gap-2">
+            <div key={t.id} className="glass rounded-2xl p-5 border border-border flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
                   <t.icon className="w-5 h-5 text-[color:var(--neon-pink)]" />
                 </div>
-                <span className="text-[10px] uppercase tracking-widest font-semibold rounded-full px-2 py-0.5 bg-violet-500/15 text-violet-200 border border-violet-400/20">
+                <span className="text-[10px] uppercase tracking-widest font-semibold rounded-full px-2 py-0.5 bg-white/[0.06] text-muted-foreground border border-border">
                   Soon
                 </span>
               </div>
@@ -33,7 +33,7 @@ export function ComingSoonToolsSection({ id = "coming-soon" }: { id?: string }) 
               <ul className="mt-1 text-xs text-muted-foreground space-y-1">
                 {t.points.map((p) => (
                   <li key={p} className="flex items-start gap-1.5">
-                    <Check className="w-3.5 h-3.5 mt-0.5 shrink-0 text-violet-300" /> {p}
+                    <Check className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" /> {p}
                   </li>
                 ))}
               </ul>

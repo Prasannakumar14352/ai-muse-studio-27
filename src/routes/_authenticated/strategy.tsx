@@ -42,15 +42,15 @@ function StrategyPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="max-w-6xl space-y-6">
       <header>
-        <h1 className="text-3xl font-bold flex items-center gap-2"><Sparkles className="w-7 h-7 text-primary" /> AI Strategy</h1>
+        <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-2"><Sparkles className="w-7 h-7 text-primary" /> AI Strategy</h1>
         <p className="text-sm text-muted-foreground mt-1">Business strategy, persona, funnel, offer, campaigns, and a 30-day plan — feeding every creation module.</p>
       </header>
 
       <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
 
-      <div className="flex gap-2 border-b border-white/10">
+      <div className="flex gap-2 border-b border-border">
         {(["new", "history"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === t ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}>
@@ -93,7 +93,7 @@ function StrategyPage() {
       {tab === "history" && (
         <div className="space-y-3">
           {strategies?.map((s) => (
-            <div key={s.id} className="glass rounded-2xl p-4 border border-white/10 flex items-center justify-between gap-3">
+            <div key={s.id} className="glass rounded-2xl p-4 border border-border flex items-center justify-between gap-3">
               <button className="text-left flex-1" onClick={() => { setCurrent(s as Row); setTab("new"); }}>
                 <div className="font-medium flex items-center gap-2">
                   {s.promoting || s.product || "Untitled strategy"}

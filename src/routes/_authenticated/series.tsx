@@ -37,7 +37,7 @@ function SeriesComingSoon() {
   return (
     <div className="max-w-5xl space-y-8">
       <div className="space-y-3">
-        <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-semibold rounded-full px-2.5 py-1 bg-violet-500/15 text-violet-200 border border-violet-400/20">
+        <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-semibold rounded-full px-2.5 py-1 bg-white/[0.06] text-muted-foreground border border-border">
           <Repeat className="w-3.5 h-3.5" /> Coming soon
         </span>
         <h1 className="text-3xl md:text-4xl font-bold">Series <span className="gradient-text">Autopilot</span></h1>
@@ -49,7 +49,7 @@ function SeriesComingSoon() {
 
       <ol className="grid md:grid-cols-5 gap-3">
         {STEPS.map((s, i) => (
-          <li key={s.title} className="glass rounded-2xl p-4 border border-white/10 space-y-2">
+          <li key={s.title} className="glass rounded-2xl p-4 border border-border space-y-2">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center font-semibold text-foreground">{i + 1}</span>
               <s.icon className="w-4 h-4" />
@@ -60,7 +60,7 @@ function SeriesComingSoon() {
         ))}
       </ol>
 
-      <div className="glass rounded-2xl p-5 border border-white/10 flex flex-wrap items-center justify-between gap-4">
+      <div className="glass rounded-2xl p-5 border border-border flex flex-wrap items-center justify-between gap-4">
         <div className="text-sm text-muted-foreground max-w-xl">
           Until then, you can make each episode in <Link to="/videos" className="underline text-foreground">Video Studio</Link> and
           schedule it from the project's Publish button.

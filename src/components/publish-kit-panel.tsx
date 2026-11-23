@@ -173,7 +173,7 @@ export function PublishKitPanel({ project, output }: { project: PanelProject; ou
     <section className="glass rounded-2xl p-6 space-y-5 border border-[color:var(--neon-purple)]/20">
       <header className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-[color:var(--neon-purple)]" />
+          <Sparkles className="w-5 h-5 text-primary" />
           <h2 className="text-lg font-semibold">Publish Kit</h2>
           {kit && (
             <span className="text-xs text-muted-foreground">
@@ -193,7 +193,7 @@ export function PublishKitPanel({ project, output }: { project: PanelProject; ou
           <button
             onClick={handleOptimize}
             disabled={busy !== null || !kit}
-            className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-2 text-sm font-medium flex items-center gap-2 disabled:opacity-60"
+            className="rounded-lg bg-white/5 hover:bg-white/10 border border-border px-3 py-2 text-sm font-medium flex items-center gap-2 disabled:opacity-60"
             title="Runs quality review and regenerates weak sections until they pass"
           >
             {busy === "optimize" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
@@ -203,7 +203,7 @@ export function PublishKitPanel({ project, output }: { project: PanelProject; ou
       </header>
 
       {!kit && (
-        <div className="text-sm text-muted-foreground border border-dashed border-white/10 rounded-xl p-4">
+        <div className="text-sm text-muted-foreground border border-dashed border-border rounded-xl p-4">
           Generate a ready-to-post distribution kit: SEO title & description, per-platform captions & hashtags,
           pinned comment, CTA, and a thumbnail concept + prompt. Then click <span className="text-foreground">Optimize</span> to
           score across 8 dimensions and auto-fix weak sections.
@@ -211,7 +211,7 @@ export function PublishKitPanel({ project, output }: { project: PanelProject; ou
       )}
 
       {report && (
-        <div className="rounded-xl border border-white/10 p-4 space-y-3">
+        <div className="rounded-xl border border-border p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {report.passed ? (
@@ -254,7 +254,7 @@ export function PublishKitPanel({ project, output }: { project: PanelProject; ou
           <KitField label={`CTA (${kit.cta_type})`} value={kit.cta_line} />
           <KitField label="Pinned first comment" value={kit.pinned_comment} multiline />
 
-          <div className="rounded-xl border border-white/10 p-4 space-y-2">
+          <div className="rounded-xl border border-border p-4 space-y-2">
             <div className="text-sm font-semibold">Thumbnail concept</div>
             <div className="text-sm text-muted-foreground">{kit.thumbnail.concept}</div>
             <KitField label="Thumbnail prompt" value={kit.thumbnail.prompt} multiline compact />
@@ -267,7 +267,7 @@ export function PublishKitPanel({ project, output }: { project: PanelProject; ou
               if (!pk) return null;
               const combined = `${pk.caption}\n\n${pk.hashtags.join(" ")}`;
               return (
-                <div key={p} className="rounded-xl border border-white/10 p-3 space-y-2">
+                <div key={p} className="rounded-xl border border-border p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-medium capitalize">
                       {p.replace("_", " ")}

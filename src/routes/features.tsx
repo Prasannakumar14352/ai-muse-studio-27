@@ -151,12 +151,12 @@ function FeaturesPage() {
 function FeatureGroup({ title, items }: { title: string; items: Feature[] }) {
   return (
     <div>
-      <div className="text-xs uppercase tracking-widest text-[color:var(--neon-purple)] mb-4">{title}</div>
+      <div className="text-xs uppercase tracking-widest text-primary mb-4">{title}</div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {items.map((f) => {
           const Icon = f.icon;
           return (
-            <div key={f.title} className="glass rounded-2xl p-6 border border-border/40 hover:border-white/20 transition">
+            <div key={f.title} className="glass rounded-2xl p-6 border border-border/40 hover:border-primary/40 transition">
               <div className="w-11 h-11 rounded-xl gradient-primary/20 bg-gradient-to-br from-[color:var(--neon-purple)]/20 to-[color:var(--neon-pink)]/10 flex items-center justify-center mb-4">
                 <Icon className="w-5 h-5 text-[color:var(--neon-pink)]" />
               </div>
@@ -164,7 +164,7 @@ function FeatureGroup({ title, items }: { title: string; items: Feature[] }) {
               <p className="mt-1.5 text-sm text-muted-foreground">{f.desc}</p>
               <ul className="mt-4 space-y-1.5 text-xs text-muted-foreground">
                 {f.bullets.map((b) => (
-                  <li key={b} className="flex gap-2"><Film className="w-3 h-3 mt-0.5 text-[color:var(--neon-purple)]" /> {b}</li>
+                  <li key={b} className="flex gap-2"><Film className="w-3 h-3 mt-0.5 text-primary" /> {b}</li>
                 ))}
               </ul>
             </div>

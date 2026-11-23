@@ -181,7 +181,7 @@ function SceneStage({ scene }: { scene: DemoScene }) {
         {/* Scene body */}
         <div className="flex-1 min-h-0 p-5 md:p-8 overflow-hidden">
           <div className="max-w-5xl mx-auto h-full flex flex-col">
-            <div className="text-xs uppercase tracking-wider text-[color:var(--neon-purple)] font-semibold mb-2">{scene.module}</div>
+            <div className="text-xs uppercase tracking-wider text-primary font-semibold mb-2">{scene.module}</div>
             <h3 className="text-2xl md:text-4xl font-bold leading-tight">{scene.title}</h3>
             <p className="mt-3 text-white/70 text-sm md:text-base max-w-2xl">{scene.caption}</p>
 
@@ -279,7 +279,7 @@ function MockResearch() {
         <div className="text-sm font-semibold mb-2">Trending topics</div>
         <div className="flex flex-wrap gap-1.5 text-xs">
           {["AI video","short-form hooks","LinkedIn carousels","thumbnail CTR","viral b-rolls","YouTube Shorts"].map(t => (
-            <span key={t} className="px-2 py-1 rounded-full bg-white/5 border border-white/10">{t}</span>
+            <span key={t} className="px-2 py-1 rounded-full bg-white/5 border border-border">{t}</span>
           ))}
         </div>
       </Card>
@@ -332,7 +332,7 @@ function MockCarousel() {
   return (
     <div className="grid grid-cols-5 gap-2 h-full">
       {[0,1,2,3,4].map(i => (
-        <div key={i} className="rounded-lg bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 p-3 flex flex-col">
+        <div key={i} className="rounded-lg bg-gradient-to-br from-white/5 to-white/[0.02] border border-border p-3 flex flex-col">
           <div className="text-[10px] uppercase opacity-60">Slide {i+1}</div>
           <div className="mt-2 text-xs font-semibold leading-tight">{["Hook","Problem","Insight","Proof","CTA"][i]}</div>
           <div className="mt-auto space-y-1">
@@ -349,7 +349,7 @@ function MockImages() {
   return (
     <div className="grid grid-cols-4 gap-2 h-full">
       {[0,1,2,3,4,5,6,7].map(i => (
-        <div key={i} className={`rounded-lg aspect-square border border-white/10 ${
+        <div key={i} className={`rounded-lg aspect-square border border-border ${
           ["bg-gradient-to-br from-fuchsia-500/40 to-orange-500/40",
            "bg-gradient-to-br from-purple-500/40 to-sky-500/40",
            "bg-gradient-to-br from-orange-500/40 to-rose-500/40",
@@ -364,7 +364,7 @@ function MockThumbnails() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 h-full">
       {["Best AI in 2026","This changed everything","I tested 47 tools","Do NOT miss this"].map((t, i) => (
-        <div key={t} className={`relative rounded-lg overflow-hidden aspect-video border border-white/10 ${
+        <div key={t} className={`relative rounded-lg overflow-hidden aspect-video border border-border ${
           ["bg-gradient-to-br from-orange-500 to-rose-600",
            "bg-gradient-to-br from-fuchsia-600 to-indigo-700",
            "bg-gradient-to-br from-amber-400 to-red-600",
@@ -392,7 +392,7 @@ function MockLinkedIn() {
       </Card>
       <div className="grid grid-cols-3 gap-2">
         {[0,1,2,3,4,5].map(i => (
-          <div key={i} className="rounded-lg aspect-square bg-gradient-to-br from-orange-500/30 to-pink-500/30 border border-white/10 flex items-center justify-center text-[10px] opacity-70">
+          <div key={i} className="rounded-lg aspect-square bg-gradient-to-br from-orange-500/30 to-pink-500/30 border border-border flex items-center justify-center text-[10px] opacity-70">
             Slide {i+1}
           </div>
         ))}
@@ -412,7 +412,7 @@ function MockBrand() {
         <div className="text-sm font-semibold mb-2">Brand colors</div>
         <div className="flex gap-2">
           {["#ff5b1f","#ff2e6a","#7a3bff","#0e0b16"].map(c => (
-            <div key={c} className="w-10 h-10 rounded-lg border border-white/10" style={{ background: c }}/>
+            <div key={c} className="w-10 h-10 rounded-lg border border-border" style={{ background: c }}/>
           ))}
         </div>
       </Card>

@@ -25,7 +25,7 @@ export function ContentTypePicker({ value, onSelect }: Props) {
           <div className={`glass rounded-2xl p-4 border transition h-full flex flex-col gap-2 group ${
             selected
               ? "border-[color:var(--neon-pink)]/60 bg-[color:var(--neon-pink)]/5"
-              : "border-border hover:border-white/20"
+              : "border-border hover:border-primary/40"
           }`}>
             <div className="flex items-start gap-3">
               <div className="rounded-lg p-2 bg-[color:var(--neon-purple)]/10 text-[color:var(--neon-pink)]">

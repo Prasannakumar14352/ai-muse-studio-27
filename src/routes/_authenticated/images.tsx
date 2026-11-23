@@ -490,7 +490,7 @@ function ImagesPage() {
                   </div>
                   {history.map((h) => (
                     <button key={h.id} onClick={() => applyHistoryEntry(h)}
-                      className="w-full text-left glass border border-border rounded-lg px-3 py-2 hover:border-white/20 transition">
+                      className="w-full text-left glass border border-border rounded-lg px-3 py-2 hover:border-primary/40 transition">
                       <div className="text-xs text-white/90 line-clamp-2">{h.prompt}</div>
                       <div className="text-[10px] text-muted-foreground mt-1 flex gap-2">
                         <span>{h.style ?? "—"}</span>
@@ -525,12 +525,12 @@ function ImagesPage() {
               <div className="flex flex-wrap gap-2">
                 <button onClick={() => setStyle(AS_DESCRIBED_STYLE)}
                   title="Use only the style written in your prompt"
-                  className={`px-3 py-1.5 rounded-full text-xs border transition ${style === AS_DESCRIBED_STYLE ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"}`}>
+                  className={`px-3 py-1.5 rounded-full text-xs border transition ${style === AS_DESCRIBED_STYLE ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-primary/40"}`}>
                   As described
                 </button>
                 {STYLES.map((s) => (
                   <button key={s.id} onClick={() => setStyle(s.id)}
-                    className={`px-3 py-1.5 rounded-full text-xs border transition ${style === s.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"}`}>
+                    className={`px-3 py-1.5 rounded-full text-xs border transition ${style === s.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-primary/40"}`}>
                     {s.label}
                   </button>
                 ))}
@@ -581,7 +581,7 @@ function ImagesPage() {
               <div className="flex gap-2">
                 <button onClick={() => setStockGalleryOpen(true)} disabled={loading}
                   title="Search free royalty-free photos from Pixabay instead of generating"
-                  className="rounded-lg glass border border-border px-4 py-2.5 text-sm font-medium flex items-center gap-2 disabled:opacity-40 hover:border-white/20">
+                  className="rounded-lg glass border border-border px-4 py-2.5 text-sm font-medium flex items-center gap-2 disabled:opacity-40 hover:border-primary/40">
                   <Search className="w-4 h-4" /> Free stock
                   <span className="ml-1 inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-1.5 py-0.5 text-[10px] font-semibold">0 credits</span>
                 </button>
@@ -854,11 +854,11 @@ function UploadPanel({
         <div className="flex items-center gap-1.5">
           {onStock && (
             <button type="button" onClick={onStock}
-              className="rounded-md glass border border-border px-2 py-1 text-xs flex items-center gap-1 hover:border-white/20">
+              className="rounded-md glass border border-border px-2 py-1 text-xs flex items-center gap-1 hover:border-primary/40">
               <Search className="w-3 h-3" /> Free stock
             </button>
           )}
-          <label className="rounded-md glass border border-border px-2 py-1 text-xs flex items-center gap-1 cursor-pointer hover:border-white/20">
+          <label className="rounded-md glass border border-border px-2 py-1 text-xs flex items-center gap-1 cursor-pointer hover:border-primary/40">
             <Upload className="w-3 h-3" /> Upload
             <input type="file" accept="image/*" multiple className="hidden"
               onChange={(e) => { onAdd(e.target.files); e.currentTarget.value = ""; }} />
@@ -963,7 +963,7 @@ function ImageCard({
 function MenuBtn({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
   return (
     <button onClick={onClick}
-      className="rounded-md glass border border-border px-2 py-1.5 text-[11px] flex items-center gap-1 hover:border-white/20 hover:bg-white/5">
+      className="rounded-md glass border border-border px-2 py-1.5 text-[11px] flex items-center gap-1 hover:border-primary/40 hover:bg-white/5">
       {icon} {label}
     </button>
   );

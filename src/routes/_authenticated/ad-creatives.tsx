@@ -192,16 +192,16 @@ function AdCreativesPage() {
     (Object.keys(AD_SIZES) as AdFormat[]).forEach((f, i) => setTimeout(() => download(f), i * 400));
   }
 
-  const input = "w-full text-sm bg-black/30 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-orange-500/60";
+  const input = "w-full text-sm bg-black/30 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-orange-500/60";
   const label = "text-xs text-muted-foreground block mb-1";
-  const section = "glass rounded-2xl p-5 border border-white/10 space-y-3";
+  const section = "glass rounded-2xl p-5 border border-border space-y-3";
   const ratioStyle = useMemo(() => ({ aspectRatio: `${AD_SIZES[spec.format].w} / ${AD_SIZES[spec.format].h}` }), [spec.format]);
 
   return (
     <div className="max-w-6xl space-y-6">
       {InsufficientDialog}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold flex items-center gap-2"><Megaphone className="w-7 h-7" /> Ad <span className="gradient-text">Creatives</span></h1>
+        <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-2"><Megaphone className="w-7 h-7" /> Ad <span className="gradient-text">Creatives</span></h1>
         <p className="text-muted-foreground max-w-2xl text-sm">
           Make Facebook &amp; Instagram ads for any business. AI writes the text and makes the picture — with your real product
           photos if you add them — and every word stays exact and editable.
@@ -240,7 +240,7 @@ function AdCreativesPage() {
               <label className={label}>Your real product photos (optional, up to 3) — the AI keeps your product exactly as it is</label>
               <div className="flex flex-wrap gap-2">
                 {photos.map((p, i) => (
-                  <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border border-white/10">
+                  <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border">
                     <img src={p} alt={`Product photo ${i + 1}`} className="w-full h-full object-cover" />
                     <button aria-label="Remove photo" onClick={() => setPhotos((x) => x.filter((_, j) => j !== i))}
                       className="absolute top-1 right-1 bg-black/70 rounded p-0.5"><Trash2 className="w-3 h-3" /></button>
@@ -329,7 +329,7 @@ function AdCreativesPage() {
         </div>
 
         {/* Preview */}
-        <div className="space-y-3 lg:sticky lg:top-4">
+        <div className="space-y-3 lg:sticky lg:top-20">
           <div className="flex flex-wrap gap-2">
             {LAYOUTS.map((l) => (
               <button key={l.id} title={l.hint} onClick={() => set("layout", l.id)}
@@ -342,7 +342,7 @@ function AdCreativesPage() {
                 className={`px-3 py-1.5 rounded-full text-xs border ${spec.format === f ? "bg-white text-black border-transparent" : "glass border-border"}`}>{AD_SIZES[f].label}</button>
             ))}
           </div>
-          <div className="rounded-2xl overflow-hidden border border-white/10 bg-black mx-auto" style={{ ...ratioStyle, maxHeight: "70vh" }}>
+          <div className="rounded-2xl overflow-hidden border border-border bg-black mx-auto" style={{ ...ratioStyle, maxHeight: "70vh" }}>
             <canvas ref={canvasRef} className="w-full h-full object-contain" />
           </div>
           <div className="flex flex-wrap gap-2">

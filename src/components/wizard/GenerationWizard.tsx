@@ -63,7 +63,7 @@ export function GenerationWizard({
                     ? "gradient-primary text-white border-transparent"
                     : done
                       ? "border-emerald-500/40 text-emerald-300"
-                      : "border-white/10 text-muted-foreground"
+                      : "border-border text-muted-foreground"
                 }`}
               >
                 <span className="w-5 h-5 rounded-full bg-black/30 inline-flex items-center justify-center text-[10px]">
@@ -83,7 +83,7 @@ export function GenerationWizard({
         <button
           onClick={() => (onBack ? onBack() : goto(idx - 1))}
           disabled={idx === 0}
-          className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-white/10 text-sm disabled:opacity-40"
+          className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-border text-sm disabled:opacity-40"
         >
           <ChevronLeft className="w-4 h-4" /> Back
         </button>

@@ -54,13 +54,13 @@ export function SiteLanguageSwitcher() {
     <div ref={boxRef} className="relative notranslate" translate="no">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={open}
         aria-label="Change website language"
-        className="inline-flex items-center gap-1.5 rounded-lg glass border border-white/10 px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground">
+        className="inline-flex items-center gap-1.5 rounded-lg glass border border-border px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground">
         <Globe className={`w-4 h-4 ${busy ? "animate-spin" : ""}`} />
         <span className="hidden sm:inline">{currentName?.native ?? currentName?.name ?? "English"}</span>
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-72 max-h-[70vh] overflow-hidden rounded-xl border border-white/10 bg-[#0d0d14] shadow-2xl z-[60] flex flex-col">
-          <div className="p-2 border-b border-white/10 flex items-center gap-2">
+        <div className="absolute right-0 mt-2 w-72 max-h-[70vh] overflow-hidden rounded-xl border border-border bg-[#0d0d14] shadow-2xl z-[60] flex flex-col">
+          <div className="p-2 border-b border-border flex items-center gap-2">
             <Search className="w-4 h-4 text-muted-foreground" />
             <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search language"
               className="flex-1 bg-transparent text-sm focus:outline-none" />
@@ -73,7 +73,7 @@ export function SiteLanguageSwitcher() {
             {world.map(item)}
             {!india.length && !world.length && <div className="px-3 py-4 text-sm text-muted-foreground">No match</div>}
           </div>
-          <div className="px-3 py-2 border-t border-white/10 text-[10px] text-muted-foreground">Translated automatically by Google</div>
+          <div className="px-3 py-2 border-t border-border text-[10px] text-muted-foreground">Translated automatically by Google</div>
         </div>
       )}
     </div>

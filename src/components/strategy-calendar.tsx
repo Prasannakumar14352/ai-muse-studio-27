@@ -24,7 +24,7 @@ export function StrategyPlanView({ plan }: { plan: StrategyPlan }) {
 
       {plan.customerPersona && (
         <Section icon={<Users className="w-4 h-4 text-primary" />} title="Customer Persona">
-          <div className="rounded-xl border border-white/10 p-4 bg-card/40 space-y-3">
+          <div className="rounded-xl border border-border p-4 bg-card/40 space-y-3">
             <div className="text-lg font-semibold">{plan.customerPersona.name}</div>
             <div className="grid md:grid-cols-2 gap-3 text-sm">
               <KV label="Demographics" value={plan.customerPersona.demographics} />
@@ -41,7 +41,7 @@ export function StrategyPlanView({ plan }: { plan: StrategyPlan }) {
       <Section icon={<Lightbulb className="w-4 h-4 text-primary" />} title="Content Pillars">
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
           {plan.contentPillars?.map((p) => (
-            <div key={p.name} className="rounded-xl border border-white/10 p-4 bg-card/40">
+            <div key={p.name} className="rounded-xl border border-border p-4 bg-card/40">
               <div className="flex items-center justify-between mb-1">
                 <div className="font-medium">{p.name}</div>
                 {typeof p.percentage === "number" && (
@@ -68,13 +68,13 @@ export function StrategyPlanView({ plan }: { plan: StrategyPlan }) {
               const s = plan.marketingFunnel[stage];
               if (!s) return null;
               return (
-                <div key={stage} className="rounded-xl border border-white/10 p-4 bg-card/40">
+                <div key={stage} className="rounded-xl border border-border p-4 bg-card/40">
                   <div className="text-xs uppercase tracking-wider text-primary mb-1">{stage}</div>
                   <div className="text-xs font-medium">{s.goal}</div>
                   {s.contentTypes?.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {s.contentTypes.map((c, i) => (
-                        <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full border border-white/10">{c}</span>
+                        <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full border border-border">{c}</span>
                       ))}
                     </div>
                   )}
@@ -90,7 +90,7 @@ export function StrategyPlanView({ plan }: { plan: StrategyPlan }) {
         <Section icon={<Megaphone className="w-4 h-4 text-primary" />} title="Campaign Strategy">
           <div className="grid md:grid-cols-3 gap-3">
             {plan.campaigns.map((c) => (
-              <div key={c.name} className="rounded-xl border border-white/10 p-4 bg-card/40 space-y-1.5">
+              <div key={c.name} className="rounded-xl border border-border p-4 bg-card/40 space-y-1.5">
                 <div className="font-medium">{c.name}</div>
                 <div className="text-xs text-muted-foreground">{c.goal}</div>
                 {c.duration && <div className="text-xs"><span className="text-muted-foreground">Duration:</span> {c.duration}</div>}
@@ -104,7 +104,7 @@ export function StrategyPlanView({ plan }: { plan: StrategyPlan }) {
 
       {plan.offer && (
         <Section icon={<Gift className="w-4 h-4 text-primary" />} title="Offer">
-          <div className="rounded-xl border border-white/10 p-4 bg-card/40 space-y-3">
+          <div className="rounded-xl border border-border p-4 bg-card/40 space-y-3">
             <div className="text-lg font-semibold gradient-primary bg-clip-text text-transparent">{plan.offer.headline}</div>
             <p className="text-sm">{plan.offer.coreOffer}</p>
             <div className="grid md:grid-cols-3 gap-3 text-xs">
@@ -121,7 +121,7 @@ export function StrategyPlanView({ plan }: { plan: StrategyPlan }) {
         <Section icon={<Rocket className="w-4 h-4 text-primary" />} title="CTAs by funnel stage">
           <div className="grid md:grid-cols-2 gap-2">
             {plan.ctas.map((c, i) => (
-              <div key={i} className="rounded-lg border border-white/10 p-3 text-sm flex gap-3">
+              <div key={i} className="rounded-lg border border-border p-3 text-sm flex gap-3">
                 <span className="text-[10px] uppercase tracking-wider text-primary shrink-0 mt-0.5">{c.stage}</span>
                 <span>{c.text}</span>
               </div>
@@ -134,7 +134,7 @@ export function StrategyPlanView({ plan }: { plan: StrategyPlan }) {
         <Section icon={<Calendar className="w-4 h-4 text-primary" />} title="30-Day Content Plan">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead className="text-muted-foreground border-b border-white/10">
+              <thead className="text-muted-foreground border-b border-border">
                 <tr>
                   <th className="text-left py-2 px-2">Day</th>
                   <th className="text-left py-2 px-2">Platform</th>
@@ -180,7 +180,7 @@ export function StrategyPlanView({ plan }: { plan: StrategyPlan }) {
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
-    <section className="glass rounded-2xl p-6 border border-white/10">
+    <section className="glass rounded-2xl p-6 border border-border">
       <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">{icon}{title}</h3>
       {children}
     </section>

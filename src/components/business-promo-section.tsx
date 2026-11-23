@@ -34,7 +34,7 @@ export function BusinessPromoSection({ id = "for-business" }: { id?: string }) {
         </div>
         <div className="grid md:grid-cols-2 gap-5">
           {TOOLS.map((t) => (
-            <div key={t.title} className="glass rounded-2xl p-6 border border-white/10 flex flex-col gap-3">
+            <div key={t.title} className="glass rounded-2xl p-6 border border-border flex flex-col gap-3">
               <div className="w-11 h-11 rounded-xl gradient-primary flex items-center justify-center">
                 <t.icon className="w-5 h-5 text-white" />
               </div>
@@ -52,7 +52,7 @@ export function BusinessPromoSection({ id = "for-business" }: { id?: string }) {
         </div>
         <div className="mt-8 flex flex-wrap justify-center gap-2">
           {WHO.map((w) => (
-            <span key={w} className="text-xs rounded-full px-3 py-1.5 glass border border-white/10 text-muted-foreground">{w}</span>
+            <span key={w} className="text-xs rounded-full px-3 py-1.5 glass border border-border text-muted-foreground">{w}</span>
           ))}
         </div>
         <div className="mt-8 text-center">

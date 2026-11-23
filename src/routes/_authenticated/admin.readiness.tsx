@@ -39,7 +39,7 @@ function ReadinessPage() {
     <div className="mx-auto max-w-6xl space-y-6 p-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Feature Readiness</h1>
+          <h1 className="text-3xl md:text-4xl font-bold">Feature Readiness</h1>
           <p className="mt-1 text-sm text-white/60">
             The comparison table on the landing page reads its status from this data.
             A feature can only be marked <span className="font-medium text-emerald-300">Available</span> when every check passes.
@@ -56,7 +56,7 @@ function ReadinessPage() {
       </div>
 
       {/* Provider registry snapshot */}
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <section className="rounded-2xl border border-border bg-white/[0.03] p-4">
         <h2 className="mb-3 text-sm font-semibold text-white/80">Provider capabilities</h2>
         <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
           {(capsQ.data ?? []).map((c) => (
@@ -73,7 +73,7 @@ function ReadinessPage() {
 
       <section className="space-y-3">
         {rows.map((row) => (
-          <div key={row.feature_id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div key={row.feature_id} className="rounded-2xl border border-border bg-white/[0.03] p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <div className="text-base font-semibold text-white">{FEATURE_LABELS[row.feature_id as FeatureId] ?? row.feature_id}</div>
@@ -131,7 +131,7 @@ function StatusBadge({ status }: { status: string }) {
     available: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
     beta: "bg-amber-500/15 text-amber-200 border-amber-500/30",
     coming_soon: "bg-sky-500/15 text-sky-200 border-sky-500/30",
-    not_available: "bg-white/5 text-white/60 border-white/10",
+    not_available: "bg-white/5 text-white/60 border-border",
   };
   return <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${map[status] ?? map.not_available}`}>{status.replace("_", " ")}</span>;
 }

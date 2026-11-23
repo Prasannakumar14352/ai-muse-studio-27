@@ -31,7 +31,7 @@ export function StrategyWizard({ onCreated }: { onCreated?: (plan: StrategyPlan,
       ? f.secondaryPlatforms.filter((x) => x !== p) : [...f.secondaryPlatforms, p] }));
 
   return (
-    <div className="glass rounded-2xl p-6 space-y-4 border border-white/10">
+    <div className="glass rounded-2xl p-6 space-y-4 border border-border">
       <div className="flex items-center gap-2">
         <Sparkles className="w-5 h-5 text-primary" />
         <h2 className="text-xl font-semibold">Build your content strategy</h2>
@@ -66,7 +66,7 @@ export function StrategyWizard({ onCreated }: { onCreated?: (plan: StrategyPlan,
               const on = form.secondaryPlatforms.includes(p);
               return (
                 <button key={p} type="button" onClick={() => togglePlat(p)}
-                  className={`px-3 py-1 rounded-full text-xs border ${on ? "bg-primary text-primary-foreground border-primary" : "border-white/15 hover:border-white/30"}`}>
+                  className={`px-3 py-1 rounded-full text-xs border ${on ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/40"}`}>
                   {p}
                 </button>
               );

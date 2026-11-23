@@ -128,13 +128,13 @@ export function ShowcaseManager({ rows, isLoading, onSave, onDelete, onReorder, 
 
       {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
       {!isLoading && !rows.length && (
-        <div className="text-sm text-muted-foreground rounded-xl border border-dashed border-white/15 p-6 text-center">
+        <div className="text-sm text-muted-foreground rounded-xl border border-dashed border-border p-6 text-center">
           No showcase videos yet. The section stays hidden on the landing page until you publish at least one.
         </div>
       )}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {rows.map((r, i) => (
-          <div key={r.id} className="rounded-xl border border-white/10 overflow-hidden bg-black/20 flex flex-col">
+          <div key={r.id} className="rounded-xl border border-border overflow-hidden bg-black/20 flex flex-col">
             <button type="button" onClick={() => r.video_url && onPreview(r.video_url)} className="relative aspect-video bg-black">
               {r.video_url && <video src={`${r.video_url}#t=0.5`} poster={r.poster_url ?? undefined} muted preload="metadata" className="w-full h-full object-cover" />}
               <span className={`absolute top-2 left-2 text-[10px] uppercase px-2 py-0.5 rounded-full font-semibold ${r.status === "published" ? "bg-emerald-500/80 text-white" : "bg-white/20 text-white"}`}>{r.status}</span>
@@ -144,7 +144,7 @@ export function ShowcaseManager({ rows, isLoading, onSave, onDelete, onReorder, 
               {r.tool && <div className="text-[11px] text-orange-300">{r.tool}</div>}
               <p className="text-xs text-muted-foreground line-clamp-3">{r.prompt || <span className="text-amber-300">No prompt yet</span>}</p>
             </div>
-            <div className="flex items-center gap-1 p-2 border-t border-white/10">
+            <div className="flex items-center gap-1 p-2 border-t border-border">
               <IconBtn label="Edit" onClick={() => setEditing({ ...r, kind: "showcase" })}><Pencil className="w-3.5 h-3.5" /></IconBtn>
               <IconBtn label={r.status === "published" ? "Unpublish" : "Publish"}
                 onClick={() => onSave({ ...r, kind: "showcase", status: r.status === "published" ? "draft" : "published" }).catch((e) => toast.error(e instanceof Error ? e.message : "Failed"))}>
@@ -229,7 +229,7 @@ function PickerModal({ onClose, onPicked }: { onClose: () => void; onPicked: (d:
         <div className="grid sm:grid-cols-2 gap-2">
           {items?.map((c) => (
             <button key={c.ref} type="button" disabled={!!busy} onClick={() => pick(c)}
-              className="text-left rounded-xl border border-white/10 p-3 hover:bg-white/5 disabled:opacity-50 space-y-1">
+              className="text-left rounded-xl border border-border p-3 hover:bg-white/5 disabled:opacity-50 space-y-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-semibold truncate">{c.title}</span>
                 {busy === c.ref ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Plus className="w-4 h-4 shrink-0" />}
@@ -253,7 +253,7 @@ function ShowcaseEditor({ value, onClose, onSave }: {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const set = <K extends keyof ShowcaseDraft>(k: K, v: ShowcaseDraft[K]) => setD((x) => ({ ...x, [k]: v }));
-  const input = "w-full text-sm bg-black/30 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-orange-500/60";
+  const input = "w-full text-sm bg-black/30 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-orange-500/60";
   const label = "text-xs text-muted-foreground block mb-1";
 
   async function onFile(f: File | null, kind: "video" | "poster") {

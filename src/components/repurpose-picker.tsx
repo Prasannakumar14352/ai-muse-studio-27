@@ -51,7 +51,7 @@ export function RepurposePicker() {
 
   return (
     <div className="space-y-6">
-      <div className="glass rounded-2xl p-6 border border-white/10 space-y-4">
+      <div className="glass rounded-2xl p-6 border border-border space-y-4">
         <label className="block space-y-1.5">
           <div className="text-xs font-medium text-muted-foreground">Source project (optional)</div>
           <CreatorFlowSelect
@@ -76,7 +76,7 @@ export function RepurposePicker() {
               const on = formats.includes(f.id);
               return (
                 <button key={f.id} onClick={() => toggle(f.id)}
-                  className={`px-3 py-1.5 rounded-full text-xs border ${on ? "bg-primary text-primary-foreground border-primary" : "border-white/15 hover:border-white/30"}`}>
+                  className={`px-3 py-1.5 rounded-full text-xs border ${on ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/40"}`}>
                   {f.label}
                 </button>
               );
@@ -97,7 +97,7 @@ export function RepurposePicker() {
           {results.map((r) => {
             const label = REPURPOSE_FORMATS.find((f) => f.id === r.format)?.label ?? r.format;
             return (
-              <div key={r.id} className="glass rounded-2xl p-5 border border-white/10">
+              <div key={r.id} className="glass rounded-2xl p-5 border border-border">
                 <div className="flex items-center justify-between mb-3">
                   <div className="font-semibold text-sm">{label}</div>
                   <button onClick={() => { navigator.clipboard.writeText(r.content); setCopied(r.id); setTimeout(() => setCopied(null), 1500); }}

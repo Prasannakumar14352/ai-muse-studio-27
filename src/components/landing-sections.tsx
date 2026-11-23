@@ -241,7 +241,7 @@ function DemoVideoPlayer({ videoUrl, posterUrl }: { videoUrl: string; posterUrl:
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           {HERO_FEATURES.map((f) => (
             <div key={f.label} className="glass rounded-full px-4 py-2 text-sm flex items-center gap-2">
-              <Check className="w-3.5 h-3.5 text-[color:var(--neon-purple)]" />
+              <Check className="w-3.5 h-3.5 text-primary" />
               <f.icon className="w-3.5 h-3.5 text-muted-foreground" />
               {f.label}
             </div>
@@ -761,7 +761,7 @@ export function GuaranteeSection() {
               <ShieldCheck className="w-12 h-12 text-white" />
             </div>
             <div>
-              <div className="text-xs uppercase tracking-wider text-[color:var(--neon-purple)] font-semibold mb-2">
+              <div className="text-xs uppercase tracking-wider text-primary font-semibold mb-2">
                 CreatorFlow AI Satisfaction Guarantee
               </div>
               <h2 className="text-3xl md:text-4xl font-bold">We stand behind CreatorFlow AI.</h2>
@@ -840,7 +840,7 @@ export function TrustBadgesSection() {
           {TRUST_BADGES.map((b) => {
             const Icon = BADGE_ICONS[b.icon] ?? Sparkles;
             return (
-              <div key={b.title} className="glass rounded-2xl p-6 hover:border-white/20 transition group">
+              <div key={b.title} className="glass rounded-2xl p-6 hover:border-primary/40 transition group">
                 <div className="w-11 h-11 rounded-xl gradient-primary flex items-center justify-center mb-4 group-hover:scale-110 transition">
                   <Icon className="w-5 h-5 text-white" />
                 </div>

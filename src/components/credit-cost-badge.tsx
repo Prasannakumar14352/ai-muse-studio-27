@@ -15,7 +15,7 @@ type Props = {
 export function CreditCostBadge({ action, params, className, label }: Props) {
   const cost = estimateCost(action, params);
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full bg-white/10 border border-white/15 px-2 py-0.5 text-[11px] text-white/80 ${className ?? ""}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full bg-white/10 border border-border px-2 py-0.5 text-[11px] text-white/80 ${className ?? ""}`}>
       <Coins className="w-3 h-3 text-orange-300" />
       {label ? `${label} · ` : ""}{formatCostLabel(cost)}
     </span>

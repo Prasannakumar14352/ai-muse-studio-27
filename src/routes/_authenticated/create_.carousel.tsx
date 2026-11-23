@@ -161,7 +161,7 @@ function CreateCarouselPage() {
       <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <div className="text-[11px] uppercase tracking-widest text-[color:var(--neon-purple)] flex items-center gap-1.5">
+          <div className="text-[11px] uppercase tracking-widest text-primary flex items-center gap-1.5">
             <Layers className="w-3 h-3" /> Carousel builder
           </div>
           <h1 className="text-3xl md:text-4xl font-bold mt-1">
@@ -213,7 +213,7 @@ function CreateCarouselPage() {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {PLATFORMS.map((p) => (
                 <button key={p.id} onClick={() => set("platform", p.id)}
-                  className={`text-left rounded-xl border p-3 flex items-center gap-2 ${form.platform === p.id ? "border-[color:var(--neon-purple)] bg-[color:var(--neon-purple)]/10 shadow-[var(--shadow-glow)]" : "border-border hover:border-white/20 bg-white/[0.02]"}`}>
+                  className={`text-left rounded-xl border p-3 flex items-center gap-2 ${form.platform === p.id ? "border-[color:var(--neon-purple)] bg-[color:var(--neon-purple)]/10 shadow-[var(--shadow-glow)]" : "border-border hover:border-primary/40 bg-white/[0.02]"}`}>
                   <p.icon className="w-4 h-4" /> <span className="text-sm">{p.label}</span>
                 </button>
               ))}
@@ -224,7 +224,7 @@ function CreateCarouselPage() {
             <div className="flex flex-wrap gap-2">
               {TONES.map((t) => (
                 <button key={t} onClick={() => set("tone", t)}
-                  className={`px-4 py-2 rounded-full text-sm border transition ${form.tone === t ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-white/20"}`}>{t}</button>
+                  className={`px-4 py-2 rounded-full text-sm border transition ${form.tone === t ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-primary/40"}`}>{t}</button>
               ))}
             </div>
           </Section>
@@ -260,7 +260,7 @@ function CreateCarouselPage() {
                 <div className="flex flex-wrap gap-2">
                   {RATIOS.map((r) => (
                     <button key={r} onClick={() => set("aspect_ratio", r)}
-                      className={`px-4 py-2 rounded-full text-sm border ${form.aspect_ratio === r ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-white/20"}`}>
+                      className={`px-4 py-2 rounded-full text-sm border ${form.aspect_ratio === r ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-primary/40"}`}>
                       {r}
                     </button>
                   ))}

@@ -33,14 +33,14 @@ export function ScriptRewritePanel({ script, language, onUse }: {
   }
 
   return (
-    <div className="rounded-xl border border-white/10 p-4 space-y-3 bg-white/[0.02]">
+    <div className="rounded-xl border border-border p-4 space-y-3 bg-white/[0.02]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm font-semibold flex items-center gap-1.5"><Wand2 className="w-4 h-4 text-orange-300" /> Rewrite with AI <span className="text-xs font-normal text-muted-foreground">(optional · 1 credit)</span></div>
       </div>
       <div className="flex flex-wrap gap-2">
         {REWRITE_GOALS.map((g) => (
           <button key={g.id} type="button" title={g.hint} onClick={() => setGoal(g.id)}
-            className={`px-3 py-1.5 rounded-full text-xs border ${goal === g.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"}`}>
+            className={`px-3 py-1.5 rounded-full text-xs border ${goal === g.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-primary/40"}`}>
             {g.label}
           </button>
         ))}
@@ -60,7 +60,7 @@ export function ScriptRewritePanel({ script, language, onUse }: {
           <div className="grid md:grid-cols-2 gap-3">
             <div>
               <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Your script · ~{estimateScriptSeconds(script, language)}s</div>
-              <div className="rounded-lg border border-white/10 bg-black/30 p-3 text-sm whitespace-pre-wrap max-h-72 overflow-y-auto">{script}</div>
+              <div className="rounded-lg border border-border bg-black/30 p-3 text-sm whitespace-pre-wrap max-h-72 overflow-y-auto">{script}</div>
             </div>
             <div>
               <div className="text-[11px] uppercase tracking-wider text-orange-300 mb-1">AI rewrite · ~{estimateScriptSeconds(suggestion, language)}s</div>

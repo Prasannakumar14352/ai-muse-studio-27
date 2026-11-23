@@ -1065,7 +1065,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
               className={`px-3.5 py-2 rounded-full text-sm border transition ${
                 niche === n.id
                   ? "gradient-primary text-white border-transparent"
-                  : "glass border-border hover:border-white/20"
+                  : "glass border-border hover:border-primary/40"
               }`}
             >
               <span className="mr-1.5">{n.emoji}</span>{n.label}
@@ -1076,7 +1076,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
             className={`px-3.5 py-2 rounded-full text-sm border transition ${
               isCustom
                 ? "gradient-primary text-white border-transparent"
-                : "glass border-border hover:border-white/20"
+                : "glass border-border hover:border-primary/40"
             }`}
           >
             <span className="mr-1.5">✨</span>Custom / Other
@@ -1105,7 +1105,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
               <button
                 key={t}
                 onClick={() => setTitle(t)}
-                className={`text-left glass rounded-xl p-3 border transition hover:border-white/20 hover:scale-[1.02] ${
+                className={`text-left glass rounded-xl p-3 border transition hover:border-primary/40 hover:scale-[1.02] ${
                   title === t ? "border-[color:var(--neon-pink)]" : "border-border"
                 }`}
               >
@@ -1162,7 +1162,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
                 className={`group relative aspect-[4/5] rounded-xl overflow-hidden border transition transform hover:scale-[1.04] ${
                   selected
                     ? "border-transparent ring-2 ring-offset-2 ring-offset-background"
-                    : "border-border hover:border-white/20"
+                    : "border-border hover:border-primary/40"
                 }`}
                 style={selected ? { boxShadow: "0 0 0 2px transparent", backgroundImage: "linear-gradient(hsl(var(--background)), hsl(var(--background))), linear-gradient(135deg, #f97316, #ec4899)", backgroundOrigin: "border-box", backgroundClip: "padding-box, border-box" } : undefined}
               >
@@ -1231,7 +1231,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
               const active = motionMode === o.id;
               return (
                 <button key={o.id} type="button" disabled={disabled} onClick={() => setMotionMode(o.id)}
-                  className={`text-left rounded-xl p-3 border transition disabled:opacity-40 ${active ? "border-[color:var(--brand-orange)] bg-[color:var(--brand-orange)]/10" : "glass border-border hover:border-white/20"}`}>
+                  className={`text-left rounded-xl p-3 border transition disabled:opacity-40 ${active ? "border-[color:var(--brand-orange)] bg-[color:var(--brand-orange)]/10" : "glass border-border hover:border-primary/40"}`}>
                   <div className="text-sm font-medium">{o.label}</div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">{o.desc}</div>
                 </button>
@@ -1317,7 +1317,7 @@ function ChipRow<T extends string | number>({
           className={`px-3.5 py-2 rounded-lg text-sm border transition ${
             value === o.id
               ? "gradient-primary text-white border-transparent"
-              : "glass border-border hover:border-white/20"
+              : "glass border-border hover:border-primary/40"
           }`}
         >
           {o.label}
@@ -1572,7 +1572,7 @@ function AssetReviewGate({
                   <button
                     onClick={() => handleRegen(s.id)}
                     disabled={busyId === s.id}
-                    className="w-full mt-1 rounded-md glass border border-border px-2 py-1 text-[11px] flex items-center justify-center gap-1 hover:border-white/20 disabled:opacity-50"
+                    className="w-full mt-1 rounded-md glass border border-border px-2 py-1 text-[11px] flex items-center justify-center gap-1 hover:border-primary/40 disabled:opacity-50"
                   >
                     {busyId === s.id
                       ? <><Loader2 className="w-3 h-3 animate-spin" /> Regenerating…</>
@@ -1581,7 +1581,7 @@ function AssetReviewGate({
                   <button
                     onClick={() => setReplaceFor({ id: s.id, index: i })}
                     disabled={busyId === s.id}
-                    className="w-full rounded-md glass border border-border px-2 py-1 text-[11px] flex items-center justify-center gap-1 hover:border-white/20 disabled:opacity-50"
+                    className="w-full rounded-md glass border border-border px-2 py-1 text-[11px] flex items-center justify-center gap-1 hover:border-primary/40 disabled:opacity-50"
                   >
                     <ImagePlus className="w-3 h-3" /> Use my photo / clip
                   </button>
@@ -1778,7 +1778,7 @@ function JobDashboard({
       {/* Voiceover progress */}
       {dash.voiceoverTotal > 0 && dash.phase !== "rendering" && dash.phase !== "complete" && (
         <div className="glass rounded-2xl p-4 text-sm flex items-center gap-3">
-          <Loader2 className="w-4 h-4 animate-spin text-[color:var(--neon-purple)]" />
+          <Loader2 className="w-4 h-4 animate-spin text-primary" />
           <span>Narration {dash.voiceoverDone} / {dash.voiceoverTotal} scenes</span>
         </div>
       )}
@@ -1995,7 +1995,7 @@ function InProgressJobs({
   return (
     <div className="glass rounded-2xl p-4 space-y-3">
       <div className="flex items-center gap-2">
-        <Clock className="w-4 h-4 text-[color:var(--neon-purple)]" />
+        <Clock className="w-4 h-4 text-primary" />
         <h2 className="font-semibold text-sm">In progress · resume where you left off</h2>
       </div>
       <div className="space-y-2">
@@ -2267,7 +2267,7 @@ function ResultScreen({
               ))}
             </div>
           </div>
-          <button onClick={() => toast.info("YouTube publishing will connect soon")} className="w-full rounded-2xl glass border border-border p-4 text-sm flex items-center justify-center gap-2 hover:border-white/20 transition">
+          <button onClick={() => toast.info("YouTube publishing will connect soon")} className="w-full rounded-2xl glass border border-border p-4 text-sm flex items-center justify-center gap-2 hover:border-primary/40 transition">
             <Youtube className="w-5 h-5 text-rose-500" />
             <span>Publish to YouTube</span>
             <Send className="w-4 h-4 opacity-60" />

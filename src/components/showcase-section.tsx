@@ -22,7 +22,7 @@ function ShowcaseCard({ r }: { r: LandingMediaRow }) {
 
   return (
     <div className="snap-start shrink-0 w-[85vw] sm:w-[420px] flex flex-col">
-      <div className="relative rounded-2xl overflow-hidden bg-black border border-white/10 aspect-video">
+      <div className="relative rounded-2xl overflow-hidden bg-black border border-border aspect-video">
         <video ref={ref} src={r.video_url ?? undefined} poster={r.poster_url ?? undefined}
           muted loop playsInline controls preload="metadata" className="w-full h-full object-cover" />
         {r.tool && (

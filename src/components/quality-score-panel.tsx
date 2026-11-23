@@ -6,7 +6,7 @@ export function QualityScorePanel({ scores, recommendations }: { scores: Quality
     ["thumbnail", "Thumbnail"], ["script", "Script"], ["cta", "CTA"],
   ];
   return (
-    <div className="glass rounded-2xl p-6 border border-white/10 space-y-4">
+    <div className="glass rounded-2xl p-6 border border-border space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">AI Quality Score</h3>
         <div className={`text-3xl font-bold ${scores.overall >= 80 ? "text-emerald-400" : scores.overall >= 60 ? "text-amber-400" : "text-red-400"}`}>
@@ -29,7 +29,7 @@ export function QualityScorePanel({ scores, recommendations }: { scores: Quality
         })}
       </div>
       {recommendations?.length ? (
-        <div className="pt-2 border-t border-white/10">
+        <div className="pt-2 border-t border-border">
           <div className="text-xs font-semibold mb-2">Recommendations</div>
           <ul className="space-y-1 text-xs text-muted-foreground">
             {recommendations.map((r, i) => <li key={i}>→ {r}</li>)}

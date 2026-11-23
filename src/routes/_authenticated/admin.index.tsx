@@ -102,7 +102,7 @@ function AdminPanel() {
         </div>
         <div className="flex-1">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Admin Panel</div>
-          <h1 className="text-2xl font-bold">Manage users & subscriptions</h1>
+          <h1 className="text-3xl md:text-4xl font-bold">Manage users & subscriptions</h1>
         </div>
         <Link
           to="/admin/payments"
@@ -234,9 +234,9 @@ function CreditCostCard() {
       </h2>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <AssetCost icon={<ImageIcon className="w-4 h-4 text-[color:var(--neon-pink)]" />} label="AI image" cost={ASSET_CREDIT_COST.image} />
-        <AssetCost icon={<Layers className="w-4 h-4 text-[color:var(--neon-purple)]" />} label="Carousel (≈5 slides)" cost={ASSET_CREDIT_COST.carousel} />
-        <AssetCost icon={<Film className="w-4 h-4 text-[color:var(--neon-purple)]" />} label="Short reel (≤ 60s)" cost={ASSET_CREDIT_COST.shortReel} />
-        <AssetCost icon={<Video className="w-4 h-4 text-[color:var(--neon-purple)]" />} label="5-min long video" cost={ASSET_CREDIT_COST.longVideo} />
+        <AssetCost icon={<Layers className="w-4 h-4 text-primary" />} label="Carousel (≈5 slides)" cost={ASSET_CREDIT_COST.carousel} />
+        <AssetCost icon={<Film className="w-4 h-4 text-primary" />} label="Short reel (≤ 60s)" cost={ASSET_CREDIT_COST.shortReel} />
+        <AssetCost icon={<Video className="w-4 h-4 text-primary" />} label="5-min long video" cost={ASSET_CREDIT_COST.longVideo} />
       </div>
     </div>
   );

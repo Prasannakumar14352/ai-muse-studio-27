@@ -56,7 +56,7 @@ function AdminTemplatesPage() {
       <header className="flex items-center justify-between">
         <div>
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Admin</div>
-          <h1 className="text-2xl font-bold">Templates</h1>
+          <h1 className="text-3xl md:text-4xl font-bold">Templates</h1>
           <p className="text-muted-foreground text-sm mt-1">Manage the Premium Templates catalog.</p>
         </div>
         <button

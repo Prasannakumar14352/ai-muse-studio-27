@@ -92,7 +92,7 @@ export function ProjectBriefForm({
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {CONTENT_TYPES.map((c) => (
               <Card key={c.id} active={form.content_type === c.id} onClick={() => update("content_type", c.id)}>
-                <c.icon className="w-5 h-5 mb-2 text-[color:var(--neon-purple)]" />
+                <c.icon className="w-5 h-5 mb-2 text-primary" />
                 <div className="font-medium text-sm">{c.label}</div>
                 <div className="text-xs text-muted-foreground mt-1">{c.desc}</div>
               </Card>
@@ -112,7 +112,7 @@ export function ProjectBriefForm({
                 className={`px-4 py-2 rounded-full text-sm border transition ${
                   form.long_video_length_sec === sec
                     ? "gradient-primary text-white border-transparent shadow-lg"
-                    : "glass border-border hover:border-white/20"
+                    : "glass border-border hover:border-primary/40"
                 }`}
               >
                 {sec >= 60 ? `${Math.round(sec / 60)}${sec % 60 ? `:${String(sec % 60).padStart(2, "0")}` : " min"}` : `${sec}s`}
@@ -133,7 +133,7 @@ export function ProjectBriefForm({
                 className={`px-4 py-2 rounded-full text-sm border transition ${
                   form.reel_length_sec === sec
                     ? "gradient-primary text-white border-transparent shadow-lg"
-                    : "glass border-border hover:border-white/20"
+                    : "glass border-border hover:border-primary/40"
                 }`}
               >
                 {sec} seconds
@@ -187,7 +187,7 @@ export function ProjectBriefForm({
             {TONES.map((t) => (
               <button key={t} type="button" onClick={() => update("tone", t)}
                 className={`px-4 py-2 rounded-full text-sm border transition ${
-                  form.tone === t ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-white/20"
+                  form.tone === t ? "gradient-primary text-white border-transparent shadow-lg" : "glass border-border hover:border-primary/40"
                 }`}>{t}</button>
             ))}
           </div>
@@ -263,7 +263,7 @@ function Card({ active, onClick, children, compact }: {
   return (
     <button type="button" onClick={onClick}
       className={`text-left rounded-xl border p-4 transition flex ${compact ? "items-center gap-2" : "flex-col"} ${
-        active ? "border-[color:var(--neon-purple)] bg-[color:var(--neon-purple)]/10 shadow-[var(--shadow-glow)]" : "border-border hover:border-white/20 bg-white/[0.02]"
+        active ? "border-[color:var(--neon-purple)] bg-[color:var(--neon-purple)]/10 shadow-[var(--shadow-glow)]" : "border-border hover:border-primary/40 bg-white/[0.02]"
       }`}>{children}</button>
   );
 }

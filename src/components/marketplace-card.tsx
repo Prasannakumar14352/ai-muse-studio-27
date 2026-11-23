@@ -16,7 +16,7 @@ export function MarketplaceCard({ item, installed }: { item: MarketplaceItem; in
   });
 
   return (
-    <div className="glass rounded-2xl overflow-hidden border border-white/10 hover:border-primary/40 transition">
+    <div className="glass rounded-2xl overflow-hidden border border-border hover:border-primary/40 transition">
       <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center relative">
         {item.preview_url
           ? <img src={item.preview_url} alt={item.title} className="w-full h-full object-cover" />

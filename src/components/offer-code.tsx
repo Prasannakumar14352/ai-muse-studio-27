@@ -132,7 +132,7 @@ export function OfferCodeBox({ code, setCode, quote, error, loading }: {
         (!quote || !code) && (
           <form onSubmit={(e) => { e.preventDefault(); setCode(draft); }} className="flex gap-2">
             <input value={draft} onChange={(e) => setDraft(e.target.value.toUpperCase())} placeholder="Offer code"
-              className="flex-1 text-sm bg-black/30 border border-white/10 rounded-lg px-3 py-2 font-mono uppercase focus:outline-none focus:border-orange-500/60" />
+              className="flex-1 text-sm bg-black/30 border border-border rounded-lg px-3 py-2 font-mono uppercase focus:outline-none focus:border-orange-500/60" />
             <button type="submit" disabled={!draft.trim() || loading} className="rounded-lg glass border border-border px-3 py-2 text-sm disabled:opacity-60">
               {loading ? "Checking…" : "Apply"}
             </button>

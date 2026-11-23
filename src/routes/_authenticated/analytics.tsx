@@ -21,9 +21,9 @@ function AnalyticsPage() {
   const maxCredit = Math.max(1, ...s.creditsSeries.map((p) => p.credits));
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
+    <div className="max-w-7xl space-y-6">
       <header>
-        <h1 className="text-3xl font-bold flex items-center gap-2"><BarChart3 className="w-7 h-7 text-primary" /> Analytics</h1>
+        <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-2"><BarChart3 className="w-7 h-7 text-primary" /> Analytics</h1>
         <p className="text-sm text-muted-foreground mt-1">What you've created and published, and how many credits it used.</p>
       </header>
 
@@ -39,7 +39,7 @@ function AnalyticsPage() {
       </div>
 
       {/* Credit Usage sparkline */}
-      <section className="glass rounded-2xl p-6 border border-white/10">
+      <section className="glass rounded-2xl p-6 border border-border">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Credit Usage (30 days)</h3>
           <div className="text-xs text-muted-foreground">Total: {creditsLabel(s.creditsUsed30d)}</div>
@@ -62,7 +62,7 @@ function AnalyticsPage() {
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Top Performing */}
-        <section className="glass rounded-2xl p-6 border border-white/10">
+        <section className="glass rounded-2xl p-6 border border-border">
           <h3 className="font-semibold mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-primary" /> Top Performing Content</h3>
           <div className="space-y-2">
             {s.topProjects.map((p) => (
@@ -82,7 +82,7 @@ function AnalyticsPage() {
         </section>
 
         {/* Best Templates */}
-        <section className="glass rounded-2xl p-6 border border-white/10">
+        <section className="glass rounded-2xl p-6 border border-border">
           <h3 className="font-semibold mb-3 flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Best Templates</h3>
           <div className="space-y-2">
             {s.topTemplates.length ? s.topTemplates.map((t) => (
@@ -95,7 +95,7 @@ function AnalyticsPage() {
         </section>
 
         {/* Platform Analytics */}
-        <section className="glass rounded-2xl p-6 border border-white/10">
+        <section className="glass rounded-2xl p-6 border border-border">
           <h3 className="font-semibold mb-3 flex items-center gap-2"><Send className="w-4 h-4 text-primary" /> Platform Analytics</h3>
           <div className="space-y-2">
             {s.platformBreakdown.length ? s.platformBreakdown.map((p) => (
@@ -115,7 +115,7 @@ function AnalyticsPage() {
         </section>
 
         {/* Recent activity */}
-        <section className="glass rounded-2xl p-6 border border-white/10">
+        <section className="glass rounded-2xl p-6 border border-border">
           <h3 className="font-semibold mb-3 flex items-center gap-2"><FolderKanban className="w-4 h-4 text-primary" /> Recent activity</h3>
           <div className="space-y-2">
             {s.recentActivity.map((a, i) => (

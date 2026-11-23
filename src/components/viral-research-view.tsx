@@ -99,7 +99,7 @@ export function ViralResearchView({ findings }: { findings: ResearchFindings }) 
         {similar.length ? (
           <div className="space-y-2">
             {similar.map((s, i) => (
-              <div key={i} className="rounded-xl border border-white/10 p-3 text-sm">
+              <div key={i} className="rounded-xl border border-border p-3 text-sm">
                 <div className="flex items-center justify-between gap-2">
                   {s.url
                     ? <a href={s.url} target="_blank" rel="noreferrer" className="font-medium truncate hover:underline">{s.title}</a>
@@ -287,7 +287,7 @@ function ScoreTile({ card }: { card: ScoreCard }) {
     effective >= 30 ? "from-amber-400 to-orange-500" :
                       "from-red-400 to-red-600";
   return (
-    <div className="glass rounded-xl border border-white/10 p-4">
+    <div className="glass rounded-xl border border-border p-4">
       <div className="flex items-center justify-between">
         <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {card.label}
@@ -305,7 +305,7 @@ function ScoreTile({ card }: { card: ScoreCard }) {
 
 function Panel({ title, children, tone }: { title: string; children: React.ReactNode; tone?: "accent" }) {
   return (
-    <div className={`glass rounded-xl border p-4 ${tone === "accent" ? "border-orange-500/30" : "border-white/10"}`}>
+    <div className={`glass rounded-xl border p-4 ${tone === "accent" ? "border-orange-500/30" : "border-border"}`}>
       <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{title}</div>
       {children}
     </div>
@@ -325,7 +325,7 @@ function ChipList({ items, tone }: { items?: string[]; tone?: "accent" }) {
   return (
     <div className="flex flex-wrap gap-1">
       {items.map((k, i) => (
-        <span key={i} className={`text-[10px] px-2 py-0.5 rounded-full border ${tone === "accent" ? "border-pink-500/40 text-pink-200" : "border-white/10 text-muted-foreground"}`}>{k}</span>
+        <span key={i} className={`text-[10px] px-2 py-0.5 rounded-full border ${tone === "accent" ? "border-pink-500/40 text-pink-200" : "border-border text-muted-foreground"}`}>{k}</span>
       ))}
     </div>
   );
@@ -343,7 +343,7 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
 function Collapsible({ title, children, defaultOpen }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(!!defaultOpen);
   return (
-    <div className="glass rounded-2xl border border-white/10">
+    <div className="glass rounded-2xl border border-border">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-5 py-3 text-left">
         <span className="text-sm font-semibold">{title}</span>
         <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />

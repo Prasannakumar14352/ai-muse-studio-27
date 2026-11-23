@@ -109,23 +109,23 @@ function SeoPage() {
           <input
             value={topic} onChange={(e) => setTopic(e.target.value)} maxLength={300}
             placeholder="e.g. Beginner's guide to AI-generated Instagram Reels for coaches"
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white placeholder:text-white/30"
+            className="w-full rounded-lg border border-border bg-black/30 px-3 py-2 text-white placeholder:text-white/30"
           />
         </label>
         <label className="space-y-1 text-sm">
           <span className="text-white/70">Primary keyword (optional)</span>
           <input value={primary} onChange={(e) => setPrimary(e.target.value)} maxLength={120}
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white" />
+            className="w-full rounded-lg border border-border bg-black/30 px-3 py-2 text-white" />
         </label>
         <label className="space-y-1 text-sm">
           <span className="text-white/70">Audience (optional)</span>
           <input value={audience} onChange={(e) => setAudience(e.target.value)} maxLength={240}
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white" />
+            className="w-full rounded-lg border border-border bg-black/30 px-3 py-2 text-white" />
         </label>
         <label className="space-y-1 text-sm">
           <span className="text-white/70">Tone</span>
           <input value={tone} onChange={(e) => setTone(e.target.value)} maxLength={60}
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white" />
+            className="w-full rounded-lg border border-border bg-black/30 px-3 py-2 text-white" />
         </label>
         <div className="col-span-full flex justify-end">
           <button
@@ -146,7 +146,7 @@ function SeoPage() {
             preferred SEO tool.
           </div>
           {sections.map(([key, value]) => (
-            <div key={key} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <div key={key} className="rounded-2xl border border-border bg-white/[0.03] p-4">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold uppercase tracking-wide text-white/80">{key}</div>
                 <button

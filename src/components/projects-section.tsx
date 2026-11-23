@@ -216,7 +216,7 @@ export function ProjectsSection({
       {Header}
       {FilterChips}
       {rows.length === 0 ? (
-        <div className="glass rounded-2xl p-6 text-center text-sm text-muted-foreground border border-dashed border-white/10">
+        <div className="glass rounded-2xl p-6 text-center text-sm text-muted-foreground border border-dashed border-border">
           No projects match these filters.
         </div>
       ) : (

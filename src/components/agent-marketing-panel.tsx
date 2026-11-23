@@ -112,9 +112,9 @@ function RunControls() {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <input value={focus} onChange={(e) => setFocus(e.target.value)} placeholder="Optional focus, e.g. Telugu creators, new HD images, Diwali"
-          className="flex-1 min-w-[220px] text-sm bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:border-orange-500/60" />
+          className="flex-1 min-w-[220px] text-sm bg-black/30 border border-border rounded-lg px-3 py-1.5 focus:outline-none focus:border-orange-500/60" />
         <select value={count} onChange={(e) => setCount(Number(e.target.value))}
-          className="text-sm bg-black/30 border border-white/10 rounded-lg px-2 py-1.5">
+          className="text-sm bg-black/30 border border-border rounded-lg px-2 py-1.5">
           {[2, 3, 4, 5, 6, 8].map((n) => <option key={n} value={n}>{n} drafts</option>)}
         </select>
         <button disabled={busy !== null} onClick={() => go("social_media_manager")}
@@ -174,7 +174,7 @@ export function SocialPostCard({ t }: { t: AgentTask }) {
       <div className="font-semibold">{t.title.replace(/^\w+:\s*/, "")}</div>
       <div className="text-xs text-muted-foreground whitespace-pre-wrap">{t.body}</div>
       {ref.media_url && (
-        <div className="rounded-xl overflow-hidden bg-black/40 border border-white/10">
+        <div className="rounded-xl overflow-hidden bg-black/40 border border-border">
           {ref.media_type === "video"
             ? <video src={ref.media_url} controls muted playsInline preload="metadata" className="w-full max-h-64 object-contain" />
             : <img src={ref.media_url} alt="" className="w-full max-h-64 object-contain" />}
@@ -183,24 +183,24 @@ export function SocialPostCard({ t }: { t: AgentTask }) {
       {ref.needs_build && <BuildAndAttach t={t} ref_={ref} platform={platform} onDone={refresh} />}
       {platform === "youtube" && (
         <input value={ytTitle} onChange={(e) => setYtTitle(e.target.value)} placeholder="YouTube title"
-          className="w-full text-sm bg-black/30 border border-white/10 rounded-lg px-3 py-1.5" />
+          className="w-full text-sm bg-black/30 border border-border rounded-lg px-3 py-1.5" />
       )}
       <textarea value={caption} onChange={(e) => setCaption(e.target.value)} rows={7}
-        className="w-full text-sm bg-black/30 border border-white/10 rounded-lg p-3 focus:outline-none focus:border-orange-500/60" />
+        className="w-full text-sm bg-black/30 border border-border rounded-lg p-3 focus:outline-none focus:border-orange-500/60" />
       <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="#hashtags"
-        className="w-full text-xs bg-black/30 border border-white/10 rounded-lg px-3 py-1.5" />
+        className="w-full text-xs bg-black/30 border border-border rounded-lg px-3 py-1.5" />
       {ref.first_comment && <div className="text-xs text-muted-foreground">Suggested first comment: {ref.first_comment}</div>}
 
       {accounts.length ? (
         <div className="flex flex-wrap items-center gap-2">
           {accounts.length > 1 && (
-            <select value={chosen} onChange={(e) => setAccount(e.target.value)} className="text-sm bg-black/30 border border-white/10 rounded-lg px-2 py-1.5">
+            <select value={chosen} onChange={(e) => setAccount(e.target.value)} className="text-sm bg-black/30 border border-border rounded-lg px-2 py-1.5">
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
             </select>
           )}
           {accounts.length === 1 && <span className="text-xs text-muted-foreground">to {accounts[0].label}</span>}
           <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)}
-            className="text-sm bg-black/30 border border-white/10 rounded-lg px-2 py-1.5" />
+            className="text-sm bg-black/30 border border-border rounded-lg px-2 py-1.5" />
         </div>
       ) : (
         <div className="text-xs text-amber-300">
@@ -253,13 +253,13 @@ function PromoCard({ t }: { t: AgentTask }) {
   return (
     <div className="glass rounded-2xl p-4 border border-border space-y-3">
       <div className="flex items-center gap-2 text-xs">
-        <span className="px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 font-semibold">{(ref.channel ?? "promo").replace(/_/g, " ")}</span>
+        <span className="px-2 py-0.5 rounded-full bg-violet-500/15 text-primary font-semibold">{(ref.channel ?? "promo").replace(/_/g, " ")}</span>
         {t.priority === 1 && <span className="text-orange-300">high impact</span>}
       </div>
       <div className="font-semibold">{t.title.replace(/^[\w ]+:\s*/, "")}</div>
       <div className="text-xs text-muted-foreground whitespace-pre-wrap">{t.body}</div>
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={7}
-        className="w-full text-sm bg-black/30 border border-white/10 rounded-lg p-3 focus:outline-none focus:border-orange-500/60" />
+        className="w-full text-sm bg-black/30 border border-border rounded-lg p-3 focus:outline-none focus:border-orange-500/60" />
       <div className="flex flex-wrap gap-2">
         {isTelegram ? (
           <button disabled={busy || !text.trim()} onClick={async () => {

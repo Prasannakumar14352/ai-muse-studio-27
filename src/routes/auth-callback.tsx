@@ -78,7 +78,7 @@ function AuthCallbackPage() {
           </>
         ) : (
           <>
-            <Loader2 className="mx-auto h-6 w-6 animate-spin text-[color:var(--neon-purple)]" />
+            <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
             <h1 className="mt-4 text-2xl font-bold">Finishing sign-in</h1>
             <p className="mt-2 text-sm text-muted-foreground">Taking you to your dashboard.</p>
           </>

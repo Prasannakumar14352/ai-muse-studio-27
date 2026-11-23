@@ -14,9 +14,9 @@ function AgentsPage() {
   const specialists = AI_AGENTS.filter((a) => a.kind === "specialist");
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-8">
+    <div className="max-w-6xl space-y-8">
       <header>
-        <h1 className="text-3xl font-bold flex items-center gap-2"><Bot className="w-7 h-7 text-primary" /> AI Agents</h1>
+        <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-2"><Bot className="w-7 h-7 text-primary" /> AI Agents</h1>
         <p className="text-sm text-muted-foreground mt-1">Specialists produce single assets. Campaign agents produce complete, publish-ready multi-asset campaigns.</p>
       </header>
 

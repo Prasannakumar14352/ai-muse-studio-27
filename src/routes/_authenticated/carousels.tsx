@@ -747,7 +747,7 @@ function CarouselsPage() {
                             <span className="gradient-primary text-white px-1.5 py-0.5 rounded text-[10px]">Slide {sl.n}</span>
                             <span className="text-muted-foreground uppercase tracking-wider text-[10px]">{sl.role}</span>
                             {sl.label && (
-                              <span className="border border-[color:var(--neon-purple)]/50 text-[color:var(--neon-purple)] px-1.5 py-0.5 rounded text-[10px]">
+                              <span className="border border-[color:var(--neon-purple)]/50 text-primary px-1.5 py-0.5 rounded text-[10px]">
                                 {sl.label}
                               </span>
                             )}
@@ -761,7 +761,7 @@ function CarouselsPage() {
                           {sl.bullets && sl.bullets.length > 0 && (
                             <ul className="mt-1.5 space-y-0.5 text-muted-foreground">
                               {sl.bullets.map((b, i) => (
-                                <li key={i} className="pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-[color:var(--neon-purple)]">
+                                <li key={i} className="pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-primary">
                                   {b}
                                 </li>
                               ))}
@@ -854,7 +854,7 @@ function CarouselsPage() {
                                       <div className="flex items-center gap-1.5 flex-wrap">
                                         <span className="uppercase tracking-wider text-[9px] text-muted-foreground">{sl.role}</span>
                                         {sl.label && (
-                                          <span className="border border-[color:var(--neon-purple)]/50 text-[color:var(--neon-purple)] px-1.5 py-0 rounded text-[9px]">
+                                          <span className="border border-[color:var(--neon-purple)]/50 text-primary px-1.5 py-0 rounded text-[9px]">
                                             {sl.label}
                                           </span>
                                         )}
@@ -866,7 +866,7 @@ function CarouselsPage() {
                                       {sl.bullets && sl.bullets.length > 0 && (
                                         <ul className="mt-1 space-y-0.5 text-muted-foreground text-[11px]">
                                           {sl.bullets.slice(0, 4).map((b, j) => (
-                                            <li key={j} className="pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-[color:var(--neon-purple)]">{b}</li>
+                                            <li key={j} className="pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-primary">{b}</li>
                                           ))}
                                         </ul>
                                       )}

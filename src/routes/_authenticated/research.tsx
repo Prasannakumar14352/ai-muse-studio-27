@@ -91,9 +91,9 @@ function ResearchPage() {
   const hasSelected = !!selected;
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="max-w-6xl space-y-6">
       <header>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
+        <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-2">
           <Search className="w-7 h-7 text-primary" /> Viral Research Engine
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -102,7 +102,7 @@ function ResearchPage() {
       </header>
 
       {/* Inputs */}
-      <div className="glass rounded-2xl p-6 border border-white/10 space-y-4">
+      <div className="glass rounded-2xl p-6 border border-border space-y-4">
         <div className="grid md:grid-cols-2 gap-3">
           <div className="md:col-span-2">
             <Label>Topic or keyword</Label>
@@ -163,7 +163,7 @@ function ResearchPage() {
           <div className="font-semibold text-red-300">Research failed</div>
           <div className="text-muted-foreground mt-1">{(m.error as Error)?.message ?? "Unknown error"}</div>
           <div className="mt-3 flex gap-2">
-            <button onClick={() => m.mutate()} className="px-3 py-1.5 rounded-lg border border-white/10 text-sm inline-flex items-center gap-1.5">
+            <button onClick={() => m.mutate()} className="px-3 py-1.5 rounded-lg border border-border text-sm inline-flex items-center gap-1.5">
               <RefreshCw className="w-3.5 h-3.5" /> Retry
             </button>
           </div>
@@ -193,7 +193,7 @@ function ResearchPage() {
         {(reports ?? []).map((r) => {
           const va = r.findings.viralAnalysis;
           return (
-            <div key={r.id} className="glass rounded-2xl p-4 border border-white/10 flex items-center gap-3">
+            <div key={r.id} className="glass rounded-2xl p-4 border border-border flex items-center gap-3">
               <button onClick={() => setSelected(r.findings)} className="text-left flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <div className="font-medium truncate">{r.topic}</div>
@@ -396,7 +396,7 @@ function OneClickActions({ findings, navigate }: { findings: ResearchFindings; n
   };
 
   return (
-    <div className="glass rounded-2xl border border-white/10 p-4">
+    <div className="glass rounded-2xl border border-border p-4">
       <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">One-click actions</div>
       <p className="text-xs text-muted-foreground mb-3">
         <span className="text-foreground/80 font-medium">Create Draft</span> opens the destination module prefilled with this research.
@@ -416,7 +416,7 @@ function OneClickActions({ findings, navigate }: { findings: ResearchFindings; n
                 <span className="text-primary">{action.icon}</span>
                 <span className="truncate">{noun}</span>
               </div>
-              <div className="inline-flex items-stretch rounded-xl border border-white/10 overflow-hidden">
+              <div className="inline-flex items-stretch rounded-xl border border-border overflow-hidden">
                 <button
                   type="button"
                   disabled={anyBusy}
@@ -431,7 +431,7 @@ function OneClickActions({ findings, navigate }: { findings: ResearchFindings; n
                     type="button"
                     disabled={anyBusy}
                     onClick={() => runAction(action, true)}
-                    className="inline-flex items-center gap-2 px-3 py-2 text-xs border-l border-white/10 bg-gradient-to-r from-orange-500/20 to-pink-500/20 hover:from-orange-500/30 hover:to-pink-500/30 text-pink-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    className="inline-flex items-center gap-2 px-3 py-2 text-xs border-l border-border bg-gradient-to-r from-orange-500/20 to-pink-500/20 hover:from-orange-500/30 hover:to-pink-500/30 text-pink-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
                     {genBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     Generate {noun} Now
@@ -443,7 +443,7 @@ function OneClickActions({ findings, navigate }: { findings: ResearchFindings; n
                   aria-label={`Preview handoff for ${action.label}`}
                   disabled={anyBusy}
                   onClick={() => setPreview({ action, payload: action.build(findings, researchId), autogen: false })}
-                  className="px-2 border-l border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/5 disabled:opacity-50"
+                  className="px-2 border-l border-border text-muted-foreground hover:text-foreground hover:bg-white/5 disabled:opacity-50"
                 >
                   <Eye className="w-3.5 h-3.5" />
                 </button>
@@ -473,7 +473,7 @@ function Label({ children }: { children: React.ReactNode }) {
 function IconBtn({ children, onClick, title, tone }: { children: React.ReactNode; onClick: () => void; title: string; tone?: "danger" }) {
   return (
     <button title={title} onClick={onClick}
-      className={`p-2 rounded-lg border border-white/10 ${tone === "danger" ? "text-red-400 hover:bg-red-500/10" : "text-muted-foreground hover:text-foreground hover:bg-white/5"}`}>
+      className={`p-2 rounded-lg border border-border ${tone === "danger" ? "text-red-400 hover:bg-red-500/10" : "text-muted-foreground hover:text-foreground hover:bg-white/5"}`}>
       {children}
     </button>
   );

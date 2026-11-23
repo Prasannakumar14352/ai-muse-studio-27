@@ -23,7 +23,7 @@ export function BrandPreview({ kit }: Props) {
     <div className="space-y-4" style={{ fontFamily: bodyFont }}>
       <SectionLabel>Landing hero</SectionLabel>
       <div
-        className="rounded-2xl p-6 md:p-8 overflow-hidden relative border border-white/10"
+        className="rounded-2xl p-6 md:p-8 overflow-hidden relative border border-border"
         style={{ background: `${gradient}` }}
       >
         <div className="flex items-center gap-3 mb-4">
@@ -52,7 +52,7 @@ export function BrandPreview({ kit }: Props) {
       <div className="grid md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <SectionLabel>Palette & typography</SectionLabel>
-          <div className="glass rounded-xl p-4 border border-white/10 space-y-3">
+          <div className="glass rounded-xl p-4 border border-border space-y-3">
             <div className="flex gap-2">
               <Swatch color={primary} label="Primary" />
               <Swatch color={secondary} label="Secondary" />
@@ -72,7 +72,7 @@ export function BrandPreview({ kit }: Props) {
 
         <div className="space-y-2">
           <SectionLabel>Social post</SectionLabel>
-          <div className="glass rounded-xl border border-white/10 overflow-hidden">
+          <div className="glass rounded-xl border border-border overflow-hidden">
             <div className="flex items-center gap-2 p-3">
               <LogoMark kit={kit} size={32} />
               <div>
@@ -97,7 +97,7 @@ export function BrandPreview({ kit }: Props) {
 
         <div className="space-y-2">
           <SectionLabel>Carousel slide</SectionLabel>
-          <div className="glass rounded-xl border border-white/10 overflow-hidden aspect-[4/5] relative" style={{ background: `linear-gradient(160deg, ${secondary}, ${primary})` }}>
+          <div className="glass rounded-xl border border-border overflow-hidden aspect-[4/5] relative" style={{ background: `linear-gradient(160deg, ${secondary}, ${primary})` }}>
             <div className="absolute top-3 left-3 flex items-center gap-2">
               <LogoMark kit={kit} size={28} />
               <span className="text-white text-xs font-semibold" style={{ fontFamily: headingFont }}>{brand}</span>
@@ -118,7 +118,7 @@ export function BrandPreview({ kit }: Props) {
 
         <div className="space-y-2">
           <SectionLabel>Video thumbnail</SectionLabel>
-          <div className="glass rounded-xl border border-white/10 overflow-hidden aspect-video relative" style={{ background: `radial-gradient(circle at 30% 30%, ${accent}, ${primary} 60%, #0b0b13)` }}>
+          <div className="glass rounded-xl border border-border overflow-hidden aspect-video relative" style={{ background: `radial-gradient(circle at 30% 30%, ${accent}, ${primary} 60%, #0b0b13)` }}>
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-2xl">
                 <Play className="w-6 h-6 text-black fill-black ml-0.5" />
@@ -138,7 +138,7 @@ export function BrandPreview({ kit }: Props) {
 
       <div className="space-y-2">
         <SectionLabel>Sample ad</SectionLabel>
-        <div className="glass rounded-xl border border-white/10 p-5 flex items-center gap-4" style={{ background: `linear-gradient(90deg, ${primary}22, transparent)` }}>
+        <div className="glass rounded-xl border border-border p-5 flex items-center gap-4" style={{ background: `linear-gradient(90deg, ${primary}22, transparent)` }}>
           <LogoMark kit={kit} size={56} />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-black truncate" style={{ fontFamily: headingFont }}>{brand}</div>
@@ -189,7 +189,7 @@ function LogoMark({ kit, size = 40 }: { kit: Partial<BrandKit>; size?: number })
 function Swatch({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex-1">
-      <div className="h-10 rounded-lg border border-white/10" style={{ background: color }} />
+      <div className="h-10 rounded-lg border border-border" style={{ background: color }} />
       <div className="text-[10px] mt-1 flex justify-between text-muted-foreground">
         <span>{label}</span>
         <span className="font-mono uppercase">{color}</span>

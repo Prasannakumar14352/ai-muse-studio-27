@@ -110,14 +110,14 @@ function LibraryPage() {
   ], []);
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
+    <div className="max-w-7xl space-y-6">
       <header>
-        <h1 className="text-3xl font-bold flex items-center gap-2"><Library className="w-7 h-7 text-primary" /> Asset Library</h1>
+        <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-2"><Library className="w-7 h-7 text-primary" /> Asset Library</h1>
         <p className="text-sm text-muted-foreground mt-1">Store, search, and reuse images, videos, logos, voiceovers, music, characters, backgrounds, and documents across every module.</p>
       </header>
 
       {/* Upload */}
-      <section className="glass rounded-2xl p-5 border border-white/10">
+      <section className="glass rounded-2xl p-5 border border-border">
         <h3 className="font-semibold mb-3 flex items-center gap-2"><Upload className="w-4 h-4 text-primary" /> Add to library</h3>
         <div className="grid md:grid-cols-4 gap-3">
           <CreatorFlowSelect
@@ -140,7 +140,7 @@ function LibraryPage() {
             </Button>
           </label>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-white/15 p-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-border p-3">
           <div className="flex-1 min-w-[200px]">
             <div className="text-sm font-medium">Free stock photos & videos</div>
             <div className="text-xs text-muted-foreground">Millions of royalty-free images and clips from Pixabay — 0 credits.</div>
@@ -170,13 +170,13 @@ function LibraryPage() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setTag("")}
-            className={`text-xs px-3 py-1 rounded-full border ${tag === "" ? "bg-primary text-primary-foreground border-primary" : "border-white/10 text-muted-foreground hover:bg-white/5"}`}
+            className={`text-xs px-3 py-1 rounded-full border ${tag === "" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-white/5"}`}
           >All tags</button>
           {allTags.map((t) => (
             <button
               key={t}
               onClick={() => setTag(t === tag ? "" : t)}
-              className={`text-xs px-3 py-1 rounded-full border ${t === tag ? "bg-primary text-primary-foreground border-primary" : "border-white/10 text-muted-foreground hover:bg-white/5"}`}
+              className={`text-xs px-3 py-1 rounded-full border ${t === tag ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-white/5"}`}
             >#{t}</button>
           ))}
         </div>
@@ -188,7 +188,7 @@ function LibraryPage() {
           {Array.from({ length: 10 }).map((_, i) => <div key={i} className="glass rounded-xl aspect-square animate-pulse" />)}
         </div>
       ) : items.length === 0 ? (
-        <div className="glass rounded-2xl p-12 text-center text-muted-foreground border border-white/10">
+        <div className="glass rounded-2xl p-12 text-center text-muted-foreground border border-border">
           <Library className="w-10 h-10 mx-auto mb-2 opacity-50" />
           No assets yet. Upload above or generate content — every generated asset can be saved here.
         </div>
@@ -213,7 +213,7 @@ function AssetTile({ asset, onDelete, onFavorite }: { asset: LibraryAsset; onDel
   };
 
   return (
-    <div className="glass rounded-xl border border-white/10 overflow-hidden group relative">
+    <div className="glass rounded-xl border border-border overflow-hidden group relative">
       <div className="aspect-square bg-black/40 flex items-center justify-center overflow-hidden">
         {isImage && <img src={asset.url} alt={asset.title} loading="lazy" className="w-full h-full object-cover" />}
         {isVideo && <video src={asset.url} className="w-full h-full object-cover" muted />}

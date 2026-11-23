@@ -591,7 +591,7 @@ function EditBriefPanel({ project, onSaved }: { project: { id: string; content_t
         className="w-full flex items-center justify-between p-4 hover:bg-white/5"
       >
         <div className="flex items-center gap-2 text-sm font-semibold">
-          <Edit3 className="w-4 h-4 text-[color:var(--neon-purple)]" />
+          <Edit3 className="w-4 h-4 text-primary" />
           Edit brief & regenerate
           <span className="text-xs text-muted-foreground font-normal ml-2">(same form used to create the project)</span>
         </div>
@@ -1269,7 +1269,7 @@ function VideoPreview({
         >
           <span className="flex items-center gap-2">
             {openPrep ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            <Edit3 className="w-4 h-4 text-[color:var(--neon-purple)]" /> Scene prep & script editor
+            <Edit3 className="w-4 h-4 text-primary" /> Scene prep & script editor
           </span>
           <span className="text-xs text-muted-foreground flex items-center gap-2">
             <span>{readyImages}/{totalScenes} images ready</span>
@@ -1490,7 +1490,7 @@ function VideoPreview({
         >
           <span className="flex items-center gap-2">
             {openHistory ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            <History className="w-4 h-4 text-[color:var(--neon-purple)]" /> Script version history
+            <History className="w-4 h-4 text-primary" /> Script version history
           </span>
           <span className="text-xs text-muted-foreground">{history.length} snapshot{history.length === 1 ? "" : "s"}</span>
         </button>
@@ -1536,7 +1536,7 @@ function VideoPreview({
         >
           <span className="flex items-center gap-2">
             {openBundle ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            <Package className="w-4 h-4 text-[color:var(--neon-purple)]" /> Export & download
+            <Package className="w-4 h-4 text-primary" /> Export & download
           </span>
           <span className="text-xs text-muted-foreground">video ready</span>
         </button>
@@ -2215,7 +2215,7 @@ function EditableSections({
       <div className="glass rounded-2xl p-6 lg:col-span-2">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[color:var(--neon-purple)]" /> Full Script
+            <FileText className="w-4 h-4 text-primary" /> Full Script
           </h2>
           <EditToggle
             editing={editScript}
@@ -2257,7 +2257,7 @@ function EditableSections({
       <div className="glass rounded-2xl p-6">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold flex items-center gap-2">
-            <Film className="w-4 h-4 text-[color:var(--neon-purple)]" /> Scene Breakdown
+            <Film className="w-4 h-4 text-primary" /> Scene Breakdown
           </h2>
           <EditToggle
             editing={editScenes}
@@ -2320,7 +2320,7 @@ function EditableSections({
       <div className="glass rounded-2xl p-6">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold flex items-center gap-2">
-            <Wand2 className="w-4 h-4 text-[color:var(--neon-purple)]" /> Image Prompts (B-roll)
+            <Wand2 className="w-4 h-4 text-primary" /> Image Prompts (B-roll)
           </h2>
           <EditToggle
             editing={editPrompts}
@@ -2353,7 +2353,7 @@ function EditableSections({
       <div className="glass rounded-2xl p-6">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold flex items-center gap-2">
-            <Copy className="w-4 h-4 text-[color:var(--neon-purple)]" /> Captions & Hashtags
+            <Copy className="w-4 h-4 text-primary" /> Captions & Hashtags
           </h2>
           <EditToggle
             editing={editCaps}

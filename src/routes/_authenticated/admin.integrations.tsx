@@ -69,7 +69,7 @@ function ProviderCard({ row, onChanged }: { row: ProviderRow; onChanged: () => v
   const callbacks = meta.platforms.map((p) => `${origin}/api/public/oauth/${p}/callback`);
 
   return (
-    <div className="glass rounded-2xl p-5 border border-white/10 space-y-4">
+    <div className="glass rounded-2xl p-5 border border-border space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="font-semibold">{meta.title}</div>
@@ -161,7 +161,7 @@ function ProviderCard({ row, onChanged }: { row: ProviderRow; onChanged: () => v
             } catch (e) { toast.error(e instanceof Error ? e.message : "Test failed"); }
             finally { setBusy(null); }
           }}
-          className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-40"
+          className="rounded-lg bg-white/5 hover:bg-white/10 border border-border px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-40"
         >
           {busy === "test" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlayCircle className="w-3.5 h-3.5" />}
           Test

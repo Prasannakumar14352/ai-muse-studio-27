@@ -598,7 +598,7 @@ function Chips<T extends string>({ options, value, onChange }: {
       {options.map((o) => (
         <button key={o.id} onClick={() => onChange(o.id)} title={o.hint}
           className={`px-2.5 py-1 rounded-full text-[11px] border transition ${
-            value === o.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"
+            value === o.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-primary/40"
           }`}>
           {o.label}
         </button>
@@ -921,7 +921,7 @@ function GenerationGrid(props: {
         {items.map((it) => (
           <button key={it.id} onClick={() => setSelectedId(it.id)}
             className={`text-left glass rounded-xl overflow-hidden border transition ${
-              selectedId === it.id ? "border-[color:var(--neon-purple)] ring-2 ring-[color:var(--neon-purple)]/40" : "border-border hover:border-white/20"
+              selectedId === it.id ? "border-[color:var(--neon-purple)] ring-2 ring-[color:var(--neon-purple)]/40" : "border-border hover:border-primary/40"
             }`}>
             <div className="aspect-video bg-black">
               <img src={it.image} alt="concept" className="w-full h-full object-cover" />
@@ -1020,7 +1020,7 @@ function ActionButton({ icon: Icon, label, onClick, primary = false }: {
 }) {
   return (
     <button onClick={onClick}
-      className={`rounded-lg px-3 py-1.5 text-xs flex items-center gap-1.5 ${primary ? "gradient-primary text-white" : "glass border border-border hover:border-white/20"}`}>
+      className={`rounded-lg px-3 py-1.5 text-xs flex items-center gap-1.5 ${primary ? "gradient-primary text-white" : "glass border border-border hover:border-primary/40"}`}>
       <Icon className="w-3.5 h-3.5" /> {label}
     </button>
   );
@@ -1082,7 +1082,7 @@ function ReverseEngineerPanel({ onUseBrief }: { onUseBrief: (b: ThumbnailBrief) 
         <div className="text-sm font-semibold flex items-center gap-2"><Upload className="w-4 h-4 text-primary" /> Upload a thumbnail</div>
         <input ref={fileRef} type="file" accept="image/*" onChange={(e) => onFile(e.target.files?.[0] ?? null)} className="hidden" />
         <button onClick={() => fileRef.current?.click()}
-          className="w-full rounded-lg glass border border-dashed border-border py-8 text-sm text-muted-foreground hover:border-white/20 flex flex-col items-center justify-center gap-2">
+          className="w-full rounded-lg glass border border-dashed border-border py-8 text-sm text-muted-foreground hover:border-primary/40 flex flex-col items-center justify-center gap-2">
           <Upload className="w-5 h-5" />
           {image ? "Replace image" : "Click to upload an image"}
         </button>
@@ -1114,7 +1114,7 @@ function ReverseEngineerPanel({ onUseBrief }: { onUseBrief: (b: ThumbnailBrief) 
                 <div className="text-xs text-muted-foreground mb-1">Colors</div>
                 <div className="flex gap-1">
                   {result.colors.map((c, i) => (
-                    <div key={i} title={c} className="w-8 h-8 rounded border border-white/10" style={{ background: c }} />
+                    <div key={i} title={c} className="w-8 h-8 rounded border border-border" style={{ background: c }} />
                   ))}
                 </div>
               </div>
@@ -1171,7 +1171,7 @@ function FormatSelector({ activeId, onSelect }: {
               className={`text-left rounded-xl border p-4 transition ${
                 active
                   ? "border-[color:var(--neon-purple)] bg-primary/10 ring-2 ring-[color:var(--neon-purple)]/40"
-                  : "glass border-border hover:border-white/20"
+                  : "glass border-border hover:border-primary/40"
               }`}>
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold">{f.label}</div>
@@ -1192,7 +1192,7 @@ function FormatSelector({ activeId, onSelect }: {
             <button key={f.id} onClick={() => onSelect(f.id)}
               title={`${f.outputWidth}×${f.outputHeight}`}
               className={`px-2.5 py-1 rounded-full text-[11px] border transition ${
-                activeId === f.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"
+                activeId === f.id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-primary/40"
               }`}>
               {f.shortLabel} · {f.ratio}
             </button>
@@ -1229,7 +1229,7 @@ function SubjectUploader({ value, onChange }: { value?: string; onChange: (v: st
         </div>
       ) : (
         <button onClick={() => ref.current?.click()}
-          className="w-full rounded-lg glass border border-dashed border-border py-3 text-xs text-muted-foreground hover:border-white/20 flex items-center justify-center gap-2">
+          className="w-full rounded-lg glass border border-dashed border-border py-3 text-xs text-muted-foreground hover:border-primary/40 flex items-center justify-center gap-2">
           <Upload className="w-4 h-4" /> Upload primary subject (face)
         </button>
       )}
@@ -1263,7 +1263,7 @@ function ReferenceUploader({ value, onChange }: { value: string[]; onChange: (v:
           </div>
         ))}
         <button aria-label="Upload" onClick={() => ref.current?.click()}
-          className="w-14 h-14 rounded-lg glass border border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-white/20">
+          className="w-14 h-14 rounded-lg glass border border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-primary/40">
           <Upload className="w-4 h-4" />
         </button>
       </div>

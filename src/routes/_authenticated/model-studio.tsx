@@ -163,7 +163,7 @@ function ModelStudioPage() {
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
+        <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-2">
           <Sparkles className="h-6 w-6 text-primary" /> Model Studio
         </h1>
         <p className="text-sm text-muted-foreground mt-1">

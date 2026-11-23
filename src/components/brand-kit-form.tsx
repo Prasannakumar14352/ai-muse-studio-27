@@ -77,7 +77,7 @@ export function BrandKitForm() {
         <div className="space-y-1.5">
           {kits?.map((k) => (
             <button key={k.id} onClick={() => setEditing(k)}
-              className={`w-full text-left p-3 rounded-xl border transition ${editing.id === k.id ? "border-primary bg-primary/10" : "border-white/10 hover:border-white/25"}`}>
+              className={`w-full text-left p-3 rounded-xl border transition ${editing.id === k.id ? "border-primary bg-primary/10" : "border-border hover:border-white/25"}`}>
               <div className="flex items-center justify-between">
                 <div className="font-medium text-sm truncate">{k.name}</div>
                 {k.is_default && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />}
@@ -93,8 +93,8 @@ export function BrandKitForm() {
       </aside>
 
       {/* Editor */}
-      <div className="glass rounded-2xl p-5 md:p-6 border border-white/10 space-y-5">
-        <div className="flex items-center gap-1 border-b border-white/10 pb-3 overflow-x-auto">
+      <div className="glass rounded-2xl p-5 md:p-6 border border-border space-y-5">
+        <div className="flex items-center gap-1 border-b border-border pb-3 overflow-x-auto">
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -142,7 +142,7 @@ export function BrandKitForm() {
               <F label="Heading font"><Input value={editing.font_primary ?? ""} onChange={(v) => setEditing({ ...editing, font_primary: v })} placeholder="Inter, Space Grotesk, Sora…" /></F>
               <F label="Body font"><Input value={editing.font_secondary ?? ""} onChange={(v) => setEditing({ ...editing, font_secondary: v })} placeholder="Inter, DM Sans…" /></F>
             </div>
-            <div className="pt-3 border-t border-white/10 space-y-3">
+            <div className="pt-3 border-t border-border space-y-3">
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Default styles (auto-applied to every generation)</div>
               <div className="grid md:grid-cols-2 gap-4">
                 <F label="Visual style"><Input value={editing.default_styles?.visualStyle ?? ""} onChange={(v) => setEditing({ ...editing, default_styles: { ...(editing.default_styles ?? {}), visualStyle: v } })} placeholder="cinematic, editorial, minimal…" /></F>
@@ -186,7 +186,7 @@ export function BrandKitForm() {
               <F label="Email"><Input value={meta.email ?? ""} onChange={(v) => patchMeta({ email: v })} placeholder="hello@brand.com" /></F>
               <F label="Phone"><Input value={meta.phone ?? ""} onChange={(v) => patchMeta({ phone: v })} placeholder="+1 555 …" /></F>
             </div>
-            <div className="pt-3 border-t border-white/10">
+            <div className="pt-3 border-t border-border">
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Social links</div>
               <div className="grid md:grid-cols-2 gap-3">
                 {(["instagram","youtube","tiktok","linkedin","twitter","facebook","pinterest"] as const).map((k) => (
@@ -237,7 +237,7 @@ export function BrandKitForm() {
           </div>
         )}
 
-        <div className="flex justify-between pt-4 border-t border-white/10">
+        <div className="flex justify-between pt-4 border-t border-border">
           <div>
             {selected && (
               <button onClick={() => remove.mutate(selected.id)}
@@ -285,7 +285,7 @@ function Textarea(p: { value: string; onChange: (v: string) => void; placeholder
 function ColorInput(p: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex gap-2 items-center">
-      <input type="color" className="w-12 h-10 rounded-lg border border-white/10 bg-transparent cursor-pointer" value={p.value} onChange={(e) => p.onChange(e.target.value)} />
+      <input type="color" className="w-12 h-10 rounded-lg border border-border bg-transparent cursor-pointer" value={p.value} onChange={(e) => p.onChange(e.target.value)} />
       <input className="input-base flex-1 font-mono uppercase text-xs" value={p.value} onChange={(e) => p.onChange(e.target.value)} />
     </div>
   );
@@ -311,7 +311,7 @@ function AssetUploader({ label, url, onChange, accept, kind }: { label: string; 
     <div className="space-y-2">
       <div className="text-xs font-medium text-muted-foreground">{label}</div>
       <div className="flex items-center gap-3">
-        <div className="w-20 h-20 rounded-xl border border-dashed border-white/15 bg-white/[0.02] flex items-center justify-center overflow-hidden shrink-0">
+        <div className="w-20 h-20 rounded-xl border border-dashed border-border bg-white/[0.02] flex items-center justify-center overflow-hidden shrink-0">
           {url ? <img src={url} alt="" className="w-full h-full object-contain bg-white" /> : <ImageIcon className="w-6 h-6 text-muted-foreground" />}
         </div>
         <div className="flex-1 min-w-0 space-y-2">
@@ -324,11 +324,11 @@ function AssetUploader({ label, url, onChange, accept, kind }: { label: string; 
               catch (err) { toast.error((err as Error).message); }
               finally { setBusy(false); if (ref.current) ref.current.value = ""; }
             }} />
-            <button onClick={() => ref.current?.click()} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/15 hover:border-white/30 text-xs disabled:opacity-50">
+            <button onClick={() => ref.current?.click()} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:border-primary/40 text-xs disabled:opacity-50">
               {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload
             </button>
             {url && (
-              <button onClick={() => onChange(null)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/15 text-xs text-muted-foreground hover:text-red-400">
+              <button onClick={() => onChange(null)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-red-400">
                 <X className="w-3.5 h-3.5" /> Remove
               </button>
             )}
@@ -346,14 +346,14 @@ function MultiImageUploader({ urls, onChange }: { urls: string[]; onChange: (u: 
     <div className="space-y-3">
       <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
         {urls.map((u, i) => (
-          <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-white/10 bg-white/[0.02] group">
+          <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-border bg-white/[0.02] group">
             <img src={u} alt="" className="w-full h-full object-cover" />
             <button aria-label="Remove" onClick={() => onChange(urls.filter((_, j) => j !== i))} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
               <X className="w-3 h-3 text-white" />
             </button>
           </div>
         ))}
-        <button onClick={() => ref.current?.click()} disabled={busy} className="aspect-square rounded-lg border border-dashed border-white/15 hover:border-primary flex items-center justify-center text-muted-foreground disabled:opacity-50">
+        <button onClick={() => ref.current?.click()} disabled={busy} className="aspect-square rounded-lg border border-dashed border-border hover:border-primary flex items-center justify-center text-muted-foreground disabled:opacity-50">
           {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
         </button>
       </div>

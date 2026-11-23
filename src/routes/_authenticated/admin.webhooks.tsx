@@ -60,7 +60,7 @@ function Inner() {
       </div>
 
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Razorpay <span className="gradient-text">Debugger</span></h1>
+        <h1 className="text-3xl md:text-4xl font-bold">Razorpay <span className="gradient-text">Debugger</span></h1>
         <p className="text-muted-foreground text-sm mt-1">Live webhook events + payment attempts. Refreshes every 15s.</p>
       </div>
 

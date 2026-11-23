@@ -45,7 +45,7 @@ function AgentHqPage() {
     <div className="space-y-6 max-w-6xl">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2"><Bot className="w-7 h-7 text-[color:var(--brand-orange)]" /> Agent HQ</h1>
+          <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-2"><Bot className="w-7 h-7 text-[color:var(--brand-orange)]" /> Agent HQ</h1>
           <p className="text-muted-foreground mt-1 text-sm">Your AI team: Telegram support, daily QA and ops checks, the weekly product plan, and marketing (social posts + promotion). Anything about money, and every post, waits for you.</p>
         </div>
         {d && (
@@ -122,7 +122,7 @@ function ApprovalCard({ t }: { t: AgentTask }) {
         <>
           <label className="text-xs text-muted-foreground block">{t.source === "in_app" ? "Reply to send in their in-app chat" : "Reply to post in the group"}</label>
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4}
-            className="w-full text-sm bg-black/30 border border-white/10 rounded-lg p-3 focus:outline-none focus:border-orange-500/60" />
+            className="w-full text-sm bg-black/30 border border-border rounded-lg p-3 focus:outline-none focus:border-orange-500/60" />
         </>
       )}
       <div className="flex flex-wrap gap-2">
@@ -158,7 +158,7 @@ function TaskBoard({ tasks }: { tasks: AgentTask[] }) {
             <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">{c.label} · {items.length}</div>
             <div className="space-y-2 max-h-[70vh] overflow-auto pr-1">
               {items.map((t) => (
-                <details key={t.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <details key={t.id} className="rounded-xl border border-border bg-black/20 p-3">
                   <summary className="cursor-pointer list-none">
                     <div className="flex items-center gap-1.5 text-[11px] mb-1">
                       <KindBadge kind={t.kind} />
@@ -385,7 +385,7 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
 function KindBadge({ kind }: { kind: string }) {
   const cls: Record<string, string> = {
     bug: "bg-rose-500/15 text-rose-300", billing: "bg-amber-500/15 text-amber-300", question: "bg-sky-500/15 text-sky-300",
-    feature: "bg-violet-500/15 text-violet-300", report: "bg-emerald-500/15 text-emerald-300", alert: "bg-rose-500/15 text-rose-300",
+    feature: "bg-violet-500/15 text-primary", report: "bg-emerald-500/15 text-emerald-300", alert: "bg-rose-500/15 text-rose-300",
     chat: "bg-white/10 text-muted-foreground",
   };
   return <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide ${cls[kind] ?? "bg-white/10"}`}>{kind}</span>;

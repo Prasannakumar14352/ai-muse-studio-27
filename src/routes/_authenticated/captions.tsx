@@ -174,7 +174,7 @@ function CaptionsPage() {
           <div className="space-y-4">
             <Section title="Caption variants">
               {result.captions.map((c, i) => (
-                <div key={i} className="border border-white/10 rounded-lg p-3 flex items-start justify-between gap-3">
+                <div key={i} className="border border-border rounded-lg p-3 flex items-start justify-between gap-3">
                   <p className="text-sm whitespace-pre-wrap flex-1">{c}</p>
                   <button onClick={() => copy(c)} className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"><Copy className="w-3 h-3" />Copy</button>
                 </div>
@@ -237,7 +237,7 @@ function CaptionsPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-card/40 p-4">
+    <div className="rounded-xl border border-border bg-card/40 p-4">
       <h2 className="text-xs uppercase tracking-wide text-muted-foreground mb-2">{title}</h2>
       {children}
     </div>

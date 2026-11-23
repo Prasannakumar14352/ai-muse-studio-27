@@ -6,7 +6,7 @@ export function ProjectMemoryTimeline({ items }: { items: MemoryEntry[] }) {
   return (
     <div className="space-y-2">
       {items.map((m) => (
-        <div key={m.id} className="rounded-xl border border-white/10 bg-card/40 p-4">
+        <div key={m.id} className="rounded-xl border border-border bg-card/40 p-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Brain className="w-3.5 h-3.5 text-primary" />
             <span className="uppercase tracking-wider">{m.kind}</span>

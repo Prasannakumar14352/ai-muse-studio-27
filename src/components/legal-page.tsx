@@ -27,7 +27,7 @@ export function Section({ id, title, children }: { id?: string; title: string; c
   return (
     <section id={id} className="scroll-mt-24">
       <h2 className="text-xl font-semibold mb-3">{title}</h2>
-      <div className="space-y-3 text-[15px] leading-relaxed text-foreground/85 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_a]:text-[color:var(--neon-purple)] [&_a]:underline">
+      <div className="space-y-3 text-[15px] leading-relaxed text-foreground/85 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_a]:text-primary [&_a]:underline">
         {children}
       </div>
     </section>

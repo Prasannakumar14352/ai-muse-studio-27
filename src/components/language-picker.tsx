@@ -67,18 +67,18 @@ export function LanguagePicker({ value, onChange, allowAuto = false, showVoice =
     <div className="flex flex-wrap items-center gap-2">
       {chips.map((id) => (
         <button key={id} type="button" onClick={() => onChange(id)}
-          className={`${chipCls} rounded-full border transition ${value === id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-white/20"}`}>
+          className={`${chipCls} rounded-full border transition ${value === id ? "gradient-primary text-white border-transparent" : "glass border-border hover:border-primary/40"}`}>
           {label(id)}
         </button>
       ))}
       <div ref={boxRef} className="relative">
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
-          className={`${chipCls} rounded-full border glass border-border hover:border-white/20 inline-flex items-center gap-1`}>
+          className={`${chipCls} rounded-full border glass border-border hover:border-primary/40 inline-flex items-center gap-1`}>
           More languages ({ALL_LANGUAGES.length}) <ChevronDown className="w-3.5 h-3.5" />
         </button>
         {open && (
-          <div className="absolute left-0 mt-2 w-72 max-h-80 rounded-xl border border-white/10 bg-[#0d0d14] shadow-2xl z-50 flex flex-col overflow-hidden">
-            <div className="p-2 border-b border-white/10 flex items-center gap-2">
+          <div className="absolute left-0 mt-2 w-72 max-h-80 rounded-xl border border-border bg-[#0d0d14] shadow-2xl z-50 flex flex-col overflow-hidden">
+            <div className="p-2 border-b border-border flex items-center gap-2">
               <Search className="w-4 h-4 text-muted-foreground" />
               <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search language"
                 className="flex-1 bg-transparent text-sm focus:outline-none" />
@@ -124,7 +124,7 @@ export function VoiceFallbackNotice({ language, voiceLanguage, onChange }: {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <select value={voiceLanguage} onChange={(e) => onChange(e.target.value)} aria-label="Voice language"
-          className="text-sm bg-black/30 border border-white/10 rounded-lg px-2 py-1.5">
+          className="text-sm bg-black/30 border border-border rounded-lg px-2 py-1.5">
           <option value="">Choose voice…</option>
           <option value="none">No voiceover</option>
           <option value={suggested}>{suggested} voice (suggested)</option>

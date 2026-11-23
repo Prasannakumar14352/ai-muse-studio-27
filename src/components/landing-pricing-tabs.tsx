@@ -130,13 +130,13 @@ function LandingCard({ p, cycle }: { p: PricingPlan; cycle: BillingCycle }) {
       <ul className="mt-6 space-y-2.5 flex-1">
         {p.features.slice(0, 6).map((f) => (
           <li key={f} className="flex items-start gap-2 text-sm">
-            <Check className={`w-4 h-4 mt-0.5 shrink-0 ${p.contactSales ? "text-[color:var(--brand-orange)]" : "text-[color:var(--neon-purple)]"}`} />
+            <Check className={`w-4 h-4 mt-0.5 shrink-0 ${p.contactSales ? "text-[color:var(--brand-orange)]" : "text-primary"}`} />
             <span>{f}</span>
           </li>
         ))}
         {!p.contactSales && (
           <li className="flex items-start gap-2 text-sm">
-            <Check className="w-4 h-4 mt-0.5 shrink-0 text-[color:var(--neon-purple)]" />
+            <Check className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
             <span>{planUpdatesLine({ planType: p.planType, isFree, cycle })}</span>
           </li>
         )}

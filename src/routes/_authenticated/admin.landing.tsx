@@ -108,7 +108,7 @@ function AdminLanding() {
       <div className="flex items-center justify-between">
         <div>
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Admin</div>
-          <h1 className="text-2xl font-bold">Landing page media</h1>
+          <h1 className="text-3xl md:text-4xl font-bold">Landing page media</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Manage the main demo card and video testimonials shown on the public landing page.
           </p>

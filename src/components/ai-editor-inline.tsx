@@ -22,11 +22,11 @@ export function AiEditorInline({ text, onAccept, targetType }: {
   });
 
   return (
-    <div className="rounded-xl border border-white/10 bg-card/40 p-3 space-y-2">
+    <div className="rounded-xl border border-border bg-card/40 p-3 space-y-2">
       <div className="flex flex-wrap gap-1.5">
         {QUICK.map((q) => (
           <button key={q} onClick={() => m.mutate(q)} disabled={m.isPending}
-            className="px-2.5 py-1 rounded-full text-xs border border-white/15 hover:border-primary/50 disabled:opacity-50">
+            className="px-2.5 py-1 rounded-full text-xs border border-border hover:border-primary/50 disabled:opacity-50">
             {q}
           </button>
         ))}

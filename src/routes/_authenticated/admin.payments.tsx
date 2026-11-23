@@ -157,12 +157,12 @@ function PaymentSettings() {
           </Field>
 
           <Field label="Currency">
-            <input className="w-full rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm placeholder:text-white/30 disabled:opacity-50" value={form.currency} disabled />
+            <input className="w-full rounded-lg bg-black/30 border border-border focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm placeholder:text-white/30 disabled:opacity-50" value={form.currency} disabled />
           </Field>
 
           <Field label="Razorpay Key ID" hint="Public identifier — safe to expose to browser">
             <input
-              className="w-full rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm font-mono placeholder:text-white/30 disabled:opacity-50"
+              className="w-full rounded-lg bg-black/30 border border-border focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm font-mono placeholder:text-white/30 disabled:opacity-50"
               placeholder="rzp_test_xxx / rzp_live_xxx"
               value={form.keyId}
               onChange={(e) => patch({ keyId: e.target.value })}
@@ -174,7 +174,7 @@ function PaymentSettings() {
             hint={data.hasKeySecret ? "Saved. Leave blank to keep. Enter a new value to replace." : "Never saved yet"}
           >
             <input
-              className="w-full rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm font-mono placeholder:text-white/30 disabled:opacity-50"
+              className="w-full rounded-lg bg-black/30 border border-border focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm font-mono placeholder:text-white/30 disabled:opacity-50"
               type="password"
               placeholder={data.hasKeySecret ? "•••••••••••••• (unchanged)" : "Enter secret"}
               value={form.keySecret}
@@ -187,7 +187,7 @@ function PaymentSettings() {
             hint={data.hasWebhookSecret ? "Saved. Leave blank to keep." : "Optional — used by /api/public/webhooks/razorpay"}
           >
             <input
-              className="w-full rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm font-mono placeholder:text-white/30 disabled:opacity-50"
+              className="w-full rounded-lg bg-black/30 border border-border focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm font-mono placeholder:text-white/30 disabled:opacity-50"
               type="password"
               placeholder={data.hasWebhookSecret ? "•••••••••••••• (unchanged)" : "Enter webhook secret"}
               value={form.webhookSecret}
@@ -197,7 +197,7 @@ function PaymentSettings() {
 
           <Field label="Company Name">
             <input
-              className="w-full rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm placeholder:text-white/30 disabled:opacity-50"
+              className="w-full rounded-lg bg-black/30 border border-border focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm placeholder:text-white/30 disabled:opacity-50"
               placeholder="CreatorFlow AI"
               value={form.companyName}
               onChange={(e) => patch({ companyName: e.target.value })}
@@ -206,7 +206,7 @@ function PaymentSettings() {
 
           <Field label="Logo URL">
             <input
-              className="w-full rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm placeholder:text-white/30 disabled:opacity-50"
+              className="w-full rounded-lg bg-black/30 border border-border focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm placeholder:text-white/30 disabled:opacity-50"
               placeholder="https://…/logo.png"
               value={form.logoUrl}
               onChange={(e) => patch({ logoUrl: e.target.value })}
@@ -217,12 +217,12 @@ function PaymentSettings() {
             <div className="flex items-center gap-2">
               <input
                 type="color"
-                className="h-10 w-14 rounded border border-white/10 bg-transparent"
+                className="h-10 w-14 rounded border border-border bg-transparent"
                 value={form.themeColor || "#0F172A"}
                 onChange={(e) => patch({ themeColor: e.target.value })}
               />
               <input
-                className="flex-1 rounded-lg bg-black/30 border border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm font-mono placeholder:text-white/30"
+                className="flex-1 rounded-lg bg-black/30 border border-border focus:border-primary/60 focus:ring-2 focus:ring-primary/30 outline-none px-3 py-2 text-sm font-mono placeholder:text-white/30"
                 value={form.themeColor}
                 onChange={(e) => patch({ themeColor: e.target.value })}
               />
@@ -230,7 +230,7 @@ function PaymentSettings() {
           </Field>
         </div>
 
-        <label className="flex items-center gap-3 pt-2 border-t border-white/10">
+        <label className="flex items-center gap-3 pt-2 border-t border-border">
           <input
             type="checkbox"
             className="w-4 h-4"
@@ -279,7 +279,7 @@ function PaymentSettings() {
             onClick={handleTest}
             disabled={testing}
             aria-busy={testing}
-            className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white/90 bg-white/5 border border-white/15 hover:bg-white/10 hover:border-white/25 transition
+            className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white/90 bg-white/5 border border-border hover:bg-white/10 hover:border-white/25 transition
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background
               disabled:opacity-60 disabled:cursor-not-allowed"
           >
@@ -399,7 +399,7 @@ function AutopayPlansPanel() {
           {AUTOPAY_EXPECTED.map(({ code, cycle }) => {
             const p = plans.find((x) => x.planCode === code && x.cycle === cycle);
             return (
-              <div key={`${code}-${cycle}`} className="rounded-lg border border-white/10 px-3 py-2 text-xs flex items-center gap-2">
+              <div key={`${code}-${cycle}`} className="rounded-lg border border-border px-3 py-2 text-xs flex items-center gap-2">
                 {p ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> : <XCircle className="w-4 h-4 text-amber-400 shrink-0" />}
                 <div className="min-w-0">
                   <div className="capitalize text-white">{code} {cycle}</div>

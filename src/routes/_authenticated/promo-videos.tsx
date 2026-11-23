@@ -506,7 +506,7 @@ function Stepper({ current, onGoto }: { current: StepId; onGoto: (s: StepId) => 
                 ? "bg-gradient-to-r from-pink-500/20 to-orange-500/20 border border-pink-500/40 text-white"
                 : done
                 ? "border border-emerald-500/40 text-emerald-300"
-                : "border border-white/10 text-muted-foreground hover:text-white"
+                : "border border-border text-muted-foreground hover:text-white"
             }`}
           >
             <span className="grid h-5 w-5 place-items-center rounded-full bg-white/5 text-[10px]">
@@ -535,7 +535,7 @@ function DetailsStep({
 }) {
   const ready = !!brief.productName.trim() && !!brief.topic.trim();
   return (
-    <Card className="p-6 space-y-5 bg-white/[0.02] backdrop-blur border border-white/10">
+    <Card className="p-6 space-y-5 bg-white/[0.02] backdrop-blur border border-border">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-pink-500 to-orange-500">
@@ -606,14 +606,14 @@ function DetailsStep({
         <Field label="Offer / price / discount" htmlFor="offer">
           <Input id="offer" value={brief.offer ?? ""} onChange={(e) => setBrief({ offer: e.target.value })} placeholder="e.g. 40% off — this week only" maxLength={160} />
         </Field>
-        <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] p-3">
+        <div className="flex items-center justify-between rounded-xl border border-border bg-white/[0.02] p-3">
           <div>
             <div className="text-sm font-medium">Captions on video</div>
             <div className="text-xs text-muted-foreground">Burned-in text overlays per scene</div>
           </div>
           <Switch checked={brief.captions} onCheckedChange={(v) => setBrief({ captions: v })} />
         </div>
-        <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] p-3">
+        <div className="flex items-center justify-between rounded-xl border border-border bg-white/[0.02] p-3">
           <div>
             <div className="text-sm font-medium">Background music</div>
             <div className="text-xs text-muted-foreground">Auto-suggest a mood</div>
@@ -622,7 +622,7 @@ function DetailsStep({
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-white/10 pt-4">
+      <div className="flex items-center justify-between border-t border-border pt-4">
         <p className="text-xs text-muted-foreground">
           ~{estimatedSceneCount} scenes · est. <span className="text-white font-medium">{estimatedCredits} credits</span>
         </p>
@@ -689,7 +689,7 @@ function BrandStep({
   const addColor = (v: string) => setDraft((d) => ({ ...d, brandColors: [...d.brandColors, v].slice(0, 5), brief: { ...d.brief, brandColors: [...d.brandColors, v].slice(0, 5) } }));
 
   return (
-    <Card className="p-6 space-y-5 bg-white/[0.02] backdrop-blur border border-white/10">
+    <Card className="p-6 space-y-5 bg-white/[0.02] backdrop-blur border border-border">
       <div>
         <h2 className="text-lg font-semibold">Brand assets</h2>
         <p className="text-xs text-muted-foreground">Optional — add clear photos of your real product (mug, T-shirt, keychain…) and every scene will show it exactly as it is. Scenes with product photos use HD images, so they cost more credits.</p>
@@ -698,7 +698,7 @@ function BrandStep({
       <div className="grid gap-5 md:grid-cols-2">
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">Logo</Label>
-          <div className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-4">
+          <div className="rounded-xl border border-dashed border-border bg-white/[0.02] p-4">
             {draft.logo ? (
               <div className="flex items-center gap-3">
                 <img src={draft.logo} alt="Logo" className="h-16 w-16 rounded-lg object-contain bg-white/5" />
@@ -719,8 +719,8 @@ function BrandStep({
           <Label className="text-xs text-muted-foreground">Brand colors ({draft.brandColors.length}/5)</Label>
           <div className="flex flex-wrap items-center gap-2">
             {draft.brandColors.map((c, i) => (
-              <span key={i} className="inline-flex items-center gap-1 rounded-full border border-white/10 pl-1 pr-2 py-0.5 text-xs">
-                <span className="h-4 w-4 rounded-full border border-white/10" style={{ background: c }} />
+              <span key={i} className="inline-flex items-center gap-1 rounded-full border border-border pl-1 pr-2 py-0.5 text-xs">
+                <span className="h-4 w-4 rounded-full border border-border" style={{ background: c }} />
                 {c}
                 <button aria-label="Remove" className="opacity-70 hover:opacity-100" onClick={() => setDraft((d) => ({ ...d, brandColors: d.brandColors.filter((_, x) => x !== i) }))}>
                   <X className="h-3 w-3" />
@@ -731,7 +731,7 @@ function BrandStep({
               <input
                 type="color"
                 onChange={(e) => addColor(e.target.value)}
-                className="h-8 w-10 cursor-pointer rounded border border-white/10 bg-transparent"
+                className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent"
                 aria-label="Add brand color"
               />
             )}
@@ -742,7 +742,7 @@ function BrandStep({
           <Label className="text-xs text-muted-foreground">Product photos ({draft.productImages.length}/8) — the first 3 are used in every scene</Label>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {draft.productImages.map((src, i) => (
-              <div key={i} className="group relative aspect-square overflow-hidden rounded-xl border border-white/10 bg-white/5">
+              <div key={i} className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-white/5">
                 <img src={src} alt={`Product ${i + 1}`} className="h-full w-full object-cover" />
                 <button
                   onClick={() => removeProductImage(i)}
@@ -754,7 +754,7 @@ function BrandStep({
               </div>
             ))}
             {draft.productImages.length < 8 && (
-              <label className="grid aspect-square cursor-pointer place-items-center rounded-xl border border-dashed border-white/15 bg-white/[0.02] text-xs text-muted-foreground hover:border-white/30">
+              <label className="grid aspect-square cursor-pointer place-items-center rounded-xl border border-dashed border-border bg-white/[0.02] text-xs text-muted-foreground hover:border-primary/40">
                 <div className="flex flex-col items-center gap-1">
                   <ImagePlus className="h-5 w-5" /> Add
                 </div>
@@ -768,7 +768,7 @@ function BrandStep({
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-white/10 pt-4">
+      <div className="flex items-center justify-between border-t border-border pt-4">
         <Button variant="ghost" onClick={onBack} className="gap-2"><ChevronLeft className="h-4 w-4" /> Back</Button>
         <div className="flex items-center gap-3">
           <p className="text-xs text-muted-foreground">Est. <span className="text-white font-medium">{estimatedCredits} credits</span></p>
@@ -798,7 +798,7 @@ function PlanStep({
 }) {
   return (
     <div className="space-y-5">
-      <Card className="p-5 space-y-3 bg-white/[0.02] backdrop-blur border border-white/10">
+      <Card className="p-5 space-y-3 bg-white/[0.02] backdrop-blur border border-border">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">{plan.title}</h2>
@@ -825,10 +825,10 @@ function PlanStep({
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-muted-foreground">Scenes ({plan.scenes.length})</h3>
         {plan.scenes.map((s, i) => (
-          <Card key={i} className="p-4 space-y-3 bg-white/[0.02] backdrop-blur border border-white/10">
+          <Card key={i} className="p-4 space-y-3 bg-white/[0.02] backdrop-blur border border-border">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="border-white/15">#{s.n}</Badge>
+                <Badge variant="outline" className="border-border">#{s.n}</Badge>
                 <Badge className="bg-gradient-to-r from-pink-500/20 to-orange-500/20 border border-pink-500/30 text-white">{s.role}</Badge>
                 <span className="text-xs text-muted-foreground">{s.duration_sec}s · transition: {s.transition}</span>
               </div>
@@ -852,7 +852,7 @@ function PlanStep({
         ))}
       </div>
 
-      <div className="flex items-center justify-between border-t border-white/10 pt-4">
+      <div className="flex items-center justify-between border-t border-border pt-4">
         <Button variant="ghost" onClick={onBack} className="gap-2"><ChevronLeft className="h-4 w-4" /> Back</Button>
         <Button onClick={onNext} className="gap-2 bg-gradient-to-r from-pink-500 to-orange-500">
           Generate video <ChevronRight className="h-4 w-4" />
@@ -874,7 +874,7 @@ function onEditSceneMeta(_plan: PromoPlan, _field: keyof PromoPlan, _value: stri
 
 function PlanBlock({ title, text, onChange }: { title: string; text: string; onChange: (v: string) => void }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+    <div className="rounded-xl border border-border bg-white/[0.02] p-3">
       <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
       <Textarea rows={2} value={text} onChange={(e) => onChange(e.target.value)} className="border-0 bg-transparent p-0 focus-visible:ring-0" />
     </div>
@@ -894,7 +894,7 @@ function GenerateStep({
   sceneImages: (string | null)[];
 }) {
   return (
-    <Card className="p-6 space-y-5 bg-white/[0.02] backdrop-blur border border-white/10">
+    <Card className="p-6 space-y-5 bg-white/[0.02] backdrop-blur border border-border">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Generating your promo</h2>
@@ -919,7 +919,7 @@ function GenerateStep({
           {plan.scenes.map((s, i) => {
             const img = sceneImages[i];
             return (
-              <div key={i} className="aspect-video overflow-hidden rounded-lg border border-white/10 bg-white/5 relative">
+              <div key={i} className="aspect-video overflow-hidden rounded-lg border border-border bg-white/5 relative">
                 {img ? (
                   <img src={img} alt={`Scene ${i + 1}`} className="h-full w-full object-cover" />
                 ) : (
@@ -973,9 +973,9 @@ function ReviewStep({
 
   return (
     <div className="space-y-5">
-      <Card className="p-5 bg-white/[0.02] backdrop-blur border border-white/10">
+      <Card className="p-5 bg-white/[0.02] backdrop-blur border border-border">
         <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="rounded-xl overflow-hidden border border-white/10 bg-black">
+          <div className="rounded-xl overflow-hidden border border-border bg-black">
             {videoUrl ? (
               <video src={videoUrl} controls playsInline className="w-full max-h-[540px] bg-black" />
             ) : (
@@ -1018,14 +1018,14 @@ function ReviewStep({
         {plan.scenes.map((s, i) => {
           const img = sceneImages[i];
           return (
-            <div key={i} className="overflow-hidden rounded-lg border border-white/10 bg-white/5 aspect-video">
+            <div key={i} className="overflow-hidden rounded-lg border border-border bg-white/5 aspect-video">
               {img ? <img src={img} alt={`Scene ${s.n}`} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-[10px] text-muted-foreground">Scene {s.n}</div>}
             </div>
           );
         })}
       </div>
 
-      <div className="flex items-center justify-between border-t border-white/10 pt-4">
+      <div className="flex items-center justify-between border-t border-border pt-4">
         <Button variant="ghost" onClick={onBack} className="gap-2"><ChevronLeft className="h-4 w-4" /> Edit plan</Button>
         <Button variant="ghost" onClick={onReset} className="gap-2 text-muted-foreground"><Trash2 className="h-4 w-4" /> Start over</Button>
       </div>
@@ -1035,7 +1035,7 @@ function ReviewStep({
 
 function CopyBlock({ label, value, onCopy }: { label: string; value: string; onCopy: (v: string, l: string) => void }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+    <div className="rounded-xl border border-border bg-white/[0.02] p-3">
       <div className="mb-1 flex items-center justify-between">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
         <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => onCopy(value, label)}>

@@ -102,7 +102,7 @@ export function ContentPlanBoard() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/70 flex flex-wrap items-center gap-3 justify-between">
+      <div className="rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-white/70 flex flex-wrap items-center gap-3 justify-between">
         <p className="max-w-3xl">
           The post creator drafts each day two days ahead (08:10 IST) — one post per platform. Days marked
           <span className="text-white"> Product clip</span> are ready to approve. Video days: click <span className="text-white">Build</span> and
@@ -144,7 +144,7 @@ export function ContentPlanBoard() {
         const status = dayStatus(it, tasks);
         const date = new Date(`${it.plan_date}T00:00:00`);
         return (
-          <div key={it.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+          <div key={it.id} className="rounded-2xl border border-border bg-white/[0.03] p-4 space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1 min-w-0">
                 <div className="text-xs text-white/50">

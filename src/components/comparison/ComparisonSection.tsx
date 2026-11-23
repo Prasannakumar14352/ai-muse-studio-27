@@ -72,7 +72,7 @@ export function ComparisonSection() {
                   "rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
                   category === c.id
                     ? "bg-white/10 border-white/30 text-foreground"
-                    : "border-white/10 text-muted-foreground hover:text-foreground hover:border-white/20",
+                    : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40",
                 )}
               >
                 {c.label}
@@ -94,13 +94,13 @@ export function ComparisonSection() {
         </div>
 
         {/* Desktop table */}
-        <div className="hidden lg:block glass rounded-2xl overflow-hidden border border-white/10">
+        <div className="hidden lg:block glass rounded-2xl overflow-hidden border border-border">
           <TooltipProvider delayDuration={150}>
             <table className="w-full text-sm">
               <caption className="sr-only">CreatorFlow AI capability comparison with ChatGPT, Canva, InVideo and CapCut</caption>
               <thead>
                 <tr className="text-left">
-                  <th scope="col" className="w-[28%] px-5 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                  <th scope="col" className="w-[28%] px-5 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
                     Capability
                   </th>
                   {COMPARISON_TOOLS.map((tool) => (
@@ -108,7 +108,7 @@ export function ComparisonSection() {
                       key={tool.id}
                       scope="col"
                       className={cn(
-                        "px-4 py-4 font-semibold border-b border-white/10 align-bottom",
+                        "px-4 py-4 font-semibold border-b border-border align-bottom",
                         tool.isPrimary && "bg-gradient-to-b from-[color:var(--neon-pink)]/10 to-transparent",
                       )}
                     >
@@ -178,7 +178,7 @@ export function ComparisonSection() {
                             <TooltipContent side="top" className="max-w-xs text-xs space-y-1">
                               <div className="font-semibold">{tool.name} · {statusLabel(st.status)}</div>
                               <div className="text-muted-foreground">{st.explanation}</div>
-                              <div className="text-[10px] text-muted-foreground/80 pt-1 border-t border-white/10">
+                              <div className="text-[10px] text-muted-foreground/80 pt-1 border-t border-border">
                                 {st.sourceLabel ? `Source: ${st.sourceLabel}` : "Reviewed manually"} · Verified {tool.lastVerifiedAt}
                               </div>
                             </TooltipContent>
@@ -202,7 +202,7 @@ export function ComparisonSection() {
 
         {/* Mobile / tablet view */}
         <div className="lg:hidden space-y-4">
-          <div className="glass rounded-2xl p-4 border border-white/10">
+          <div className="glass rounded-2xl p-4 border border-border">
             <label className="block text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
               Choose a tool to compare
             </label>
@@ -218,7 +218,7 @@ export function ComparisonSection() {
                   const i = competitors.findIndex((c) => c.id === mobileCompetitor);
                   setMobileCompetitor(competitors[(i - 1 + competitors.length) % competitors.length].id);
                 }}
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs hover:bg-white/5"
+                className="rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-white/5"
               >
                 ← Previous
               </button>
@@ -227,15 +227,15 @@ export function ComparisonSection() {
                   const i = competitors.findIndex((c) => c.id === mobileCompetitor);
                   setMobileCompetitor(competitors[(i + 1) % competitors.length].id);
                 }}
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs hover:bg-white/5"
+                className="rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-white/5"
               >
                 Next →
               </button>
             </div>
           </div>
 
-          <div className="glass rounded-2xl overflow-hidden border border-white/10">
-            <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 px-3 py-3 border-b border-white/10 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div className="glass rounded-2xl overflow-hidden border border-border">
+            <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 px-3 py-3 border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
               <div>Capability</div>
               <div>CreatorFlow AI</div>
               <div>{competitors.find((c) => c.id === mobileCompetitor)?.name}</div>
@@ -295,7 +295,7 @@ export function ComparisonSection() {
         </div>
 
         {/* CTA */}
-        <div className="mt-10 glass rounded-3xl p-8 md:p-10 text-center border border-white/10">
+        <div className="mt-10 glass rounded-3xl p-8 md:p-10 text-center border border-border">
           <h3 className="text-2xl md:text-3xl font-bold">Build Your Content in One Connected Workspace</h3>
           <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
             CreatorFlow AI is designed for creators who want structured workflows for writing,

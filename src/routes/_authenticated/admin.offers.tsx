@@ -89,7 +89,7 @@ function OffersPage() {
     <div className="space-y-6 max-w-5xl">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2"><Tag className="w-7 h-7 text-[color:var(--brand-orange)]" /> Offers &amp; codes</h1>
+          <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-2"><Tag className="w-7 h-7 text-[color:var(--brand-orange)]" /> Offers &amp; codes</h1>
           <p className="text-muted-foreground mt-1 text-sm">Festival discounts and promo codes. Prices are always recalculated on the server at checkout.</p>
         </div>
         <button onClick={() => setEditing({ ...EMPTY })} className="rounded-lg gradient-primary text-white px-4 py-2 text-sm inline-flex items-center gap-1.5">
@@ -147,7 +147,7 @@ function OfferRowCard({ o, onEdit }: { o: AdminOffer; onEdit: () => void }) {
               {o.code} <Copy className="w-3.5 h-3.5 opacity-60" />
             </button>
             <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full font-semibold ${st.cls}`}>{st.text}</span>
-            {o.auto_apply && <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300">auto-applies</span>}
+            {o.auto_apply && <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-violet-500/15 text-primary">auto-applies</span>}
             {o.show_banner && <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300">banner</span>}
             {!!o.flash_minutes && (
               <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300">
@@ -236,7 +236,7 @@ function OfferEditor({ initial, onClose }: { initial: Form; onClose: () => void 
     } finally { setBusy(false); }
   }
 
-  const input = "w-full text-sm bg-black/30 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-orange-500/60";
+  const input = "w-full text-sm bg-black/30 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-orange-500/60";
   const label = "text-xs text-muted-foreground block mb-1";
 
   return (
@@ -291,7 +291,7 @@ function OfferEditor({ initial, onClose }: { initial: Form; onClose: () => void 
         </div>
 
         {showAutopay && (
-          <div className="rounded-xl border border-white/10 p-4 space-y-3">
+          <div className="rounded-xl border border-border p-4 space-y-3">
             <div className="text-sm font-semibold">Auto-renew plans</div>
             <div className="grid sm:grid-cols-2 gap-3">
               <div><label className={label}>Discount lasts</label>
@@ -341,7 +341,7 @@ function OfferEditor({ initial, onClose }: { initial: Form; onClose: () => void 
           )}
         </div>
 
-        <div className="rounded-xl border border-white/10 p-4 space-y-3">
+        <div className="rounded-xl border border-border p-4 space-y-3">
           <Check label="Flash timer — each visitor gets their own countdown" value={f.flashOn} onChange={(v) => set("flashOn", v)} />
           {f.flashOn && (
             <>

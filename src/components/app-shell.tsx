@@ -312,7 +312,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <n.icon className={`w-4 h-4 shrink-0 transition-transform duration-200 ${!active ? "group-hover:scale-110" : ""}`} />
         {!collapsed && <span className={`flex-1 truncate ${!lock.allowed ? "opacity-60" : ""}`}>{n.label}</span>}
         {!collapsed && n.soon && (
-          <span className="ml-auto text-[9px] uppercase tracking-wide font-semibold rounded-full px-1.5 py-0.5 bg-violet-500/15 text-violet-200">Soon</span>
+          <span className="ml-auto text-[9px] uppercase tracking-wide font-semibold rounded-full px-1.5 py-0.5 bg-white/[0.06] text-muted-foreground">Soon</span>
         )}
         {!lock.allowed && (collapsed ? (
           <Lock className="absolute top-1 right-1 w-2.5 h-2.5 text-muted-foreground" aria-label="Locked" />

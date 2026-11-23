@@ -26,7 +26,7 @@ export function AssetActions({
           key={id}
           onClick={() => onAction(id)}
           disabled={disabled[id]}
-          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-white/10 hover:border-primary/50 disabled:opacity-40"
+          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-border hover:border-primary/50 disabled:opacity-40"
         >
           <Icon className="w-3.5 h-3.5" /> {label}
         </button>

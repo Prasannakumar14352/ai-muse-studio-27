@@ -102,13 +102,13 @@ function ConnectionsPage() {
               : "Every Page / Instagram business account you allow during login is added.";
 
           return (
-            <div key={id} className="glass rounded-2xl p-5 border border-white/10 space-y-3">
+            <div key={id} className="glass rounded-2xl p-5 border border-border space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center"><Icon className="w-5 h-5" /></div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold flex items-center gap-2">
                     {label}
-                    {comingSoon && <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-200 border border-violet-400/20">Coming soon</span>}
+                    {comingSoon && <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/[0.06] text-muted-foreground border border-border">Coming soon</span>}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {comingSoon
@@ -124,7 +124,7 @@ function ConnectionsPage() {
                   onClick={() => handleConnect(id)}
                   disabled={!canConnect || atLimit || starting === id}
                   title={!configured ? "OAuth credentials have not been configured by the administrator." : !enabled ? "This provider is currently disabled by the administrator." : atLimit ? "Plan limit reached — disconnect one or upgrade." : ""}
-                  className={`rounded-lg px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${accounts.length ? "bg-white/5 hover:bg-white/10 border border-white/10" : "gradient-primary text-white"}`}
+                  className={`rounded-lg px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${accounts.length ? "bg-white/5 hover:bg-white/10 border border-border" : "gradient-primary text-white"}`}
                 >
                   {starting === id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : accounts.length ? <Plus className="w-3.5 h-3.5" /> : <Plug className="w-3.5 h-3.5" />}
                   {accounts.length ? "Add account" : "Connect"}
@@ -160,7 +160,7 @@ function ConnectionsPage() {
                         </div>
                         {bad && (
                           <button onClick={() => handleConnect(id)} disabled={!canConnect || starting === id} title="Reconnect"
-                            className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 p-1.5 disabled:opacity-40">
+                            className="rounded-lg bg-white/5 hover:bg-white/10 border border-border p-1.5 disabled:opacity-40">
                             <RefreshCw className="w-3.5 h-3.5" />
                           </button>
                         )}
@@ -180,7 +180,7 @@ function ConnectionsPage() {
                             qc.invalidateQueries({ queryKey: ["publish-targets"] });
                             toast.success("Disconnected");
                           }}
-                          className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 p-1.5">
+                          className="rounded-lg bg-white/5 hover:bg-white/10 border border-border p-1.5">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </li>
@@ -195,7 +195,7 @@ function ConnectionsPage() {
         })}
       </section>
 
-      <section className="glass rounded-2xl p-5 border border-white/10">
+      <section className="glass rounded-2xl p-5 border border-border">
         <div className="flex items-center gap-2 mb-3">
           <Clock className="w-4 h-4" />
           <h2 className="font-semibold">Scheduled &amp; recent</h2>
@@ -221,12 +221,12 @@ function ConnectionsPage() {
                 )}
                 <button
                   onClick={async () => { await retry({ data: { id: p.id as string } }); qc.invalidateQueries({ queryKey: ["scheduled_posts"] }); toast.success("Re-queued"); }}
-                  className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1 text-xs flex items-center gap-1">
+                  className="rounded-lg bg-white/5 hover:bg-white/10 border border-border px-2 py-1 text-xs flex items-center gap-1">
                   <RefreshCw className="w-3 h-3" /> Retry
                 </button>
                 <button
                   onClick={async () => { await cancel({ data: { id: p.id as string } }); qc.invalidateQueries({ queryKey: ["scheduled_posts"] }); toast.success("Removed"); }}
-                  className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1 text-xs flex items-center gap-1">
+                  className="rounded-lg bg-white/5 hover:bg-white/10 border border-border px-2 py-1 text-xs flex items-center gap-1">
                   <Trash2 className="w-3 h-3" /> Remove
                 </button>
               </div>

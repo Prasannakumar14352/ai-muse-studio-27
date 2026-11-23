@@ -38,7 +38,7 @@ const CONFIG: Record<
     label: "Coming soon",
     short: "Coming soon",
     icon: Clock,
-    classes: "bg-violet-500/10 text-violet-300 border-violet-500/30",
+    classes: "bg-violet-500/10 text-primary border-violet-500/30",
     ariaLabel: "Coming soon",
   },
   not_available: {
@@ -52,7 +52,7 @@ const CONFIG: Record<
     label: "Not core",
     short: "Not core",
     icon: CircleDot,
-    classes: "bg-white/5 text-muted-foreground border-white/10",
+    classes: "bg-white/5 text-muted-foreground border-border",
     ariaLabel: "Not a core feature",
   },
 };

@@ -27,7 +27,7 @@ export function ResearchReportView({ findings }: { findings: ResearchFindings })
           {findings.googleTrends?.relatedTopics?.length ? (
             <div className="mt-3 flex flex-wrap gap-1">
               {findings.googleTrends.relatedTopics.map((t, i) => (
-                <span key={i} className="text-[10px] px-2 py-0.5 rounded-full border border-white/10 text-muted-foreground">{t}</span>
+                <span key={i} className="text-[10px] px-2 py-0.5 rounded-full border border-border text-muted-foreground">{t}</span>
               ))}
             </div>
           ) : null}
@@ -98,7 +98,7 @@ function sentimentClass(s: string) {
 
 function SourceCard({ icon, title, tagline, children }: { icon: React.ReactNode; title: string; tagline?: string; children: React.ReactNode }) {
   return (
-    <div className="glass rounded-2xl p-5 border border-white/10">
+    <div className="glass rounded-2xl p-5 border border-border">
       <div className="flex items-center gap-2 mb-1 text-sm font-semibold">
         <span className="text-primary">{icon}</span>{title}
       </div>
@@ -111,7 +111,7 @@ function SourceCard({ icon, title, tagline, children }: { icon: React.ReactNode;
 
 function Card({ icon, title, items, accent }: { icon: React.ReactNode; title: string; items?: string[]; accent?: boolean }) {
   return (
-    <div className="glass rounded-2xl p-5 border border-white/10">
+    <div className="glass rounded-2xl p-5 border border-border">
       <div className="flex items-center gap-2 mb-3 text-sm font-semibold">
         <span className="text-primary">{icon}</span>{title}
       </div>

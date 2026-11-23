@@ -119,7 +119,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
     <button
       onClick={onClick}
       className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition ${
-        active ? "gradient-primary text-white border-transparent" : "border-border/60 hover:border-white/20 text-muted-foreground hover:text-foreground"
+        active ? "gradient-primary text-white border-transparent" : "border-border/60 hover:border-primary/40 text-muted-foreground hover:text-foreground"
       }`}
     >
       {children}
@@ -155,7 +155,7 @@ function TemplateCard({ t, userTier }: { t: TemplateRecord; userTier: ReturnType
               ? "bg-sky-500/25 text-sky-200"
               : t.access_tier === "creator"
                 ? "bg-[color:var(--brand-orange)]/25 text-[color:var(--brand-orange)]"
-                : "bg-purple-500/25 text-purple-200"
+                : "bg-pink-500/25 text-pink-200"
         }`}>
           {t.access_tier}
         </span>

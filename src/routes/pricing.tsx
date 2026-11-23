@@ -196,7 +196,7 @@ function PricingCard({
         "bg-[color:var(--card)]/40 backdrop-blur-md border transition-all duration-300",
         recommended
           ? "border-[color:var(--brand-orange)]/50 shadow-[0_20px_60px_-20px_rgba(255,107,53,0.35)] bg-gradient-to-b from-[color:var(--brand-orange)]/10 to-transparent"
-          : "border-border/60 hover:border-white/20",
+          : "border-border/60 hover:border-primary/40",
         "hover:-translate-y-1 hover:shadow-[0_20px_50px_-20px_rgba(0,0,0,0.7)]",
       ].join(" ")}
     >

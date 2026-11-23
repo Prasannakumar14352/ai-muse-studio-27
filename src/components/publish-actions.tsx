@@ -262,14 +262,14 @@ export function PublishDialog({
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4"
       onClick={(e) => { e.stopPropagation(); if (!busy) onClose(); }}
       onKeyDown={stop} onPointerDown={stop}>
-      <div className="glass rounded-2xl max-w-lg w-full max-h-[92vh] overflow-auto p-6 space-y-5 border border-white/10 bg-[oklch(0.14_0.012_40)]"
+      <div className="glass rounded-2xl max-w-lg w-full max-h-[92vh] overflow-auto p-6 space-y-5 border border-border bg-[oklch(0.14_0.012_40)]"
         onClick={stop}>
         <div className="flex items-start justify-between gap-3">
           <h3 className="text-lg font-semibold line-clamp-2">Publish "{content.title}"</h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close"><X className="w-4 h-4" /></button>
         </div>
 
-        <div className="rounded-xl border border-white/10 p-3 space-y-3">
+        <div className="rounded-xl border border-border p-3 space-y-3">
           <div className="flex items-center justify-between">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Post to</div>
             <div className={`text-xs ${selected.length ? "text-muted-foreground" : "text-amber-300"}`}>
@@ -304,7 +304,7 @@ export function PublishDialog({
                             <button key={t.id} disabled={!t.usable} onClick={() => toggle(t.id, t.platform)}
                               role="checkbox" aria-checked={on}
                               title={t.usable ? "" : "Session expired — reconnect in Connected Accounts"}
-                              className={`pl-1.5 pr-3 py-1 rounded-full text-xs border inline-flex items-center gap-1.5 disabled:opacity-40 ${on ? "border-orange-500/70 bg-orange-500/15 text-white" : "border-white/10 hover:bg-white/5"}`}>
+                              className={`pl-1.5 pr-3 py-1 rounded-full text-xs border inline-flex items-center gap-1.5 disabled:opacity-40 ${on ? "border-orange-500/70 bg-orange-500/15 text-white" : "border-border hover:bg-white/5"}`}>
                               <span className={`w-4 h-4 rounded-[5px] border inline-flex items-center justify-center shrink-0 ${on ? "gradient-primary border-transparent" : "border-white/30"}`}>
                                 {on && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                               </span>
@@ -322,7 +322,7 @@ export function PublishDialog({
             </div>
           )}
           {!isHiddenPath("/connections") && (
-            <Link to="/connections" search={{ ok: undefined, err: undefined }} className="text-xs text-[color:var(--neon-purple)] hover:underline inline-flex items-center gap-1">
+            <Link to="/connections" search={{ ok: undefined, err: undefined }} className="text-xs text-primary hover:underline inline-flex items-center gap-1">
               Manage connected accounts <ExternalLink className="w-3 h-3" />
             </Link>
           )}
@@ -334,7 +334,7 @@ export function PublishDialog({
             <div className="flex gap-1">
               {shownPlatforms.map((p) => (
                 <button key={p} onClick={() => setFocus(p)}
-                  className={`px-2 py-0.5 rounded-full text-[11px] capitalize border ${focus === p ? "border-orange-500/70 text-white" : "border-white/10 text-muted-foreground hover:text-foreground"}`}>
+                  className={`px-2 py-0.5 rounded-full text-[11px] capitalize border ${focus === p ? "border-orange-500/70 text-white" : "border-border text-muted-foreground hover:text-foreground"}`}>
                   {p}
                 </button>
               ))}
@@ -345,7 +345,7 @@ export function PublishDialog({
             onChange={(e) => setEdited((cur) => ({ ...cur, [focus]: e.target.value }))}
             placeholder={`Write the ${focus} caption…`}
             rows={5}
-            className="w-full text-sm bg-black/30 border border-white/10 rounded-lg p-3 resize-y focus:outline-none focus:border-orange-500/60"
+            className="w-full text-sm bg-black/30 border border-border rounded-lg p-3 resize-y focus:outline-none focus:border-orange-500/60"
           />
           <div className="text-[11px] text-muted-foreground mt-1">Each platform keeps its own caption. Hashtags can go at the end.</div>
         </div>
@@ -359,7 +359,7 @@ export function PublishDialog({
             </button>
             {content.projectId && (
               <button onClick={handleMarkPublished} disabled={busy !== null}
-                className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-60">
+                className="rounded-lg bg-white/5 hover:bg-white/10 border border-border px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-60">
                 {busy === "manual" ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 Mark as manually published
               </button>
@@ -371,7 +371,7 @@ export function PublishDialog({
               min={new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16)}
               className="bg-input/60 border border-border rounded-lg px-2 py-1.5 text-sm" />
             <button onClick={() => runAll("schedule")} disabled={busy !== null || !scheduleAt || !canPublish}
-              className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-60">
+              className="rounded-lg bg-white/5 hover:bg-white/10 border border-border px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-60">
               {busy === "schedule" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
               Schedule
             </button>
@@ -400,7 +400,7 @@ export function PublishButton({
     <>
       <button
         onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-        className={className ?? "rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5"}
+        className={className ?? "rounded-lg bg-white/5 hover:bg-white/10 border border-border px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5"}
       >
         <Send className="w-3.5 h-3.5" /> {label}
       </button>
@@ -474,36 +474,36 @@ export function PublishActions(props: PublishActionsProps) {
 
       <button
         onClick={() => setOpen(true)}
-        className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-sm font-medium flex items-center gap-1.5"
+        className="rounded-lg bg-white/5 hover:bg-white/10 border border-border px-3 py-1.5 text-sm font-medium flex items-center gap-1.5"
       >
         <Send className="w-3.5 h-3.5" /> Publish
       </button>
 
       {props.caption && (
         <button onClick={() => copyText(props.caption!, "Caption copied")}
-          className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-sm flex items-center gap-1.5">
+          className="rounded-lg bg-white/5 hover:bg-white/10 border border-border px-3 py-1.5 text-sm flex items-center gap-1.5">
           <Copy className="w-3.5 h-3.5" /> Caption
         </button>
       )}
       {props.hashtags && (
         <button onClick={() => copyText(props.hashtags!, "Hashtags copied")}
-          className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-sm flex items-center gap-1.5">
+          className="rounded-lg bg-white/5 hover:bg-white/10 border border-border px-3 py-1.5 text-sm flex items-center gap-1.5">
           <Copy className="w-3.5 h-3.5" /> Hashtags
         </button>
       )}
       {props.caption && (
         <button onClick={handleCopyLinkedIn}
-          className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-sm flex items-center gap-1.5">
+          className="rounded-lg bg-white/5 hover:bg-white/10 border border-border px-3 py-1.5 text-sm flex items-center gap-1.5">
           <Share2 className="w-3.5 h-3.5" /> LinkedIn text
         </button>
       )}
       {props.onEdit && (
         <button onClick={props.onEdit}
-          className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-sm">Edit</button>
+          className="rounded-lg bg-white/5 hover:bg-white/10 border border-border px-3 py-1.5 text-sm">Edit</button>
       )}
       {props.onDuplicate && (
         <button onClick={props.onDuplicate}
-          className="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-sm">Duplicate</button>
+          className="rounded-lg bg-white/5 hover:bg-white/10 border border-border px-3 py-1.5 text-sm">Duplicate</button>
       )}
 
       <PublishDialog open={open} onClose={() => setOpen(false)} content={props} />

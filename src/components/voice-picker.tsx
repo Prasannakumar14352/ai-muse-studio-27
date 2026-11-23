@@ -54,7 +54,7 @@ export function VoicePicker({ value, onChange, language }: {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="inline-flex rounded-lg border border-white/10 p-0.5 bg-black/20" role="tablist" aria-label="Voice type">
+        <div className="inline-flex rounded-lg border border-border p-0.5 bg-black/20" role="tablist" aria-label="Voice type">
           {(["male", "female"] as const).map((g) => (
             <button key={g} type="button" role="tab" aria-selected={gender === g} onClick={() => setGender(g)}
               className={`px-3 py-1.5 rounded-md text-sm ${gender === g ? "gradient-primary text-white" : "text-muted-foreground hover:text-foreground"}`}>
@@ -69,7 +69,7 @@ export function VoicePicker({ value, onChange, language }: {
           const isSel = selected === v.id;
           return (
             <div key={v.id}
-              className={`rounded-xl border p-2.5 flex items-center gap-2 transition ${isSel ? "border-orange-400/60 bg-orange-500/10" : "glass border-border hover:border-white/20"}`}>
+              className={`rounded-xl border p-2.5 flex items-center gap-2 transition ${isSel ? "border-orange-400/60 bg-orange-500/10" : "glass border-border hover:border-primary/40"}`}>
               <button type="button" onClick={() => preview(v.id)} aria-label={`Play ${v.label} sample`}
                 className="w-8 h-8 shrink-0 rounded-full gradient-primary text-white flex items-center justify-center">
                 {loading === v.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

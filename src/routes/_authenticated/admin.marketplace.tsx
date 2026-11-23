@@ -26,13 +26,13 @@ function AdminMarketplace() {
   });
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <h1 className="text-3xl font-bold">Marketplace CMS</h1>
+    <div className="max-w-6xl space-y-6">
+      <h1 className="text-3xl md:text-4xl font-bold">Marketplace CMS</h1>
 
       <div className="grid lg:grid-cols-[1fr_360px] gap-6">
         <div className="space-y-2">
           {items?.map((it) => (
-            <div key={it.id} className="glass rounded-xl p-4 border border-white/10 flex items-center justify-between">
+            <div key={it.id} className="glass rounded-xl p-4 border border-border flex items-center justify-between">
               <button onClick={() => setEditing(it)} className="text-left">
                 <div className="font-medium">{it.title}</div>
                 <div className="text-xs text-muted-foreground">{it.kind} · {it.slug} · {it.active ? "active" : "inactive"}</div>
@@ -45,7 +45,7 @@ function AdminMarketplace() {
           ))}
         </div>
 
-        <div className="glass rounded-2xl p-5 border border-white/10 space-y-3 h-fit sticky top-6">
+        <div className="glass rounded-2xl p-5 border border-border space-y-3 h-fit sticky top-20">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">{editing.id ? "Edit item" : "New item"}</h3>
             <button onClick={() => setEditing(empty)} className="text-xs text-muted-foreground"><Plus className="w-3.5 h-3.5 inline" /> New</button>

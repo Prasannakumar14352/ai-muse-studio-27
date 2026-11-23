@@ -29,16 +29,16 @@ function MarketplacePage() {
   const filtered = items?.filter((i) => kind === "all" || i.kind === kind) ?? [];
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="max-w-6xl space-y-6">
       <header>
-        <h1 className="text-3xl font-bold flex items-center gap-2"><Store className="w-7 h-7 text-primary" /> Marketplace</h1>
+        <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-2"><Store className="w-7 h-7 text-primary" /> Marketplace</h1>
         <p className="text-sm text-muted-foreground mt-1">Prompt packs, templates, brand kits and more. Install once, use anywhere.</p>
       </header>
 
       <div className="flex flex-wrap gap-2">
         {KINDS.map((k) => (
           <button key={k.id} onClick={() => setKind(k.id)}
-            className={`px-3 py-1.5 rounded-full text-sm border ${kind === k.id ? "bg-primary text-primary-foreground border-primary" : "border-white/15 hover:border-white/30"}`}>
+            className={`px-3 py-1.5 rounded-full text-sm border ${kind === k.id ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/40"}`}>
             {k.label}
           </button>
         ))}
