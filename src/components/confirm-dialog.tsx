@@ -8,6 +8,7 @@
 // Requires <ConfirmDialogHost /> to be mounted once at the app shell.
 
 import { useEffect, useState } from "react";
+import { AlertTriangle, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,8 +73,11 @@ export function ConfirmDialogHost() {
       }}
     >
       <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{pending?.title}</AlertDialogTitle>
+        <AlertDialogHeader className="gap-3">
+          <div className={`grid h-12 w-12 place-items-center rounded-full ${tone === "destructive" ? "bg-rose-500/15 text-rose-400" : "bg-primary/15 text-primary"}`}>
+            {tone === "destructive" ? <Trash2 className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+          </div>
+          <AlertDialogTitle className="text-xl">{pending?.title}</AlertDialogTitle>
           {pending?.description && (
             <AlertDialogDescription>{pending.description}</AlertDialogDescription>
           )}
@@ -91,7 +95,7 @@ export function ConfirmDialogHost() {
             data-testid="confirm-dialog-confirm"
             className={
               tone === "destructive"
-                ? "bg-rose-600 hover:bg-rose-700 text-white"
+                ? "bg-none! bg-rose-500! hover:bg-rose-600! text-white shadow-none!"
                 : undefined
             }
             onClick={() => {

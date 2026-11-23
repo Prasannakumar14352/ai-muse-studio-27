@@ -4,6 +4,8 @@
 // and mirrors the wizard state in sessionStorage for refresh survival.
 
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { celebrate } from "@/components/celebrate";
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -180,8 +182,14 @@ function PromoVideosPage() {
     toast.success("CreatorFlow AI preset loaded — feel free to edit");
   };
 
-  const resetAll = () => {
-    if (!confirm("Discard this promo and start over?")) return;
+  const resetAll = async () => {
+    const ok = await confirmDialog({
+      title: "Discard this promo?",
+      description: "Your brief, plan and photos for this promo will be cleared so you can start over.",
+      confirmText: "Discard",
+      tone: "destructive",
+    });
+    if (!ok) return;
     setDraft(newDraft());
     sessionStorage.removeItem(DRAFT_KEY);
   };
@@ -391,7 +399,13 @@ function PromoVideosPage() {
     if (pErr) throw pErr;
 
     setDraft((d) => ({ ...d, videoUrl, projectId: project.id, step: 4 }));
-    toast.success("Promo video ready");
+    celebrate({
+      title: "Your promo video is ready!",
+      subtitle: `${draft.brief.productName || "Your promo"} · saved to Projects.`,
+      videoUrl,
+      downloadName: `${(plan.title || "promo").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.mp4`,
+      primaryLabel: "See my promo",
+    });
   };
 
   const cancelRender = () => { abortRef.current?.abort(); };

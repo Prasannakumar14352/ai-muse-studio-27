@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { celebrate } from "@/components/celebrate";
+import { confirmDialog } from "@/components/confirm-dialog";
 import { resolveContentLanguage } from "@/lib/content-language";
 import { estimateProjectCredits } from "@/lib/credit-costs";
 import { creditsLabel } from "@/lib/credits-label";
@@ -83,6 +85,9 @@ export const Route = createFileRoute("/_authenticated/videos")({
       { property: "og:description", content: "Generate a ready-to-post video from a single idea." },
     ],
   }),
+  // ?new=script|idea (from the Create menu / welcome) opens the form straight away.
+  validateSearch: (s: Record<string, unknown>): { new?: "script" | "idea" } =>
+    s.new === "script" || s.new === "idea" ? { new: s.new } : {},
   component: VideosPage,
 });
 
@@ -295,6 +300,16 @@ const initialDash: DashState = {
 
 function VideosPage() {
   const [view, setView] = useState<View>("landing");
+  const { new: startNew } = Route.useSearch();
+  const navigateSelf = Route.useNavigate();
+  const [startMode, setStartMode] = useState<"idea" | "script" | undefined>(undefined);
+  useEffect(() => {
+    if (!startNew) return;
+    setStartMode(startNew);
+    setView("input");
+    // Drop the param so choosing the same option again from the Create menu still works.
+    void navigateSelf({ search: {}, replace: true });
+  }, [startNew, navigateSelf]);
   // Research hands off as "video" (long) or "short" (reel) — accept both.
   const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("video") ?? consumeResearchPrefill("short"));
   useEffect(() => {
@@ -460,6 +475,12 @@ function VideosPage() {
       setResult(r);
       setAssetsBundle(null);
       setView("result");
+      celebrate({
+        title: "Your video is ready!",
+        subtitle: `${gen.brief.title} · ${Math.round(r.render.duration_sec)}s · download it or schedule it below.`,
+        thumbnailUrl: r.thumbnail.url,
+        primaryLabel: "See my video",
+      });
       await refreshInProgress();
 
       try {
@@ -596,6 +617,13 @@ function VideosPage() {
   }
 
   async function removeFromLibrary(id: string) {
+    const ok = await confirmDialog({
+      title: "Delete this video?",
+      description: "It will be removed from this device's library for good. Credits already spent are not refunded.",
+      confirmText: "Delete video",
+      tone: "destructive",
+    });
+    if (!ok) return;
     await deleteGeneratedVideo(id);
     if (libraryOpen?.meta.id === id) {
       URL.revokeObjectURL(libraryOpen.videoUrl);
@@ -708,9 +736,11 @@ function VideosPage() {
           </div>
           <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
           <InputScreen
+            key={startMode ?? "default"}
             onGenerate={start}
             initialTopic={handoff?.titles?.[0] || handoff?.topic}
             initialRatio={handoff?.aspectRatio as AspectRatio | undefined}
+            initialMode={startMode}
             initialVideoType={handoffVideoType(handoff)}
             initialDuration={handoffDuration(handoff)}
             autogen={handoff?.autogen}
@@ -794,7 +824,8 @@ function handoffDuration(h: ResearchPrefill | null): DurationSec | undefined {
   return options.reduce((best, d) => (Math.abs(d - h.duration!) < Math.abs(best - h.duration!) ? d : best), options[0]);
 }
 
-function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType, initialDuration, autogen }: {
+function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType, initialDuration, autogen, initialMode }: {
+  initialMode?: "idea" | "script";
   onGenerate: (args: GenerateArgs) => void;
   initialTopic?: string;
   initialRatio?: AspectRatio;
@@ -817,7 +848,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
   const [motionMode, setMotionMode] = useState<MotionMode>("off");
   const [motionTier, setMotionTier] = useState<MotionTier>("standard");
   // "idea" = AI researches and writes the script; "script" = the creator's own script, word for word.
-  const [mode, setMode] = useState<"idea" | "script">("idea");
+  const [mode, setMode] = useState<"idea" | "script">(initialMode ?? "idea");
   const [script, setScript] = useState("");
   const [scriptTitle, setScriptTitle] = useState("");
   const scriptLang = resolveContentLanguage(language, script);

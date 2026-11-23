@@ -1,4 +1,5 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -177,7 +178,7 @@ function OfferRowCard({ o, onEdit }: { o: AdminOffer; onEdit: () => void }) {
         }} className="rounded-lg glass border border-border px-3 py-1.5 text-sm">{o.active ? "Switch off" : "Switch on"}</button>
         {!!o.flash_minutes && (
           <button disabled={busy} onClick={async () => {
-            if (!window.confirm(`Give every visitor a fresh ${o.flash_minutes}-minute window for ${o.code}, starting now?`)) return;
+            if (!(await confirmDialog({ title: "Restart the timer for everyone?", description: `Every visitor gets a fresh ${o.flash_minutes}-minute window for ${o.code}, starting now. Use this for a real new offer window.`, confirmText: "Restart now" }))) return;
             setBusy(true);
             try { await restart({ data: { id: o.id } }); toast.success("Flash timer restarted for everyone"); refresh(); }
             catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } finally { setBusy(false); }

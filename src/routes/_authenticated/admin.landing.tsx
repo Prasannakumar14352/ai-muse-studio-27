@@ -1,4 +1,5 @@
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
+import { confirmDialog } from "@/components/confirm-dialog";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -134,7 +135,7 @@ function AdminLanding() {
         rows={showcase}
         isLoading={isLoading}
         onSave={(d) => upsertMut.mutateAsync(d)}
-        onDelete={(id) => confirm("Remove this video from the showcase?") && deleteMut.mutate(id)}
+        onDelete={(id) => { void confirmDialog({ title: "Remove this video from the showcase?", confirmText: "Delete", tone: "destructive" }).then((ok) => { if (ok) deleteMut.mutate(id); }); }}
         onReorder={(items) => orderMut.mutate(items)}
         onPreview={setPreviewUrl}
       />
@@ -146,7 +147,7 @@ function AdminLanding() {
         isLoading={isLoading}
         onNew={() => setEditing({ ...EMPTY_TESTIMONIAL, display_order: testimonials.length })}
         onEdit={(r) => setEditing(r)}
-        onDelete={(id) => confirm("Delete this review?") && deleteMut.mutate(id)}
+        onDelete={(id) => { void confirmDialog({ title: "Delete this review?", confirmText: "Delete", tone: "destructive" }).then((ok) => { if (ok) deleteMut.mutate(id); }); }}
         onPublishToggle={(r) => upsertMut.mutate({ ...r, status: r.status === "published" ? "draft" : "published" })}
         onMove={(id, dir) => move(testimonials, id, dir)}
         onPreview={setPreviewUrl}
@@ -161,7 +162,7 @@ function AdminLanding() {
         isLoading={isLoading}
         onNew={() => setEditing({ ...EMPTY_WALKTHROUGH, display_order: walkthroughs.length })}
         onEdit={(r) => setEditing(r)}
-        onDelete={(id) => confirm("Delete this walkthrough clip?") && deleteMut.mutate(id)}
+        onDelete={(id) => { void confirmDialog({ title: "Delete this walkthrough clip?", confirmText: "Delete", tone: "destructive" }).then((ok) => { if (ok) deleteMut.mutate(id); }); }}
         onPublishToggle={(r) => upsertMut.mutate({ ...r, status: r.status === "published" ? "draft" : "published" })}
         onMove={(id, dir) => move(walkthroughs, id, dir)}
         onPreview={setPreviewUrl}
@@ -175,7 +176,7 @@ function AdminLanding() {
         isLoading={isLoading}
         onNew={() => setEditing({ ...EMPTY_DEMO, display_order: demos.length })}
         onEdit={(r) => setEditing(r)}
-        onDelete={(id) => confirm("Delete this demo entry?") && deleteMut.mutate(id)}
+        onDelete={(id) => { void confirmDialog({ title: "Delete this demo entry?", confirmText: "Delete", tone: "destructive" }).then((ok) => { if (ok) deleteMut.mutate(id); }); }}
         onPublishToggle={(r) => upsertMut.mutate({ ...r, status: r.status === "published" ? "draft" : "published" })}
         onMove={(id, dir) => move(demos, id, dir)}
         onPreview={setPreviewUrl}

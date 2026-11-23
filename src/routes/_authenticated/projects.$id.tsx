@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { celebrate } from "@/components/celebrate";
 import { convertRenderToMp4 } from "@/lib/transcode-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -847,7 +848,12 @@ function VideoPreview({
     await persistDiagnostics(next);
     setAutoRetryUsed(false);
     qc.invalidateQueries({ queryKey: ["project", projectId] });
-    toast.success(`Rendered ${durationSec.toFixed(1)}s ${extension.toUpperCase()} — saved to your library.`);
+    celebrate({
+      title: "Your video is ready!",
+      subtitle: `${durationSec.toFixed(1)}s ${extension.toUpperCase()} · saved to your library.`,
+      videoUrl: url,
+      downloadName: `video.${extension}`,
+    });
   }
 
   // Prefer the user's edits (already saved) over the underlying scenes prop.

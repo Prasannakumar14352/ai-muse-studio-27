@@ -112,7 +112,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <Outlet />
       <SiteTranslateGuard />
-      <Toaster theme="dark" richColors position="top-right" />
+      <Toaster theme="dark" position="top-right" closeButton />
     </QueryClientProvider>
   );
 }

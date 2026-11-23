@@ -26,6 +26,9 @@ import { getSupportChat } from "@/lib/support-chat.functions";
 import { isHiddenPath, CONNECTIONS_PATH } from "@/lib/hidden-features";
 import { useSocialPublishingAvailable } from "@/lib/use-social-publishing";
 import { PromptDialogHost } from "@/components/prompt-dialog";
+import { CelebrateHost } from "@/components/celebrate";
+import { CreateMenuHost, openCreateMenu } from "@/components/create-menu";
+import { WelcomeDialog } from "@/components/welcome-dialog";
 
 // Map a project's `content_type` to the top-level sidebar tab that should
 // show the "active" highlight while the user is editing that project at
@@ -533,12 +536,13 @@ export function AppShell({ children }: { children: ReactNode }) {
               <kbd className="rounded border border-border/70 bg-white/[0.04] px-1.5 py-0.5">K</kbd>
             </span>
           </button>
-          <Link
-            to="/create"
+          <button
+            type="button"
+            onClick={openCreateMenu}
             className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white gradient-primary shadow-[var(--shadow-glow)] hover:brightness-110 transition"
           >
             <Plus className="w-4 h-4" /> Create
-          </Link>
+          </button>
           <NotificationsMenu />
           <CreditsChip />
           <ProfileMenu onSignOut={signOut} />
@@ -548,6 +552,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       </main>
       <MobileTabBar isActive={isActive} onMore={() => setOpen(true)} />
       <ConfirmDialogHost />
+      <CelebrateHost />
+      <CreateMenuHost />
+      <WelcomeDialog projectCount={counts ? Object.values(counts).reduce((a, b) => a + b, 0) : null} />
       <PromptDialogHost />
       <CommandPalette />
     </div>
@@ -771,9 +778,9 @@ function MobileTabBar({ isActive, onMore }: { isActive: (to: string) => boolean;
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 flex items-start justify-around border-t border-border bg-[#14141D]/95 backdrop-blur-xl px-2 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       {tabs.map(item)}
-      <Link to="/create" aria-label="Create" className="-mt-6 grid h-12 w-12 place-items-center rounded-full gradient-primary text-white shadow-[var(--shadow-glow)]">
+      <button type="button" onClick={openCreateMenu} aria-label="Create" className="-mt-6 grid h-12 w-12 place-items-center rounded-full gradient-primary text-white shadow-[var(--shadow-glow)]">
         <Plus className="w-6 h-6" />
-      </Link>
+      </button>
       {right.map(item)}
       <button type="button" onClick={onMore} className="flex flex-col items-center gap-0.5 min-w-[56px] text-[10px] font-medium text-muted-foreground">
         <Menu className="w-5 h-5" />

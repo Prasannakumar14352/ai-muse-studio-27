@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { reserveCreditsFn, finalizeCreditsFn, refundLedgerFn } from "@/lib/credits-guard.functions";
 import type { ReserveResult } from "@/lib/credits-guard.functions";
-import { useAccess } from "@/lib/access";
+import { useAccess, canGenerate } from "@/lib/access";
 import { InsufficientCreditsDialog } from "@/components/insufficient-credits-dialog";
 import type { CreditAction } from "@/lib/credit-estimator";
 
@@ -66,6 +66,24 @@ export function useCreditGuard() {
       setPending((s) => new Set(s).add(key));
       let ledgerId: string | null = null;
       try {
+        // Check the balance first so the user sees "not enough credits" before
+        // anything starts. Re-read the balance once in case they just topped up.
+        if (!canGenerate(access, spec.amount)) {
+          const fresh = (await refetch()).data;
+          if (fresh && !canGenerate(fresh, spec.amount)) {
+            const available = Math.max(0, fresh.monthlyRemaining + fresh.balance + fresh.lifetimeCredits);
+            setInsufficient({
+              required: spec.amount,
+              available,
+              shortage: Math.max(1, spec.amount - available),
+              planType: fresh.planType ?? "free",
+              isPaid: fresh.planType !== "free",
+            });
+            const err = new Error("Insufficient credits");
+            (err as { code?: string }).code = "insufficient_credits";
+            throw err;
+          }
+        }
         const res = (await reserve({
           data: {
             amount: spec.amount,

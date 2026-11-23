@@ -2,6 +2,7 @@
 // Renders the current blueprint from projects.metadata, autosaves edits,
 // and exposes render actions with credit estimates + pre-render validation.
 
+import { confirmDialog } from "@/components/confirm-dialog";
 import { VOICE_CATALOG } from "@/lib/voice-catalog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { creditsLabel } from "@/lib/credits-label";
@@ -227,7 +228,7 @@ export function VideoBlueprintEditor({
   };
 
   const restoreOriginal = async () => {
-    if (!confirm("Restore original AI blueprint? Your edits will be saved as a version you can access from history.")) return;
+    if (!(await confirmDialog({ title: "Restore the original AI blueprint?", description: "Your edits are saved as a version you can open from History.", confirmText: "Restore" }))) return;
     const restored = await restoreOriginalBlueprint(projectId);
     if (restored) {
       setMeta(restored);
