@@ -18,6 +18,7 @@ import { ComparisonSection } from "@/components/comparison/ComparisonSection";
 import { EXTRA_FAQ } from "@/lib/landing-content";
 import { ComingSoonToolsSection } from "@/components/coming-soon-tools-section";
 import { BusinessPromoSection } from "@/components/business-promo-section";
+import { ShowcaseSection } from "@/components/showcase-section";
 import { SiteLanguageSwitcher } from "@/components/site-language-switcher";
 
 
@@ -104,6 +105,9 @@ function Landing() {
 
       {/* Demo Video */}
       <DemoVideoSection />
+
+      {/* Real videos made in the app, with their prompts (Admin → Landing) */}
+      <ShowcaseSection />
 
 
 

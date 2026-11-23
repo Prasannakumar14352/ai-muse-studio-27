@@ -7,6 +7,7 @@ import {
   Play, AlertCircle, Loader2,
 } from "lucide-react";
 import { useAccess } from "@/lib/access";
+import { ShowcaseManager } from "@/components/admin/showcase-manager";
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 import {
   listAllLandingMedia, upsertLandingMedia, deleteLandingMedia, setLandingMediaOrder,
@@ -86,6 +87,7 @@ function AdminLanding() {
   const testimonials = useMemo(() => (rows ?? []).filter((r) => r.kind === "testimonial"), [rows]);
   const demos = useMemo(() => (rows ?? []).filter((r) => r.kind === "demo"), [rows]);
   const walkthroughs = useMemo(() => (rows ?? []).filter((r) => r.kind === "walkthrough"), [rows]);
+  const showcase = useMemo(() => (rows ?? []).filter((r) => r.kind === "showcase"), [rows]);
 
   if (accessLoading) return <div className="glass rounded-2xl h-64 animate-pulse" />;
   if (!access?.isAdmin) return <Navigate to="/dashboard" />;
@@ -127,6 +129,15 @@ function AdminLanding() {
           </p>
         </div>
       </div>
+
+      <ShowcaseManager
+        rows={showcase}
+        isLoading={isLoading}
+        onSave={(d) => upsertMut.mutateAsync(d)}
+        onDelete={(id) => confirm("Remove this video from the showcase?") && deleteMut.mutate(id)}
+        onReorder={(items) => orderMut.mutate(items)}
+        onPreview={setPreviewUrl}
+      />
 
       <MediaSection
         label="Creator reviews (video + written)"

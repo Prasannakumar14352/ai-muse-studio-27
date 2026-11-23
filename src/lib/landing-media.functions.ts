@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-export type LandingMediaKind = "testimonial" | "demo" | "walkthrough";
+export type LandingMediaKind = "testimonial" | "demo" | "walkthrough" | "showcase";
 export type LandingMediaStatus = "draft" | "published";
 export type LandingVideoType = "mp4" | "webm" | "youtube" | "vimeo";
 export type LandingSource = "customer" | "sample" | "demo";
@@ -26,6 +26,12 @@ export interface LandingMediaRow {
   display_order: number;
   photo_url: string | null;
   consent_confirmed: boolean;
+  /** Showcase: the exact prompt / idea that produced the video. */
+  prompt?: string | null;
+  /** Showcase: which CreatorFlow tool made it. */
+  tool?: string | null;
+  /** Showcase: where it came from in the app (video or project id). */
+  source_ref?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -76,7 +82,7 @@ export const listAllLandingMedia = createServerFn({ method: "GET" })
 
 const UpsertSchema = z.object({
   id: z.string().uuid().optional(),
-  kind: z.enum(["testimonial", "demo", "walkthrough"]),
+  kind: z.enum(["testimonial", "demo", "walkthrough", "showcase"]),
   title: z.string().max(200).nullable().optional(),
   subtitle: z.string().max(300).nullable().optional(),
   country: z.string().max(80).nullable().optional(),
@@ -93,6 +99,9 @@ const UpsertSchema = z.object({
   display_order: z.number().int().min(0).max(999).default(0),
   photo_url: z.string().url().max(1000).nullable().optional().or(z.literal("")),
   consent_confirmed: z.boolean().optional().default(false),
+  prompt: z.string().max(1500).nullable().optional(),
+  tool: z.string().max(60).nullable().optional(),
+  source_ref: z.string().max(120).nullable().optional(),
 });
 
 export const upsertLandingMedia = createServerFn({ method: "POST" })
@@ -104,6 +113,9 @@ export const upsertLandingMedia = createServerFn({ method: "POST" })
     if (clean.poster_url === "") clean.poster_url = null;
     if (clean.video_url === "") clean.video_url = null;
     if (clean.photo_url === "") clean.photo_url = null;
+    if (data.kind === "showcase" && data.status === "published" && (!data.video_url || !data.prompt?.trim())) {
+      throw new Error("A showcase video needs a video and its prompt before it can be published.");
+    }
     // Enforce: real customer testimonials can only be published with consent confirmed.
     if (
       data.kind === "testimonial" &&
