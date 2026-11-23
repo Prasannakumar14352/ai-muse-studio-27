@@ -6,7 +6,7 @@ import {
   Loader2, Wand2, Download, RefreshCw, Trash2, Sparkles,
   Image as ImageIcon, Eye, ChevronDown, ChevronRight, Copy,
   Upload, Maximize2, Eraser, Scissors, X, Palette as PaletteIcon,
-  Sliders, BarChart3, Rocket, ArrowLeft, Wand,
+  Sliders, BarChart3, Rocket, ArrowLeft, Wand, Check,
 } from "lucide-react";
 import { useAccess, canGenerate } from "@/lib/access";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -60,7 +60,7 @@ type GeneratedItem = {
   overlayText?: string;
 };
 
-type Mode = "create" | "reverse";
+type Mode = "create" | "reverse" | "library";
 type Step = 1 | 2 | 3;
 
 /** Cover-crop + upscale an AI image to the exact delivery size (e.g. YouTube 1280×720). */
@@ -144,8 +144,45 @@ function ThumbnailsPage() {
     setLibrary(t);
     const urls: Record<string, string> = {};
     for (const x of t) { const u = await loadThumbnailImageURL(x); if (u) urls[x.id] = u; }
-    setLibraryUrls(urls);
+    setLibraryUrls((prev) => {
+      for (const u of Object.values(prev)) URL.revokeObjectURL(u);
+      return urls;
+    });
   }
+
+  // Every generated / edited concept is saved automatically, so nothing is lost when the
+  // user leaves the page. Each on-screen concept keeps one saved copy (replaced on edit).
+  const savedRef = useRef<Record<string, { image: string; savedId: string }>>({});
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => {
+    const pending = items.filter((it) => savedRef.current[it.id]?.image !== it.image);
+    if (!pending.length) return;
+    for (const it of pending) savedRef.current[it.id] = { image: it.image, savedId: savedRef.current[it.id]?.savedId ?? "" };
+    saveChainRef.current = saveChainRef.current.then(async () => {
+      for (const it of pending) {
+        try {
+          const prev = savedRef.current[it.id]?.savedId;
+          if (prev) await deleteGeneratedThumbnail(prev).catch(() => {});
+          const rec = await saveGeneratedThumbnail({
+            title: brief.title || plan?.thumbnailText || "Untitled",
+            concept: plan?.thumbnailText ?? "Concept",
+            headline: it.overlayText ?? plan?.thumbnailText ?? brief.customText ?? "",
+            niche: null,
+            topic: brief.title,
+            styleId: brief.styleId,
+            styleLabel: EXTENDED_STYLES.find((x) => x.id === brief.styleId)?.label ?? brief.styleId,
+            image: it.image,
+          });
+          if (savedRef.current[it.id]?.image === it.image) savedRef.current[it.id] = { image: it.image, savedId: rec.id };
+          else await deleteGeneratedThumbnail(rec.id).catch(() => {}); // superseded by a newer edit
+        } catch (e) {
+          console.warn("[thumbnails] auto-save failed", e);
+        }
+      }
+      await refreshLibrary();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   const selectedItem = useMemo(() => items.find((x) => x.id === selectedId) ?? null, [items, selectedId]);
 
@@ -363,6 +400,10 @@ function ThumbnailsPage() {
   }
 
   async function saveItemToLibrary(item: GeneratedItem) {
+    if (savedRef.current[item.id]?.image === item.image && savedRef.current[item.id]?.savedId) {
+      toast.success("Already saved — see My thumbnails");
+      return;
+    }
     try {
       await saveGeneratedThumbnail({
         title: brief.title || "Untitled",
@@ -402,6 +443,10 @@ function ThumbnailsPage() {
             className={`px-3 py-1.5 rounded-lg text-sm ${mode === "reverse" ? "gradient-primary text-white" : "glass border border-border"}`}>
             Reverse Engineer
           </button>
+          <button onClick={() => { setMode("library"); void refreshLibrary(); }}
+            className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 ${mode === "library" ? "gradient-primary text-white" : "glass border border-border"}`}>
+            <ImageIcon className="w-3.5 h-3.5" /> My thumbnails{library.length ? ` (${library.length})` : ""}
+          </button>
         </div>
       </div>
 
@@ -417,6 +462,12 @@ function ThumbnailsPage() {
         <PlanReview plan={plan} setPlan={setPlan} brief={brief} onBack={() => setStep(1)} onGenerate={runGeneration} />
       )}
 
+      {mode === "create" && step === 3 && items.length > 0 && (
+        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+          <Check className="w-3.5 h-3.5 text-emerald-400" /> Saved automatically —
+          <button onClick={() => setMode("library")} className="underline hover:text-white">view in My thumbnails</button>
+        </div>
+      )}
       {mode === "create" && step === 3 && (
         <GenerationGrid
           items={items} selectedId={selectedId} setSelectedId={setSelectedId}
@@ -433,16 +484,24 @@ function ThumbnailsPage() {
       )}
 
       {/* Library */}
-      {library.length > 0 && (
+      {mode === "library" && library.length === 0 && (
+        <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">
+          No thumbnails yet. Every thumbnail you generate is saved here automatically.
+          <div className="mt-4">
+            <button onClick={() => setMode("create")} className="rounded-lg gradient-primary text-white px-4 py-2 text-sm">Create a thumbnail</button>
+          </div>
+        </div>
+      )}
+      {mode === "library" && library.length > 0 && (
         <div className="space-y-3">
           <div className="text-sm text-muted-foreground flex items-center gap-2">
-            <ImageIcon className="w-4 h-4" /> Your saved thumbnails
+            <ImageIcon className="w-4 h-4" /> Your thumbnails — saved automatically, newest first
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {library.map((t) => (
               <div key={t.id} className="glass rounded-xl overflow-hidden">
                 <div className="aspect-video bg-black">
-                  {libraryUrls[t.id] && <img src={libraryUrls[t.id]} alt={t.headline} className="w-full h-full object-cover" />}
+                  {libraryUrls[t.id] && <img src={libraryUrls[t.id]} alt={t.headline} className="w-full h-full object-contain" />}
                 </div>
                 <div className="p-3">
                   <div className="text-xs font-semibold line-clamp-1">{t.title || t.headline}</div>
