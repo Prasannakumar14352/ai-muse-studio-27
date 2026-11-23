@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { consumeResearchPrefill, type ResearchPrefill } from "@/lib/research-prefill";
 import { HandoffBanner } from "@/components/handoff-banner";
+import { openCreateMenu } from "@/components/create-menu";
 import { isHiddenPath } from "@/lib/hidden-features";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
@@ -42,7 +43,7 @@ export const Route = createFileRoute("/_authenticated/calendar")({
     return (
       <div className="p-8 text-white">
         <h2 className="text-lg font-semibold mb-2">Calendar failed to load</h2>
-        <p className="text-sm text-white/60 mb-4">{error instanceof Error ? error.message : String(error)}</p>
+        <p className="text-sm text-muted-foreground mb-4">{error instanceof Error ? error.message : String(error)}</p>
         <Button onClick={() => { reset(); router.invalidate(); }}>Retry</Button>
       </div>
     );
@@ -116,59 +117,81 @@ function CalendarPage() {
     return c;
   }, [rows]);
 
+  const upcoming = useMemo(() => {
+    const now = Date.now();
+    return rows
+      .filter((r) => r.status === "scheduled" && r.scheduled_at && new Date(String(r.scheduled_at)).getTime() >= now)
+      .sort((a, b) => new Date(String(a.scheduled_at)).getTime() - new Date(String(b.scheduled_at)).getTime())
+      .slice(0, 6);
+  }, [rows]);
+
+  const tabs = ([
+    ["calendar", "Calendar"],
+    ...(isAdmin ? [["plan", "Content plan"] as [Tab, string]] : []),
+    ["scheduled", `Scheduled${counts.scheduled ? ` · ${counts.scheduled}` : ""}`],
+    ["queue", `Queue${counts.queue ? ` · ${counts.queue}` : ""}`],
+    ["drafts", `Drafts${counts.drafts ? ` · ${counts.drafts}` : ""}`],
+    ["failed", `Failed${counts.failed ? ` · ${counts.failed}` : ""}`],
+    ["analytics", "Analytics"],
+    ["platforms", "Channels"],
+  ] as Array<[Tab, string]>);
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#120a08] via-[#0d0605] to-black text-white">
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <header className="mb-6 flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2 mb-1 text-xs uppercase tracking-widest text-pink-300/70">
-              <CalendarIcon className="w-3.5 h-3.5" /> Publishing
-            </div>
-            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-pink-300 to-orange-300 bg-clip-text text-transparent">
-              Content Calendar
-            </h1>
-            <p className="text-white/60 text-sm mt-1">
-              Plan, schedule, and monitor every post across your connected platforms.
-            </p>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => { posts.refetch(); analytics.refetch(); platforms.refetch(); }}>
-            <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+    <div className="space-y-6">
+      <header className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold">Planner</h1>
+          <p className="text-muted-foreground mt-1.5">
+            Every scheduled and published post, across your connected channels.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => { posts.refetch(); analytics.refetch(); platforms.refetch(); }}>
+            <RefreshCw /> Refresh
           </Button>
-        </header>
+          <Button size="sm" onClick={openCreateMenu}>＋ Create content</Button>
+        </div>
+      </header>
 
-        <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
+      <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
 
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {([
+          ["scheduled", "Scheduled", counts.scheduled, "text-sky-400"],
+          ["queue", "In queue", counts.queue, "text-amber-400"],
+          ["drafts", "Drafts", counts.drafts, "text-muted-foreground"],
+          ["failed", "Failed", counts.failed, counts.failed ? "text-rose-400" : "text-muted-foreground"],
+        ] as Array<[Tab, string, number, string]>).map(([id, label, n, cls]) => (
+          <button key={id} type="button" onClick={() => setTab(id)}
+            className={cn("glass rounded-2xl p-4 text-left transition hover:border-primary/50", tab === id && "border-primary/60")}>
+            <div className="text-xs text-muted-foreground">{label}</div>
+            <div className={cn("mt-1 text-2xl font-bold [font-family:'Space_Grotesk',Inter,sans-serif]", cls)}>{n}</div>
+          </button>
+        ))}
+      </div>
 
-        <nav className="flex gap-2 flex-wrap mb-6 border-b border-border pb-3">
-          {([
-            ["calendar", "Monthly Calendar"],
-            ...(isAdmin ? [["plan", "Content plan"] as [Tab, string]] : []),
-            ["scheduled", `Scheduled${counts.scheduled ? ` (${counts.scheduled})` : ""}`],
-            ["queue", `Queue${counts.queue ? ` (${counts.queue})` : ""}`],
-            ["drafts", `Drafts${counts.drafts ? ` (${counts.drafts})` : ""}`],
-            ["failed", `Failed${counts.failed ? ` (${counts.failed})` : ""}`],
-            ["analytics", "Analytics"],
-            ["platforms", "Platform Status"],
-          ] as Array<[Tab, string]>).map(([id, label]) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={cn(
-                "px-3 py-1.5 rounded-lg text-sm transition",
-                tab === id
-                  ? "bg-gradient-to-r from-pink-500/30 to-orange-500/30 text-white border border-pink-400/40"
-                  : "text-white/60 hover:text-white hover:bg-white/5 border border-transparent",
-              )}
-            >{label}</button>
-          ))}
-        </nav>
+      <nav className="flex gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 w-full sm:w-max max-w-full" role="tablist" aria-label="Planner views">
+        {tabs.map(([id, label]) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={cn(
+              "shrink-0 px-3.5 py-2 rounded-lg text-sm font-semibold transition",
+              tab === id ? "gradient-primary text-white shadow-[var(--shadow-glow)]" : "text-muted-foreground hover:text-foreground",
+            )}
+          >{label}</button>
+        ))}
+      </nav>
 
-        {posts.isLoading ? (
-          <div className="p-12 text-center text-white/50">Loading…</div>
-        ) : (
-          <>
-            {tab === "plan" && isAdmin && <ContentPlanBoard />}
-            {tab === "calendar" && (
+      {posts.isLoading ? (
+        <div className="glass rounded-2xl p-12 text-center text-muted-foreground">Loading your planner…</div>
+      ) : (
+        <>
+          {tab === "plan" && isAdmin && <ContentPlanBoard />}
+          {tab === "calendar" && (
+            <div className="grid xl:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
               <MonthlyCalendar
                 rows={calendarRows}
                 planned={isAdmin ? plannedRows : []}
@@ -179,24 +202,47 @@ function CalendarPage() {
                 onToday={() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); setMonthAnchor(d); }}
                 onChange={() => posts.refetch()}
               />
-            )}
-            {tab === "scheduled" && (
-              <PostsTable rows={rows.filter(r => r.status === "scheduled")} emptyLabel="No scheduled posts" onChange={() => posts.refetch()} />
-            )}
-            {tab === "queue" && (
-              <PostsTable rows={rows.filter(r => r.status === "ready" || r.status === "publishing")} emptyLabel="Queue is empty" onChange={() => posts.refetch()} />
-            )}
-            {tab === "drafts" && (
-              <PostsTable rows={rows.filter(r => r.status === "draft")} emptyLabel="No drafts" onChange={() => posts.refetch()} />
-            )}
-            {tab === "failed" && (
-              <FailedPanel rows={rows.filter(r => r.status === "failed")} onChange={() => posts.refetch()} />
-            )}
-            {tab === "analytics" && <AnalyticsPanel data={analytics.data} loading={analytics.isLoading} />}
-            {tab === "platforms" && <PlatformsPanel data={platforms.data} loading={platforms.isLoading} />}
-          </>
-        )}
-      </div>
+              <aside className="xl:sticky xl:top-20 space-y-4">
+                <div className="glass rounded-2xl p-5 space-y-3">
+                  <div className="font-semibold">Coming up</div>
+                  {upcoming.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">Nothing scheduled yet.</div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {upcoming.map((r) => (
+                        <li key={String(r.id)} className="rounded-xl bg-secondary px-3 py-2.5">
+                          <div className="text-sm font-medium truncate">{String(r.caption ?? r.title ?? "Post")}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            <span className="capitalize">{String(r.platform)}</span> · {new Date(String(r.scheduled_at)).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="rounded-2xl border border-sky-500/35 bg-sky-500/[0.07] p-4 text-xs leading-relaxed">
+                  <div className="font-semibold text-sky-400 mb-1">How to schedule</div>
+                  <span className="text-muted-foreground">Open a finished project and choose <span className="text-foreground">Publish → Schedule</span>. It appears here on its day.</span>
+                </div>
+              </aside>
+            </div>
+          )}
+          {tab === "scheduled" && (
+            <PostsTable rows={rows.filter(r => r.status === "scheduled")} emptyLabel="No scheduled posts" onChange={() => posts.refetch()} />
+          )}
+          {tab === "queue" && (
+            <PostsTable rows={rows.filter(r => r.status === "ready" || r.status === "publishing")} emptyLabel="Queue is empty" onChange={() => posts.refetch()} />
+          )}
+          {tab === "drafts" && (
+            <PostsTable rows={rows.filter(r => r.status === "draft")} emptyLabel="No drafts" onChange={() => posts.refetch()} />
+          )}
+          {tab === "failed" && (
+            <FailedPanel rows={rows.filter(r => r.status === "failed")} onChange={() => posts.refetch()} />
+          )}
+          {tab === "analytics" && <AnalyticsPanel data={analytics.data} loading={analytics.isLoading} />}
+          {tab === "platforms" && <PlatformsPanel data={platforms.data} loading={platforms.isLoading} />}
+        </>
+      )}
     </div>
   );
 }
@@ -240,15 +286,15 @@ function MonthlyCalendar({
   const openItems = openDay ? (byDay[localDayKey(openDay)] ?? []) : [];
 
   return (
-    <section className="rounded-2xl border border-border bg-white/[0.03] backdrop-blur-xl p-4">
-      <div className="flex items-center justify-between mb-4">
+    <section className="glass rounded-2xl p-3 sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={onPrev}><ChevronLeft className="w-4 h-4" /></Button>
-          <div className="text-lg font-semibold min-w-[10rem] text-center">{monthLabel}</div>
+          <div className="text-lg font-bold min-w-[9rem] text-center [font-family:'Space_Grotesk',Inter,sans-serif]">{monthLabel}</div>
           <Button variant="ghost" size="icon" onClick={onNext}><ChevronRight className="w-4 h-4" /></Button>
           <Button variant="outline" size="sm" onClick={onToday}>Today</Button>
         </div>
-        <div className="text-xs text-white/50 flex items-center gap-3">
+        <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-3">
           {planned.length > 0 && <LegendDot color="bg-sky-400" label="planned" />}
           <LegendDot color="bg-blue-400" label="scheduled" />
           <LegendDot color="bg-amber-400" label="queue" />
@@ -256,9 +302,9 @@ function MonthlyCalendar({
           <LegendDot color="bg-red-400" label="failed" />
         </div>
       </div>
-      <div className="grid grid-cols-7 gap-px bg-white/5 rounded-xl overflow-hidden text-xs">
+      <div className="grid grid-cols-7 gap-px bg-border rounded-xl overflow-hidden text-xs border border-border">
         {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
-          <div key={d} className="bg-black/40 py-2 text-center text-white/50 uppercase tracking-wider">{d}</div>
+          <div key={d} className="bg-secondary py-2 text-center text-muted-foreground font-semibold uppercase tracking-wider text-[10px]">{d}</div>
         ))}
         {cells.map((c, i) => {
           const key = c.date ? localDayKey(c.date) : `e${i}`;
@@ -272,17 +318,17 @@ function MonthlyCalendar({
               onClick={(e) => { if (c.date && !(e.target as HTMLElement).closest("button,a")) setOpenDay(c.date); }}
               onKeyDown={(e) => { if (c.date && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setOpenDay(c.date); } }}
               className={cn(
-              "bg-black/30 min-h-[110px] p-1.5 flex flex-col gap-1",
-              c.date && "cursor-pointer hover:bg-white/[0.06] transition",
+              "bg-card min-h-[72px] sm:min-h-[110px] p-1 sm:p-1.5 flex flex-col gap-1",
+              c.date && "cursor-pointer hover:bg-accent transition",
               !c.date && "opacity-30",
-              isToday && "ring-1 ring-pink-400/60"
+              isToday && "ring-2 ring-inset ring-primary"
             )}>
               {c.date && (
                 <div className="flex justify-between items-center">
-                  <span className={cn("text-[11px]", isToday ? "text-pink-300 font-semibold" : "text-white/60")}>
+                  <span className={cn("text-[11px]", isToday ? "text-primary font-bold" : "text-muted-foreground")}>
                     {c.date.getDate()}
                   </span>
-                  {items.length > 0 && <span className="text-[9px] text-white/40">{items.length}</span>}
+                  {items.length > 0 && <span className="text-[9px] text-muted-foreground">{items.length}</span>}
                 </div>
               )}
               <div className="flex flex-col gap-1 overflow-hidden">
@@ -296,7 +342,7 @@ function MonthlyCalendar({
                   <CalendarChip key={String(p.id)} row={p} onChange={onChange} />
                 ))}
                 {items.length > 3 && (
-                  <div className="text-[10px] text-white/40 pl-1">+{items.length - 3} more</div>
+                  <div className="text-[10px] text-muted-foreground pl-1">+{items.length - 3} more</div>
                 )}
               </div>
             </div>
@@ -304,30 +350,30 @@ function MonthlyCalendar({
         })}
       </div>
       {openDay && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setOpenDay(null)}>
-          <div role="dialog" aria-label={openDay.toDateString()} className="w-full max-w-md rounded-2xl border border-border bg-[#120a08] p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setOpenDay(null)}>
+          <div role="dialog" aria-label={openDay.toDateString()} className="w-full max-w-md rounded-2xl border border-border bg-card p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">{openDay.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</h3>
-              <button onClick={() => setOpenDay(null)} aria-label="Close" className="text-white/60 hover:text-white"><XCircle className="w-5 h-5" /></button>
+              <button onClick={() => setOpenDay(null)} aria-label="Close" className="text-muted-foreground hover:text-foreground"><XCircle className="w-5 h-5" /></button>
             </div>
             {openItems.length === 0 ? (
-              <p className="text-sm text-white/60">Nothing planned for this day yet.</p>
+              <p className="text-sm text-muted-foreground">Nothing planned for this day yet.</p>
             ) : (
               <div className="space-y-2">
                 {openItems.map((p) => (
                   <div key={String(p.id)} className="rounded-lg border border-border p-2.5 text-sm flex items-center gap-2">
-                    <span className="capitalize text-white/60 text-xs w-20 shrink-0">{String(p.platform)}</span>
+                    <span className="capitalize text-muted-foreground text-xs w-20 shrink-0">{String(p.platform)}</span>
                     <span className="flex-1 truncate">{String(p.caption ?? p.title ?? "Post")}</span>
-                    <span className="text-[11px] text-white/50">{String(p.status).replace("_", " ")}</span>
+                    <span className="text-[11px] text-muted-foreground">{String(p.status).replace("_", " ")}</span>
                     {p.external_post_url ? <a href={String(p.external_post_url)} target="_blank" rel="noreferrer" className="text-xs underline">View</a> : null}
                   </div>
                 ))}
               </div>
             )}
-            <Link to="/create" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-pink-500 to-orange-500 px-4 py-2 text-sm font-medium">
+            <Link to="/create" className="inline-flex items-center gap-2 rounded-xl gradient-primary text-white px-4 py-2 text-sm font-semibold">
               Create content for this day
             </Link>
-            <p className="text-xs text-white/50">To schedule, open a finished project and choose Publish → Schedule.</p>
+            <p className="text-xs text-muted-foreground">To schedule, open a finished project and choose Publish → Schedule.</p>
           </div>
         </div>
       )}
@@ -381,12 +427,12 @@ function PostsTable({
   const update = useServerFn(updateScheduledPost);
 
   if (rows.length === 0) {
-    return <div className="p-12 text-center text-white/50 rounded-2xl border border-border bg-white/[0.03]">{emptyLabel}</div>;
+    return <div className="p-12 text-center text-muted-foreground rounded-2xl border border-border bg-white/[0.03]">{emptyLabel}</div>;
   }
   return (
     <div className="rounded-2xl border border-border bg-white/[0.03] overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-white/5 text-white/60 text-xs uppercase tracking-wider">
+        <thead className="bg-white/5 text-muted-foreground text-xs uppercase tracking-wider">
           <tr>
             <th className="text-left px-4 py-2">Platform</th>
             <th className="text-left px-4 py-2">Caption</th>
@@ -402,7 +448,7 @@ function PostsTable({
               <tr key={String(r.id)} className="border-t border-white/5 hover:bg-white/[0.03]">
                 <td className="px-4 py-3"><div className="flex items-center gap-2"><Icon className="w-4 h-4" />{String(r.platform)}</div></td>
                 <td className="px-4 py-3 text-white/80 max-w-md truncate">{String(r.caption ?? "—")}</td>
-                <td className="px-4 py-3 text-white/60">{r.scheduled_at ? new Date(String(r.scheduled_at)).toLocaleString() : "—"}</td>
+                <td className="px-4 py-3 text-muted-foreground">{r.scheduled_at ? new Date(String(r.scheduled_at)).toLocaleString() : "—"}</td>
                 <td className="px-4 py-3">
                   <StatusBadge status={String(r.status)} />
                   {r.external_post_url ? (
@@ -452,7 +498,7 @@ function PostsTable({
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { c: string; Icon: typeof Clock }> = {
-    draft:              { c: "bg-white/10 text-white/70", Icon: Clock },
+    draft:              { c: "bg-white/10 text-muted-foreground", Icon: Clock },
     ready:              { c: "bg-amber-500/20 text-amber-200", Icon: Clock },
     scheduled:          { c: "bg-blue-500/20 text-blue-200", Icon: Clock },
     publishing:         { c: "bg-amber-500/20 text-amber-200", Icon: Clock },
@@ -475,7 +521,7 @@ function FailedPanel({ rows, onChange }: { rows: Array<Record<string, unknown>>;
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="text-sm text-white/60">{rows.length} failed post{rows.length === 1 ? "" : "s"}</div>
+        <div className="text-sm text-muted-foreground">{rows.length} failed post{rows.length === 1 ? "" : "s"}</div>
         {rows.length > 0 && (
           <Button size="sm" variant="outline" onClick={async () => {
             const res = await retryAll({});
@@ -484,7 +530,7 @@ function FailedPanel({ rows, onChange }: { rows: Array<Record<string, unknown>>;
         )}
       </div>
       {rows.length === 0 ? (
-        <div className="p-12 text-center text-white/50 rounded-2xl border border-border bg-white/[0.03]">No failed posts</div>
+        <div className="p-12 text-center text-muted-foreground rounded-2xl border border-border bg-white/[0.03]">No failed posts</div>
       ) : (
         <div className="space-y-2">
           {rows.map((r) => {
@@ -498,7 +544,7 @@ function FailedPanel({ rows, onChange }: { rows: Array<Record<string, unknown>>;
                       <span className="text-sm text-white/80 truncate">{String(r.caption ?? "—")}</span>
                     </div>
                     {r.last_error ? <div className="text-xs text-red-300/80 mt-1"><AlertTriangle className="inline w-3 h-3 mr-1" />{String(r.last_error)}</div> : null}
-                    <div className="text-[11px] text-white/40 mt-1">Attempts: {String(r.attempts ?? 0)}</div>
+                    <div className="text-[11px] text-muted-foreground mt-1">Attempts: {String(r.attempts ?? 0)}</div>
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <Button size="sm" variant="outline" onClick={async () => {
@@ -521,7 +567,7 @@ function FailedPanel({ rows, onChange }: { rows: Array<Record<string, unknown>>;
 // ---------- Analytics ----------
 
 function AnalyticsPanel({ data, loading }: { data: Awaited<ReturnType<typeof getPublishingAnalytics>> | undefined; loading: boolean }) {
-  if (loading || !data) return <div className="p-12 text-center text-white/50">Loading analytics…</div>;
+  if (loading || !data) return <div className="p-12 text-center text-muted-foreground">Loading analytics…</div>;
   return (
     <div className="space-y-6">
       <div className="grid gap-3 md:grid-cols-4">
@@ -546,7 +592,7 @@ function AnalyticsPanel({ data, loading }: { data: Awaited<ReturnType<typeof get
               </div>
             );
           })}
-          {Object.keys(data.byPlatform).length === 0 && <div className="text-sm text-white/50">No posts yet</div>}
+          {Object.keys(data.byPlatform).length === 0 && <div className="text-sm text-muted-foreground">No posts yet</div>}
         </div>
       </div>
       <div className="rounded-2xl border border-border bg-white/[0.03] p-4">
@@ -560,7 +606,7 @@ function AnalyticsPanel({ data, loading }: { data: Awaited<ReturnType<typeof get
 function Metric({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
     <div className="rounded-2xl border border-border bg-white/[0.03] p-4">
-      <div className="text-xs uppercase tracking-wider text-white/50">{label}</div>
+      <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className={cn("text-3xl font-bold mt-2", accent ?? "text-white")}>{value}</div>
     </div>
   );
@@ -588,7 +634,7 @@ function Sparkline({ data }: { data: Record<string, number> }) {
 // ---------- Platform Status ----------
 
 function PlatformsPanel({ data, loading }: { data: Awaited<ReturnType<typeof getPlatformStatus>> | undefined; loading: boolean }) {
-  if (loading || !data) return <div className="p-12 text-center text-white/50">Loading platforms…</div>;
+  if (loading || !data) return <div className="p-12 text-center text-muted-foreground">Loading platforms…</div>;
   return (
     <div className="grid gap-3 md:grid-cols-2">
       {data.map((p) => {
@@ -602,15 +648,15 @@ function PlatformsPanel({ data, loading }: { data: Awaited<ReturnType<typeof get
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center",
-                  ok ? "bg-emerald-500/20 text-emerald-200" : "bg-white/5 text-white/50")}>
+                  ok ? "bg-emerald-500/20 text-emerald-200" : "bg-white/5 text-muted-foreground")}>
                   <Icon className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="capitalize font-semibold">{p.platform}</div>
-                  <div className="text-xs text-white/50">{p.accountName ?? "Not connected"}</div>
+                  <div className="text-xs text-muted-foreground">{p.accountName ?? "Not connected"}</div>
                 </div>
               </div>
-              <Badge variant="outline" className={ok ? "border-emerald-400/40 text-emerald-200" : "border-white/20 text-white/60"}>
+              <Badge variant="outline" className={ok ? "border-emerald-400/40 text-emerald-200" : "border-white/20 text-muted-foreground"}>
                 {p.status}
               </Badge>
             </div>
@@ -620,7 +666,7 @@ function PlatformsPanel({ data, loading }: { data: Awaited<ReturnType<typeof get
               </a>
             )}
             {p.expiresAt && (
-              <div className="text-[11px] text-white/40 mt-2">
+              <div className="text-[11px] text-muted-foreground mt-2">
                 Token expires {new Date(p.expiresAt).toLocaleDateString()}
               </div>
             )}
