@@ -8,7 +8,9 @@ import { jsPDF } from "jspdf";
 import { useAccess } from "@/lib/access";
 import { supabase } from "@/integrations/supabase/client";
 import { STYLES } from "@/lib/constants";
-import { autoSlideOverlays, renderSlideWithOverlays, textFreeSlidePrompt } from "@/lib/carousel-compose";
+import { autoSlideOverlays, renderSlideWithOverlays, textFreeSlidePrompt, photoToSlideBackground } from "@/lib/carousel-compose";
+import { MediaPicker } from "@/components/media-picker";
+import { fetchPickedBlob, type PickedMedia } from "@/lib/picked-media";
 import { listOutputs, saveOutput, deleteOutput, getOutput, type CarouselSlide, type SlideOverlaySet } from "@/lib/local-store";
 import {
   putDataURL, getObjectURL, getDataURL, deleteBlob, deleteBlobsByPrefix, isBlobKey, makeBlobKey,
@@ -18,7 +20,7 @@ import { SlideEditor } from "@/components/slide-editor";
 import { useProjectDelete } from "@/hooks/use-project-delete";
 import {
   Plus, Layers, Loader2, Sparkles, Download, ChevronLeft, ChevronRight, X,
-  Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2, Film, Pencil,
+  Settings2, AlertTriangle, RefreshCw, FileArchive, FileText, Trash2, Film, Pencil, ImagePlus,
 } from "lucide-react";
 
 
@@ -101,6 +103,7 @@ function CarouselsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [collapsedSlides, setCollapsedSlides] = useState<Record<string, boolean>>({});
   const [editingSlide, setEditingSlide] = useState<{ rowId: string; idx: number } | null>(null);
+  const [bgPickerFor, setBgPickerFor] = useState<{ rowId: string; idx: number } | null>(null);
   const deleteProject = useProjectDelete();
   const isAdmin = !!useAccess().data?.isAdmin;
 
@@ -476,6 +479,56 @@ function CarouselsPage() {
     }
   }
 
+  /** Replace one slide's background with the user's own photo (library or free stock) — 0 credits. */
+  async function applyOwnBackground(row: CarouselRow, idx: number, item: PickedMedia) {
+    const cfg = getLayout(row);
+    const blob = await fetchPickedBlob(item);
+    const src = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error("Couldn't read the image"));
+      r.readAsDataURL(blob);
+    });
+    const image = await photoToSlideBackground(src, cfg.ratio);
+    const stamp = Date.now();
+    const base = await putDataURL(`carousel:${row.id}:${idx}:base:v${stamp}`, image);
+    const slide = row.carousel_slides?.[idx];
+    let composed = image;
+    let overlaySet: SlideOverlaySet | null = null;
+    if (slide?.headline) {
+      const overlays = autoSlideOverlays(cfg.ratio, {
+        headline: slide.headline, subhead: slide.body, bullets: slide.bullets ?? [], cta: slide.bottom_highlight,
+      });
+      composed = await renderSlideWithOverlays(image, overlays);
+      overlaySet = { overlays };
+    }
+    const key = await putDataURL(`carousel:${row.id}:${idx}:v${stamp}`, composed);
+    const count = Math.max(row.image_prompts.length, row.carousel_images?.length ?? 0, idx + 1);
+    const nextImages = [...(row.carousel_images ?? [])];
+    while (nextImages.length < count) nextImages.push(null);
+    const oldImage = nextImages[idx];
+    nextImages[idx] = key;
+    const nextBases = [...(row.base_images ?? [])];
+    while (nextBases.length < count) nextBases.push(null);
+    const oldBase = nextBases[idx];
+    nextBases[idx] = base;
+    const nextOverlays: Record<number, SlideOverlaySet> = { ...row.slide_overlays };
+    if (overlaySet) nextOverlays[idx] = overlaySet; else delete nextOverlays[idx];
+    const nextDiag: SlideDiagMap = {
+      ...row.slide_diagnostics,
+      [String(idx)]: { at: new Date().toISOString(), ok: true, durationMs: 0, attempts: 0, prompt: `Own photo: ${item.title}`, ratio: cfg.ratio },
+    };
+    await persistSlides(row, nextImages, nextDiag, nextBases, nextOverlays);
+    for (const old of [oldImage, oldBase]) {
+      if (old && isBlobKey(old) && old !== key && old !== base) {
+        try { await deleteBlob(old); } catch { /* ignore */ }
+      }
+    }
+    qc.invalidateQueries({ queryKey: ["carousels"] });
+    qc.invalidateQueries({ queryKey: ["project", row.id] });
+    toast.success(`Slide ${idx + 1} now uses your photo — no credits used`);
+  }
+
   async function exportZip(row: CarouselRow) {
     const slides = await resolveSlideDataURLs(row);
     if (slides.length === 0) return toast.error("Generate slides first");
@@ -776,6 +829,12 @@ function CarouselsPage() {
                                       <span className="absolute top-1 left-1 text-[9px] px-1.5 py-0.5 rounded bg-black/70 text-white font-medium">
                                         {sl.n}
                                       </span>
+                                      <button onClick={(e) => { e.stopPropagation(); setBgPickerFor({ rowId: row.id, idx: i }); }}
+                                        disabled={generating || isRetrying}
+                                        className="absolute bottom-1 left-1 rounded-md bg-black/80 hover:bg-black text-white p-1 disabled:opacity-50"
+                                        title="Use my photo (library or free stock)">
+                                        <ImagePlus className="w-3 h-3" />
+                                      </button>
                                       {failed && (
                                         <button onClick={() => retrySlide(row, i)} disabled={isRetrying}
                                           className="absolute bottom-1 right-1 rounded-md bg-black/80 hover:bg-black text-white p-1"
@@ -872,6 +931,14 @@ function CarouselsPage() {
                             <span className="absolute top-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-black/70 text-white font-medium">
                               {i + 1}/{slides.length}
                             </span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setBgPickerFor({ rowId: row.id, idx: i }); }}
+                              disabled={generating || isRetrying}
+                              className="absolute bottom-1.5 left-1.5 rounded-md bg-black/80 hover:bg-black text-white p-1 disabled:opacity-50"
+                              title="Use my photo (library or free stock)"
+                            >
+                              <ImagePlus className="w-3 h-3" />
+                            </button>
                             {failed ? (
                               <button
                                 onClick={() => retrySlide(row, i)}
@@ -1034,6 +1101,18 @@ function CarouselsPage() {
         </div>
       )}
 
+      <MediaPicker
+        open={bgPickerFor !== null}
+        onOpenChange={(o) => { if (!o) setBgPickerFor(null); }}
+        accept={["image"]}
+        title={bgPickerFor ? `Slide ${bgPickerFor.idx + 1} — use my photo` : "Use my photo"}
+        onPicked={async (item) => {
+          const target = bgPickerFor;
+          const row = target ? data?.find((r) => r.id === target.rowId) : undefined;
+          if (!target || !row) return;
+          await applyOwnBackground(row, target.idx, item);
+        }}
+      />
       {editingSlide && (() => {
         const row = data?.find((r) => r.id === editingSlide.rowId);
         // Edit on the text-free background when we have it, so text isn't stacked on burned-in copy.

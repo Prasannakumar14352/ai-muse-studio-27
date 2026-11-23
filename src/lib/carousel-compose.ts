@@ -134,3 +134,32 @@ export async function renderSlideWithOverlays(baseSrc: string, overlays: SlideOv
   }
   return canvas.toDataURL("image/png");
 }
+
+const RATIO_WH: Record<Ratio, [number, number]> = { "1:1": [1, 1], "4:5": [4, 5], "9:16": [9, 16], "16:9": [16, 9] };
+
+/**
+ * Turn a user-picked photo (library / free stock) into a slide background:
+ * centre-crop to the slide ratio, cap the size, and dim it slightly so the
+ * overlaid headline stays readable on busy photos.
+ */
+export async function photoToSlideBackground(src: string, ratio: Ratio, dim = 0.22): Promise<string> {
+  const img = await loadImage(src);
+  const [rw, rh] = RATIO_WH[ratio];
+  const longest = 1440;
+  const W = rw >= rh ? longest : Math.round((longest * rw) / rh);
+  const H = rw >= rh ? Math.round((longest * rh) / rw) : longest;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not supported");
+  const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+  const dw = img.naturalWidth * scale;
+  const dh = img.naturalHeight * scale;
+  ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  if (dim > 0) {
+    ctx.fillStyle = `rgba(0,0,0,${dim})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+  return canvas.toDataURL("image/jpeg", 0.92);
+}

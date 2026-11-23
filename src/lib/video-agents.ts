@@ -2498,6 +2498,44 @@ export async function regenerateShot(
   }
 }
 
+/**
+ * Replace one shot with the user's own media (Media Library or free stock)
+ * from the asset-review screen. No generation, no credits. Video files are
+ * used as motion clips (the renderer loops/trims them to the beat).
+ */
+export async function replaceShotWithMedia(
+  jobId: string,
+  shotId: string,
+  blob: Blob,
+  kind: "image" | "clip",
+  onEvent: (ev: JobEvent) => void,
+): Promise<void> {
+  const job = await getJob(jobId);
+  if (!job) throw new Error("Video job not found");
+  const shot = job.shots.find((s) => s.id === shotId);
+  if (!shot) throw new Error("Scene not found");
+  const wasDone = shot.status === "done";
+  const wasFailed = shot.status === "failed";
+  const key = await saveShotBlob(job.id, shot.id, blob);
+  const url = await loadShotObjectURL(key);
+  shot.status = "done";
+  shot.kind = kind;
+  shot.blobKey = key;
+  shot.mime = blob.type || (kind === "clip" ? "video/mp4" : "image/jpeg");
+  shot.error = null;
+  if (!wasDone) job.shotsDone += 1;
+  if (wasFailed) job.shotsFailed = Math.max(0, job.shotsFailed - 1);
+  await saveJob(job);
+  onEvent({
+    type: "shot",
+    done: job.shotsDone,
+    failed: job.shotsFailed,
+    total: job.shots.length,
+    shot: { id: shot.id, index: shot.index, status: "done",
+      kind, previewUrl: url, error: null, attempts: shot.attempts },
+  });
+}
+
 /** Requeue only the failed shots on an existing job. Emits the same events. */
 export async function retryFailedShots(
   jobId: string,

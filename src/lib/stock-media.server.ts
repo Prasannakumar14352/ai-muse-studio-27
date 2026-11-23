@@ -158,7 +158,7 @@ export async function importStock(userId: string, opts: { id: number; type: Stoc
   const params = new URLSearchParams({ id: String(opts.id) });
 
   let fileUrl: string; let width = 0; let height = 0; let tags = ""; let author = ""; let pageUrl = "";
-  let duration: number | null = null; let thumb: string | null = null;
+  let duration: number | null = null;
   if (opts.type === "video") {
     const r = await cachedPixabay<PixabayVideoHit>("videos/", params);
     const v = r.hits[0];
@@ -167,7 +167,7 @@ export async function importStock(userId: string, opts: { id: number; type: Stoc
     const f = v.videos.medium?.url ? v.videos.medium : v.videos.small?.url ? v.videos.small : v.videos.large;
     if (!f?.url) throw new StockMediaError("That video has no downloadable file.");
     fileUrl = f.url; width = f.width; height = f.height; duration = v.duration;
-    tags = v.tags; author = v.user; pageUrl = v.pageURL; thumb = videoThumb(v) || null;
+    tags = v.tags; author = v.user; pageUrl = v.pageURL;
   } else {
     const r = await cachedPixabay<PixabayImageHit>("", params);
     const h = r.hits[0];
@@ -210,7 +210,7 @@ export async function importStock(userId: string, opts: { id: number; type: Stoc
     duration_seconds: duration,
     width, height,
     tags: tagList,
-    metadata: { source: "pixabay", pixabay_id: opts.id, pixabay_type: opts.type, author, page_url: pageUrl, preview: thumb },
+    metadata: { source: "pixabay", pixabay_id: opts.id, pixabay_type: opts.type, author, page_url: pageUrl },
   } as never).select("id").single();
   if (error) {
     await supabaseAdmin.storage.from("library").remove([path]);

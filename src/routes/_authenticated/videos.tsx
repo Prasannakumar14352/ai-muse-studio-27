@@ -9,11 +9,13 @@ import { toast } from "sonner";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
   Wand2, Youtube, Play, RefreshCw, Send, Check, Trash2, Clock, Plus, Video,
-  X, RotateCw, Maximize2, ChevronLeft, ChevronRight,
+  X, RotateCw, Maximize2, ChevronLeft, ChevronRight, ImagePlus,
 } from "lucide-react";
+import { MediaPicker } from "@/components/media-picker";
+import { fetchPickedBlob, type PickedMedia } from "@/lib/picked-media";
 import {
   runPlanningPhase, runAssetGenerationPhase, runRenderPhase,
-  retryFailedShots, regenerateShot,
+  retryFailedShots, regenerateShot, replaceShotWithMedia,
   PIPELINE_STEPS,
   VIDEO_TYPES, DURATIONS, VOICES, ASPECT_RATIOS,
   type VideoBrief, type VideoType, type DurationSec, type StyleId, type VoiceId, type AspectRatio,
@@ -509,6 +511,14 @@ function VideosPage() {
     }
   }
 
+  /** Swap one shot for the user's own photo/clip (library or free stock) — 0 credits. */
+  async function replaceOneShot(shotId: string, item: PickedMedia) {
+    if (!dash.jobId) return;
+    const blob = await fetchPickedBlob(item);
+    await replaceShotWithMedia(dash.jobId, shotId, blob, item.kind === "video" ? "clip" : "image", handleJobEvent);
+    toast.success("Scene updated with your media — no credits used");
+  }
+
   function cancel() {
     abortRef.current?.abort();
   }
@@ -725,6 +735,7 @@ function VideosPage() {
           bundle={assetsBundle}
           onRender={renderFinal}
           onRegenerate={regenOneShot}
+          onReplace={replaceOneShot}
           onBackToBlueprint={() => setView("review")}
           onCancel={() => setView("landing")}
         />
@@ -1221,18 +1232,28 @@ function ReviewGate({
 
 // ---------------- Asset Review Gate (mandatory pre-render checkpoint) ----------------
 
+const STOCK_STOPWORDS = new Set(["a", "an", "the", "of", "in", "on", "at", "with", "and", "to", "for", "from", "by", "close", "up", "shot", "wide", "medium", "view", "scene", "showing", "is", "are"]);
+
+/** Pixabay matches every word, so seed the stock search with a few key words from the scene. */
+function stockQueryFrom(visual: string): string {
+  return visual.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/)
+    .filter((w) => w.length > 2 && !STOCK_STOPWORDS.has(w)).slice(0, 3).join(" ");
+}
+
 function AssetReviewGate({
-  shots, bundle, onRender, onRegenerate, onBackToBlueprint, onCancel,
+  shots, bundle, onRender, onRegenerate, onReplace, onBackToBlueprint, onCancel,
 }: {
   shots: ShotProgress[];
   bundle: AssetGenerationBundle;
   onRender: () => void;
   onRegenerate: (shotId: string) => Promise<void>;
+  onReplace: (shotId: string, item: PickedMedia) => Promise<void>;
   onBackToBlueprint: () => void;
   onCancel: () => void;
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [replaceFor, setReplaceFor] = useState<{ id: string; index: number } | null>(null);
   const viewable = useMemo(() => shots.filter((s) => s.previewUrl), [shots]);
   const failedCount = shots.filter((s) => s.status === "failed").length;
   const voMinutes = bundle.voiceover.reduce(
@@ -1346,11 +1367,31 @@ function AssetReviewGate({
                       ? <><Loader2 className="w-3 h-3 animate-spin" /> Regenerating…</>
                       : <><RotateCw className="w-3 h-3" /> Regenerate this shot</>}
                   </button>
+                  <button
+                    onClick={() => setReplaceFor({ id: s.id, index: i })}
+                    disabled={busyId === s.id}
+                    className="w-full rounded-md glass border border-border px-2 py-1 text-[11px] flex items-center justify-center gap-1 hover:border-white/20 disabled:opacity-50"
+                  >
+                    <ImagePlus className="w-3 h-3" /> Use my photo / clip
+                  </button>
                 </div>
               </div>
             );
           })}
         </div>
+        <MediaPicker
+          open={replaceFor !== null}
+          onOpenChange={(o) => { if (!o) setReplaceFor(null); }}
+          accept={["image", "video"]}
+          title={replaceFor ? `Scene ${replaceFor.index + 1} — use my photo or clip` : "Use my photo or clip"}
+          initialQuery={replaceFor ? stockQueryFrom(bundle.script.scenes[replaceFor.index]?.visual ?? "") : ""}
+          onPicked={async (item) => {
+            const target = replaceFor;
+            if (!target) return;
+            setBusyId(target.id);
+            try { await onReplace(target.id, item); } finally { setBusyId(null); }
+          }}
+        />
         <p className="text-xs text-muted-foreground mt-3">
           Need to change scripts, timings or prompts? Use “Back to blueprint” — assets will regenerate from your edits.
         </p>
