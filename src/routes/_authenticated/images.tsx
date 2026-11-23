@@ -27,6 +27,9 @@ import { HandoffBanner } from "@/components/handoff-banner";
 import { useAutogen } from "@/lib/use-autogen";
 import { promptDialog } from "@/components/prompt-dialog";
 import { StockMediaPicker, type PickedStock } from "@/components/stock-media-picker";
+import { MediaPicker } from "@/components/media-picker";
+import { fetchPickedBlob, type PickedMedia } from "@/lib/picked-media";
+import { photoToSlideBackground } from "@/lib/carousel-compose";
 
 /** Matches ACTION_COSTS.image_hd on the server. */
 const HD_CREDITS = 8;
@@ -50,6 +53,14 @@ type DebugInfo = {
 
 type EditOp = NonNullable<GenerateImageRequest["operation"]>;
 
+const STOCK_STOPWORDS = new Set(["a", "an", "the", "of", "in", "on", "at", "with", "and", "to", "for", "from", "by", "ultra", "detailed", "photo", "image", "realistic", "high", "quality", "4k", "8k"]);
+
+/** Pixabay matches every word, so seed the stock search with a few key words from the prompt. */
+function stockQueryFromPrompt(prompt: string): string {
+  return prompt.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/)
+    .filter((w) => w.length > 2 && !STOCK_STOPWORDS.has(w)).slice(0, 3).join(" ");
+}
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -72,6 +83,7 @@ function ImagesPage() {
   const [styleStrength, setStyleStrength] = useState(70);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const [stockTarget, setStockTarget] = useState<"ref" | "style" | null>(null);
+  const [stockGalleryOpen, setStockGalleryOpen] = useState(false);
   const [styleImages, setStyleImages] = useState<string[]>([]);
   // HD (Nano Banana) also runs whenever reference/style images are attached.
   const usesHdModel = quality === "hd" || referenceImages.length > 0 || styleImages.length > 0;
@@ -192,6 +204,25 @@ function ImagesPage() {
     const dataUrl = await fileToDataUrl(file);
     if (kind === "ref") setReferenceImages((prev) => [...prev, dataUrl].slice(0, 4));
     else setStyleImages((prev) => [...prev, dataUrl].slice(0, 4));
+  }
+
+  /** Add a free stock / library photo to the gallery, cropped to the chosen ratio — 0 credits. */
+  async function addStockToGallery(item: PickedMedia) {
+    if (!access?.userId) throw new Error("Not signed in");
+    const blob = await fetchPickedBlob(item);
+    const src = await fileToDataUrl(new File([blob], "stock.jpg", { type: blob.type || item.mimeType }));
+    const r = ratio as "1:1" | "9:16" | "16:9" | "4:5";
+    const image = await photoToSlideBackground(src, r, 0);
+    const title = `Stock: ${item.title}`.slice(0, 80);
+    const { error } = await supabase.from("projects").insert({
+      user_id: access.userId, title, content_type: "ai_image",
+      topic: title, style: "stock", status: "generated", thumbnail_url: image, aspect_ratio: r,
+    });
+    if (error) throw new Error("Couldn't save the photo to your images");
+    qc.invalidateQueries({ queryKey: ["images-library"] });
+    qc.invalidateQueries({ queryKey: ["projects-section"] });
+    qc.invalidateQueries({ queryKey: ["recent-projects"] });
+    toast.success(`Added to your images (${r}) — no credits used`);
   }
 
   async function runGeneration(p: string, s: string, r: string, count: number) {
@@ -548,6 +579,12 @@ function ImagesPage() {
                 </div>
               </div>
               <div className="flex gap-2">
+                <button onClick={() => setStockGalleryOpen(true)} disabled={loading}
+                  title="Search free royalty-free photos from Pixabay instead of generating"
+                  className="rounded-lg glass border border-border px-4 py-2.5 text-sm font-medium flex items-center gap-2 disabled:opacity-40 hover:border-white/20">
+                  <Search className="w-4 h-4" /> Free stock
+                  <span className="ml-1 inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-1.5 py-0.5 text-[10px] font-semibold">0 credits</span>
+                </button>
                 <button onClick={regenerateExact} disabled={loading || !lastRun}
                   title={lastRun ? "Rerun with the exact last prompt & settings" : "Generate once first"}
                   className="rounded-lg glass border border-border px-4 py-2.5 text-sm font-medium flex items-center gap-2 disabled:opacity-40">
@@ -740,6 +777,16 @@ function ImagesPage() {
           )}
         </>
       )}
+
+      <MediaPicker
+        open={stockGalleryOpen}
+        onOpenChange={setStockGalleryOpen}
+        accept={["image"]}
+        defaultTab="stock"
+        title={`Free stock photos — added at ${ratio}`}
+        initialQuery={stockQueryFromPrompt(prompt)}
+        onPicked={addStockToGallery}
+      />
 
       {viewerIdx !== null && results[viewerIdx] && (
         <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"

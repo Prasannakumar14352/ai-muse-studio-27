@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Search, Loader2, Play, Library, Images } from "lucide-react";
@@ -21,7 +21,7 @@ const IMAGE_KINDS = new Set(["image", "background", "character", "logo"]);
  * Pixabay stock. Both return our own stored copy — 0 credits.
  */
 export function MediaPicker({
-  open, onOpenChange, onPicked, accept = ["image"], title, initialQuery = "",
+  open, onOpenChange, onPicked, accept = ["image"], title, initialQuery = "", defaultTab = "library",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -29,8 +29,10 @@ export function MediaPicker({
   accept?: Accept[];
   title?: string;
   initialQuery?: string;
+  defaultTab?: "library" | "stock";
 }) {
-  const [tab, setTab] = useState<"library" | "stock">("library");
+  const [tab, setTab] = useState<"library" | "stock">(defaultTab);
+  useEffect(() => { if (open) setTab(defaultTab); }, [open, defaultTab]);
   const [busy, setBusy] = useState(false);
   const wantsVideo = accept.includes("video");
   const wantsImage = accept.includes("image");
