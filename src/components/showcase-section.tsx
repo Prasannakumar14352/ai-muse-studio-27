@@ -41,13 +41,18 @@ function ShowcaseCard({ r }: { r: LandingMediaRow }) {
   );
 }
 
-export function ShowcaseSection() {
+/** Published showcase videos (Admin → Landing). Empty until the admin adds some. */
+export function useShowcaseItems() {
   const { data } = useQuery({
     queryKey: ["landing-media-public"],
     queryFn: () => listPublishedLandingMedia(),
     staleTime: 60_000,
   });
-  const items = (data ?? []).filter((r) => r.kind === "showcase" && r.video_url && (r.prompt ?? "").trim());
+  return (data ?? []).filter((r) => r.kind === "showcase" && r.video_url && (r.prompt ?? "").trim());
+}
+
+export function ShowcaseSection() {
+  const items = useShowcaseItems();
   const rail = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState({ start: true, end: false });
 
@@ -66,7 +71,7 @@ export function ShowcaseSection() {
   };
 
   return (
-    <section id="made-with" className="py-20">
+    <section id="made-with" className="py-20 scroll-mt-24">
       <div className="max-w-7xl mx-auto px-6 text-center mb-10">
         <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-semibold rounded-full px-2.5 py-1 bg-orange-500/15 text-orange-200 border border-orange-400/20">
           <Sparkles className="w-3.5 h-3.5" /> Made with CreatorFlow AI

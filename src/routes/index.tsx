@@ -21,7 +21,7 @@ import { ComparisonSection } from "@/components/comparison/ComparisonSection";
 import { EXTRA_FAQ } from "@/lib/landing-content";
 import { ComingSoonToolsSection } from "@/components/coming-soon-tools-section";
 import { BusinessPromoSection } from "@/components/business-promo-section";
-import { ShowcaseSection } from "@/components/showcase-section";
+import { ShowcaseSection, useShowcaseItems } from "@/components/showcase-section";
 import { SiteLanguageSwitcher } from "@/components/site-language-switcher";
 
 
@@ -49,6 +49,8 @@ const FAQ = [
 
 function Landing() {
   const [menuOpen, setMenuOpen] = useState(false);
+  // The examples section only exists once the admin has published showcase videos.
+  const hasExamples = useShowcaseItems().length > 0;
   return (
     <div className="min-h-screen">
       {/* Festival offer (only while one is live) */}
@@ -114,9 +116,13 @@ function Landing() {
             <Link to="/auth" className="rounded-xl gradient-primary px-7 py-3.5 text-sm font-semibold text-white shadow-[var(--shadow-glow)] hover:brightness-110 transition inline-flex items-center justify-center gap-1">
               Start free · 50 credits <ChevronRight className="w-4 h-4" />
             </Link>
-            <a href="#made-with" className="rounded-xl border border-border bg-secondary px-7 py-3.5 text-sm font-semibold hover:bg-accent transition">
-              ▶ See real examples
-            </a>
+            <button
+              type="button"
+              onClick={() => document.getElementById(hasExamples ? "made-with" : "steps")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              className="rounded-xl border border-border bg-secondary px-7 py-3.5 text-sm font-semibold hover:bg-accent transition"
+            >
+              {hasExamples ? "▶ See real examples" : "See how it works ↓"}
+            </button>
           </div>
           <div className="mt-5 text-xs text-muted-foreground">
             No card needed · Telugu, Hindi, Tamil, English and 100+ more languages
@@ -141,7 +147,7 @@ function Landing() {
       </section>
 
       {/* How it works */}
-      <section className="px-4 sm:px-6 py-16">
+      <section id="steps" className="px-4 sm:px-6 py-16 scroll-mt-20">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-10">
             <h2 className="text-3xl md:text-5xl font-bold">From idea to posted <span className="gradient-text">in 4 steps</span></h2>
