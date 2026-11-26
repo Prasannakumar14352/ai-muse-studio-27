@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import type { Metrics } from "./types";
 import { Dashboard } from "./Dashboard";
+import { LeadsCard } from "./Leads";
 import { ago } from "./format";
 
 const RANGES = [7, 30, 90] as const;
@@ -104,6 +105,7 @@ function Authed({ session }: { session: Session }) {
       {error && <div className="alert">Couldn't load the numbers: {error.text}</div>}
       {!m && !error && <div className="center muted">Loading numbers…</div>}
       {m && <Dashboard m={m} name={firstName} />}
+      {m && <main className="grid"><LeadsCard days={days} /></main>}
       <footer className="muted small">Live from the CreatorFlow database · refreshes every 5 minutes · times in IST</footer>
     </div>
   );
