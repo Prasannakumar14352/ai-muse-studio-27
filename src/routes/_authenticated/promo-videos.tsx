@@ -22,6 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 import { supabase } from "@/integrations/supabase/client";
+import { ProjectsSection } from "@/components/projects-section";
+import { useQueryClient } from "@tanstack/react-query";
 import { convertRenderToMp4 } from "@/lib/transcode-client";
 import { saveOutput } from "@/lib/local-store";
 import { useAccess, getAvailableCredits } from "@/lib/access";
@@ -145,6 +147,7 @@ function saveDraft(d: Draft) {
 // ---------- Page ----------
 
 function PromoVideosPage() {
+  const queryClient = useQueryClient();
   const { data: access } = useAccess();
   const [draft, setDraft] = useState<Draft>(() => loadDraft());
   const { runWithCredits, InsufficientDialog } = useCreditGuard();
@@ -435,6 +438,7 @@ function PromoVideosPage() {
     } catch { /* local save is best-effort */ }
 
     setDraft((d) => ({ ...d, videoUrl: savedUrl ?? videoUrl, projectId: project.id, step: 4 }));
+    void queryClient.invalidateQueries({ queryKey: ["projects-section", "promo-videos"] });
     celebrate({
       title: "Your promo video is ready!",
       subtitle: `${draft.brief.productName || "Your promo"} · ${savedUrl ? "saved to Projects." : "download it now."}`,
@@ -580,6 +584,15 @@ function PromoVideosPage() {
           </aside>
         )}
         </div>
+
+        {/* Promos made before — open one to watch, download or render it again */}
+        <ProjectsSection
+          contentTypes={["promo_video"]}
+          title="Your promo videos"
+          cacheKey="promo-videos"
+          emptyLabel="Your finished promos will appear here"
+          thumbnailAspect={fmt?.aspect === "9:16" ? "portrait" : "landscape"}
+        />
       </div>
       {InsufficientDialog}
     </>
