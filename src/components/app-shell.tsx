@@ -525,7 +525,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Main */}
       <main className="flex-1 min-w-0 pt-14 md:pt-0 overflow-y-auto">
-        <div className="hidden md:flex sticky top-0 z-20 items-center gap-3 px-6 md:px-10 py-3 border-b border-border/50 bg-background/70 backdrop-blur-xl">
+        {/* Same centred width and side padding as the page content below, so search lines up with
+            the content's left edge and the actions with its right edge. */}
+        <div className="hidden md:block sticky top-0 z-20 border-b border-border/50 bg-background/70 backdrop-blur-xl">
+          <div className="max-w-7xl mx-auto flex items-center gap-3 px-6 md:px-10 py-3">
           <button
             onClick={openCommandPalette}
             className="group flex-1 max-w-xl flex items-center gap-2 rounded-xl border border-border/60 bg-white/[0.03] hover:bg-white/[0.06] px-3 py-2 text-sm text-muted-foreground transition"
@@ -537,16 +540,19 @@ export function AppShell({ children }: { children: ReactNode }) {
               <kbd className="rounded border border-border/70 bg-white/[0.04] px-1.5 py-0.5">K</kbd>
             </span>
           </button>
-          <button
-            type="button"
-            onClick={openCreateMenu}
-            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white gradient-primary shadow-[var(--shadow-glow)] hover:brightness-110 transition"
-          >
-            <Plus className="w-4 h-4" /> Create
-          </button>
-          <NotificationsMenu />
-          <CreditsChip />
-          <ProfileMenu onSignOut={signOut} />
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              type="button"
+              onClick={openCreateMenu}
+              className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white gradient-primary shadow-[var(--shadow-glow)] hover:brightness-110 transition"
+            >
+              <Plus className="w-4 h-4" /> Create
+            </button>
+            <NotificationsMenu />
+            <CreditsChip />
+            <ProfileMenu onSignOut={signOut} />
+          </div>
+          </div>
         </div>
         {/* Extra bottom padding so the floating support button never covers the last action on a page. */}
         <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-10 pb-32 md:pb-28">{children}</div>
