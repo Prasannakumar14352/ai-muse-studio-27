@@ -50,3 +50,32 @@ export const PROMO_UNIT_TYPES = [
   "seconds",
 ] as const;
 export type PromoUnitType = (typeof PROMO_UNIT_TYPES)[number];
+
+/* ---------- Promo videos (Step 1: generated in the browser, downloaded as MP4) ---------- */
+export const PROMO_VIDEO_TEMPLATES = [
+  "product_tour",
+  "feature_spotlight",
+  "offer",
+  "faceless_explainer",
+  "telugu_voiceover",
+] as const;
+export type PromoVideoTemplate = (typeof PROMO_VIDEO_TEMPLATES)[number];
+
+/** short = YouTube Shorts / Reels 9:16; regular = YouTube 16:9. */
+export const PROMO_VIDEO_FORMATS = ["short", "regular"] as const;
+export type PromoVideoFormat = (typeof PROMO_VIDEO_FORMATS)[number];
+
+/** Allowed lengths (seconds) per format, and the scene count the script is written for. */
+export const PROMO_VIDEO_LENGTHS: Record<PromoVideoFormat, readonly number[]> = {
+  short: [15, 30, 45],
+  regular: [45, 60, 90],
+};
+export function promoVideoSceneCount(seconds: number): number {
+  return Math.min(12, Math.max(3, Math.round(seconds / 6)));
+}
+
+/** Frame size the scene stills are drawn at (the renderer scales them to its canvas). */
+export const PROMO_VIDEO_FRAME: Record<PromoVideoFormat, { width: number; height: number }> = {
+  short: { width: 1080, height: 1920 },
+  regular: { width: 1920, height: 1080 },
+};

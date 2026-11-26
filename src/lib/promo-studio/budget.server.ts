@@ -56,7 +56,10 @@ export class SpendCallError extends Error {
   readonly actualUsd: number | null;
   readonly units: number | null;
   readonly requestId: string | null;
-  constructor(message: string, opts: { actualUsd?: number | null; units?: number | null; requestId?: string | null } = {}) {
+  constructor(
+    message: string,
+    opts: { actualUsd?: number | null; units?: number | null; requestId?: string | null } = {},
+  ) {
     super(message);
     this.name = "SpendCallError";
     this.actualUsd = opts.actualUsd ?? null;
@@ -65,7 +68,8 @@ export class SpendCallError extends Error {
   }
 }
 
-export type SpendRefusalCode = "budget" | "rate" | "disabled" | "forbidden" | "per_request" | "invalid";
+export type SpendRefusalCode =
+  "budget" | "rate" | "disabled" | "forbidden" | "per_request" | "invalid";
 
 export type SpendResult<T> =
   | { ok: true; value: T; alert: boolean; logId: string }
@@ -97,7 +101,10 @@ export function refusalMessage(r: ReserveResponse): { code: SpendRefusalCode; me
       };
     case "rate": {
       const mins = Math.max(1, Math.ceil(Number(r.retry_after_s ?? 60) / 60));
-      return { code: "rate", message: `Slow down. Try again in ${mins} minute${mins === 1 ? "" : "s"}.` };
+      return {
+        code: "rate",
+        message: `Slow down. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`,
+      };
     }
     case "per_request":
       return {
@@ -160,7 +167,14 @@ export async function withSpend<T>(
   }
   const logId = r.id;
 
-  let settle: { ok: boolean; actual: number | null; units: number | null; error: string | null; requestId: string | null; creative: string | null };
+  let settle: {
+    ok: boolean;
+    actual: number | null;
+    units: number | null;
+    error: string | null;
+    requestId: string | null;
+    creative: string | null;
+  };
   let result: SpendResult<T>;
   try {
     const out = await call();
@@ -197,9 +211,14 @@ export async function withSpend<T>(
       _request_id: settle.requestId,
       _creative: settle.creative,
     });
-    if (settleErr) console.error("[promo-studio] settle failed; row stays pending", logId, settleErr.message);
+    if (settleErr)
+      console.error("[promo-studio] settle failed; row stays pending", logId, settleErr.message);
   } catch (e) {
-    console.error("[promo-studio] settle failed; row stays pending", logId, e instanceof Error ? e.message : e);
+    console.error(
+      "[promo-studio] settle failed; row stays pending",
+      logId,
+      e instanceof Error ? e.message : e,
+    );
   }
   return result;
 }

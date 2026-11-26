@@ -11,6 +11,10 @@ import {
   PROMO_LANGUAGES,
   PROMO_SIZES,
   PROMO_TEMPLATES,
+  PROMO_VIDEO_FORMATS,
+  PROMO_VIDEO_LENGTHS,
+  PROMO_VIDEO_TEMPLATES,
+  promoVideoSceneCount,
   SIZE_PX,
   type PromoSize,
 } from "@/lib/promo-studio/constants";
@@ -1387,4 +1391,234 @@ export const planWeeklyPack = createServerFn({ method: "GET" })
     const perItem = estimateRequestUsd({ size: "4:5", variants: 1, aiBackground: false });
     return { rows, estimateUsd: perItem * rows.length };
   });
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/* ================= Promo videos (Step 1): script + voice; render happens in the browser ================= */
+
+/* eslint-disable @typescript-eslint/no-explicit-any -- promo tables aren't in the generated types yet */
+const videoSchema = z
+  .object({
+    template: z.enum(PROMO_VIDEO_TEMPLATES),
+    format: z.enum(PROMO_VIDEO_FORMATS),
+    seconds: z.number().int(),
+    language: z.enum(PROMO_LANGUAGES),
+    assetIds: z.array(z.string().uuid()).min(1).max(8),
+    topic: z.string().trim().max(300).optional(),
+  })
+  .superRefine((v, c) => {
+    if (!PROMO_VIDEO_LENGTHS[v.format].includes(v.seconds))
+      c.addIssue({ code: "custom", message: "Pick a listed length" });
+    if (v.template === "telugu_voiceover" && v.language !== "te")
+      c.addIssue({ code: "custom", message: "Telugu voiceover videos are in Telugu" });
+  });
+
+export type PromoVideoPlan = {
+  batchId: string;
+  format: "short" | "regular";
+  seconds: number;
+  language: "en" | "te" | "hi";
+  template: string;
+  script: import("@/lib/promo-studio/video-script.server").PromoVideoScript;
+  assetUrls: string[];
+  offer: { code: string; label: string } | null;
+  link: string;
+  estVoiceUsd: number;
+};
+
+export const generatePromoVideoScript = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) => videoSchema.parse(d))
+  .handler(
+    async ({
+      data,
+      context,
+    }): Promise<
+      { ok: true; plan: PromoVideoPlan } | { ok: false; code: string; message: string }
+    > => {
+      const { adminId } = ctx(context);
+      const { isPromoDisabledByEnv, loadPromoSettings } =
+        await import("@/lib/promo-studio/settings.server");
+      const s = await loadPromoSettings();
+      if (isPromoDisabledByEnv() || !s.enabled)
+        return { ok: false, code: "disabled", message: "Promo Studio is turned off." };
+      const d = await db();
+      const offer = await liveOfferSnapshot(s.offer_id);
+      if (data.template === "offer" && !offer)
+        return {
+          ok: false,
+          code: "needs_offer",
+          message: "No live offer. Create or activate one in Admin → Offers first.",
+        };
+      const { data: rows } = await d
+        .from("promo_assets")
+        .select("id,path,label,feature_tag")
+        .in("id", data.assetIds)
+        .is("archived_at", null);
+      const assets = data.assetIds
+        .map((id) => ((rows ?? []) as any[]).find((a) => a.id === id))
+        .filter(Boolean) as any[];
+      if (assets.length !== data.assetIds.length)
+        return {
+          ok: false,
+          code: "invalid",
+          message: "A selected screenshot was removed. Pick again.",
+        };
+
+      const scenes = promoVideoSceneCount(data.seconds);
+      const { HONESTY_RULES } = await import("@/lib/agents/marketing.server");
+      const { liveKb } = await import("@/lib/agents/support-kb");
+      const { buildVideoPrompt, writeVideoScript } =
+        await import("@/lib/promo-studio/video-script.server");
+      const {
+        estimateCopyUsd,
+        estimateVoiceUsd,
+        PROMO_COPY_MODEL,
+        PROMO_VOICE_TURBO,
+        PROMO_VOICE_V3,
+      } = await import("@/lib/promo-studio/prices.server");
+      const { withSpend } = await import("@/lib/promo-studio/budget.server");
+      const prompt = buildVideoPrompt({
+        kb: await liveKb(d),
+        honestyRules: HONESTY_RULES,
+        appUrl: s.app_url,
+        template: data.template,
+        format: data.format,
+        seconds: data.seconds,
+        scenes,
+        language: data.language,
+        assets: assets.map((a) => ({ label: a.label, featureTag: a.feature_tag })),
+        offerTitle: offer ? offer.label.split(" · ")[0] : null,
+        defaultCta: s.default_cta,
+        topic: data.topic,
+      });
+      const batchId = crypto.randomUUID();
+      const r = await withSpend(
+        {
+          adminId,
+          step: "copy",
+          provider: "openrouter",
+          model: PROMO_COPY_MODEL,
+          batchId,
+          unitType: "input_tokens+output_tokens",
+        },
+        estimateCopyUsd({ inputChars: prompt.system.length + prompt.user.length }),
+        () => writeVideoScript(prompt, { scenes, assets: assets.length, language: data.language }),
+      );
+      if (!r.ok) {
+        if (r.code === "provider")
+          return {
+            ok: false,
+            code: "copy_failed",
+            message: "Couldn't write the script. Try again.",
+          };
+        return { ok: false, code: r.code, message: r.message };
+      }
+      const script = r.value;
+      const link = `${s.app_url}?utm_source=youtube&utm_medium=video&utm_campaign=promo_${data.template}&utm_content=${batchId.slice(0, 8)}`;
+      script.description = `${script.description}\n\nTry it free (50 credits): ${link}`;
+      const chars =
+        script.scenes.reduce((t, x) => t + x.voiceover.length, 0) + script.end.voiceover.length;
+      const model = data.language === "te" ? PROMO_VOICE_V3 : PROMO_VOICE_TURBO;
+      const signed = await signMany(assets.map((a) => a.path));
+      return {
+        ok: true,
+        plan: {
+          batchId,
+          format: data.format,
+          seconds: data.seconds,
+          language: data.language,
+          template: data.template,
+          script,
+          assetUrls: assets.map((a) => signed[a.path] ?? ""),
+          offer: offer ? { code: offer.code, label: offer.label } : null,
+          link,
+          estVoiceUsd: estimateVoiceUsd(model, chars),
+        },
+      };
+    },
+  );
+
+/** One voice clip, paid from the Promo Studio budget (never user credits). Returns MP3 as base64. */
+export const promoVideoVoice = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        batchId: z.string().uuid(),
+        text: z.string().trim().min(1).max(400),
+        language: z.enum(PROMO_LANGUAGES),
+        voice: z.string().regex(/^[A-Za-z]{2,20}$/),
+      })
+      .parse(d),
+  )
+  .handler(
+    async ({
+      data,
+      context,
+    }): Promise<
+      { ok: true; audioBase64: string } | { ok: false; code: string; message: string }
+    > => {
+      const { adminId } = ctx(context);
+      await assertEnabled();
+      const { VOICE_CATALOG } = await import("@/lib/voice-catalog");
+      if (!VOICE_CATALOG.some((v) => v.id === data.voice))
+        return { ok: false, code: "invalid", message: "Unknown voice" };
+      const { estimateVoiceUsd, PROMO_VOICE_TURBO, PROMO_VOICE_V3 } =
+        await import("@/lib/promo-studio/prices.server");
+      const { withSpend, SpendCallError } = await import("@/lib/promo-studio/budget.server");
+      const model = data.language === "te" ? PROMO_VOICE_V3 : PROMO_VOICE_TURBO;
+      const code = data.language === "en" ? null : data.language;
+      const chars = data.text.length;
+      const r = await withSpend(
+        {
+          adminId,
+          step: "voice",
+          provider: "fal",
+          model,
+          batchId: data.batchId,
+          units: chars,
+          unitType: "characters",
+        },
+        estimateVoiceUsd(model, chars),
+        async () => {
+          const key = process.env.FAL_KEY;
+          if (!key) throw new Error("Voice is not configured (missing FAL_KEY).");
+          const call = (withCode: boolean) =>
+            fetch(`https://fal.run/${model}`, {
+              method: "POST",
+              headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                text: data.text,
+                voice: data.voice,
+                ...(withCode && code ? { language_code: code } : {}),
+              }),
+              signal: AbortSignal.timeout(40_000),
+            });
+          let res = await call(true);
+          if (!res.ok && code && (res.status === 400 || res.status === 422))
+            res = await call(false);
+          const out = (await res.json().catch(() => ({}))) as { audio?: { url?: string } };
+          if (!res.ok || !out.audio?.url)
+            throw new SpendCallError(`Voice failed (${res.status})`, { units: chars });
+          const audio = await fetch(out.audio.url, { signal: AbortSignal.timeout(20_000) });
+          if (!audio.ok)
+            throw new SpendCallError("Couldn't download the voice clip", { units: chars });
+          const buf = Buffer.from(await audio.arrayBuffer());
+          return {
+            value: buf.toString("base64"),
+            actualUsd: null,
+            units: chars,
+            requestId: res.headers.get("x-fal-request-id"),
+          };
+        },
+      );
+      if (!r.ok)
+        return {
+          ok: false,
+          code: r.code,
+          message: r.code === "provider" ? "Voice generation failed. Try again." : r.message,
+        };
+      return { ok: true, audioBase64: r.value };
+    },
+  );
 /* eslint-enable @typescript-eslint/no-explicit-any */

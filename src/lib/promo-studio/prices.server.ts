@@ -17,10 +17,29 @@ export const PROMO_BG_MODEL = "fal-ai/flux/schnell";
 /** Background endpoints the code allows. promo_settings.bg_models is intersected with this. */
 export const PROMO_BG_MODEL_ALLOWLIST: readonly string[] = [PROMO_BG_MODEL];
 
+/** Promo video voices (fal ElevenLabs). Prices checked 2026-11-26 on fal's model pages:
+ *  turbo-v2.5 "$0.05 per 1000 character", eleven-v3 "$0.1 per 1000 character". */
+export const PROMO_VOICE_TURBO = "fal-ai/elevenlabs/tts/turbo-v2.5";
+export const PROMO_VOICE_V3 = "fal-ai/elevenlabs/tts/eleven-v3";
+
 export const PROMO_PRICES = {
-  [PROMO_COPY_MODEL]: { provider: "openrouter", inputPerToken: 0.0000003, outputPerToken: 0.0000025 },
+  [PROMO_COPY_MODEL]: {
+    provider: "openrouter",
+    inputPerToken: 0.0000003,
+    outputPerToken: 0.0000025,
+  },
   [PROMO_BG_MODEL]: { provider: "fal", perMegapixel: 0.003 },
+  [PROMO_VOICE_TURBO]: { provider: "fal", perChar: 0.00005 },
+  [PROMO_VOICE_V3]: { provider: "fal", perChar: 0.0001 },
 } as const;
+
+/** Voice clip estimate: characters × the model's per-character price. */
+export function estimateVoiceUsd(
+  model: typeof PROMO_VOICE_TURBO | typeof PROMO_VOICE_V3,
+  chars: number,
+): number {
+  return roundUsd(Math.max(1, chars) * PROMO_PRICES[model].perChar);
+}
 
 export type PromoPricedModel = keyof typeof PROMO_PRICES;
 
@@ -57,7 +76,10 @@ export function approxTokens(chars: number): number {
  */
 export function estimateCopyUsd(opts: { inputChars?: number } = {}): number {
   const p = PROMO_PRICES[PROMO_COPY_MODEL];
-  const input = opts.inputChars === undefined ? COPY_MAX_INPUT_TOKENS : Math.min(approxTokens(opts.inputChars), COPY_MAX_INPUT_TOKENS);
+  const input =
+    opts.inputChars === undefined
+      ? COPY_MAX_INPUT_TOKENS
+      : Math.min(approxTokens(opts.inputChars), COPY_MAX_INPUT_TOKENS);
   return roundUsd(input * p.inputPerToken + COPY_MAX_TOKENS * p.outputPerToken);
 }
 
@@ -68,7 +90,9 @@ export function billedMegapixels(width: number, height: number): number {
 
 /** Cost of one flux/schnell background at the given pixel size. */
 export function estimateBackgroundUsd(opts: { width: number; height: number }): number {
-  return roundUsd(billedMegapixels(opts.width, opts.height) * PROMO_PRICES[PROMO_BG_MODEL].perMegapixel);
+  return roundUsd(
+    billedMegapixels(opts.width, opts.height) * PROMO_PRICES[PROMO_BG_MODEL].perMegapixel,
+  );
 }
 
 /**
