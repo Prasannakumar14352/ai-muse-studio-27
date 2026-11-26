@@ -9,7 +9,7 @@
  *     the row stays pending, which keeps counting at its estimate (conservative).
  * A retry is a new withSpend call, so every attempt has its own cost-log row.
  *
- * This is company money, never user credits: nothing here touches credit_ledger.
+ * This is company money, never user credits: nothing here touches the user credit tables.
  */
 import type { PromoProvider, PromoSpendStep, PromoUnitType } from "./constants";
 import { isPricedModel, PROMO_PRICES } from "./prices.server";
