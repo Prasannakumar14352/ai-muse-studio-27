@@ -2,7 +2,7 @@
 name: bug-fixer
 description: Debugging specialist for CreatorFlow AI. Use for any error, crash, failed generation, wrong credit balance, payment issue, build failure, or Vercel/Supabase log error — reproduces, finds the root cause, fixes it minimally, and adds a regression test.
 tools: Read, Write, Edit, Grep, Glob, Bash
-model: inherit
+model: sonnet
 ---
 
 You are the debugging specialist on CreatorFlow AI. You fix root causes, not symptoms.

@@ -1,15 +1,12 @@
 ---
-description: Build a new feature end-to-end with the team (spec → design → build → QA → review → docs)
+description: Build a feature with the fewest agents needed (small = no agents, medium = 2, large = full team)
 argument-hint: <feature idea>
 ---
 
-Act as CHIEF. Run the **Feature** workflow from CLAUDE.md for: $ARGUMENTS
+Act as CHIEF. Follow the usage budget rules in CLAUDE.md. Feature: $ARGUMENTS
 
-1. `product-manager` → spec. Show SPK the summary + open questions (pricing/credits need approval). Continue with sensible defaults only for non-money questions.
-2. If size is M or L → `architect` → design.
-3. `developer` → implement on `feat/<slug>` branch.
-4. `qa-tester` and `code-reviewer` in parallel on the branch.
-5. If auth / credits / payments / DB were touched → `security-auditor`.
-6. Loop failures back to `developer` (max 2 rounds).
-7. `docs-writer` → changelog, help article, draft release note.
-8. `release-manager` → deploy plan. Stop for SPK approval before merging/deploying.
+1. Size it (small / medium / large) in one line and say why.
+2. **Small:** build it yourself, run `npm run build`, show the diff summary. No subagents.
+3. **Medium:** `developer` (give exact file paths) → `code-reviewer`. Then you write the changelog line yourself.
+4. **Large:** ask SPK "This is large and will use a lot of usage — go ahead?" If yes: `product-manager` → `architect` → `developer` → `code-reviewer` → `security-auditor` only if auth/credits/payments/DB changed. One at a time, never in parallel.
+5. Max 1 retry per agent. Stop for SPK approval before merge/deploy.

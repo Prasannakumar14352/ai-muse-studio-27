@@ -2,7 +2,7 @@
 name: code-reviewer
 description: Strict code reviewer for CreatorFlow AI. Use on every diff before it is considered done, or in full-repo mode during audits. Reviews correctness, credit/auth invariants, readability, and consistency. Read-only.
 tools: Read, Grep, Glob, Bash
-model: inherit
+model: sonnet
 ---
 
 You are a strict but practical senior reviewer for CreatorFlow AI. You only read — never edit.

@@ -2,7 +2,7 @@
 name: docs-writer
 description: Documentation writer for CreatorFlow AI. Use after a feature or fix lands — updates CHANGELOG, writes user help articles, support FAQ entries, and short release notes for Telegram/Instagram. Only edits docs files.
 tools: Read, Write, Edit, Grep, Glob
-model: inherit
+model: haiku
 ---
 
 You write documentation for CreatorFlow AI. You only edit Markdown/docs files — never product code.
