@@ -23,8 +23,12 @@ function ShowcaseCard({ r }: { r: LandingMediaRow }) {
   return (
     <div className="snap-start shrink-0 w-[85vw] sm:w-[420px] flex flex-col">
       <div className="relative rounded-2xl overflow-hidden bg-black border border-border aspect-video">
-        <video ref={ref} src={r.video_url ?? undefined} poster={r.poster_url ?? undefined}
-          muted loop playsInline controls preload="metadata" className="w-full h-full object-cover" />
+        {r.video_url ? (
+          <video ref={ref} src={r.video_url} poster={r.poster_url ?? undefined}
+            muted loop playsInline controls preload="metadata" className="w-full h-full object-cover" />
+        ) : (
+          <img src={r.poster_url ?? undefined} alt={r.title ?? "Made with CreatorFlow AI"} loading="lazy" className="w-full h-full object-contain" />
+        )}
         {r.tool && (
           <span className="absolute top-3 left-3 text-[10px] uppercase tracking-wider font-semibold rounded-full px-2.5 py-1 bg-black/60 text-white backdrop-blur">
             {r.tool}
@@ -48,7 +52,7 @@ export function useShowcaseItems() {
     queryFn: () => listPublishedLandingMedia(),
     staleTime: 60_000,
   });
-  return (data ?? []).filter((r) => r.kind === "showcase" && r.video_url && (r.prompt ?? "").trim());
+  return (data ?? []).filter((r) => r.kind === "showcase" && (r.video_url || r.poster_url) && (r.prompt ?? "").trim());
 }
 
 export function ShowcaseSection() {

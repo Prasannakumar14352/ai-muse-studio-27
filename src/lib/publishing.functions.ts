@@ -48,6 +48,17 @@ export function platformMediaProblem(platform: Platform, mediaUrls: string[]): s
   return null;
 }
 
+/** The user's connection for this platform, or a friendly error. Shared by schedulePost and Promo Studio. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function assertPublishConnection(supabase: any, userId: string, platform: Platform, connectionId: string): Promise<{ id: string }> {
+  const { data: conn } = await supabase.from("platform_connections")
+    .select("id, status, expires_at, account_label")
+    .eq("user_id", userId).eq("platform", platform).eq("id", connectionId)
+    .maybeSingle();
+  if (!conn) throw new Error(`That ${platform} account isn't connected any more. Reconnect it in Connected Accounts.`);
+  return conn as { id: string };
+}
+
 // Upload an embedded (data:) image or video to storage so it can be published
 // by URL. Returns a signed URL; the publisher re-signs it when it runs.
 export const stagePublishMedia = createServerFn({ method: "POST" })
@@ -90,11 +101,7 @@ export const schedulePost = createServerFn({ method: "POST" })
     const problem = platformMediaProblem(data.platform, media);
     if (problem) throw new Error(problem);
 
-    const { data: conn } = await supabase.from("platform_connections")
-      .select("id, status, expires_at, account_label")
-      .eq("user_id", userId).eq("platform", data.platform).eq("id", data.connectionId)
-      .maybeSingle();
-    if (!conn) throw new Error(`That ${data.platform} account isn't connected any more. Reconnect it in Connected Accounts.`);
+    const conn = await assertPublishConnection(supabase, userId, data.platform, data.connectionId);
 
     const scheduled = data.scheduledAt ?? null;
     if (scheduled && new Date(scheduled).getTime() < Date.now() - 60_000) {

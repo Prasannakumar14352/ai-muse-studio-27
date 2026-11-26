@@ -1,9 +1,10 @@
 // Admin → Promo Studio: make ads that promote CreatorFlow itself. Admin-only (route guard +
-// requireAdmin on every server fn). Library and Brand Kit tabs arrive in the next steps.
+// requireAdmin on every server fn). The Brand Kit tab arrives in the next step.
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateTab } from "./CreateTab";
+import { LibraryTab } from "./LibraryTab";
 
 export default function PromoStudioPage() {
   return (
@@ -33,6 +34,9 @@ export default function PromoStudioPage() {
         </TabsList>
         <TabsContent value="create" className="mt-6">
           <CreateTab />
+        </TabsContent>
+        <TabsContent value="library" className="mt-6">
+          <LibraryTab />
         </TabsContent>
       </Tabs>
     </div>

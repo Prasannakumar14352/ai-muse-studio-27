@@ -113,8 +113,8 @@ export const upsertLandingMedia = createServerFn({ method: "POST" })
     if (clean.poster_url === "") clean.poster_url = null;
     if (clean.video_url === "") clean.video_url = null;
     if (clean.photo_url === "") clean.photo_url = null;
-    if (data.kind === "showcase" && data.status === "published" && (!data.video_url || !data.prompt?.trim())) {
-      throw new Error("A showcase video needs a video and its prompt before it can be published.");
+    if (data.kind === "showcase" && data.status === "published" && ((!data.video_url && !data.poster_url) || !data.prompt?.trim())) {
+      throw new Error("A showcase item needs a video or image and its prompt before it can be published.");
     }
     // Enforce: real customer testimonials can only be published with consent confirmed.
     if (

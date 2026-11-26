@@ -159,6 +159,7 @@ export function CreateTab() {
       }
       setResults((prev) => [...r.creatives, ...prev]);
       qc.invalidateQueries({ queryKey: ["promo-studio"] });
+      qc.invalidateQueries({ queryKey: ["promo-library"] });
       toast.success(`${r.creatives.length} creative(s) generated`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));

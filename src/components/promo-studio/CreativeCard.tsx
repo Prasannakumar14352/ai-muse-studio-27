@@ -15,14 +15,17 @@ type Phase = "loading" | "rendering" | "done" | "overflow" | "error";
 export function CreativeCard({
   creative,
   brand: brandProp,
+  onRendered,
 }: {
   creative: PromoCreativeView;
   brand: Brand;
+  onRendered?: (outputUrls: string[]) => void;
 }) {
+  const alreadyRendered = creative.outputUrls.length > 0;
   // Snapshot brand once: the studio query refetches with new signed URLs, which must not re-render cards.
   const [brand] = useState(brandProp);
   const [local, setLocal] = useState<{ c: PromoCreativeView; brand: Brand } | null>(null);
-  const [phase, setPhase] = useState<Phase>("loading");
+  const [phase, setPhase] = useState<Phase>(alreadyRendered ? "done" : "loading");
   const [error, setError] = useState("");
   const [urls, setUrls] = useState<string[]>(creative.outputUrls);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -37,6 +40,7 @@ export function CreativeCard({
 
   // 1) Pull every image into blob: URLs (same-origin for html-to-image).
   useEffect(() => {
+    if (alreadyRendered && loadAttempt === 0) return;
     let cancelled = false;
     (async () => {
       try {
@@ -93,6 +97,7 @@ export function CreativeCard({
         if (!cancelled) {
           setUrls(outputUrls);
           setPhase("done");
+          onRendered?.(outputUrls);
         }
       } catch (e) {
         if (!cancelled) {

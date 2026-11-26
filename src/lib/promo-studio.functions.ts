@@ -667,3 +667,495 @@ export const commitPromoRender = createServerFn({ method: "POST" })
     return { outputUrls: pngs.map((p) => signed[p]) };
   });
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+/* ================= Step B: Library, edits, status, calendar, showcase ================= */
+
+/* eslint-disable @typescript-eslint/no-explicit-any -- promo tables aren't in the generated types yet */
+const VIEW_COLS =
+  "id,template,format,size,language,hook,headline,slides,cta,caption,hashtags,copy_warnings,offer_id,offer_code,offer_label,offer_ends_at,asset_ids,before_path,background_path,output_paths,text_version,rendered_text_version,status,schedule_note,scheduled_post_ids,cost_usd,created_at,updated_at";
+
+export type PromoLibraryItem = PromoCreativeView & {
+  costUsd: number;
+  scheduleNote: string | null;
+  scheduledPostIds: string[];
+  createdAt: string;
+};
+
+/** Rows → views with every image signed in one batch. outputUrls only when the render is current. */
+async function toViews(rows: any[]): Promise<PromoLibraryItem[]> {
+  const d = await db();
+  const assetIds = [...new Set(rows.flatMap((r) => (r.asset_ids ?? []) as string[]))];
+  const { data: assets } = assetIds.length
+    ? await d.from("promo_assets").select("id,path").in("id", assetIds)
+    : { data: [] };
+  const assetPath = new Map(((assets ?? []) as any[]).map((a) => [a.id, a.path as string]));
+  const signed = await signMany(
+    rows.flatMap((r) => [
+      r.before_path,
+      r.background_path,
+      ...(r.output_paths ?? []),
+      ...((r.asset_ids ?? []) as string[]).map((id) => assetPath.get(id)),
+    ]),
+  );
+  return rows.map((r) => {
+    const current = (r.output_paths ?? []).length > 0 && r.rendered_text_version === r.text_version;
+    return {
+      id: r.id,
+      template: r.template,
+      format: r.format,
+      size: r.size,
+      language: r.language,
+      hook: r.hook,
+      headline: r.headline,
+      slides: r.slides ?? [],
+      cta: r.cta,
+      caption: r.caption,
+      hashtags: r.hashtags ?? [],
+      copyWarnings: r.copy_warnings ?? [],
+      offer: r.offer_code
+        ? { code: r.offer_code, label: r.offer_label ?? "", endsAt: r.offer_ends_at }
+        : null,
+      assetUrls: ((r.asset_ids ?? []) as string[])
+        .map((id) => signed[assetPath.get(id) ?? ""] ?? "")
+        .filter(Boolean),
+      beforeUrl: r.before_path ? (signed[r.before_path] ?? null) : null,
+      backgroundUrl: r.background_path ? (signed[r.background_path] ?? null) : null,
+      textVersion: r.text_version,
+      status: r.status,
+      outputUrls: current
+        ? (r.output_paths as string[]).map((p) => signed[p] ?? "").filter(Boolean)
+        : [],
+      costUsd: Number(r.cost_usd ?? 0),
+      scheduleNote: r.schedule_note ?? null,
+      scheduledPostIds: r.scheduled_post_ids ?? [],
+      createdAt: r.created_at,
+    };
+  });
+}
+
+async function audit(
+  adminId: string,
+  action: string,
+  targetId: string | null,
+  details: Record<string, unknown>,
+) {
+  await (
+    await db()
+  )
+    .from("promo_audit")
+    .insert({ admin_id: adminId, action, target_id: targetId, details });
+}
+
+/** Design §7.3: settle scheduled creatives against their scheduled_posts rows. */
+async function syncScheduled() {
+  const d = await db();
+  const { data: sched } = await d
+    .from("promo_creatives")
+    .select("id,scheduled_post_ids")
+    .eq("status", "scheduled")
+    .limit(200);
+  const list = (sched ?? []) as any[];
+  if (!list.length) return;
+  const ids = [...new Set(list.flatMap((c) => c.scheduled_post_ids as string[]))];
+  const { data: posts } = ids.length
+    ? await d.from("scheduled_posts").select("id,status,last_error").in("id", ids)
+    : { data: [] };
+  const byId = new Map(((posts ?? []) as any[]).map((p) => [p.id, p]));
+  for (const c of list) {
+    const linked = (c.scheduled_post_ids as string[])
+      .map((id) => byId.get(id))
+      .filter(Boolean) as any[];
+    const ids2 = linked.map((p) => p.id);
+    if (!linked.length) {
+      await d
+        .from("promo_creatives")
+        .update({ status: "approved", scheduled_post_ids: [], schedule_note: null })
+        .eq("id", c.id)
+        .eq("status", "scheduled");
+    } else if (linked.every((p) => ["published", "manually_published"].includes(p.status))) {
+      await d
+        .from("promo_creatives")
+        .update({ status: "posted", schedule_note: null })
+        .eq("id", c.id)
+        .eq("status", "scheduled");
+    } else {
+      const failed = linked.find((p) => ["failed", "reconnect_required"].includes(p.status));
+      await d
+        .from("promo_creatives")
+        .update({
+          scheduled_post_ids: ids2,
+          schedule_note: failed
+            ? `Post failed: ${failed.last_error ?? failed.status}`.slice(0, 300)
+            : null,
+        })
+        .eq("id", c.id)
+        .eq("status", "scheduled");
+    }
+  }
+}
+
+export const listPromoCreatives = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        status: z
+          .enum(["draft", "approved", "scheduled", "posted", "archived", "active"])
+          .default("active"),
+        template: z.enum(PROMO_TEMPLATES).optional(),
+        page: z.number().int().min(0).max(1000).default(0),
+      })
+      .parse(d ?? {}),
+  )
+  .handler(async ({ data }) => {
+    await assertEnabled();
+    await syncScheduled();
+    const d = await db();
+    let q = d.from("promo_creatives").select(VIEW_COLS, { count: "exact" });
+    q = data.status === "active" ? q.neq("status", "archived") : q.eq("status", data.status);
+    if (data.template) q = q.eq("template", data.template);
+    const {
+      data: rows,
+      count,
+      error,
+    } = await q
+      .order("created_at", { ascending: false })
+      .range(data.page * 24, data.page * 24 + 23);
+    if (error) throw new Error(error.message);
+    return { items: await toViews(rows ?? []), total: count ?? 0, pageSize: 24 };
+  });
+
+export const getPromoCreative = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    await assertEnabled();
+    const { data: row } = await (
+      await db()
+    )
+      .from("promo_creatives")
+      .select(VIEW_COLS)
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!row) throw new Error("Creative not found");
+    return (await toViews([row]))[0];
+  });
+
+export const updatePromoCreativeText = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        headline: z.string().trim().min(1).max(120).optional(),
+        hook: z.string().trim().min(1).max(120).optional(),
+        cta: z.string().trim().min(1).max(40).optional(),
+        caption: z.string().max(2200).optional(),
+        hashtags: z.array(z.string().trim().min(1).max(60)).max(30).optional(),
+        slides: z
+          .array(z.object({ title: z.string().trim().min(1).max(80), body: z.string().max(200) }))
+          .min(3)
+          .max(5)
+          .optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertEnabled();
+    const { adminId } = ctx(context);
+    const d = await db();
+    const { data: c } = await d
+      .from("promo_creatives")
+      .select("id,status,format,slides,text_version")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!c) throw new Error("Creative not found");
+    if (!["draft", "approved"].includes(c.status))
+      throw new Error("Only drafts or approved creatives can be edited");
+    if (
+      data.slides &&
+      (c.format !== "carousel" || data.slides.length !== (c.slides as unknown[]).length)
+    )
+      throw new Error("Keep the same number of slides");
+    const patch: Record<string, unknown> = { text_version: Number(c.text_version) + 1 };
+    for (const k of ["headline", "hook", "cta", "caption", "slides"] as const)
+      if (data[k] !== undefined) patch[k] = data[k];
+    if (data.hashtags) patch.hashtags = data.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`));
+    if (c.status === "approved")
+      Object.assign(patch, { status: "draft", approved_by: null, approved_at: null });
+    const { data: upd, error } = await d
+      .from("promo_creatives")
+      .update(patch)
+      .eq("id", c.id)
+      .eq("text_version", c.text_version)
+      .select(VIEW_COLS);
+    if (error) throw new Error(error.message);
+    if (!(upd ?? []).length)
+      throw new Error("Someone else just edited this. Reload and try again.");
+    await audit(adminId, "creative.edit", c.id, { fields: Object.keys(patch) });
+    return (await toViews(upd))[0];
+  });
+
+async function assertOfferStillLive(c: any) {
+  if (!c.offer_code) return;
+  const { isOfferLive } = await import("@/lib/offers.server");
+  const { data: o } = c.offer_id
+    ? await (await db()).from("offers").select("*").eq("id", c.offer_id).maybeSingle()
+    : { data: null };
+  if (!o || o.code !== c.offer_code || !isOfferLive(o))
+    throw new Error("This offer has ended. Regenerate or remove the offer.");
+  return o;
+}
+
+export const setPromoCreativeStatus = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z
+      .object({ id: z.string().uuid(), to: z.enum(["approved", "draft", "posted", "archived"]) })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertEnabled();
+    const { adminId } = ctx(context);
+    const d = await db();
+    const { data: c } = await d.from("promo_creatives").select("*").eq("id", data.id).maybeSingle();
+    if (!c) throw new Error("Creative not found");
+    const allowed: Record<string, string[]> = {
+      approved: ["draft"],
+      draft: ["approved", "archived"],
+      posted: ["approved"],
+      archived: ["draft", "approved"],
+    };
+    if (!allowed[data.to].includes(c.status))
+      throw new Error(`Can't move a ${c.status} creative to ${data.to}.`);
+    const patch: Record<string, unknown> = { status: data.to };
+    if (data.to === "approved") {
+      if (!(c.output_paths ?? []).length || c.rendered_text_version !== c.text_version)
+        throw new Error("Render the creative before approving it");
+      await assertOfferStillLive(c);
+      Object.assign(patch, { approved_by: adminId, approved_at: new Date().toISOString() });
+    }
+    if (data.to === "draft" && c.status === "approved")
+      Object.assign(patch, { approved_by: null, approved_at: null });
+    const { data: upd, error } = await d
+      .from("promo_creatives")
+      .update(patch)
+      .eq("id", c.id)
+      .eq("status", c.status)
+      .select(VIEW_COLS);
+    if (error) throw new Error(error.message);
+    if (!(upd ?? []).length) throw new Error(`Can't move a ${c.status} creative to ${data.to}.`);
+    await audit(adminId, "creative.transition", c.id, { from: c.status, to: data.to });
+    return (await toViews(upd))[0];
+  });
+
+/** Admin's own connected accounts that can take an image post. */
+export const getPromoConnections = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .handler(async ({ context }) => {
+    const { adminId } = ctx(context);
+    const { data } = await (
+      await db()
+    )
+      .from("platform_connections")
+      .select("id,platform,account_label,status")
+      .eq("user_id", adminId)
+      .in("platform", ["instagram", "facebook", "linkedin"]);
+    return ((data ?? []) as any[]).map((c) => ({
+      id: c.id as string,
+      platform: c.platform as "instagram" | "facebook" | "linkedin",
+      label: (c.account_label as string) || c.platform,
+      ok: c.status === "connected",
+    }));
+  });
+
+export const schedulePromoCreative = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        creativeId: z.string().uuid(),
+        targets: z
+          .array(
+            z.object({
+              platform: z.enum(["instagram", "facebook", "linkedin"]),
+              connectionId: z.string().uuid(),
+            }),
+          )
+          .min(1)
+          .max(3),
+        scheduledAt: z.string().datetime(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertEnabled();
+    const { adminId } = ctx(context);
+    const supabase = (context as unknown as { supabase: any }).supabase;
+    const d = await db();
+    const { data: c } = await d
+      .from("promo_creatives")
+      .select("*")
+      .eq("id", data.creativeId)
+      .maybeSingle();
+    if (!c) throw new Error("Creative not found");
+    if (c.status !== "approved") throw new Error("Approve this creative first");
+    const at = new Date(data.scheduledAt).getTime();
+    if (at < Date.now() + 5 * 60_000) throw new Error("Pick a time at least 5 minutes from now.");
+    if (at > Date.now() + 45 * 86_400_000) throw new Error("Pick a time within the next 45 days.");
+    const offer = await assertOfferStillLive(c);
+    const ends = offer?.ends_at ?? c.offer_ends_at;
+    if (ends && at > new Date(ends).getTime())
+      throw new Error("This post would go out after the offer ends.");
+
+    const { platformMediaProblem, assertPublishConnection } =
+      await import("@/lib/publishing.functions");
+    const paths = (c.publish_paths ?? []) as string[];
+    if (!paths.length || c.rendered_text_version !== c.text_version)
+      throw new Error("Render the creative before scheduling it");
+    const { data: urls, error: sErr } = await d.storage
+      .from("renders")
+      .createSignedUrls(paths, 45 * 86_400);
+    if (sErr) throw new Error("Couldn't prepare the images");
+    const media = ((urls ?? []) as any[]).map((u) => u.signedUrl as string);
+    for (const t of data.targets) {
+      const problem = platformMediaProblem(t.platform, media);
+      if (problem) throw new Error(problem);
+      if (t.platform === "instagram" && c.size === "9:16")
+        throw new Error(
+          "Instagram feed posts need 4:5 or 1:1. Download the story and post it manually.",
+        );
+      await assertPublishConnection(supabase, adminId, t.platform, t.connectionId);
+    }
+    const ids: string[] = [];
+    for (const t of data.targets) {
+      const { data: row, error } = await supabase
+        .from("scheduled_posts")
+        .insert({
+          user_id: adminId,
+          project_id: null,
+          platform: t.platform,
+          connection_id: t.connectionId,
+          title: String(c.headline).slice(0, 100),
+          caption: c.caption,
+          hashtags: (c.hashtags ?? []).join(" "),
+          media_urls: media,
+          scheduled_at: data.scheduledAt,
+          status: "scheduled",
+        })
+        .select("id")
+        .single();
+      if (error) {
+        if (ids.length) await d.from("scheduled_posts").delete().in("id", ids);
+        throw new Error(error.message);
+      }
+      ids.push(row.id);
+    }
+    const { data: upd } = await d
+      .from("promo_creatives")
+      .update({ status: "scheduled", scheduled_post_ids: ids, schedule_note: null })
+      .eq("id", c.id)
+      .eq("status", "approved")
+      .select("id");
+    if (!(upd ?? []).length) {
+      await d.from("scheduled_posts").delete().in("id", ids);
+      throw new Error("This creative changed. Reload and try again.");
+    }
+    await audit(adminId, "creative.schedule", c.id, {
+      targets: data.targets.map((t) => t.platform),
+      at: data.scheduledAt,
+    });
+    return { ok: true, postIds: ids };
+  });
+
+export const cancelPromoSchedule = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) => z.object({ creativeId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertEnabled();
+    const { adminId } = ctx(context);
+    const d = await db();
+    const { data: c } = await d
+      .from("promo_creatives")
+      .select("id,status,scheduled_post_ids")
+      .eq("id", data.creativeId)
+      .maybeSingle();
+    if (!c || c.status !== "scheduled") throw new Error("This creative isn't scheduled");
+    const ids = (c.scheduled_post_ids ?? []) as string[];
+    if (ids.length) {
+      const { data: live } = await d.from("scheduled_posts").select("id,status").in("id", ids);
+      if (
+        ((live ?? []) as any[]).some((p) =>
+          ["publishing", "published", "manually_published"].includes(p.status),
+        )
+      )
+        throw new Error("This post is already going out.");
+      await d
+        .from("scheduled_posts")
+        .delete()
+        .in("id", ids)
+        .eq("user_id", adminId)
+        .in("status", ["scheduled", "failed", "reconnect_required"]);
+    }
+    await d
+      .from("promo_creatives")
+      .update({ status: "approved", scheduled_post_ids: [], schedule_note: null })
+      .eq("id", c.id)
+      .eq("status", "scheduled");
+    await audit(adminId, "creative.unschedule", c.id, {});
+    return { ok: true };
+  });
+
+/** Copies the first slide to the public landing bucket and adds a DRAFT showcase item (publish it in Admin → Landing). */
+export const addPromoToShowcase = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) => z.object({ creativeId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertEnabled();
+    const { adminId } = ctx(context);
+    const d = await db();
+    const { data: c } = await d
+      .from("promo_creatives")
+      .select("*")
+      .eq("id", data.creativeId)
+      .maybeSingle();
+    if (!c) throw new Error("Creative not found");
+    if (!["approved", "scheduled", "posted"].includes(c.status))
+      throw new Error("Approve this creative first");
+    const src = (c.output_paths ?? [])[0];
+    if (!src) throw new Error("Render the creative first");
+    const { data: existing } = await d
+      .from("landing_media")
+      .select("id")
+      .eq("kind", "showcase")
+      .eq("source_ref", `promo:${c.id}`)
+      .limit(1);
+    if ((existing ?? []).length) return { ok: true, already: true };
+    const { data: blob, error: dErr } = await d.storage.from("renders").download(src);
+    if (dErr || !blob) throw new Error("Couldn't read the rendered image");
+    const path = `showcase/promo-${c.id}.png`;
+    const { error: uErr } = await d.storage
+      .from("landing")
+      .upload(path, blob, { contentType: "image/png", upsert: true });
+    if (uErr) throw new Error(`Upload failed: ${uErr.message}`);
+    const url = d.storage.from("landing").getPublicUrl(path).data.publicUrl as string;
+    const { count } = await d
+      .from("landing_media")
+      .select("id", { count: "exact", head: true })
+      .eq("kind", "showcase");
+    const { error } = await d.from("landing_media").insert({
+      kind: "showcase",
+      status: "draft",
+      title: c.headline,
+      poster_url: url,
+      prompt: c.hook,
+      tool: "Promo Studio",
+      source_ref: `promo:${c.id}`,
+      display_order: count ?? 0,
+      consent_confirmed: false,
+    });
+    if (error) throw new Error(error.message);
+    await audit(adminId, "creative.showcase", c.id, { url });
+    return { ok: true, already: false };
+  });
+/* eslint-enable @typescript-eslint/no-explicit-any */
