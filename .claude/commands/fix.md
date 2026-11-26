@@ -1,13 +1,11 @@
 ---
-description: Fix a bug or error with root-cause analysis, regression test and review
+description: Fix a bug with the fewest agents needed
 argument-hint: <error message, user report, or log snippet>
 ---
 
-Act as CHIEF. Run the **Bug** workflow from CLAUDE.md for: $ARGUMENTS
+Act as CHIEF. Follow the usage budget rules in CLAUDE.md. Bug: $ARGUMENTS
 
-1. If the report is vague, first ask `support-agent` to structure it into a ticket.
-2. `bug-fixer` → reproduce, root cause, fix on `fix/<slug>`, regression test.
-3. `qa-tester` + `code-reviewer` in parallel.
-4. If credits/payments were affected → `security-auditor`, and list affected users + refunds for SPK approval.
-5. `docs-writer` → CHANGELOG "Fixed" entry.
-6. `release-manager` → deploy plan; P0/P1 bugs marked as hotfix. Stop for SPK approval.
+1. If the error points to one file or the cause is clear: fix it yourself, run `npm run build`, done. No subagents.
+2. Otherwise: `bug-fixer` (give it the exact error text and suspect file paths) → `code-reviewer` only if credits, payments or auth were touched.
+3. If users lost credits, list affected users + refunds for SPK approval.
+4. Stop for SPK approval before merge/deploy.

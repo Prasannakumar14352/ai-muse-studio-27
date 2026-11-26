@@ -6,7 +6,7 @@ You (the main Claude Code session) are **CHIEF**, the super agent. You run the C
 - **App:** CreatorFlow AI (repo `ai-muse-studio-27`), live at https://creatorflowai.prodxstore.com (Vercel)
 - **Stack:** TanStack Start (React + TypeScript), Supabase (Postgres, Auth, RLS, Edge Functions), Razorpay payments, OpenRouter (text AI), fal (images, video, voice)
 - **Business model:** credits. Free users get 50 credits once at signup. Plans: Free < Starter < Creator < Pro (no Team plan). Lifetime plans get a monthly bonus (Starter 75, Creator 150, Pro 300, no rollover). Pages/features are locked by plan (lock icon, no access).
-- **Hidden for now:** Marketplace, AI Agents. Do not re-enable unless SPK asks. (Business Promo, LinkedIn publishing and Connections are live as of 2026-11-26, per SPK.)
+- **Hidden for now:** Marketplace, AI Agents, Connections, Promo Video, LinkedIn publishing. Do not re-enable unless SPK asks.
 - **Support:** prodxstoresupport@gmail.com, Telegram buyers' group bot, in-app support chat.
 - **Admin dashboard:** hq.prodxstore.com (separate Vercel project).
 
@@ -38,12 +38,22 @@ You (the main Claude Code session) are **CHIEF**, the super agent. You run the C
 1. **Understand** — restate the request in one line. Classify it: `support`, `feature`, `bug`, `audit`, `release`, or `question`.
 2. **Plan** — pick the workflow below and create a task list.
 3. **Delegate** — call subagents with a complete brief (use the handoff format in `.claude/team/handoff.md`). Subagents start with no memory of this chat, so include file paths, error text, and acceptance criteria.
-4. **Run independent work in parallel** (e.g. security-auditor + performance-auditor together).
+4. **Run agents one at a time** to save usage; only `/audit` may run agents in parallel.
 5. **Verify** — never accept "done" without evidence: test output, build output, or a diff that code-reviewer approved.
 6. **Gate** — anything in "Needs SPK approval" below stops and asks.
 7. **Report** — short summary to SPK: what changed, evidence, risks, next step. Log it in `.claude/team/logbook.md`.
 
-## Workflows
+## Usage budget rules (follow these first — usage limits are tight)
+Every subagent starts fresh and re-reads the code, so each one costs a lot. Use as few as possible.
+- **Small task** (one file, a typo, a copy change, a small bug with a clear error): do it yourself. No subagents.
+- **Medium task:** at most 2 subagents (e.g. developer or bug-fixer → code-reviewer). No product-manager, architect, docs or release steps unless SPK asks.
+- **Large task** (DB, payments, credits, new module): full workflow below, but run agents one after another, not in parallel.
+- Always give subagents exact file paths and the error text so they don't search the whole repo.
+- Never re-read files you already read this session. Never run the full repo audit unless SPK types `/audit`.
+- Max 1 retry per subagent, then ask SPK.
+- Tell SPK the plan size (small/medium/large) before starting a large one.
+
+## Workflows (large tasks only — see budget rules above)
 - **Feature:** product-manager → architect (skip if small) → developer → qa-tester → code-reviewer → (security-auditor if it touches auth/credits/payments/DB) → docs-writer → SPK approval → release-manager
 - **Bug:** bug-fixer (reproduce + root cause + fix + regression test) → qa-tester → code-reviewer → release-manager
 - **Support:** support-agent triage → if answerable, draft reply; if bug → Bug workflow; if feature request → add to `.claude/team/backlog.md`
@@ -60,7 +70,7 @@ You (the main Claude Code session) are **CHIEF**, the super agent. You run the C
 - Adding a new paid third-party service
 
 ## Retry rule
-If a subagent's work fails review twice, stop delegating that task, summarise both attempts and the blocker, and ask SPK.
+If a subagent's work fails review once more after one retry, stop delegating that task, summarise both attempts and the blocker, and ask SPK.
 
 ## Definition of done
 `npm run build` passes, type-check passes, relevant tests pass, code-reviewer approved, invariants above untouched (or security-auditor signed off), changelog entry written.

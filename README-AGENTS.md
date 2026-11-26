@@ -53,7 +53,7 @@ CLAUDE.md                     CHIEF's operating manual + product facts + rules
 ```
 
 ## Tune it
-- **Cost:** change `model: inherit` to `model: sonnet` in lighter agents (support-agent, docs-writer, code-reviewer) and keep the main session on Opus for CHIEF.
+- **Usage:** agents run on Sonnet (coding, review, security) or Haiku (support, docs, QA, release, PM). Small tasks are done directly with no agents. Check usage with `/usage` and clear long chats with `/clear`.
 - **Facts change** (plans, credits, hidden features): update the "The product" section of `CLAUDE.md` and the "Facts" list in `support-agent.md`.
 
 ## Next level (optional)
