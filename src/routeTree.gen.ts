@@ -63,6 +63,7 @@ import { Route as AuthenticatedAdminMarketplaceRouteImport } from './routes/_aut
 import { Route as AuthenticatedAdminOffersRouteImport } from './routes/_authenticated/admin.offers'
 import { Route as AuthenticatedAdminPaymentsRouteImport } from './routes/_authenticated/admin.payments'
 import { Route as AuthenticatedAdminPlanAccessRouteImport } from './routes/_authenticated/admin.plan-access'
+import { Route as AuthenticatedAdminPromoStudioRouteImport } from './routes/_authenticated/admin.promo-studio'
 import { Route as AuthenticatedAdminReadinessRouteImport } from './routes/_authenticated/admin.readiness'
 import { Route as AuthenticatedAdminTemplatesRouteImport } from './routes/_authenticated/admin.templates'
 import { Route as AuthenticatedAdminWebhooksRouteImport } from './routes/_authenticated/admin.webhooks'
@@ -362,6 +363,12 @@ const AuthenticatedAdminPlanAccessRoute =
     path: '/plan-access',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminPromoStudioRoute =
+  AuthenticatedAdminPromoStudioRouteImport.update({
+    id: '/promo-studio',
+    path: '/promo-studio',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminReadinessRoute =
   AuthenticatedAdminReadinessRouteImport.update({
     id: '/readiness',
@@ -505,6 +512,7 @@ export interface FileRoutesByFullPath {
   '/admin/offers': typeof AuthenticatedAdminOffersRoute
   '/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/admin/plan-access': typeof AuthenticatedAdminPlanAccessRoute
+  '/admin/promo-studio': typeof AuthenticatedAdminPromoStudioRoute
   '/admin/readiness': typeof AuthenticatedAdminReadinessRoute
   '/admin/templates': typeof AuthenticatedAdminTemplatesRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
@@ -573,6 +581,7 @@ export interface FileRoutesByTo {
   '/admin/offers': typeof AuthenticatedAdminOffersRoute
   '/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/admin/plan-access': typeof AuthenticatedAdminPlanAccessRoute
+  '/admin/promo-studio': typeof AuthenticatedAdminPromoStudioRoute
   '/admin/readiness': typeof AuthenticatedAdminReadinessRoute
   '/admin/templates': typeof AuthenticatedAdminTemplatesRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
@@ -645,6 +654,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/offers': typeof AuthenticatedAdminOffersRoute
   '/_authenticated/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/_authenticated/admin/plan-access': typeof AuthenticatedAdminPlanAccessRoute
+  '/_authenticated/admin/promo-studio': typeof AuthenticatedAdminPromoStudioRoute
   '/_authenticated/admin/readiness': typeof AuthenticatedAdminReadinessRoute
   '/_authenticated/admin/templates': typeof AuthenticatedAdminTemplatesRoute
   '/_authenticated/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
@@ -717,6 +727,7 @@ export interface FileRouteTypes {
     | '/admin/offers'
     | '/admin/payments'
     | '/admin/plan-access'
+    | '/admin/promo-studio'
     | '/admin/readiness'
     | '/admin/templates'
     | '/admin/webhooks'
@@ -785,6 +796,7 @@ export interface FileRouteTypes {
     | '/admin/offers'
     | '/admin/payments'
     | '/admin/plan-access'
+    | '/admin/promo-studio'
     | '/admin/readiness'
     | '/admin/templates'
     | '/admin/webhooks'
@@ -856,6 +868,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/offers'
     | '/_authenticated/admin/payments'
     | '/_authenticated/admin/plan-access'
+    | '/_authenticated/admin/promo-studio'
     | '/_authenticated/admin/readiness'
     | '/_authenticated/admin/templates'
     | '/_authenticated/admin/webhooks'
@@ -1278,6 +1291,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPlanAccessRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/promo-studio': {
+      id: '/_authenticated/admin/promo-studio'
+      path: '/promo-studio'
+      fullPath: '/admin/promo-studio'
+      preLoaderRoute: typeof AuthenticatedAdminPromoStudioRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/readiness': {
       id: '/_authenticated/admin/readiness'
       path: '/readiness'
@@ -1395,6 +1415,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminOffersRoute: typeof AuthenticatedAdminOffersRoute
   AuthenticatedAdminPaymentsRoute: typeof AuthenticatedAdminPaymentsRoute
   AuthenticatedAdminPlanAccessRoute: typeof AuthenticatedAdminPlanAccessRoute
+  AuthenticatedAdminPromoStudioRoute: typeof AuthenticatedAdminPromoStudioRoute
   AuthenticatedAdminReadinessRoute: typeof AuthenticatedAdminReadinessRoute
   AuthenticatedAdminTemplatesRoute: typeof AuthenticatedAdminTemplatesRoute
   AuthenticatedAdminWebhooksRoute: typeof AuthenticatedAdminWebhooksRoute
@@ -1410,6 +1431,7 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminOffersRoute: AuthenticatedAdminOffersRoute,
   AuthenticatedAdminPaymentsRoute: AuthenticatedAdminPaymentsRoute,
   AuthenticatedAdminPlanAccessRoute: AuthenticatedAdminPlanAccessRoute,
+  AuthenticatedAdminPromoStudioRoute: AuthenticatedAdminPromoStudioRoute,
   AuthenticatedAdminReadinessRoute: AuthenticatedAdminReadinessRoute,
   AuthenticatedAdminTemplatesRoute: AuthenticatedAdminTemplatesRoute,
   AuthenticatedAdminWebhooksRoute: AuthenticatedAdminWebhooksRoute,

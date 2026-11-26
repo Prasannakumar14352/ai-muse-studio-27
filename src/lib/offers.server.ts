@@ -61,12 +61,14 @@ export function offerDuration(o: Pick<OfferRow, "recurring" | "recurring_cycles"
   return `on the first ${unit}`;
 }
 
-function isLive(o: OfferRow, now = Date.now()): boolean {
+export function isOfferLive(o: OfferRow, now = Date.now()): boolean {
   if (!o.active) return false;
   if (o.starts_at && new Date(o.starts_at).getTime() > now) return false;
   if (o.ends_at && new Date(o.ends_at).getTime() <= now) return false;
   return true;
 }
+
+const isLive = isOfferLive;
 
 async function redeemedCount(admin: Admin, offerId: string, userId?: string): Promise<number> {
   let q = admin.from("offer_redemptions").select("id", { count: "exact", head: true }).eq("offer_id", offerId).eq("status", "redeemed");
