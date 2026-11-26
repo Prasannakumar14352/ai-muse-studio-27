@@ -79,6 +79,7 @@ export function buildCopyPrompt(args: {
   topic?: string;
   assets: { label: string; featureTag: string }[];
   offerTitle: string | null;
+  defaultCta?: string;
 }): { system: string; user: string } {
   const system = [
     "You write short, honest social-media ad copy that promotes the CreatorFlow AI app itself (an AI content-creation platform for creators and small businesses).",
@@ -88,6 +89,9 @@ export function buildCopyPrompt(args: {
     "TEMPLATE: " + TEMPLATE_BRIEF[args.template],
     LANGUAGE_RULE[args.language],
     "Never write a discount code, a price, a percentage or a date. The design adds the offer itself.",
+    args.defaultCta
+      ? `Preferred CTA: "${args.defaultCta}" (translate it for Telugu/Hindi; you may vary it slightly).`
+      : "",
     "Hooks and headlines must be different in every variant. Headline ≤ 8 words. CTA ≤ 4 words.",
     'Reply with JSON only: {"variants":[{"hook","headline","slides"?:[{"title","body"}],"cta","caption","hashtags":[...]}]}',
   ].join("\n\n");

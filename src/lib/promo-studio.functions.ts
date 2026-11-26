@@ -401,6 +401,7 @@ export const generatePromoCreatives = createServerFn({ method: "POST" })
       topic: data.topic,
       assets: assets.map((a) => ({ label: a.label, featureTag: a.feature_tag })),
       offerTitle: offer ? offer.label.split(" · ")[0] : null,
+      defaultCta: s.default_cta,
     });
     const estUsd = estimateRequestUsd({
       size: data.size,
@@ -604,6 +605,7 @@ async function pngSize(url: string): Promise<{ w: number; h: number } | null> {
     headers: { Range: "bytes=0-23" },
     signal: AbortSignal.timeout(10_000),
   });
+  if (!res.ok) return null;
   const buf = new Uint8Array(await res.arrayBuffer());
   if (buf.length < 24 || buf[1] !== 0x50 || buf[2] !== 0x4e || buf[3] !== 0x47) return null;
   const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
@@ -1157,5 +1159,232 @@ export const addPromoToShowcase = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     await audit(adminId, "creative.showcase", c.id, { url });
     return { ok: true, already: false };
+  });
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/* ================= Step C: Brand Kit, budget, weekly pack ================= */
+
+/* eslint-disable @typescript-eslint/no-explicit-any -- promo tables aren't in the generated types yet */
+export const getPromoBrandKit = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .handler(async () => {
+    const { isPromoDisabledByEnv, loadPromoSettings } =
+      await import("@/lib/promo-studio/settings.server");
+    if (isPromoDisabledByEnv()) throw new Error("Promo Studio is turned off");
+    const s = await loadPromoSettings();
+    const { isOfferLive, offerLabel } = await import("@/lib/offers.server");
+    const d = await db();
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+    const [offersRes, spendRes, countRes] = await Promise.all([
+      d
+        .from("offers")
+        .select("*")
+        .eq("active", true)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      d
+        .from("promo_cost_log")
+        .select("est_usd,actual_usd")
+        .gte("created_at", monthStart.toISOString()),
+      d
+        .from("promo_creatives")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", monthStart.toISOString()),
+    ]);
+    const offers = ((offersRes.data ?? []) as any[])
+      .filter((o) => isOfferLive(o))
+      .map((o) => ({
+        id: o.id as string,
+        code: o.code as string,
+        label: `${o.title} · ${offerLabel(o)}`,
+        endsAt: o.ends_at as string | null,
+      }));
+    const monthSpend = ((spendRes.data ?? []) as any[]).reduce(
+      (t, r) => t + Number(r.actual_usd ?? r.est_usd ?? 0),
+      0,
+    );
+    const creativesThisMonth = countRes.count ?? 0;
+    return {
+      settings: {
+        enabled: s.enabled,
+        colors: s.colors,
+        appUrl: s.app_url,
+        defaultCta: s.default_cta,
+        offerId: s.offer_id,
+        monthlyCapUsd: s.monthly_cap_usd,
+        perRequestCapUsd: s.per_request_cap_usd,
+        rate10m: s.rate_10m,
+        rate24h: s.rate_24h,
+      },
+      offerEnded: !!s.offer_id && !offers.some((o) => o.id === s.offer_id),
+      offers,
+      stats: {
+        monthSpend,
+        creativesThisMonth,
+        avgCost: creativesThisMonth ? monthSpend / creativesThisMonth : 0,
+      },
+    };
+  });
+
+export const savePromoBrandKit = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) => d)
+  .handler(async ({ data, context }) => {
+    const { adminId } = ctx(context);
+    const { isPromoDisabledByEnv, savePromoSettings, promoSettingsPatchSchema } =
+      await import("@/lib/promo-studio/settings.server");
+    if (isPromoDisabledByEnv()) throw new Error("Promo Studio is turned off");
+    const patch = promoSettingsPatchSchema.parse(data);
+    if (patch.offerId) {
+      const { isOfferLive } = await import("@/lib/offers.server");
+      const { data: o } = await (
+        await db()
+      )
+        .from("offers")
+        .select("*")
+        .eq("id", patch.offerId)
+        .maybeSingle();
+      if (!o || !isOfferLive(o)) throw new Error("That offer isn't live. Pick a live offer.");
+    }
+    await savePromoSettings(adminId, patch);
+    return { ok: true };
+  });
+
+export const updatePromoAsset = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        label: z.string().trim().max(80).optional(),
+        featureTag: z.enum(PROMO_FEATURE_TAGS).optional(),
+        archived: z.boolean().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    await assertEnabled();
+    const patch: Record<string, unknown> = {};
+    if (data.label !== undefined) patch.label = data.label;
+    if (data.featureTag) patch.feature_tag = data.featureTag;
+    if (data.archived !== undefined)
+      patch.archived_at = data.archived ? new Date().toISOString() : null;
+    const { error } = await (await db()).from("promo_assets").update(patch).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+function istDate(offsetDays: number): string {
+  const t = new Date(Date.now() + 5.5 * 3_600_000 + offsetDays * 86_400_000);
+  return t.toISOString().slice(0, 10);
+}
+
+const MEDIA_TAG: Record<string, string> = {
+  thumbnails: "thumbnails",
+  thumbnail: "thumbnails",
+  carousel: "carousels",
+  carousels: "carousels",
+  images: "images",
+  image: "images",
+  video: "video",
+  voice: "voice",
+  voiceover: "voice",
+  captions: "captions",
+  research: "research",
+  planner: "planner",
+  pricing: "pricing",
+};
+
+export type WeeklyPackRow = {
+  planItemId: string;
+  date: string;
+  idea: string;
+  template: "feature_spotlight" | "offer_festival" | "before_after";
+  format: "image" | "carousel" | "story";
+  size: PromoSize;
+  language: "en" | "te" | "hi";
+  slides?: number;
+  assetIds: string[];
+  existingCreativeId: string | null;
+  note: string | null;
+};
+
+/** Design §8 H1–H9: map this week's content plan (IST) to one creative per item. Read-only. */
+export const planWeeklyPack = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .handler(async () => {
+    const s = await assertEnabled();
+    const d = await db();
+    const [itemsRes, assetsRes, offer] = await Promise.all([
+      d
+        .from("content_plan_items")
+        .select("id,plan_date,idea,format,build,media_id,status")
+        .gte("plan_date", istDate(0))
+        .lte("plan_date", istDate(6))
+        .in("status", ["planned", "drafted"])
+        .order("plan_date", { ascending: true })
+        .limit(7),
+      d
+        .from("promo_assets")
+        .select("id,feature_tag,created_at")
+        .is("archived_at", null)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      liveOfferSnapshot(s.offer_id),
+    ]);
+    const items = (itemsRes.data ?? []) as any[];
+    const assets = (assetsRes.data ?? []) as any[];
+    const ids = items.map((i) => i.id);
+    const { data: existing } = ids.length
+      ? await d
+          .from("promo_creatives")
+          .select("id,plan_item_id")
+          .in("plan_item_id", ids)
+          .neq("status", "archived")
+      : { data: [] };
+    const existingBy = new Map(((existing ?? []) as any[]).map((e) => [e.plan_item_id, e.id]));
+    const { estimateRequestUsd } = await import("@/lib/promo-studio/prices.server");
+
+    const rows: WeeklyPackRow[] = items.map((it) => {
+      const idea = String(it.idea ?? "");
+      const format: WeeklyPackRow["format"] =
+        it.format === "carousel" ? "carousel" : it.format === "image" ? "image" : "story";
+      const size: PromoSize = format === "story" ? "9:16" : "4:5";
+      let template: WeeklyPackRow["template"] = "feature_spotlight";
+      let note: string | null = null;
+      const offerish =
+        /offer|deal|sale|festival|diwali|christmas|sankranti|ugadi|discount/i.test(idea) ||
+        (!!offer && idea.toUpperCase().includes(offer.code.toUpperCase()));
+      if (offerish) {
+        if (offer) template = "offer_festival";
+        else note = "No live offer, so this uses Feature spotlight.";
+      }
+      const language: WeeklyPackRow["language"] = /telugu/i.test(idea)
+        ? "te"
+        : /hindi/i.test(idea)
+          ? "hi"
+          : "en";
+      const tag =
+        it.build === "walkthrough" ? MEDIA_TAG[String(it.media_id ?? "").toLowerCase()] : undefined;
+      const asset = (tag && assets.find((a) => a.feature_tag === tag)) || assets[0];
+      if (template !== "offer_festival" && !asset) note = "Upload at least one screenshot first.";
+      return {
+        planItemId: it.id,
+        date: it.plan_date,
+        idea,
+        template,
+        format,
+        size,
+        language,
+        slides: format === "carousel" ? 3 : undefined,
+        assetIds: asset ? [asset.id] : [],
+        existingCreativeId: existingBy.get(it.id) ?? null,
+        note,
+      };
+    });
+    const perItem = estimateRequestUsd({ size: "4:5", variants: 1, aiBackground: false });
+    return { rows, estimateUsd: perItem * rows.length };
   });
 /* eslint-enable @typescript-eslint/no-explicit-any */

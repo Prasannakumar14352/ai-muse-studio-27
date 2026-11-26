@@ -31,6 +31,7 @@ import {
   type PromoTemplate,
 } from "@/lib/promo-studio/constants";
 import { CreativeCard } from "./CreativeCard";
+import { WeeklyPackDialog } from "./WeeklyPackDialog";
 
 const TEMPLATES: { id: PromoTemplate; name: string; hint: string }[] = [
   {
@@ -442,6 +443,9 @@ export function CreateTab() {
             )}
             Generate {variants} creative{variants > 1 ? "s" : ""}
           </Button>
+          <span className="ml-0 mt-2 inline-block sm:ml-3 sm:mt-0">
+            <WeeklyPackDialog brand={brand} />
+          </span>
         </div>
       </div>
 
