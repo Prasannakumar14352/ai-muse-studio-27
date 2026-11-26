@@ -67,7 +67,30 @@ function ProjectView() {
         supabase.from("projects").select("*").eq("id", id).maybeSingle(),
         getOutput(id),
       ]);
-      return { project, output: output as LocalOutput | null };
+      let out = output as LocalOutput | null;
+      const meta = (project?.metadata ?? {}) as {
+        render_path?: string;
+        plan?: { title?: string; scenes?: Array<{ visual_prompt?: string; voiceover?: string; duration_sec?: number; on_screen_text?: string }> };
+      };
+      // Videos uploaded to storage: always sign a fresh link (works on any device, never expires on us).
+      if (meta.render_path) {
+        const { data: signed } = await supabase.storage.from("renders").createSignedUrl(meta.render_path, 60 * 60 * 24 * 7);
+        if (signed?.signedUrl) out = { ...(out ?? emptyOutput(id)), video_url: signed.signedUrl };
+      }
+      // Business Promo projects made before videos were saved: rebuild the scenes from the plan
+      // so the video can be rendered again from this page.
+      if (!out?.scenes?.length && meta.plan?.scenes?.length) {
+        out = {
+          ...(out ?? emptyOutput(id)),
+          title: out?.title || meta.plan.title || project?.title || "",
+          script: meta.plan.scenes.map((sc) => sc.voiceover ?? "").filter(Boolean).join("\n"),
+          scenes: meta.plan.scenes.map((sc, i) => ({
+            n: i + 1, visual: sc.visual_prompt ?? "", voiceover: sc.voiceover ?? "",
+            duration: String(sc.duration_sec ?? 5), on_screen_text: sc.on_screen_text,
+          })),
+        };
+      }
+      return { project, output: out };
     },
   });
 
@@ -2457,4 +2480,12 @@ function projectVoiceLanguage(project: { language?: string | null; metadata?: un
   const meta = (project.metadata ?? {}) as { voice_language?: string | null };
   if (meta.voice_language) return meta.voice_language;
   return project.language && project.language !== "auto" ? project.language : null;
+}
+
+function emptyOutput(projectId: string): LocalOutput {
+  return {
+    id: crypto.randomUUID(), project_id: projectId, title: "", hook: "", script: "", captions: "",
+    hashtags: [], scenes: [], image_prompts: [], thumbnail_ideas: [], video_url: null,
+    updated_at: new Date().toISOString(),
+  };
 }
