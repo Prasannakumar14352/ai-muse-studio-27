@@ -8,7 +8,7 @@ import {
   Wand2, Send, AlertCircle, Clock, Loader2, Maximize2, Volume2, VolumeX,
 } from "lucide-react";
 import {
-  PRODUCT_WALKTHROUGHS, WRITTEN_TESTIMONIALS,
+  PRODUCT_WALKTHROUGHS,
   REFUND_ELIGIBLE, REFUND_INELIGIBLE, TRUST_BADGES,
   type Testimonial, type ProductWalkthrough,
 } from "@/lib/landing-content";
@@ -708,39 +708,33 @@ function WrittenCard({ t }: { t: Testimonial }) {
 }
 
 export function WrittenTestimonialsSection() {
-  // Merge admin-published written reviews (testimonials with no video) with the
-  // built-in Indian sample reviews. Verified customer reviews (`source === "customer"`)
-  // hide the "Sample Review" badge automatically via WrittenCard.
+  // Real customer reviews only (published from Admin → Landing with source "customer").
+  // The section stays hidden until there is at least one: sample reviews on a sales page
+  // cost more trust than they win.
   const { data: dbRows } = useQuery({
     queryKey: ["landing-media-public"],
     queryFn: () => listPublishedLandingMedia(),
     staleTime: 60_000,
   });
-  const dbWritten = (dbRows ?? [])
-    .filter((r) => r.kind === "testimonial" && !r.video_url && (r.review ?? "").trim().length > 0)
+  const reviews = (dbRows ?? [])
+    .filter((r) => r.kind === "testimonial" && r.source === "customer" && !r.video_url && (r.review ?? "").trim().length > 0)
     .map(landingRowToTestimonial);
-
-  // Prefer admin-published rows first; fall back to built-in Indian samples.
-  const combined = dbWritten.length > 0 ? [...dbWritten, ...WRITTEN_TESTIMONIALS] : WRITTEN_TESTIMONIALS;
-  const hasRealCustomers = combined.some((t) => (t.source ?? "sample") === "customer");
-  const loop = [...combined, ...combined];
+  if (reviews.length === 0) return null;
+  const loop = reviews.length >= 4 ? [...reviews, ...reviews] : reviews;
 
   return (
     <section className="py-20">
       <div className="max-w-7xl mx-auto px-6 text-center mb-10">
-        <h2 className="text-3xl md:text-4xl font-bold">
-          {hasRealCustomers ? "Loved by creators" : "Sample Creator Reviews"}
-        </h2>
-        <p className="mt-3 text-sm text-muted-foreground max-w-xl mx-auto">
-          {hasRealCustomers
-            ? "Real reviews from creators using CreatorFlow AI, alongside illustrative samples clearly marked as such."
-            : "Illustrative sample reviews from Indian creators showing how CreatorFlow AI fits different workflows. Real customer reviews will replace these as they come in."}
-        </p>
+        <h2 className="text-3xl md:text-4xl font-bold">Loved by creators</h2>
+        <p className="mt-3 text-sm text-muted-foreground max-w-xl mx-auto">Real reviews from creators using CreatorFlow AI.</p>
       </div>
       <div className="relative overflow-hidden group">
         <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-background to-transparent z-10" />
         <div className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-background to-transparent z-10" />
-        <div className="flex gap-5 animate-marquee group-hover:[animation-play-state:paused]" style={{ width: "max-content" }}>
+        <div
+          className={reviews.length >= 4 ? "flex gap-5 animate-marquee group-hover:[animation-play-state:paused]" : "flex flex-wrap justify-center gap-5 px-6"}
+          style={reviews.length >= 4 ? { width: "max-content" } : undefined}
+        >
           {loop.map((t, i) => <WrittenCard key={`${t.id}-${i}`} t={t} />)}
         </div>
       </div>
