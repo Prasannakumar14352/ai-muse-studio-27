@@ -19,13 +19,14 @@ export const getBuyersGroupAccess = createServerFn({ method: "GET" })
     const { userId } = context as unknown as Ctx;
     const { admin, getAgentSettings } = await import("@/lib/agents/core.server");
     const db = await admin();
-    const [settings, { data: subs }, { data: profile }] = await Promise.all([
+    const [settings, { data: subs }, { data: isAdminRpc }] = await Promise.all([
       getAgentSettings(db),
       db.from("subscriptions")
         .select("plan_name, plan_type, expires_at, lifetime_access")
         .eq("user_id", userId).eq("status", "active")
         .order("started_at", { ascending: false }).limit(5),
-      db.from("profiles").select("is_admin").eq("id", userId).maybeSingle(),
+      // Admin check via user_roles, not the profiles.is_admin column.
+      db.rpc("has_role", { _user_id: userId, _role: "admin" }),
     ]);
     const now = Date.now();
     const paid = ((subs ?? []) as Array<{ plan_name: string | null; plan_type: string | null; expires_at: string | null; lifetime_access: boolean | null }>)
@@ -34,7 +35,7 @@ export const getBuyersGroupAccess = createServerFn({ method: "GET" })
         if (name === "free" || (s.plan_type ?? "").toLowerCase() === "free") return false;
         return Boolean(s.lifetime_access) || !s.expires_at || new Date(s.expires_at).getTime() > now;
       });
-    const isAdmin = Boolean((profile as { is_admin?: boolean } | null)?.is_admin);
+    const isAdmin = isAdminRpc === true;
     const eligible = Boolean(paid) || isAdmin;
     const url = settings.buyers_group_invite_url;
     return {

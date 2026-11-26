@@ -9,6 +9,8 @@ import { confirmDialog } from "@/components/confirm-dialog";
 import { CREDIT_COSTS, CREDIT_GUIDE_INTRO, ASSET_CREDIT_COST } from "@/lib/credit-costs";
 import { Crown, Users, Layers, Zap, Plus, Shield, ShieldOff, Ban, Loader2, ChevronDown, ChevronRight, Coins, FileText, FileDown, Printer, Image as ImageIcon, Film, Video } from "lucide-react";
 import { promptDialog } from "@/components/prompt-dialog";
+import { useServerFn } from "@tanstack/react-start";
+import { adminAddCreditsFn, adminSetAdminRoleFn, adminCancelSubscriptionFn } from "@/lib/admin-users.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/")({ component: AdminPanel });
 
@@ -16,6 +18,10 @@ function AdminPanel() {
   const { data: access, isLoading } = useAccess();
   const qc = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
+  // Writes go through admin-checked server functions (users can't write these columns).
+  const addCreditsServer = useServerFn(adminAddCreditsFn);
+  const setAdminRoleServer = useServerFn(adminSetAdminRoleFn);
+  const cancelSubscriptionServer = useServerFn(adminCancelSubscriptionFn);
 
   const { data: users, refetch } = useQuery({
     queryKey: ["admin-users"],
@@ -52,11 +58,13 @@ function AdminPanel() {
     const n = raw ? parseInt(raw, 10) : NaN;
     if (!Number.isFinite(n) || n <= 0) return;
     setBusy(userId);
-    const { data: cur } = await supabase.from("profiles").select("user_credits").eq("id", userId).single();
-    const newBal = (cur?.user_credits ?? 0) + n;
-    const { error } = await supabase.from("profiles").update({ user_credits: newBal } as any).eq("id", userId);
+    try {
+      await addCreditsServer({ data: { userId, amount: n } });
+    } catch (e) {
+      setBusy(null);
+      return toast.error(e instanceof Error ? e.message : "Could not add credits");
+    }
     setBusy(null);
-    if (error) return toast.error(error.message);
     toast.success(`Added ${n} credits`);
     refetch();
     qc.invalidateQueries({ queryKey: ["access"] });
@@ -64,13 +72,11 @@ function AdminPanel() {
 
   async function toggleAdmin(userId: string, makeAdmin: boolean) {
     setBusy(userId);
-    const { error: pErr } = await supabase.from("profiles")
-      .update({ is_admin: makeAdmin, role: makeAdmin ? "admin" : "user" } as any).eq("id", userId);
-    if (pErr) { setBusy(null); return toast.error(pErr.message); }
-    if (makeAdmin) {
-      await (supabase.from("user_roles") as any).insert({ user_id: userId, role: "admin" });
-    } else {
-      await (supabase.from("user_roles") as any).delete().eq("user_id", userId).eq("role", "admin");
+    try {
+      await setAdminRoleServer({ data: { userId, makeAdmin } });
+    } catch (e) {
+      setBusy(null);
+      return toast.error(e instanceof Error ? e.message : "Could not change admin role");
     }
     setBusy(null);
     toast.success(makeAdmin ? "User promoted to admin" : "Admin role removed");
@@ -86,10 +92,13 @@ function AdminPanel() {
     });
     if (!ok) return;
     setBusy(userId);
-    const { error } = await supabase.from("subscriptions")
-      .update({ status: "cancelled" } as any).eq("user_id", userId).eq("status", "active");
+    try {
+      await cancelSubscriptionServer({ data: { userId } });
+    } catch (e) {
+      setBusy(null);
+      return toast.error(e instanceof Error ? e.message : "Could not cancel subscription");
+    }
     setBusy(null);
-    if (error) return toast.error(error.message);
     toast.success("Subscription cancelled");
     refetch();
   }

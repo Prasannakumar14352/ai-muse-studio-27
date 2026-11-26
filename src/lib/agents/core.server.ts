@@ -85,8 +85,9 @@ export async function alertAdmins(text: string, db?: Admin): Promise<number> {
   const s = await getAgentSettings(a);
   const token = await botToken(s);
   if (!token) return 0;
-  const { data: admins } = await a.from("profiles").select("id").eq("is_admin", true);
-  const ids = (admins ?? []).map((r: { id: string }) => r.id);
+  // user_roles is the admin source of truth (profiles.is_admin is display-only).
+  const { data: admins } = await a.from("user_roles").select("user_id").eq("role", "admin");
+  const ids = (admins ?? []).map((r: { user_id: string }) => r.user_id);
   if (!ids.length) return 0;
   const { data: links } = await a.from("telegram_links").select("telegram_user_id").in("user_id", ids);
   let sent = 0;

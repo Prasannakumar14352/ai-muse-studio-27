@@ -122,8 +122,8 @@ export async function handleTelegramUpdate(update: TgUpdate): Promise<void> {
   if (replyTo?.from?.id && replyTo.from.id !== msg.from.id && !replyTo.from.is_bot) {
     const { data: senderLink } = await db.from("telegram_links").select("user_id").eq("telegram_user_id", msg.from.id).maybeSingle();
     if (senderLink?.user_id) {
-      const { data: p } = await db.from("profiles").select("is_admin").eq("id", senderLink.user_id).maybeSingle();
-      if (p?.is_admin) return;
+      const { data: isAdmin } = await db.rpc("has_role", { _user_id: senderLink.user_id, _role: "admin" });
+      if (isAdmin === true) return;
     }
   }
 
