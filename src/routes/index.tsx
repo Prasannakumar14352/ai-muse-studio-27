@@ -22,6 +22,7 @@ import { EXTRA_FAQ } from "@/lib/landing-content";
 import { ComingSoonToolsSection } from "@/components/coming-soon-tools-section";
 import { BusinessPromoSection } from "@/components/business-promo-section";
 import { ShowcaseSection, useShowcaseItems } from "@/components/showcase-section";
+import { LeadMagnetSection, PainSection } from "@/components/landing-growth";
 import { SiteLanguageSwitcher } from "@/components/site-language-switcher";
 
 
@@ -118,10 +119,10 @@ function Landing() {
             </Link>
             <button
               type="button"
-              onClick={() => document.getElementById(hasExamples ? "made-with" : "steps")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              onClick={() => document.getElementById(hasExamples ? "made-with" : "demo")?.scrollIntoView({ behavior: "smooth", block: "start" })}
               className="rounded-xl border border-border bg-secondary px-7 py-3.5 text-sm font-semibold hover:bg-accent transition"
             >
-              {hasExamples ? "▶ See real examples" : "See how it works ↓"}
+              {hasExamples ? "▶ See real examples" : "▶ Watch the 60-second demo"}
             </button>
           </div>
           <div className="mt-5 text-xs text-muted-foreground">
@@ -146,6 +147,14 @@ function Landing() {
         </div>
       </section>
 
+      {/* Demo video right under the hero: the product proves itself first */}
+      <div id="demo" className="scroll-mt-20">
+        <DemoVideoSection />
+      </div>
+
+      {/* The pain: by hand vs CreatorFlow */}
+      <PainSection />
+
       {/* How it works */}
       <section id="steps" className="px-4 sm:px-6 py-16 scroll-mt-20">
         <div className="max-w-6xl mx-auto">
@@ -168,9 +177,6 @@ function Landing() {
           </div>
         </div>
       </section>
-
-      {/* Demo Video */}
-      <DemoVideoSection />
 
       {/* Real videos made in the app, with their prompts (Admin → Landing) */}
       <ShowcaseSection />
@@ -197,6 +203,9 @@ function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Lead magnet: 50 faceless video ideas (email capture) */}
+      <LeadMagnetSection />
 
       {/* Small businesses: ads + promo videos */}
       <BusinessPromoSection />
