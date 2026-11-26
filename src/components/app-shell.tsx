@@ -133,6 +133,7 @@ const SECTIONS: readonly NavSection[] = [
     adminOnly: true,
     items: [
       { to: "/admin", label: "Admin", icon: Crown },
+      { to: "/admin/promo-studio", label: "Promo Studio", icon: Megaphone },
       { to: "/admin/templates", label: "Templates CMS", icon: Sparkles },
       { to: "/admin/integrations", label: "Social Publishing", icon: Plug },
       { to: "/admin/marketplace", label: "Marketplace CMS", icon: Store },

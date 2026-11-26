@@ -65,10 +65,11 @@ export function BrandKitForm() {
   });
 
   return (
-    // Three columns only on very wide screens: with the app sidebar open, the
-    // old xl layout squeezed the form to ~170px. Below 2xl the preview drops
-    // under the form at full width.
-    <div className="grid 2xl:grid-cols-[220px_minmax(0,1fr)_minmax(0,460px)] lg:grid-cols-[200px_minmax(0,1fr)] gap-6">
+    // Sized by the space the page actually has (container queries), not the window width:
+    // inside the app shell (sidebar + max-w-7xl) the 3-column layout overflowed and cut the
+    // preview off. Three columns only when the container is truly wide; otherwise the
+    // preview sits under the form at full width.
+    <div className="grid @[1400px]:grid-cols-[220px_minmax(0,1fr)_minmax(0,460px)] @[720px]:grid-cols-[200px_minmax(0,1fr)] gap-6">
       {/* Kit list */}
       <aside className="space-y-2">
         <button onClick={() => setEditing(empty)} className="w-full px-3 py-2.5 rounded-xl bg-gradient-to-r from-primary to-primary/70 text-primary-foreground text-sm font-semibold shadow-lg">
@@ -255,7 +256,7 @@ export function BrandKitForm() {
       </div>
 
       {/* Live preview */}
-      <div className="2xl:sticky 2xl:top-4 h-fit space-y-3 lg:col-span-2 2xl:col-span-1">
+      <div className="@[1400px]:sticky @[1400px]:top-4 h-fit space-y-3 @[720px]:col-span-2 @[1400px]:col-span-1">
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold">Live preview</div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Updates instantly</div>
