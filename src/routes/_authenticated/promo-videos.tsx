@@ -22,6 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { CreatorFlowSelect } from "@/components/ui/creator-flow-select";
 import { supabase } from "@/integrations/supabase/client";
+import { convertRenderToMp4 } from "@/lib/transcode-client";
+import { saveOutput } from "@/lib/local-store";
 import { useAccess, getAvailableCredits } from "@/lib/access";
 import { findLanguage } from "@/lib/languages";
 import { useCreditGuard } from "@/lib/use-credit-guard";
@@ -399,11 +401,44 @@ function PromoVideosPage() {
     }).select().single();
     if (pErr) throw pErr;
 
-    setDraft((d) => ({ ...d, videoUrl, projectId: project.id, step: 4 }));
+    // 4) Upload the video so it's still there after a refresh and on the project page.
+    //    (Before, the video only lived in this browser tab and was lost on reload.)
+    let savedUrl: string | null = null;
+    try {
+      setRenderProgress(0.99);
+      const ext = result.extension || "webm";
+      const path = `${access.userId}/${project.id}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("renders").upload(path, result.blob, {
+        contentType: result.mimeType || result.blob.type || "video/webm", upsert: true,
+      });
+      if (upErr) throw upErr;
+      const mp4 = await convertRenderToMp4(path, isVertical ? "vertical" : fmtLocal.aspect === "1:1" ? "square" : "landscape", { deleteSource: true });
+      const finalPath = mp4?.path ?? path;
+      savedUrl = mp4?.url
+        ?? (await supabase.storage.from("renders").createSignedUrl(finalPath, 60 * 60 * 24 * 7)).data?.signedUrl
+        ?? null;
+      await supabase.from("projects").update({
+        metadata: { ...(project.metadata as Record<string, unknown> ?? {}), render_path: finalPath },
+      }).eq("id", project.id);
+    } catch (e) {
+      console.warn("[promo] upload failed", e);
+      toast.warning("Your promo is ready here, but saving it to Projects failed — download it now so you don't lose it.");
+    }
+    try {
+      await saveOutput(project.id, {
+        title: plan.title,
+        hook: plan.scenes[0]?.on_screen_text ?? "",
+        script: plan.scenes.map((s) => s.voiceover).filter(Boolean).join("\n"),
+        scenes: scenes.map((sc) => ({ n: sc.n, visual: sc.visual, voiceover: sc.voiceover, duration: sc.duration, on_screen_text: sc.on_screen_text })),
+        video_url: savedUrl,
+      });
+    } catch { /* local save is best-effort */ }
+
+    setDraft((d) => ({ ...d, videoUrl: savedUrl ?? videoUrl, projectId: project.id, step: 4 }));
     celebrate({
       title: "Your promo video is ready!",
-      subtitle: `${draft.brief.productName || "Your promo"} · saved to Projects.`,
-      videoUrl,
+      subtitle: `${draft.brief.productName || "Your promo"} · ${savedUrl ? "saved to Projects." : "download it now."}`,
+      videoUrl: savedUrl ?? videoUrl,
       downloadName: `${(plan.title || "promo").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.mp4`,
       primaryLabel: "See my promo",
     });
