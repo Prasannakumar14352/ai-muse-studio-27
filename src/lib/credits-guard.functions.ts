@@ -72,12 +72,15 @@ export const reserveCreditsFn = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<ReserveResult> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { CLIENT_RESERVATION_PREFIX } = await import("@/lib/credit-refund.server");
     const { data: result, error } = await supabaseAdmin.rpc("reserve_credits", {
       _user_id: context.userId,
       _amount: data.amount,
       _action: data.action,
       _project_id: (data.projectId ?? null) as unknown as string,
-      _idempotency_key: data.idempotencyKey,
+      // Marks this as a browser-opened reservation: only these can be refunded
+      // through refundLedgerFn (see credit-refund.server.ts).
+      _idempotency_key: `${CLIENT_RESERVATION_PREFIX}${data.idempotencyKey}`,
       _description: data.description,
     });
     if (error) {
@@ -108,23 +111,23 @@ export const finalizeCreditsFn = createServerFn({ method: "POST" })
     return result as { ok: boolean };
   });
 
+/**
+ * Refund a reservation the browser opened with reserveCreditsFn, when the
+ * browser-side work failed. Only the caller's own row, only while it is still
+ * 'reserved' (never a finalized generation), and never a reservation the
+ * server opened itself.
+ */
 export const refundLedgerFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { ledgerId: string; reason?: string }) => {
-    if (!input?.ledgerId) throw new Error("ledgerId required");
+    if (!input?.ledgerId || typeof input.ledgerId !== "string") throw new Error("ledgerId required");
     return { ledgerId: input.ledgerId, reason: (input.reason ?? "generation_failed").slice(0, 240) };
   })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row } = await supabaseAdmin
-      .from("credit_ledger").select("user_id").eq("id", data.ledgerId).maybeSingle();
-    if (!row || row.user_id !== context.userId) throw new Error("forbidden");
-    const { data: result, error } = await supabaseAdmin.rpc("refund_credits_by_ledger", {
-      _ledger_id: data.ledgerId,
-      _reason: data.reason,
-    });
-    if (error) throw new Error(error.message);
-    return result as { ok: boolean; refunded?: number };
+    const { refundClientReservation } = await import("@/lib/credit-refund.server");
+    type Db = import("@/lib/credit-refund.server").AdminDb;
+    return refundClientReservation(supabaseAdmin as unknown as Db, context.userId, data.ledgerId, data.reason);
   });
 
 export const getCreditSummaryFn = createServerFn({ method: "GET" })

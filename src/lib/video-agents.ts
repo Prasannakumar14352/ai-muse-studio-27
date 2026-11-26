@@ -2326,21 +2326,10 @@ export async function runRenderPhase(
       console.warn("[video-pipeline] settling job credits did not complete", settleErr);
     }
     return out;
-  } catch (e) {
-    // The user paid for shots and narration but got no usable video —
-    // give those credits back automatically.
-    if ((e as { name?: string })?.name !== "AbortError") {
-      try {
-        const { refundVideoJobCredits } = await import("@/lib/video-refund.functions");
-        const r = await refundVideoJobCredits({ data: { jobId, reason: `render_failed: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200) } });
-        if (r.refunded > 0) {
-          opts.onEvent({ type: "error", message: `${e instanceof Error ? e.message : "Render failed"} — ${r.refunded} credits were refunded to your account.` });
-        }
-      } catch (refundErr) {
-        console.warn("[video-pipeline] refund after failed render did not complete", refundErr);
-      }
-    }
-    throw e;
+    // A failed render is not refunded here: the shots and narration were
+    // generated and charged by the server, and a browser-chosen job id can't
+    // authorise a refund (audit 2026-11-26, C4). Reservations the server opened
+    // and the provider failed are already refunded by the server itself.
   } finally {
     setCreditJobTag(null);
   }

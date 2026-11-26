@@ -187,21 +187,11 @@ export const cancelGenerationJobFn = createServerFn({ method: "POST" })
   .inputValidator((v: unknown) => z.object({ id: z.string().uuid() }).parse(v))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row } = await supabaseAdmin.from("generation_jobs")
-      .select("id, user_id, status, ledger_id").eq("id", data.id).maybeSingle();
-    if (!row || row.user_id !== context.userId) throw new Error("forbidden");
-    if (row.status === "completed" || row.status === "failed" || row.status === "cancelled") {
-      return { ok: true, alreadyTerminal: true };
-    }
-    await supabaseAdmin.from("generation_jobs").update({
-      status: "cancelled", failed_at: new Date().toISOString(), error_code: "cancelled_by_user",
-    }).eq("id", data.id);
-    if (row.ledger_id) {
-      try {
-        await supabaseAdmin.rpc("refund_credits_by_ledger", { _ledger_id: row.ledger_id, _reason: "user_cancelled" });
-      } catch (e) { console.warn("[cancel] refund failed", e); }
-    }
-    return { ok: true, alreadyTerminal: false };
+    const { cancelJobAndRefund } = await import("@/lib/credit-refund.server");
+    type Db = import("@/lib/credit-refund.server").AdminDb;
+    // Refunds only the server-linked, still-reserved ledger row of the caller's own job.
+    const r = await cancelJobAndRefund(supabaseAdmin as unknown as Db, context.userId, data.id);
+    return { ok: true, alreadyTerminal: r.alreadyTerminal };
   });
 
 /**
