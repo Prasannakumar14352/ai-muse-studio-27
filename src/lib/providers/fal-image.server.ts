@@ -3,7 +3,7 @@
  *
  * This is ONLY the transport: no auth, no plan check, no credit charging, no
  * budget. Every caller must do those first:
- *   - src/routes/api/generate-image.ts charges user credits (chargeCredits) before calling it.
+ *   - the paid image route (generate-image.ts) reserves user credits before calling it.
  *   - src/lib/promo-studio/** reserves company budget (withSpend) before calling it.
  * Never import this from a route component, a component, or a *.functions.ts
  * module that isn't behind requireAdmin / a credit charge.
