@@ -103,14 +103,14 @@ function Landing() {
         <div className="pointer-events-none absolute inset-0 [background:radial-gradient(ellipse_60%_50%_at_50%_0%,rgb(249_115_22/0.20),transparent_70%),radial-gradient(ellipse_40%_40%_at_85%_20%,rgb(236_72_153/0.16),transparent_70%)]" aria-hidden />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-14 sm:pt-20 pb-16 text-center">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-primary/40 bg-primary/10 text-xs font-semibold text-primary mb-6">
-            <Sparkles className="w-3.5 h-3.5" /> New · Script → Video in your language
+            <Sparkles className="w-3.5 h-3.5" /> Faceless videos · Telugu, Hindi, English + 100 more
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-[1.04] max-w-5xl mx-auto">
-            Turn one idea into <span className="gradient-text">videos, ads &amp; posts</span> — in your language.
+            Make <span className="gradient-text">faceless YouTube videos</span> in your language — no camera, no editing.
           </h1>
           <p className="mt-6 max-w-2xl mx-auto text-base sm:text-lg text-muted-foreground">
-            Paste a script or type an idea. CreatorFlow writes, designs, voices and schedules it —
-            and you review every scene before a single media credit is spent.
+            Type one idea. CreatorFlow writes the script, records the voice, adds visuals and captions,
+            and schedules it to YouTube — you review every scene before a single media credit is spent.
           </p>
           <div className="mt-9 flex flex-col sm:flex-row justify-center gap-3">
             <Link to="/auth" className="rounded-xl gradient-primary px-7 py-3.5 text-sm font-semibold text-white shadow-[var(--shadow-glow)] hover:brightness-110 transition inline-flex items-center justify-center gap-1">

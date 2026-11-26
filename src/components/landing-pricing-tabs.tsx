@@ -7,6 +7,7 @@ import { useQuery, queryOptions } from "@tanstack/react-query";
 import { Check, Star, Infinity as InfinityIcon } from "lucide-react";
 import { planUpdatesLine } from "@/lib/plan-updates";
 import { listPricingPlans, type PricingPlan, type BillingCycle } from "@/lib/pricing.functions";
+import { getExchangeRate } from "@/lib/fx-rate.functions";
 
 const plansQuery = queryOptions({
   queryKey: ["pricing-plans"],
@@ -18,6 +19,17 @@ function usd(n: number) {
   return `$${n.toLocaleString("en-IN")}`;
 }
 
+function inr(n: number) {
+  return `₹${Math.round(n).toLocaleString("en-IN")}`;
+}
+
+/** Today's USD→INR rate (same source as checkout). Null while loading or if it fails — then USD only. */
+function useInrRate(): number | null {
+  const { data } = useQuery({ queryKey: ["fx-rate-public"], queryFn: () => getExchangeRate(), staleTime: 60 * 60_000, retry: 1 });
+  const r = Number((data as { rate?: number } | undefined)?.rate);
+  return Number.isFinite(r) && r > 0 ? r : null;
+}
+
 export function LandingPricingTabs() {
   // Non-suspense on purpose: if the pricing fetch fails (DB down, missing
   // env var) the rest of the landing page must still render. A suspense
@@ -25,6 +37,7 @@ export function LandingPricingTabs() {
   const { data, error, isLoading } = useQuery({ ...plansQuery, retry: 1 });
   const plans = data?.plans ?? [];
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
+  const rate = useInrRate();
 
   const list = cycle === "lifetime"
     ? plans.filter((p) => p.planType === "lifetime" || p.priceLifetimeUsd > 0)
@@ -73,7 +86,7 @@ export function LandingPricingTabs() {
         </div>
 
         <div className={`grid gap-5 ${list.length >= 5 ? "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" : list.length === 4 ? "md:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-2 lg:grid-cols-3"}`}>
-          {list.map((p) => <LandingCard key={p.id} p={p} cycle={cycle} />)}
+          {list.map((p) => <LandingCard key={p.id} p={p} cycle={cycle} rate={rate} />)}
         </div>
 
         {!isLoading && plans.length === 0 && (
@@ -84,6 +97,11 @@ export function LandingPricingTabs() {
         )}
 
         <div className="mt-8 text-center">
+          {rate && (
+            <p className="mb-3 text-xs text-muted-foreground">
+              Prices in ₹ are at today's rate (1 USD = ₹{rate.toFixed(2)}). You pay in INR via Razorpay — UPI, cards and net banking.
+            </p>
+          )}
           <Link to="/pricing" className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4">
             Compare plans, credit packs & FAQ →
           </Link>
@@ -93,13 +111,14 @@ export function LandingPricingTabs() {
   );
 }
 
-function LandingCard({ p, cycle }: { p: PricingPlan; cycle: BillingCycle }) {
+function LandingCard({ p, cycle, rate }: { p: PricingPlan; cycle: BillingCycle; rate: number | null }) {
   const isLifetime = p.planType === "lifetime" || cycle === "lifetime";
   const effective: BillingCycle = p.planType === "lifetime" ? "lifetime" : cycle;
   const price = effective === "monthly" ? p.priceMonthlyUsd : effective === "yearly" ? p.priceYearlyUsd : p.priceLifetimeUsd;
   const isFree = p.planType === "free" && price === 0;
   const suffix = p.contactSales ? "" : isFree ? "" : effective === "lifetime" ? "one-time" : effective === "yearly" ? "/year" : "/month";
-  const priceLabel = p.contactSales ? "Custom" : isFree ? "$0" : usd(price);
+  const priceLabel = p.contactSales ? "Custom" : isFree ? "Free" : rate ? inr(price * rate) : usd(price);
+  const usdNote = !p.contactSales && !isFree && rate ? usd(price) : null;
   const showBadge = p.badge || (p.featured ? "🚀 Recommended" : null);
 
   return (
@@ -121,9 +140,10 @@ function LandingCard({ p, cycle }: { p: PricingPlan; cycle: BillingCycle }) {
         <span className="text-3xl font-bold">{priceLabel}</span>
         {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
       </div>
+      {usdNote && <div className="mt-0.5 text-xs text-muted-foreground">{usdNote} {suffix}</div>}
       {cycle === "yearly" && p.priceYearlyUsd > 0 && !isFree && !p.contactSales && p.planType !== "lifetime" && (
         <div className="mt-1 text-xs text-muted-foreground">
-          ≈ {usd(Math.round(p.priceYearlyUsd / 12))}/mo
+          ≈ {rate ? inr((p.priceYearlyUsd / 12) * rate) : usd(Math.round(p.priceYearlyUsd / 12))}/mo
           {p.discountPct > 0 && <span className="ml-2 text-[color:var(--brand-orange)] font-semibold">Save {p.discountPct}%</span>}
         </div>
       )}
