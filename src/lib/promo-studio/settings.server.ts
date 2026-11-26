@@ -35,7 +35,9 @@ type Res<T> = PromiseLike<{ data: T; error: { message: string } | null }>;
 /** The slice of the service-role client this module uses (promo tables aren't in the generated types yet). */
 export type SettingsDb = {
   from(table: string): {
-    select(cols: string): { eq(col: string, val: unknown): { maybeSingle(): Res<Record<string, unknown> | null> } };
+    select(cols: string): {
+      eq(col: string, val: unknown): { maybeSingle(): Res<Record<string, unknown> | null> };
+    };
     update(patch: Record<string, unknown>): { eq(col: string, val: unknown): Res<unknown> };
     insert(row: Record<string, unknown>): Res<unknown>;
   };

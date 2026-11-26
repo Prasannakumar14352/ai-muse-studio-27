@@ -7,6 +7,7 @@ import { CreateTab } from "./CreateTab";
 import { LibraryTab } from "./LibraryTab";
 import { BrandKitTab } from "./BrandKitTab";
 import { BudgetWidget } from "./BudgetWidget";
+import { VideoTab } from "./VideoTab";
 
 export default function PromoStudioPage() {
   return (
@@ -30,11 +31,15 @@ export default function PromoStudioPage() {
       <Tabs defaultValue="create">
         <TabsList>
           <TabsTrigger value="create">Create</TabsTrigger>
+          <TabsTrigger value="video">Video</TabsTrigger>
           <TabsTrigger value="library">Library</TabsTrigger>
           <TabsTrigger value="brand">Brand Kit</TabsTrigger>
         </TabsList>
         <TabsContent value="create" className="mt-6">
           <CreateTab />
+        </TabsContent>
+        <TabsContent value="video" className="mt-6">
+          <VideoTab />
         </TabsContent>
         <TabsContent value="library" className="mt-6">
           <LibraryTab />
