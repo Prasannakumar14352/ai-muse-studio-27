@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { jobTagFromRequest } from "@/lib/job-credit-tag";
+import type { FalOut } from "@/lib/providers/fal-image.server";
 
 /**
  * Image generation / editing endpoint, served by fal.ai.
@@ -166,15 +167,8 @@ export const Route = createFileRoute("/api/generate-image")({
           return json({ error: msg }, 400);
         }
 
-        type FalOut = { images?: Array<{ url?: string; content_type?: string }>; detail?: unknown };
-        const callFal = async (ep: string, body: Record<string, unknown>) => {
-          const res = await fetch(`https://fal.run/${ep}`, {
-            method: "POST",
-            headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          return { res, out: (await res.json().catch(() => ({}))) as FalOut };
-        };
+        const { falRunSync } = await import("@/lib/providers/fal-image.server");
+        const callFal = (ep: string, body: Record<string, unknown>) => falRunSync(ep, body); // no opts → no timeout, identical behaviour
         const isPolicyBlock = (o: FalOut) => JSON.stringify(o.detail ?? "").includes("content_policy_violation");
 
         let upstream: Response;
