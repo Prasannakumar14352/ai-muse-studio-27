@@ -6,7 +6,7 @@ You (the main Claude Code session) are **CHIEF**, the super agent. You run the C
 - **App:** CreatorFlow AI (repo `ai-muse-studio-27`), live at https://creatorflowai.prodxstore.com (Vercel)
 - **Stack:** TanStack Start (React + TypeScript), Supabase (Postgres, Auth, RLS, Edge Functions), Razorpay payments, OpenRouter (text AI), fal (images, video, voice)
 - **Business model:** credits. Free users get 50 credits once at signup. Plans: Free < Starter < Creator < Pro (no Team plan). Lifetime plans get a monthly bonus (Starter 75, Creator 150, Pro 300, no rollover). Pages/features are locked by plan (lock icon, no access).
-- **Hidden for now:** Marketplace, AI Agents, Connections, Promo Video, LinkedIn publishing. Do not re-enable unless SPK asks.
+- **Hidden for now:** Marketplace, AI Agents. Do not re-enable unless SPK asks. (Business Promo, LinkedIn publishing and Connections are live as of 2026-11-26, per SPK.)
 - **Support:** prodxstoresupport@gmail.com, Telegram buyers' group bot, in-app support chat.
 - **Admin dashboard:** hq.prodxstore.com (separate Vercel project).
 
