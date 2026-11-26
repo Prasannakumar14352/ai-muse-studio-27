@@ -3,8 +3,8 @@
  * Callers must already have passed requireAdmin; writes use the service role and every change is
  * recorded in promo_audit (old → new).
  *
- * offerId / liveOffer() arrive in PR 2 together with the exported isOfferLive(), so an offer can
- * only be saved after it is checked to be live (design §4.3 savePromoSettings).
+ * offerId is accepted here; savePromoBrandKit checks the offer is live (isOfferLive) before saving,
+ * so only a live offer can be saved (design §4.3 savePromoSettings).
  */
 import { z } from "zod";
 import { PROMO_BG_MODEL_ALLOWLIST } from "./prices.server";
@@ -96,6 +96,7 @@ export const promoSettingsPatchSchema = z
       .optional(),
     appUrl: z.string().trim().url().startsWith("https://").max(200).optional(),
     defaultCta: z.string().trim().min(1).max(40).optional(),
+    offerId: z.string().uuid().nullable().optional(),
     monthlyCapUsd: z.number().finite().min(0).max(500).optional(),
     perRequestCapUsd: z.number().finite().min(0.01).max(25).optional(),
     rate10m: z.number().int().min(1).max(500).optional(),
@@ -110,6 +111,7 @@ const COLUMN: Record<keyof PromoSettingsPatch, keyof PromoSettings> = {
   colors: "colors",
   appUrl: "app_url",
   defaultCta: "default_cta",
+  offerId: "offer_id",
   monthlyCapUsd: "monthly_cap_usd",
   perRequestCapUsd: "per_request_cap_usd",
   rate10m: "rate_10m",

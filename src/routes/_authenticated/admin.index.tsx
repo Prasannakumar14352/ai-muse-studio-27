@@ -119,6 +119,11 @@ function AdminPanel() {
           <Zap className="w-4 h-4" /> Payment Settings
         </Link>
         <Link
+          to="/admin/promo-studio"
+          className="inline-flex items-center gap-2 rounded-lg glass px-3 py-2 text-sm hover:bg-white/10 transition">
+          <ImageIcon className="w-4 h-4" /> Promo Studio
+        </Link>
+        <Link
           to="/admin/currency"
           className="inline-flex items-center gap-2 rounded-lg glass px-3 py-2 text-sm hover:bg-white/10 transition">
           <Coins className="w-4 h-4" /> USD → INR Rate

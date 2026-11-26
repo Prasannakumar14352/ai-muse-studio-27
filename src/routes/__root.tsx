@@ -12,6 +12,19 @@ import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { captureFirstTouch } from "@/lib/attribution";
 
+// Safety net for OAuth: if Supabase sends a sign-in back to the homepage (Site URL) instead of
+// /auth-callback, the login tokens arrive as "/#access_token=…" (or "/?code=…"). The client saves
+// the session and clears the hash, leaving the user on the landing page. Remember that the page
+// was opened from a sign-in, before the Supabase client reads the URL, so we can send them on.
+const LANDED_FROM_SIGN_IN =
+  typeof window !== "undefined" &&
+  window.location.pathname === "/" &&
+  (/(^|[#&])access_token=/.test(window.location.hash) || new URLSearchParams(window.location.search).has("code"));
+
+function goToDashboardAfterSignIn() {
+  if (LANDED_FROM_SIGN_IN && window.location.pathname === "/") window.location.replace("/dashboard");
+}
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
@@ -100,7 +113,8 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) goToDashboardAfterSignIn();
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
       router.invalidate();
       if (event !== "SIGNED_OUT") queryClient.invalidateQueries();

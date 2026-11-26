@@ -108,7 +108,6 @@ describe("promo settings", () => {
       { colors: { primary: "red", secondary: "#000000", accent: "#000000", text: "#000000" } },
       { bgModels: ["fal-ai/nano-banana"] },
       { bgMaxMegapixels: 4 },
-      { offerId: "00000000-0000-4000-8000-000000000000" },
     ]) {
       await expect(savePromoSettings(ADMIN, bad, { db: f.db })).rejects.toThrow();
     }
