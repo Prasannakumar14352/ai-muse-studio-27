@@ -34,6 +34,7 @@ export type PublishMedia = { url: string; kind: "image" | "video" | "thumbnail";
 export type PublishContent = {
   /** Project the post belongs to (optional — e.g. Model Studio results have none). */
   projectId?: string;
+  videoApprovalId?: string;
   title: string;
   caption?: string;
   hashtags?: string;
@@ -155,18 +156,19 @@ export function PublishDialog({
       if (u.startsWith("data:")) {
         const r = await stage({ data: { dataUrl: u } });
         out.push(r.url);
-      } else if (u.startsWith("blob:")) {
-        const blob = await fetch(u).then((r) => r.blob());
-        const dataUrl = await new Promise<string>((res, rej) => {
-          const fr = new FileReader();
-          fr.onload = () => res(String(fr.result));
-          fr.onerror = () => rej(new Error("Couldn't read media"));
-          fr.readAsDataURL(blob);
-        });
-        const r = await stage({ data: { dataUrl } });
-        out.push(r.url);
       } else {
-        out.push(u);
+        const response = await fetch(u, { signal: AbortSignal.timeout(20_000) });
+        if (!response.ok) throw new Error("Could not load the publishing image");
+        const blob = await response.blob();
+        if (blob.size > 4_000_000) throw new Error("Publishing images must be smaller than 4 MB");
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("Could not read media"));
+          reader.readAsDataURL(blob);
+        });
+        const staged = await stage({ data: { dataUrl } });
+        out.push(staged.url);
       }
     }
     return out;
@@ -193,6 +195,7 @@ export function PublishDialog({
     const results = await Promise.allSettled(list.map((t) => schedule({
       data: {
         projectId: content.projectId,
+        videoApprovalId: content.videoApprovalId,
         platform: t.platform,
         connectionId: t.id,
         title: content.postTitle ?? content.title,

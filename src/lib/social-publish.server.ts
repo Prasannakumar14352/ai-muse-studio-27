@@ -13,6 +13,9 @@
 // Instagram Business (image, carousel, reel), YouTube (video upload).
 import { GRAPH, PLATFORM_TO_PROVIDER, type PlatformId } from "./oauth-providers.server";
 
+import { ownedPublishObject, publishImageMime } from "./publish-media-policy";
+import { approvalBucket, getVideoApproval } from "./video-publish-approval.server";
+
 type Admin = (typeof import("@/integrations/supabase/client.server"))["supabaseAdmin"];
 
 export const MAX_ATTEMPTS = 3;
@@ -27,6 +30,7 @@ export type JobRow = {
   hashtags: string | null;
   title: string | null;
   media_urls: unknown;
+  video_approval_id: string | null;
   attempts: number | null;
   status: string;
   provider_state: Record<string, unknown> | null;
@@ -45,58 +49,20 @@ class PublishError extends Error {
 
 type Media = { kind: "image" | "video"; url: string; mime: string };
 
-const VIDEO_EXT = /\.(mp4|mov|m4v|webm)(\?|$)/i;
-
-function mediaKindFromUrl(url: string): "image" | "video" {
-  if (url.startsWith("data:")) return url.startsWith("data:video") ? "video" : "image";
-  return VIDEO_EXT.test(url) ? "video" : "image";
-}
-
-/** Storage object path when the URL points at this project's Supabase storage. */
-function storagePath(url: string): { bucket: string; path: string } | null {
-  const m = url.match(/\/storage\/v1\/object\/(?:sign|public|authenticated)\/([^/]+)\/([^?]+)/);
-  return m ? { bucket: m[1], path: decodeURIComponent(m[2]) } : null;
-}
-
-/**
- * Turn whatever the app stored (data: URL, expiring signed URL, public URL)
- * into a URL the social network can fetch for the next hour.
- */
-async function resolveMedia(admin: Admin, userId: string, raw: string): Promise<Media> {
-  const kind = mediaKindFromUrl(raw);
-  if (raw.startsWith("data:")) {
-    const m = raw.match(/^data:([^;,]+)(;base64)?,(.*)$/s);
-    if (!m) throw new PublishError("Unreadable media data");
-    const mime = m[1];
-    const bytes = m[2] ? Buffer.from(m[3], "base64") : Buffer.from(decodeURIComponent(m[3]));
-    const ext = mime.split("/")[1]?.replace("jpeg", "jpg") ?? "bin";
-    const path = `${userId}/publish/${crypto.randomUUID()}.${ext}`;
-    const { error } = await admin.storage.from("renders").upload(path, bytes, { contentType: mime, upsert: false });
-    if (error) throw new PublishError(`Couldn't stage media for upload: ${error.message}`, true);
-    const { data, error: sErr } = await admin.storage.from("renders").createSignedUrl(path, 3600);
-    if (sErr || !data) throw new PublishError("Couldn't sign media URL", true);
-    return { kind, url: data.signedUrl, mime };
-  }
-  const sp = storagePath(raw);
-  if (sp) {
-    const { data, error } = await admin.storage.from(sp.bucket).createSignedUrl(sp.path, 3600);
-    if (!error && data) return { kind, url: data.signedUrl, mime: kind === "video" ? "video/mp4" : "image/jpeg" };
-  }
-  // No storage path and no telling extension (e.g. some AI provider links):
-  // ask the server what it is.
-  if (!/\.(mp4|mov|m4v|webm|jpe?g|png|webp|gif)(\?|$)/i.test(raw)) {
-    try {
-      const head = await fetch(raw, { method: "HEAD" });
-      const ct = head.headers.get("content-type") ?? "";
-      if (ct.startsWith("video/")) return { kind: "video", url: raw, mime: ct };
-      if (ct.startsWith("image/")) return { kind: "image", url: raw, mime: ct };
-    } catch { /* fall through to the extension guess */ }
-  }
-  return { kind, url: raw, mime: kind === "video" ? "video/mp4" : "image/jpeg" };
+async function resolveImage(admin: Admin, userId: string, raw: string): Promise<Media> {
+  const path = ownedPublishObject(raw, process.env.SUPABASE_URL ?? "", userId);
+  if (!path) throw new PublishError("Upload images to your account before publishing");
+  const storage = admin.storage.from("renders");
+  const { data: info } = await storage.info(path);
+  const mime = info?.contentType;
+  if (!mime || !publishImageMime.has(mime)) throw new PublishError("Video requires an approved export");
+  const { data } = await storage.createSignedUrl(path, 3600);
+  if (!data) throw new PublishError("Could not load the publishing image", true);
+  return { kind: "image", url: data.signedUrl, mime };
 }
 
 async function fetchBytes(media: Media): Promise<{ bytes: ArrayBuffer; mime: string }> {
-  const r = await fetch(media.url);
+  const r = await fetch(media.url, { redirect: "error", signal: AbortSignal.timeout(60_000) });
   if (!r.ok) throw new PublishError(`Couldn't download media (${r.status})`, true);
   return { bytes: await r.arrayBuffer(), mime: r.headers.get("content-type") ?? media.mime };
 }
@@ -116,11 +82,10 @@ async function jsonOrThrow(res: Response, label: string): Promise<Record<string,
   try { j = text ? JSON.parse(text) : {}; } catch { /* non-JSON */ }
   if (!res.ok) {
     const err = (j.error as { message?: string; code?: number } | undefined);
-    const msg = err?.message ?? (j.message as string | undefined) ?? text.slice(0, 300);
     const status = res.status;
     // 401/190 = token revoked or expired → user must reconnect.
     const reconnect = status === 401 || err?.code === 190;
-    throw new PublishError(`${label}: ${msg || status}`, status >= 500 || status === 429, reconnect);
+    throw new PublishError(`${label}: HTTP ${status}`, status >= 500 || status === 429, reconnect);
   }
   return j;
 }
@@ -205,7 +170,7 @@ export function linkedInCommentary(text: string): string {
   }).join("");
 }
 
-async function publishLinkedIn(conn: Conn, job: JobRow, media: Media[]): Promise<Outcome> {
+async function publishLinkedIn(conn: Conn, job: JobRow, media: Media[], revalidate: () => Promise<void>): Promise<Outcome> {
   const author = `urn:li:person:${conn.account_id}`;
   const headers = {
     Authorization: `Bearer ${conn.accessToken}`,
@@ -269,6 +234,7 @@ async function publishLinkedIn(conn: Conn, job: JobRow, media: Media[]): Promise
   };
   if (imageIds.length > 1) body.content = { multiImage: { images: imageIds.map((id) => ({ id })) } };
   else if (mediaId) body.content = { media: { id: mediaId, ...(job.title ? { title: job.title.slice(0, 200) } : {}) } };
+  await revalidate();
   const res = await fetch("https://api.linkedin.com/rest/posts", { method: "POST", headers, body: JSON.stringify(body) });
   if (!res.ok) await jsonOrThrow(res, "LinkedIn post");
   const urn = res.headers.get("x-restli-id") ?? res.headers.get("x-linkedin-id") ?? "";
@@ -295,13 +261,14 @@ async function graphPost(path: string, params: Record<string, string>, label: st
   }), label);
 }
 
-async function publishFacebook(conn: Conn, job: JobRow, media: Media[]): Promise<Outcome> {
+async function publishFacebook(conn: Conn, job: JobRow, media: Media[], revalidate: () => Promise<void>): Promise<Outcome> {
   const pageId = conn.account_id;
   if (!pageId) throw new PublishError("Pick a Facebook Page in Connected Accounts.", false, true);
   const token = await pageToken(conn, pageId);
   const text = fullText(job);
   const first = media[0];
   if (first?.kind === "video") {
+    await revalidate();
     const r = await graphPost(`${pageId}/videos`, {
       file_url: first.url, description: text, ...(job.title ? { title: job.title.slice(0, 255) } : {}), access_token: token,
     }, "Facebook video", GRAPH.replace("graph.facebook.com", "graph-video.facebook.com"));
@@ -364,7 +331,7 @@ async function waitForContainer(conn: Conn, containerId: string, maxMs: number):
   return false;
 }
 
-async function publishInstagram(conn: Conn, job: JobRow, media: Media[]): Promise<Outcome> {
+async function publishInstagram(conn: Conn, job: JobRow, media: Media[], revalidate: () => Promise<void>): Promise<Outcome> {
   const igId = conn.account_id;
   if (!igId) throw new PublishError("Pick an Instagram Business account in Connected Accounts.", false, true);
   const state = job.provider_state ?? {};
@@ -372,7 +339,9 @@ async function publishInstagram(conn: Conn, job: JobRow, media: Media[]): Promis
   // Resume a container that was still processing on the last run.
   if (typeof state.ig_container === "string") {
     const done = await waitForContainer(conn, state.ig_container, 40_000);
-    return done ? igFinish(conn, igId, state.ig_container) : { kind: "pending", state };
+    if (!done) return { kind: "pending", state };
+    await revalidate();
+    return igFinish(conn, igId, state.ig_container);
   }
 
   if (media.length === 0) throw new PublishError("Instagram needs an image or a video. Text-only posts aren't supported.");
@@ -401,12 +370,13 @@ async function publishInstagram(conn: Conn, job: JobRow, media: Media[]): Promis
 
   const done = await waitForContainer(conn, container, 45_000);
   if (!done) return { kind: "pending", state: { ...state, ig_container: container } };
+  await revalidate();
   return igFinish(conn, igId, container);
 }
 
 // ───────────────────────────── YouTube ─────────────────────────────
 
-async function publishYouTube(conn: Conn, job: JobRow, media: Media[]): Promise<Outcome> {
+async function publishYouTube(conn: Conn, job: JobRow, media: Media[], revalidate: () => Promise<void>): Promise<Outcome> {
   const video = media.find((m) => m.kind === "video");
   if (!video) throw new PublishError("YouTube needs a rendered video. Render the video first.");
   const { bytes, mime } = await fetchBytes(video);
@@ -430,7 +400,9 @@ async function publishYouTube(conn: Conn, job: JobRow, media: Media[]): Promise<
   if (!init.ok) await jsonOrThrow(init, "YouTube upload init");
   const location = init.headers.get("location");
   if (!location) throw new PublishError("YouTube didn't return an upload URL", true);
-  const up = await fetch(location, { method: "PUT", headers: { "Content-Type": mime }, body: bytes });
+  if (new URL(location).origin !== "https://www.googleapis.com") throw new PublishError("Unexpected YouTube upload origin");
+  await revalidate();
+  const up = await fetch(location, { method: "PUT", headers: { "Content-Type": mime }, body: bytes, redirect: "error", signal: AbortSignal.timeout(120_000) });
   const j = await jsonOrThrow(up, "YouTube upload");
   const id = String(j.id ?? "");
   return { kind: "published", id, url: id ? `https://www.youtube.com/watch?v=${id}` : null };
@@ -441,34 +413,55 @@ async function publishYouTube(conn: Conn, job: JobRow, media: Media[]): Promise<
 async function publish(admin: Admin, job: JobRow): Promise<Outcome> {
   const platform = job.platform as PlatformId;
   if (!(platform in PLATFORM_TO_PROVIDER)) throw new PublishError(`Unsupported platform: ${job.platform}`);
+  const urls = Array.isArray(job.media_urls) ? (job.media_urls as string[]) : [];
+  let media: Media[] = [];
+  if (job.video_approval_id) {
+    const approval = await getVideoApproval(job.video_approval_id, job.user_id, job.project_id);
+    if (!approval) throw new PublishError("Video approval is missing or revoked");
+    if (!job.provider_state?.ig_container) {
+      const { data } = await admin.storage.from(approvalBucket).createSignedUrl(approval.object_path, 3600);
+      if (!data) throw new PublishError("The approved export is unavailable");
+      media = [{ kind: "video", url: data.signedUrl, mime: approval.object_path.endsWith(".webm") ? "video/webm" : "video/mp4" }];
+    }
+  } else {
+    if (platform === "youtube" || (job.provider_state?.ig_container && !urls.length)) {
+      throw new PublishError("Video requires an approved export");
+    }
+    media = await Promise.all(urls.map((url) => resolveImage(admin, job.user_id, url)));
+  }
   const conn = await loadConnection(admin, job.user_id, platform, job.connection_id);
-  const urls = Array.isArray(job.media_urls) ? (job.media_urls as unknown[]).filter((u): u is string => typeof u === "string" && !!u) : [];
-  const media = job.provider_state?.ig_container ? [] : await Promise.all(urls.map((u) => resolveMedia(admin, job.user_id, u)));
+  const revalidate = async () => {
+    if (job.video_approval_id && !(await getVideoApproval(job.video_approval_id, job.user_id, job.project_id))) {
+      throw new PublishError("Video approval was revoked before dispatch");
+    }
+  };
+  await revalidate();
   switch (platform) {
-    case "linkedin": return publishLinkedIn(conn, job, media);
-    case "facebook": return publishFacebook(conn, job, media);
-    case "instagram": return publishInstagram(conn, job, media);
-    case "youtube": return publishYouTube(conn, job, media);
+    case "linkedin": return publishLinkedIn(conn, job, media, revalidate);
+    case "facebook": return publishFacebook(conn, job, media, revalidate);
+    case "instagram": return publishInstagram(conn, job, media, revalidate);
+    case "youtube": return publishYouTube(conn, job, media, revalidate);
   }
 }
 
-const JOB_COLUMNS = "id, user_id, project_id, platform, connection_id, caption, hashtags, title, media_urls, attempts, status, provider_state";
+const JOB_COLUMNS = "id, user_id, project_id, platform, connection_id, caption, hashtags, title, media_urls, video_approval_id, attempts, status, provider_state, updated_at";
 
 /**
  * Claim and publish one job. Safe to call from the worker and from
  * "Publish now": the claim only succeeds for a job that isn't already running
  * (or that has been stuck in `publishing` for over 10 minutes).
  */
-export async function runPublishJob(admin: Admin, id: string): Promise<{
+export async function runPublishJob(admin: Admin, id: string, owner?: string): Promise<{
   status: string; url: string | null; error: string | null;
 }> {
-  const { data: row } = await admin.from("scheduled_posts").select(JOB_COLUMNS).eq("id", id).maybeSingle();
+  const read = admin.from("scheduled_posts").select(JOB_COLUMNS).eq("id", id);
+  const { data: row } = await (owner ? read.eq("user_id", owner) : read).maybeSingle();
   if (!row) return { status: "missing", url: null, error: "Post not found" };
   const job = row as unknown as JobRow;
 
   const resuming = job.status === "publishing" && typeof job.provider_state?.ig_container === "string";
   const stale = new Date(Date.now() - 10 * 60_000).toISOString();
-  const claim = admin.from("scheduled_posts").update({ status: "publishing" } as never).eq("id", id);
+  const claim = admin.from("scheduled_posts").update({ status: "publishing" } as never).eq("id", id).eq("updated_at", row.updated_at);
   const { data: claimed } = await (resuming
     ? claim.eq("status", "publishing")
     : claim.or(`status.in.(scheduled,ready,failed,reconnect_required),and(status.eq.publishing,updated_at.lt.${stale})`)
@@ -480,7 +473,7 @@ export async function runPublishJob(admin: Admin, id: string): Promise<{
   try {
     outcome = await publish(admin, job);
   } catch (e) {
-    const pe = e instanceof PublishError ? e : new PublishError(e instanceof Error ? e.message : String(e), true);
+    const pe = e instanceof PublishError ? e : new PublishError("Publishing request failed", true);
     outcome = { kind: "error", message: pe.message, retryable: pe.retryable, reconnect: pe.reconnect };
   }
 
@@ -491,10 +484,10 @@ export async function runPublishJob(admin: Admin, id: string): Promise<{
       external_post_id: outcome.id || null, external_post_url: outcome.url, provider_state: {},
     } as never).eq("id", id);
     if (job.project_id) {
-      const { data: proj } = await admin.from("projects").select("platform_urls").eq("id", job.project_id).maybeSingle();
+      const { data: proj } = await admin.from("projects").select("platform_urls").eq("id", job.project_id).eq("user_id", job.user_id).maybeSingle();
       const urls = { ...((proj?.platform_urls as Record<string, string> | null) ?? {}) };
       if (outcome.url) urls[job.platform] = outcome.url;
-      await admin.from("projects").update({ publish_status: "published", platform_urls: urls } as never).eq("id", job.project_id);
+      await admin.from("projects").update({ publish_status: "published", platform_urls: urls } as never).eq("id", job.project_id).eq("user_id", job.user_id);
     }
     return { status: "published", url: outcome.url, error: null };
   }
@@ -511,7 +504,7 @@ export async function runPublishJob(admin: Admin, id: string): Promise<{
     ...(retry ? { scheduled_at: new Date(Date.now() + attempts * 5 * 60_000).toISOString() } : {}),
   } as never).eq("id", id);
   if (job.project_id && !retry) {
-    await admin.from("projects").update({ publish_status: status } as never).eq("id", job.project_id);
+    await admin.from("projects").update({ publish_status: status } as never).eq("id", job.project_id).eq("user_id", job.user_id);
   }
   return { status, url: null, error: outcome.message };
 }

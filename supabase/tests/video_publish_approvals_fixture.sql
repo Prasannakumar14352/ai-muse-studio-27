@@ -1,0 +1,10 @@
+create role anon;
+create role authenticated;
+create role service_role;
+create schema auth;
+create schema storage;
+create table auth.users(id uuid primary key);
+create table storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
+create table public.projects(id uuid primary key, user_id uuid, title text, format text, output_url text, metadata jsonb, music text, voice text, aspect_ratio text, duration_sec integer, style text);
+create table public.scheduled_posts(id uuid primary key default gen_random_uuid(), user_id uuid, platform text, project_id uuid, media_urls jsonb, provider_state jsonb default '{}');
+grant select, insert, update on public.scheduled_posts to authenticated;

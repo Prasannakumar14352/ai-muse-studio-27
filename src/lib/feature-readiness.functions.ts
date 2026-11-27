@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 /**
  * Public readiness snapshot (drives landing comparison + admin dashboard).
  */
@@ -133,4 +134,45 @@ export const runReadinessCheckFn = createServerFn({ method: "POST" })
       results.push(updated as FeatureReadinessRow);
     }
     return results;
+  });
+
+export const getProductionChecks = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: admin } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (!admin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { execFile } = await import("node:child_process");
+    const { resolveRazorpayCredentials } = await import("./razorpay-settings.server");
+    const executable = (path: string) => new Promise<string>((resolve) => {
+      execFile(path, ["-version"], { timeout: 3000, maxBuffer: 32768 },
+        (error) => resolve(error ? "Unavailable" : "Available"));
+    });
+    const configuredFlag = (enabled: boolean, credential: boolean) =>
+      !enabled ? "Disabled" : credential ? "Configured but unverified" : "Unavailable";
+    const renderEnabled = process.env.VIDEO_SERVER_RENDER_ENABLED === "true";
+    const [schema, bucket, ffmpeg, ffprobe, payment, worker] = await Promise.all([
+      supabaseAdmin.from("video_publish_approvals").select("id").limit(1).abortSignal(AbortSignal.timeout(5000)),
+      supabaseAdmin.storage.getBucket("approved-video-exports"),
+      executable(process.env.FFMPEG_PATH || "ffmpeg"),
+      executable(process.env.FFPROBE_PATH || "ffprobe"),
+      resolveRazorpayCredentials().then((value) => value.webhookSecret ? "Configured but unverified" : "Unavailable",
+        () => "Unavailable"),
+      renderEnabled
+        ? (supabaseAdmin as unknown as SupabaseClient).from("professional_render_workers")
+          .select("id").gte("seen_at", new Date(Date.now() - 45_000).toISOString()).limit(1)
+          .abortSignal(AbortSignal.timeout(5000))
+        : null,
+    ]);
+    return {
+      "Publishing approval schema": schema.error ? "Failed" : "Available",
+      "Private approved export storage": bucket.error || bucket.data?.public ? "Failed" : "Available",
+      FFmpeg: ffmpeg,
+      FFprobe: ffprobe,
+      "Paid audio": configuredFlag(process.env.VIDEO_PAID_AUDIO_ENABLED === "true", Boolean(process.env.FAL_KEY)),
+      "Advanced video models": configuredFlag(process.env.VIDEO_ADVANCED_MODELS_ENABLED === "true", Boolean(process.env.FAL_KEY)),
+      "Professional render worker": !worker ? "Disabled" : worker.error ? "Failed" : worker.data.length ? "Available" : "Unavailable",
+      "Razorpay with webhook": payment,
+      "External publishing": "Not checked",
+    };
   });

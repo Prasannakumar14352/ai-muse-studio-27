@@ -2151,6 +2151,9 @@ export type Database = {
           hashtags: string | null
           id: string
           last_error: string | null
+          title: string | null
+          provider_state: Json
+          video_approval_id: string | null
           media_urls: Json
           platform: string
           project_id: string | null
@@ -2170,6 +2173,9 @@ export type Database = {
           hashtags?: string | null
           id?: string
           last_error?: string | null
+          title?: string | null
+          provider_state?: Json
+          video_approval_id?: string | null
           media_urls?: Json
           platform: string
           project_id?: string | null
@@ -2189,6 +2195,9 @@ export type Database = {
           hashtags?: string | null
           id?: string
           last_error?: string | null
+          title?: string | null
+          provider_state?: Json
+          video_approval_id?: string | null
           media_urls?: Json
           platform?: string
           project_id?: string | null
@@ -2214,6 +2223,34 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      video_publish_approvals: {
+        Row: {
+          id: string
+          user_id: string
+          project_id: string | null
+          object_path: string
+          sha256: string
+          metadata: Json
+          accepted_warnings: string[]
+          approved_at: string
+          revoked_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          project_id?: string | null
+          object_path: string
+          sha256: string
+          metadata: Json
+          accepted_warnings?: string[]
+          approved_at?: string
+          revoked_at?: string | null
+        }
+        Update: {
+          revoked_at?: string | null
+        }
+        Relationships: []
       }
       strategies: {
         Row: {
