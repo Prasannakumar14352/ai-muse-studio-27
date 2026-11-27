@@ -57,11 +57,11 @@ with tempfile.TemporaryDirectory() as directory, sync_playwright() as playwright
           const clipUrl = URL.createObjectURL(new Blob(
             [Uint8Array.from(atob(clipBase64), x => x.charCodeAt(0))], { type: 'video/mp4' }
           ));
-          for (const track of ['music', 'sfx', 'native', 'hybrid', 'muted']) {
+          for (const track of ['music', 'sfx', 'native', 'hybrid', 'muted', 'fullhd-portrait']) {
             const useNative = track === 'native' || track === 'hybrid';
             const hybrid = track === 'hybrid';
             const assets = track === 'native' ? [] : [{
-              track: hybrid || track === 'muted' ? 'music' : track,
+              track: hybrid || track === 'muted' || track === 'fullhd-portrait' ? 'music' : track,
               sceneIds: ['a'], offset: 0.1, buffer: tone
             }];
             if (hybrid) {
@@ -76,6 +76,10 @@ with tempfile.TemporaryDirectory() as directory, sync_playwright() as playwright
               mixAssets: assets,
               sceneMedia: useNative || track === 'muted' ? [{ kind: 'clip', url: clipUrl }] : undefined,
               nativeClipAudio: useNative ? [0.8] : undefined,
+              exportSettings: track === 'fullhd-portrait' ? {
+                resolution: '1080p', fps: 24, aspectRatio: '9:16', quality: 'standard',
+                format: 'webm', fit: 'fit', subtitles: false
+              } : undefined,
             });
             const data = new Uint8Array(await result.blob.arrayBuffer());
             outputs[track] = btoa(Array.from(data, x => String.fromCharCode(x)).join(''));
@@ -100,6 +104,9 @@ with tempfile.TemporaryDirectory() as directory, sync_playwright() as playwright
         )
         metadata = json.loads(probe)
         assert any(s["codec_type"] == "video" for s in metadata["streams"])
+        if track == "fullhd-portrait":
+            video = next(stream for stream in metadata["streams"] if stream["codec_type"] == "video")
+            assert (video["width"], video["height"]) == (1080, 1920), video
         assert any(s["codec_type"] == "audio" and s["codec_name"] == "aac" for s in metadata["streams"])
         assert 1.8 <= float(metadata["format"]["duration"]) <= 2.3, metadata["format"]
         raw = subprocess.check_output(

@@ -54,3 +54,5 @@ be changed to a legacy style before rerendering on a rollback build.
 
 See the [advanced model and clip audio guide](ADVANCED_VIDEO_MODELS.md) for Veo
 availability and the Full Motion review acknowledgement.
+
+For export settings and the worker staging checklist, see [professional video rendering](PROFESSIONAL_VIDEO_RENDERING.md).

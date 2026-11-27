@@ -1,5 +1,7 @@
+import type { VideoExportSettings } from "./video-export";
 import {
   isAdvancedVideoModel,
+  type VeoResolution,
   type SceneAudioSource,
   type VideoMotionModelId,
 } from "./advanced-video-models";
@@ -38,7 +40,7 @@ import { detectScene, buildDynamicVideoPrompt, type SceneKind, type DynamicActiv
 import { runShotPool } from "@/lib/video-shot-runner";
 import {
   createJob, getJob, saveJob, saveShotBlob, loadShotObjectURL,
-  type JobRecord, type ShotRecord,
+  motionSourceObjectURL, type JobRecord, type ShotRecord,
 } from "@/lib/video-job-store";
 import {
   directBeatPrompt, buildContinuityCard, STYLE_PRESETS, cinematicStyleFor, type CinematicStyleId,
@@ -301,6 +303,8 @@ export type VideoBrief = {
   /** "standard" = MiniMax H3 Turbo, "premium" = Kling 2.5 Turbo Pro. */
   motionTier?: MotionTier;
   motionModel?: VideoMotionModelId;
+  veoResolution?: VeoResolution;
+  exportSettings?: VideoExportSettings;
   sceneAudioSource?: SceneAudioSource;
   nativeAudioVolume?: number;
   nativeAudioMutedShotIds?: string[];
@@ -819,18 +823,20 @@ async function fetchMotionClip(
   image: string,
   prompt: string,
   beatSeconds: number,
-  tier: MotionTier,
+  tier: VideoMotionModelId,
   signal?: AbortSignal,
+  advanced?: { jobId: string; shotId: string; revision?: number; aspectRatio: string; resolution: VeoResolution; nativeAudio: boolean },
 ): Promise<Blob | null> {
   try {
     const start = await authFetch("/api/generate-video-clip", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image, prompt, beatSeconds, tier }),
+      body: JSON.stringify({ image, prompt, beatSeconds, model: tier, ...advanced }),
       signal,
     });
-    const job = (await start.json().catch(() => ({}))) as { ok?: boolean; token?: string; reason?: string };
-    if (!start.ok || !job.ok || !job.token) {
+    const job = (await start.json().catch(() => ({}))) as { ok?: boolean; token?: string; assetId?: string; reason?: string };
+    if (!start.ok || !job.ok || (!job.token && !job.assetId)) {
+      if (advanced) throw new Error(job.reason ?? "Could not start Veo");
       console.warn("[motion] clip not started:", job.reason ?? start.status);
       return null;
     }
@@ -842,7 +848,7 @@ async function fetchMotionClip(
       const res = await authFetch("/api/video-clip-status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: job.token }),
+        body: JSON.stringify(job.assetId ? { assetId: job.assetId } : { token: job.token }),
         signal,
       });
       const st = (await res.json().catch(() => ({}))) as { state?: string; url?: string; error?: string };
@@ -853,13 +859,16 @@ async function fetchMotionClip(
         return blob.size > 0 ? blob : null;
       }
       if (st.state === "failed") {
+        if (advanced) throw new Error(st.error ?? "Veo generation failed");
         console.warn("[motion] clip failed:", st.error);
         return null;
       }
     }
+    if (advanced) throw new Error("Veo is still pending. Retry the shot to resume polling.");
     console.warn("[motion] clip timed out");
     return null;
   } catch (e) {
+    if (advanced) throw e;
     if ((e as { name?: string })?.name !== "AbortError") console.warn("[motion] clip error", e);
     return null;
   }
@@ -904,6 +913,8 @@ export const RenderAgent = {
     voice: VoiceoverClip[],
     onProgress?: (p: number) => void,
     audioTracks: PlannedAudio[] = [],
+    exportSettings?: VideoExportSettings,
+    signal?: AbortSignal,
   ): Promise<RenderResult> {
     // Distribute each scene's audio duration across its beats.
     const beatDurations: number[] = new Array(beats.length).fill(TARGET_BEAT_SEC);
@@ -968,6 +979,8 @@ export const RenderAgent = {
         : audioTracks.filter((track) => isAudioTrackEnabled(brief.audio, track.request.track)),
     );
     const result = await renderVideo({
+      exportSettings,
+      signal,
       audioSettings: nativeOnly ? { ...brief.audio, voiceoverEnabled: false } : brief.audio,
       mixAssets: mixAssets.map((track) => ({
         track: track.request.track,
@@ -1041,7 +1054,7 @@ export const VoiceoverAgent = {
     script: AiVideoScript,
     onProgress?: (done: number, total: number) => void,
   ): Promise<VoiceoverClip[]> {
-    if (brief.audio?.voiceoverEnabled === false || briefVoiceLanguage(brief) === "none") return [];
+    if (brief.sceneAudioSource === "native" || brief.audio?.voiceoverEnabled === false || briefVoiceLanguage(brief) === "none") return [];
     const ctx = new AudioContext();
     if (ctx.state === "suspended") await ctx.resume().catch(() => {});
     const total = script.scenes.length;
@@ -1093,6 +1106,7 @@ async function generateVideoAudio(
   signal?: AbortSignal,
   previous: PlannedAudio[] = [],
 ) {
+  if (brief.sceneAudioSource === "native") return [];
   const tracks = planVideoAudio({
     jobId,
     title: brief.title,
@@ -1578,9 +1592,6 @@ export async function runVideoPipeline(
   brief: VideoBrief,
   onStep: (id: StepId, state: StepState, note?: string) => void
 ): Promise<PipelineResult> {
-  if (isAdvancedVideoModel(brief.motionModel) && brief.motionMode !== "off") {
-    throw new Error("Veo is unavailable until its endpoint schema and billing are verified.");
-  }
 
   const mark = async <T>(id: StepId, fn: () => Promise<T>): Promise<T> => {
     onStep(id, "running");
@@ -1975,7 +1986,16 @@ async function generateOneShot(
   // Shots with the main character are anchored to the reference portrait so
   // the face stays the same; if that render fails, fall back to text-only.
   let img: string | null = null;
-  if (characterRef && shot.hasCharacter !== false) {
+  const veo = isAdvancedVideoModel(brief.motionModel);
+  const sourceSlot = `${shot.id}-motion-source`;
+  if (veo || shot.blobKey == null) {
+    const cached = await motionSourceObjectURL(jobId, sourceSlot);
+    if (cached) {
+      try { img = await blobToDataUrl(await dataUrlToBlob(cached)); }
+      finally { URL.revokeObjectURL(cached); }
+    }
+  }
+  if (!img && characterRef && shot.hasCharacter !== false) {
     img = await fetchSceneImageWithCharacter(shot.prompt, characterRef, brief.aspectRatio);
   }
   if (brief.sameCharacter === true && shot.hasCharacter !== false && !img) {
@@ -1990,10 +2010,10 @@ async function generateOneShot(
   const mode = brief.motionMode ?? "off";
   if (mode !== "off" && totalShots && pickMotionBeats(totalShots, mode).includes(shot.index)) {
     // shot.prompt is the director's English, text-free frame description.
-    if (isAdvancedVideoModel(brief.motionModel)) {
-      throw new Error(
-        "The selected Veo model is unavailable until its endpoint schema and billing are verified.",
-      );
+    if (veo) {
+      const source = await dataUrlToBlob(img);
+      await saveShotBlob(jobId, sourceSlot, source);
+      img = await blobToDataUrl(source);
     }
     const clipBlob = await fetchMotionClip(
       img,
@@ -2002,6 +2022,8 @@ async function generateOneShot(
         cinematicStyleFor(brief.style) ? shot.prompt.split(", composed on", 1)[0] : undefined,
         [
           brief.visualInstructions,
+          veo && brief.sceneAudioSource === "hybrid" &&
+            "Use scene ambience and physical sounds. Avoid speech and music for the separate soundtrack.",
           cinematicStyleFor(brief.style) &&
             "Preserve physical contact, costume, identity and lighting. Keep foreground and background motion consistent with the camera.",
         ].filter(Boolean).join(" "),
@@ -2009,6 +2031,11 @@ async function generateOneShot(
       TARGET_BEAT_SEC,
       brief.motionModel ?? brief.motionTier ?? "standard",
       signal,
+      veo ? {
+        jobId, shotId: shot.id, revision: shot.motionRevision,
+        aspectRatio: brief.aspectRatio, resolution: brief.veoResolution ?? "720p",
+        nativeAudio: brief.sceneAudioSource === "native" || brief.sceneAudioSource === "hybrid",
+      } : undefined,
     );
     if (clipBlob) {
       const key = await saveShotBlob(jobId, shot.id, clipBlob);
@@ -2027,9 +2054,6 @@ export async function runVideoJobPipeline(
   brief: VideoBrief,
   opts: JobRunOptions,
 ): Promise<{ job: JobRecord; result: PipelineResult }> {
-  if (isAdvancedVideoModel(brief.motionModel) && brief.motionMode !== "off") {
-    throw new Error("Veo is unavailable until its endpoint schema and billing are verified.");
-  }
 
   const { onEvent, signal } = opts;
 
@@ -2260,9 +2284,6 @@ export async function runPlanningPhase(
   brief: VideoBrief,
   opts: JobRunOptions,
 ): Promise<{ job: JobRecord; script: AiVideoScript }> {
-  if (isAdvancedVideoModel(brief.motionModel) && brief.motionMode !== "off") {
-    throw new Error("Veo is unavailable until its endpoint schema and billing are verified.");
-  }
 
   const { onEvent } = opts;
   onEvent({ type: "phase", phase: "planning" });
@@ -2572,6 +2593,8 @@ export type RenderPhaseOptions = Pick<JobRunOptions, "onEvent" | "signal"> & {
    *  conversion can run past the server's time limit. */
   skipMp4?: boolean;
   acceptStillFallback?: boolean;
+  exportSettings?: VideoExportSettings;
+  reuseMetadata?: Pick<PipelineResult, "thumbnail" | "seo" | "titles" | "hook" | "intro" | "curiosity" | "retention" | "chapters">;
 };
 
 export async function runRenderPhase(
@@ -2656,7 +2679,7 @@ async function runRenderPhaseInner(
 
   const beats = beatsFromShots(job, brief.style);
   const render = await RenderAgent.run(brief, script, beats, visuals, voiceover, (p) =>
-    onEvent({ type: "render", progress: p }), audioTracks,
+    onEvent({ type: "render", progress: p }), audioTracks, opts.exportSettings, opts.signal,
   );
   job.renderProgress = 1;
 
@@ -2694,9 +2717,9 @@ async function runRenderPhaseInner(
   // Convert the browser recording (720p WebM, no duration header) into a
   // 1080p H.264 MP4 on the server — what Instagram / Shorts expect. Keeps the
   // original if conversion isn't available.
-  if (render.blob && render.blob.size > 0 && !opts.skipMp4) {
+  if (render.blob && render.blob.size > 0 && !opts.skipMp4 && opts.exportSettings?.format !== "webm") {
     const shape = brief.aspectRatio === "16:9" ? "landscape" : brief.aspectRatio === "1:1" ? "square" : "vertical";
-    const mp4 = await convertBlobToMp4(render.blob, shape).catch(() => null);
+    const mp4 = await convertBlobToMp4(render.blob, shape, opts.exportSettings).catch(() => null);
     if (mp4 && mp4.size > 0) {
       try { URL.revokeObjectURL(render.video_url); } catch { /* ignore */ }
       render.blob = mp4;
@@ -2705,21 +2728,22 @@ async function runRenderPhaseInner(
       render.extension = "mp4";
       render.size_bytes = mp4.size;
     } else {
+      if (opts.exportSettings) throw new Error("MP4 encoding or validation failed. Retry on an FFmpeg-enabled host or choose WebM.");
       console.warn("[video-pipeline] MP4 conversion unavailable; keeping the browser recording");
     }
   }
 
-  const thumbnail = await ThumbnailAgent.run(brief, script);
-  const seo = await SeoAgent.run(brief, script, timeline);
-
-  const [titles, hook] = await Promise.all([
+  const existing = opts.reuseMetadata;
+  const thumbnail = existing?.thumbnail ?? await ThumbnailAgent.run(brief, script);
+  const seo = existing?.seo ?? await SeoAgent.run(brief, script, timeline);
+  const [titles, hook] = existing ? [existing.titles, existing.hook] : await Promise.all([
     TitleOptimizerAgent.run(brief, research),
     HookAgent.run(brief, research),
   ]);
-  const intro = await IntroAgent.run(brief, script);
-  const curiosity = await CuriosityLoopAgent.run(script);
-  const retention = await RetentionAgent.run(brief, script, curiosity);
-  const chapters = await ChapterAgent.run(script);
+  const intro = existing?.intro ?? await IntroAgent.run(brief, script);
+  const curiosity = existing?.curiosity ?? await CuriosityLoopAgent.run(script);
+  const retention = existing?.retention ?? await RetentionAgent.run(brief, script, curiosity);
+  const chapters = existing?.chapters ?? await ChapterAgent.run(brief, script);
 
   validatePipelineDuration({
     requestedSec: brief.duration,
@@ -2771,12 +2795,18 @@ export async function regenerateShot(
   brief: VideoBrief,
   onEvent: (ev: JobEvent) => void,
   signal?: AbortSignal,
+  newVeoRevision = false,
 ): Promise<void> {
   const job = await getJob(jobId);
   if (!job) return;
   const shot = job.shots.find((s) => s.id === shotId);
   if (!shot) return;
 
+  if (newVeoRevision) {
+    const revision = (shot.motionRevision ?? 0) + 1;
+    if (revision > 4) throw new Error("This clip has reached its retry limit");
+    shot.motionRevision = revision;
+  }
   shot.status = "running";
   shot.error = null;
   shot.attempts += 1;

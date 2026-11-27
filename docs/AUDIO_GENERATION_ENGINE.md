@@ -133,3 +133,5 @@ that data is accounted for.
 Asset review can also mix audio already present in video clips. The
 [advanced model and clip audio guide](ADVANCED_VIDEO_MODELS.md) covers the
 fifth audio layer, source selection and local export verification.
+
+For configurable browser exports and the separate cut-based worker, see [professional video rendering](PROFESSIONAL_VIDEO_RENDERING.md).

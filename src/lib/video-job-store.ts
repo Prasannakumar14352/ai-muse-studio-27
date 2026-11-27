@@ -28,6 +28,7 @@ export type ShotRecord = {
   id: string;
   index: number;
   sceneIndex: number;
+  motionRevision?: number;
   audioSceneId?: string;
   beatIndex: number;
   isFirstOfScene: boolean;
@@ -102,6 +103,11 @@ function readJson<T>(key: string, fallback: T): T {
 }
 function writeJson(key: string, value: unknown) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* quota */ }
+}
+
+export async function motionSourceObjectURL(jobId: string, shotId: string) {
+  const user = await currentUserId();
+  return user ? loadShotObjectURL(shotBlobKey(user, jobId, shotId)) : null;
 }
 
 export async function createJob(
