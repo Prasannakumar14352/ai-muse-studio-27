@@ -57,6 +57,7 @@ const Input = z.object({
    * structured YouTube documentary.
    */
   retentionBrief: z.string().optional().default(""),
+  visualInstructions: z.string().trim().max(1000).optional(),
   /** Output language ("auto" = same as the topic). */
   language: z.string().optional().default("auto"),
 });
@@ -103,6 +104,7 @@ TOPIC: ${data.topic}
 TONE: ${data.tone}
 AUDIENCE: ${data.audience || "general creators"}
 VISUAL STYLE: ${data.styleLabel}
+${data.visualInstructions ? `Optional user direction for visuals only: ${data.visualInstructions}` : ""}
 FORMAT: ${data.contentType} (${ratio})
 
 ${languageAndFidelityRules(data.language, data.topic)}
@@ -1048,6 +1050,7 @@ const ScriptToVideoInput = z.object({
   lines: z.array(z.string().min(1).max(1200)).min(1).max(120),
   language: z.string().max(40).default("English"),
   styleLabel: z.string().max(60).default("Cinematic"),
+  visualInstructions: z.string().trim().max(1000).optional(),
   contentType: z.string().max(40).default("short_reel"),
   aspectRatio: z.string().max(10).default("9:16"),
   niche: z.string().max(200).optional().default(""),
@@ -1079,6 +1082,7 @@ export const planScriptToVideo = createServerFn({ method: "POST" })
 ${numbered}
 """
 ${data.niche ? `NICHE: ${data.niche}\n` : ""}VISUAL STYLE: ${data.styleLabel}
+${data.visualInstructions ? `Optional user direction for visuals only: ${data.visualInstructions}` : ""}
 FORMAT: ${data.contentType} (${data.aspectRatio})
 
 Return JSON:

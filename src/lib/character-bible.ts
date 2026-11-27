@@ -56,6 +56,7 @@ export type CharacterBible = {
   supporting: CharacterBibleField[];
   /** Free-text portrait prompt — used to generate the Master Character Image. */
   masterPortraitPrompt: string;
+  characterContext?: string;
   /** Optional data-URL / object URL for the generated Master Character Image. */
   masterReferenceUrl?: string | null;
 };
@@ -158,12 +159,15 @@ function baseFieldFor(topic: TopicBucket, id: string, role: string): CharacterBi
 export function defaultCharacterBibleFor(
   title: string,
   extraSignal?: string,
+  characterContext?: string,
 ): CharacterBible {
   const topic = classifyTopic(`${title} ${extraSignal ?? ""}`);
   const primary = baseFieldFor(topic, "hero_001", "protagonist");
   const supporting: CharacterBibleField[] = [];
-  const masterPortraitPrompt = buildMasterPortraitPrompt(primary);
-  return { primary, supporting, masterPortraitPrompt, masterReferenceUrl: null };
+  const masterPortraitPrompt = characterContext
+    ? `Single full-body three-quarter reference for the story protagonist. Story context: ${characterContext}. Respect the specified species, face, anatomy, proportions, skin or fur, markings, hair, clothing and accessories. Use a plain neutral backdrop with no text or watermark.`
+    : buildMasterPortraitPrompt(primary);
+  return { primary, supporting, masterPortraitPrompt, masterReferenceUrl: null, characterContext };
 }
 
 function buildMasterPortraitPrompt(c: CharacterBibleField): string {
@@ -185,6 +189,9 @@ function buildMasterPortraitPrompt(c: CharacterBibleField): string {
 
 /** Long-form locked-character block that gets prepended to every beat prompt. */
 export function bibleToCharacterSheetText(bible: CharacterBible): string {
+  if (bible.characterContext) {
+    return `Protagonist from this story context: ${bible.characterContext}. Preserve species, face, body proportions, skin or fur, markings, hair, costume and accessories from the master reference or established scene design.`;
+  }
   const c = bible.primary;
   return [
     `LOCKED CHARACTER SHEET — id=${c.id} (${c.role}). This exact person MUST appear identically in EVERY shot. Do not swap face, do not redesign, do not age, do not change ethnicity, do not restyle hair, do not change wardrobe, do not add or remove accessories.`,
@@ -200,7 +207,7 @@ export function bibleToContinuityCard(bible: CharacterBible): ContinuityCard {
   return {
     subjectAnchor: `${bible.primary.role} (${bible.primary.id})`,
     characterSheet: sheet,
-    wardrobeAnchor: `identical wardrobe (${bible.primary.clothing}), identical shoes (${bible.primary.shoes}), identical hairstyle (${bible.primary.hairStyle}), identical face across every shot`,
+    wardrobeAnchor: bible.characterContext ? "preserve the protagonist’s costume, ornaments, hair or fur and facial features" : `identical wardrobe (${bible.primary.clothing}), identical shoes (${bible.primary.shoes}), identical hairstyle (${bible.primary.hairStyle}), identical face across every shot`,
     locationAnchor: "consistent art direction, props, and set design across every shot in the project",
   };
 }

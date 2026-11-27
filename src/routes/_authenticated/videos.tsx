@@ -1,3 +1,4 @@
+import { CINEMATIC_STYLES, type CinematicStyleId } from "@/lib/visual-director";
 import { createFileRoute } from "@tanstack/react-router";
 import { celebrate } from "@/components/celebrate";
 import { confirmDialog } from "@/components/confirm-dialog";
@@ -252,6 +253,7 @@ const NICHES: Niche[] = [
 // ---------- Style cards ----------
 
 type StyleCard = { id: StyleId; label: string; image: string };
+const CINEMATIC_THUMBNAILS = { ancient: styleAncient, cinematic: styleCinematic, realistic: styleRealistic };
 const STYLE_CARDS: StyleCard[] = [
   { id: "3d", label: "3D", image: style3d },
   { id: "ghibli", label: "Hand-painted anime", image: styleGhibli },
@@ -265,6 +267,10 @@ const STYLE_CARDS: StyleCard[] = [
   { id: "cyberpunk", label: "Cyberpunk", image: styleCyberpunk },
   { id: "minimal_product", label: "Minimal Product", image: styleMinimal },
   { id: "futuristic", label: "Futuristic", image: styleFuturistic },
+  ...(Object.keys(CINEMATIC_STYLES) as CinematicStyleId[]).map((id) => {
+    const preset = CINEMATIC_STYLES[id];
+    return { id, label: preset.label, image: CINEMATIC_THUMBNAILS[preset.thumbnail] };
+  }),
 ];
 
 type View = "landing" | "input" | "processing" | "review" | "asset_review" | "result" | "library";
@@ -871,6 +877,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
   const [videoType, setVideoType] = useState<VideoType>(initialVideoType ?? "shorts");
   const [duration, setDuration] = useState<DurationSec>(initialDuration ?? 60);
   const [style, setStyle] = useState<StyleId>("cinematic");
+  const [visualInstructions, setVisualInstructions] = useState("");
   const [voice, setVoice] = useState<VoiceId>("George");
   const [ratio, setRatio] = useState<AspectRatio>(initialRatio ?? "9:16");
   // Off by default: it switches character scenes to HD (8 credits each).
@@ -921,6 +928,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
       brief: {
         title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio, sameCharacter, language,
         ...(voiceLanguage ? { voiceLanguage } : {}),
+        ...(visualInstructions.trim() ? { visualInstructions: visualInstructions.trim() } : {}),
         motionMode: motionMode === "full" && !fullMotionAllowed ? "key" : motionMode,
         motionTier,
       },
@@ -941,6 +949,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
         title: videoTitle, videoType, duration: Math.max(5, scriptSec) as DurationSec, style, voice, aspectRatio: ratio, sameCharacter,
         language: language === "auto" ? scriptLang : language,
         ...(voiceLanguage ? { voiceLanguage } : {}),
+        ...(visualInstructions.trim() ? { visualInstructions: visualInstructions.trim() } : {}),
         sourceScript: text,
         motionMode: motionMode === "full" && !fullMotionAllowed ? "key" : motionMode,
         motionTier,
@@ -1181,6 +1190,19 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
           })}
         </div>
       </Section>
+
+      <details className="rounded-xl border border-border p-4">
+        <summary className="cursor-pointer text-sm font-medium">Advanced Visual Instructions</summary>
+        <textarea
+          aria-label="Advanced Visual Instructions"
+          className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          rows={3}
+          maxLength={1000}
+          value={visualInstructions}
+          onChange={(event) => setVisualInstructions(event.target.value)}
+          placeholder="Describe locations, lighting, costumes, characters or camera movement."
+        />
+      </details>
 
       {/* 7. Voice */}
       <Section index={next()} title="Voice">
@@ -1520,7 +1542,6 @@ function AssetReviewGate({
         <div className="glass rounded-2xl p-4">
           <div className="text-xs uppercase tracking-wider text-muted-foreground">Timeline</div>
           <div className="text-2xl font-bold mt-1">{Math.round(bundle.timeline.total_sec)}s</div>
-          <div className="text-xs text-muted-foreground mt-1">Music + SFX layered</div>
         </div>
       </div>
 
@@ -1757,6 +1778,11 @@ function JobDashboard({
               </div>
             </div>
           </div>
+          {dash.shots.some((shot) => shot.status === "failed" && shot.error?.includes("Character reference")) && (
+            <p role="alert" className="mb-2 text-sm text-rose-300">
+              Character reference generation failed. Use Retry failed to try again.
+            </p>
+          )}
           <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
             <div className="h-full gradient-primary transition-all" style={{ width: `${shotPct}%` }} />
           </div>
