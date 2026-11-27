@@ -135,3 +135,5 @@ Asset review can also mix audio already present in video clips. The
 fifth audio layer, source selection and local export verification.
 
 For configurable browser exports and the separate cut-based worker, see [professional video rendering](PROFESSIONAL_VIDEO_RENDERING.md).
+
+See [Video quality assurance](VIDEO_QUALITY_ASSURANCE.md) for sampled narration checks, selective repair, and server audio validation.

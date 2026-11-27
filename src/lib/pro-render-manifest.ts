@@ -9,6 +9,10 @@ const storagePath = z
 const scene = z
   .object({
     path: storagePath,
+    sceneId: z.string().min(1).max(80).optional(),
+    movement: z.enum(["static", "push", "pull", "pan-left", "pan-right"]).default("static"),
+    overlay: z.string().max(240).optional(),
+    entrance: z.enum(["cut", "flash"]).default("cut"),
     kind: z.enum(["image", "clip"]),
     frames: z.number().int().min(1).max(900),
     trimFrame: z.number().int().min(0).max(5400).default(0),
@@ -18,6 +22,7 @@ const scene = z
 const layer = z
   .object({
     path: storagePath,
+    rate: z.number().min(1).max(1.35).default(1),
     track: z.enum(["narration", "music", "ambience", "sfx"]),
     startFrame: z.number().int().min(0),
     frames: z.number().int().min(1),
@@ -29,8 +34,9 @@ const layer = z
 
 export const proRenderManifest = z
   .object({
-    version: z.literal(1),
+    version: z.union([z.literal(1), z.literal(2)]),
     projectId: z.string().uuid(),
+    projectScope: z.enum(["cloud", "studio"]).default("cloud"),
     resolution: z.enum(["720p", "1080p", "4k"]),
     fps: z.union([z.literal(24), z.literal(30)]),
     aspectRatio: z.enum(["16:9", "9:16", "1:1"]),
@@ -43,6 +49,20 @@ export const proRenderManifest = z
   })
   .strict()
   .superRefine((manifest, ctx) => {
+    if (
+      manifest.version === 1 &&
+      (manifest.projectScope === "studio" ||
+        manifest.scenes.some(
+          (item) =>
+            item.overlay !== undefined || item.movement !== "static" || item.entrance !== "cut",
+        ) ||
+        manifest.audio.some((item) => item.rate !== 1))
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Studio effects and playback rate require manifest v2",
+      });
+    }
     const frames = manifest.scenes.reduce((sum, item) => sum + item.frames, 0);
     if (
       frames > manifest.fps * 180 ||

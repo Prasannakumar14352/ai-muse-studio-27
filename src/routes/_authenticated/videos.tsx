@@ -1,3 +1,8 @@
+import { StudioServerRender } from "@/components/video-studio/StudioServerRender";
+import { VideoQualityReview } from "@/components/video-studio/VideoQualityReview";
+import { assessVideoAssets, type QualityFinding } from "@/lib/video-quality";
+import { audioSignal, inspectShotPreviews } from "@/lib/video-quality-browser";
+import { voiceoverClipCredits } from "@/lib/tts-pricing";
 import { ExportSettings } from "@/components/video-studio/ExportSettings";
 import { defaultVideoExport, type VideoExportSettings } from "@/lib/video-export";
 import {
@@ -9,7 +14,12 @@ import {
   type AdvancedVideoModelId,
   type VeoResolution,
 } from "@/lib/advanced-video-models";
-import { persistReviewAudio, previewReviewAudio } from "@/lib/video-agents";
+import {
+  persistReviewAudio,
+  previewReviewAudio,
+  regenerateSceneNarration,
+  restorePreviousShot,
+} from "@/lib/video-agents";
 import { AudioSettingsPanel } from "@/components/video-studio/AudioSettingsPanel";
 import { generateAudio, requestAudio } from "@/lib/audio-client";
 import { audioCredits, type AudioSettings } from "@/lib/audio-generation";
@@ -27,7 +37,17 @@ import { SCRIPT_MAX_CHARS, estimateScriptSeconds, splitScriptIntoLines } from "@
 import { findLanguage } from "@/lib/languages";
 import { useAccess, getAvailableCredits } from "@/lib/access";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { estimateMotionCredits, motionClipCredits, keyMomentClipCount, MOTION_MODELS, KEY_MOMENT_EVERY_SEC, FULL_MOTION_MAX_SEC, type MotionMode, type MotionTier } from "@/lib/motion-clips";
+import {
+  estimateMotionCredits,
+  motionClipCredits,
+  pickMotionBeats,
+  keyMomentClipCount,
+  MOTION_MODELS,
+  KEY_MOMENT_EVERY_SEC,
+  FULL_MOTION_MAX_SEC,
+  type MotionMode,
+  type MotionTier,
+} from "@/lib/motion-clips";
 import { toast } from "sonner";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
@@ -46,7 +66,12 @@ import {
   type AssetGenerationBundle,
 } from "@/lib/video-agents";
 import {
-  listJobs, deleteJob as deleteJobRec, loadShotObjectURL, getJob, recoverInterruptedJobs,
+  listJobs,
+  deleteJob as deleteJobRec,
+  loadShotObjectURL,
+  getJob,
+  recoverInterruptedJobs,
+  saveQualityReview,
   type JobRecord,
 } from "@/lib/video-job-store";
 import {
@@ -322,6 +347,7 @@ const initialDash: DashState = {
 };
 
 function VideosPage() {
+  const { data: repairAccess } = useAccess();
   const [view, setView] = useState<View>("landing");
   const { new: startNew } = Route.useSearch();
   const navigateSelf = Route.useNavigate();
@@ -580,20 +606,36 @@ function VideosPage() {
       isAdvancedVideoModel(model) &&
       (shot?.status === "done" ||
         /Veo generation failed|Veo rejected|Credit reservation rejected/.test(shot?.error ?? ""));
+    const plannedMotion = pickMotionBeats(
+      dash.shots.length,
+      baseBrief.motionMode ?? "off",
+    ).includes(shot?.index ?? -1);
+    const imageCredits = baseBrief.sameCharacter ? 8 : 1;
     const credits = fallback
-      ? motionClipCredits("standard", 3.5)
+      ? imageCredits + motionClipCredits("standard", 3.5)
       : newVeoRevision && isAdvancedVideoModel(model)
-        ? advancedClipQuote(
+        ? imageCredits +
+          advancedClipQuote(
             model,
             veoSecondsFor(3.5),
-            baseBrief.sceneAudioSource === "native" || baseBrief.sceneAudioSource === "hybrid",
+            ["native", "hybrid"].includes(baseBrief.sceneAudioSource ?? ""),
           ).totalCredits
-        : null;
+        : isAdvancedVideoModel(model) && plannedMotion
+          ? null
+          : imageCredits +
+            (plannedMotion ? motionClipCredits(baseBrief.motionTier ?? "standard", 3.5) : 0);
+    const balance = repairAccess ? getAvailableCredits(repairAccess) : null;
     if (
-      credits !== null &&
       !(await confirmDialog({
-        title: fallback ? "Use MiniMax for this shot?" : "Generate a new Veo clip?",
-        description: `This clip costs ${credits} motion credits. Other shots stay as they are.`,
+        title: fallback
+          ? "Use MiniMax for this shot?"
+          : credits === null
+            ? "Recover this Veo shot?"
+            : "Regenerate this shot?",
+        description:
+          credits === null
+            ? `Resume the same provider revision. If the source image is missing, its regeneration can cost up to ${imageCredits} credits. Available: ${balance ?? "unavailable"}.`
+            : `Shot ${(shot?.index ?? 0) + 1} · ${fallback ? "MiniMax" : (model ?? baseBrief.motionTier ?? "Image model")} · up to ${credits} additional credits. Available: ${balance ?? "unavailable"}. Other shots are preserved.`,
         confirmText: "Generate clip",
       }))
     )
@@ -666,6 +708,24 @@ function VideosPage() {
 
   async function retryFailed() {
     if (!gen || !dash.jobId) return;
+    const count = dash.shots.filter((shot) => shot.status === "failed").length;
+    if (!count) return;
+    const estimated =
+      count *
+      (8 +
+        (gen.brief.motionMode === "off"
+          ? 0
+          : motionClipCredits(gen.brief.motionTier ?? "standard", 3.5)));
+    if (
+      !(await confirmDialog({
+        title: `Retry ${count} failed shots?`,
+        description: isAdvancedVideoModel(gen.brief.motionModel)
+          ? "Veo retries reuse their existing revision. A missing source image may need regeneration."
+          : `Up to ${estimated} generation credits estimated. Available: ${repairAccess ? getAvailableCredits(repairAccess) : "unavailable"}.`,
+        confirmText: "Retry failed shots",
+      }))
+    )
+      return;
     await retryFailedShots(dash.jobId, gen.brief, handleJobEvent, abortRef.current?.signal);
   }
 
@@ -771,6 +831,7 @@ function VideosPage() {
 
       {view === "landing" && (
         <>
+          <StudioServerRender />
           {inProgress.length > 0 && (
             <InProgressJobs jobs={inProgress} onResume={resumeJob} onDiscard={discardJob} />
           )}
@@ -839,8 +900,16 @@ function VideosPage() {
       )}
       {view === "asset_review" && dash.jobId && assetsBundle && (
         <AssetReviewGate
+          jobId={dash.jobId}
           shots={dash.shots}
           bundle={assetsBundle}
+          onRestore={async (shotId) => {
+            try {
+              await restorePreviousShot(dash.jobId!, shotId, handleJobEvent);
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Could not restore shot");
+            }
+          }}
           onUpdateAudio={(bundle) => {
             setAssetsBundle(bundle);
             void persistReviewAudio(dash.jobId!, bundle);
@@ -1703,6 +1772,8 @@ function stockQueryFrom(visual: string): string {
 }
 
 function AssetReviewGate({
+  jobId,
+  onRestore,
   shots,
   bundle,
   onUpdateAudio,
@@ -1712,6 +1783,8 @@ function AssetReviewGate({
   onBackToBlueprint,
   onCancel,
 }: {
+  jobId: string;
+  onRestore: (shotId: string) => Promise<void>;
   shots: ShotProgress[];
   bundle: AssetGenerationBundle;
   onUpdateAudio: (bundle: AssetGenerationBundle) => void;
@@ -1746,6 +1819,109 @@ function AssetReviewGate({
   const audioBlocked =
     audioSource !== "native" &&
     enabledAudio.some((track) => track.error || track.asset?.status !== "ready");
+  const { data: repairAccess } = useAccess();
+  const [editorialApproval, setEditorialApproval] = useState<{ key: string; reason: string }>({
+    key: "",
+    reason: "",
+  });
+  const [inspection, setInspection] = useState<{ key: string; findings: QualityFinding[] }>();
+  const [inspecting, setInspecting] = useState(false);
+  const inspectionAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => inspectionAbort.current?.abort(), []);
+  const narrationSignals = useMemo(
+    () => bundle.voiceover.map((clip) => (clip?.buffer ? audioSignal(clip.buffer) : null)),
+    [bundle.voiceover],
+  );
+  const [busyNarration, setBusyNarration] = useState<number>();
+  const previewKey = JSON.stringify(
+    shots.map((shot) => [shot.id, shot.previewUrl, shot.status, shot.error]),
+  );
+  const reviewKey = JSON.stringify([
+    previewKey,
+    bundle.brief.audio,
+    audioSource,
+    bundle.voiceover.map((clip) => clip.url),
+    enabledAudio.map((track) => track.asset?.assetId),
+    inspection,
+  ]);
+  const findings = assessVideoAssets({
+    scenes: bundle.script.scenes,
+    shots,
+    duration: bundle.brief.duration,
+    language: bundle.brief.language,
+    narration: bundle.voiceover.map((clip) => ({ n: clip.n, duration: clip.buffer?.duration })),
+    narrationEnabled:
+      audioSource !== "native" &&
+      bundle.brief.voiceLanguage !== "none" &&
+      bundle.brief.audio?.voiceoverEnabled !== false,
+    characterRequested: bundle.brief.sameCharacter === true,
+    fullMotion: bundle.brief.motionMode === "full",
+    audio:
+      audioSource === "native"
+        ? []
+        : enabledAudio.map((track) => ({
+            id: `${track.request.track}-${track.request.slot}`,
+            label: track.request.track,
+            status: track.asset?.status,
+            error: track.error,
+          })),
+  });
+  if (inspection?.key === previewKey) findings.push(...inspection.findings);
+  const qualityBlocked = findings.some((finding) => finding.blocksApproval);
+  const recordApproval = () =>
+    saveQualityReview(
+      jobId,
+      editorialApproval.reason,
+      findings.filter((finding) => finding.result === "warning").map((finding) => finding.id),
+    );
+  const approved =
+    editorialApproval.key === reviewKey && editorialApproval.reason.trim().length >= 3;
+
+  async function inspect() {
+    const controller = new AbortController();
+    inspectionAbort.current = controller;
+    setInspecting(true);
+    try {
+      const media = await inspectShotPreviews(shots, controller.signal);
+      if (!controller.signal.aborted) setInspection({ key: previewKey, findings: media });
+    } catch (error) {
+      if (!controller.signal.aborted)
+        toast.error(error instanceof Error ? error.message : "Could not inspect sources");
+    } finally {
+      if (!controller.signal.aborted) setInspecting(false);
+      inspectionAbort.current = null;
+    }
+  }
+
+  async function regenerateNarration(index: number) {
+    const scene = bundle.script.scenes[index];
+    if (!scene || busyNarration !== undefined) return;
+    const language =
+      bundle.brief.voiceLanguage ?? resolveContentLanguage(bundle.brief.language, scene.voiceover);
+    const cost = voiceoverClipCredits(scene.voiceover.length, language);
+    if (
+      !(await confirmDialog({
+        title: `Regenerate narration for scene ${scene.n}?`,
+        description: `Voice ${bundle.brief.voice} · estimated ${cost} credits. Available: ${repairAccess ? getAvailableCredits(repairAccess) : "unavailable"}. Other narration is preserved.`,
+        confirmText: "Generate narration",
+      }))
+    )
+      return;
+    setBusyNarration(index);
+    try {
+      const clip = await regenerateSceneNarration(bundle.brief, scene);
+      const old = bundle.voiceover[index];
+      const voiceover = [...bundle.voiceover];
+      voiceover[index] = clip;
+      onUpdateAudio({ ...bundle, voiceover });
+      if (old?.url) URL.revokeObjectURL(old.url);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not regenerate narration");
+    } finally {
+      setBusyNarration(undefined);
+    }
+  }
+
   const [busyAudio, setBusyAudio] = useState<number | null>(null);
   const [previewAudio, setPreviewAudio] = useState<string>();
   const [mixing, setMixing] = useState(false);
@@ -1777,11 +1953,12 @@ function AssetReviewGate({
 
   async function refreshTrack(track: PlannedAudio, index: number, regenerate = false) {
     const cost = audioCredits(track.request.track, track.request.duration);
+    const maySubmit = regenerate || !track.asset;
     if (
-      regenerate &&
+      maySubmit &&
       !(await confirmDialog({
-        title: "Generate a new audio asset?",
-        description: `This generation costs ${cost} credits.`,
+        title: regenerate ? "Generate a new audio asset?" : "Recover or generate audio?",
+        description: `${track.request.track} · up to ${cost} credits if a new provider request is needed. Available: ${repairAccess ? getAvailableCredits(repairAccess) : "unavailable"}.`,
         confirmText: "Generate audio",
       }))
     )
@@ -1835,9 +2012,20 @@ function AssetReviewGate({
             Back to blueprint
           </button>
           <button
-            onClick={() => onRender(acceptStillFallback, exportSettings)}
+            onClick={async () => {
+              try {
+                await recordApproval();
+                onRender(acceptStillFallback, exportSettings);
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "Could not save review");
+              }
+            }}
             disabled={
               failedCount > 0 ||
+              qualityBlocked ||
+              !approved ||
+              busyNarration !== undefined ||
+              inspecting ||
               audioBlocked ||
               busyAudio !== null ||
               (hasStillFallback && !acceptStillFallback)
@@ -1849,6 +2037,67 @@ function AssetReviewGate({
         </div>
       </div>
 
+      <VideoQualityReview findings={findings} />
+      <button
+        type="button"
+        className="text-sm underline"
+        disabled={inspecting}
+        onClick={() => void inspect()}
+      >
+        {inspecting ? "Inspecting source media…" : "Inspect source dimensions and image samples"}
+      </button>
+      <label className="grid gap-1 text-sm">
+        Review acknowledgement or reason for accepting warnings
+        <input
+          className="rounded border bg-background p-2"
+          maxLength={240}
+          placeholder="Describe your review"
+          value={editorialApproval.key === reviewKey ? editorialApproval.reason : ""}
+          onChange={(event) => setEditorialApproval({ key: reviewKey, reason: event.target.value })}
+        />
+      </label>
+      <StudioServerRender
+        jobId={jobId}
+        bundle={bundle}
+        settings={exportSettings}
+        beforeSubmit={recordApproval}
+        blocked={
+          !approved ||
+          qualityBlocked ||
+          audioBlocked ||
+          busyNarration !== undefined ||
+          inspecting ||
+          (hasStillFallback && !acceptStillFallback)
+        }
+      />
+      {audioSource !== "native" &&
+        bundle.brief.voiceLanguage !== "none" &&
+        bundle.brief.audio?.voiceoverEnabled !== false && (
+          <details className="rounded border p-3 text-sm">
+            <summary>Narration quality and repair</summary>
+            {bundle.script.scenes.map((scene, index) => {
+              const sample = narrationSignals[index];
+              return (
+                <div key={scene.n} className="flex flex-wrap gap-2 py-1">
+                  <span>
+                    Scene {scene.n} ·{" "}
+                    {sample
+                      ? `sampled peak ${sample.peakDbfs.toFixed(1)} dBFS${sample.peakDbfs < -65 ? " · very quiet" : ""}${sample.fullScaleShare > 0.001 ? " · samples at full scale" : ""}`
+                      : "no decoded audio"}
+                  </span>
+                  <button
+                    type="button"
+                    className="underline"
+                    disabled={!scene.voiceover.trim() || busyNarration !== undefined}
+                    onClick={() => void regenerateNarration(index)}
+                  >
+                    Regenerate narration
+                  </button>
+                </div>
+              );
+            })}
+          </details>
+        )}
       <ExportSettings
         value={exportSettings}
         onChange={(settings) => {
@@ -2057,6 +2306,16 @@ function AssetReviewGate({
                   </div>
                 </button>
                 <div className="p-2.5 space-y-1.5">
+                  {s.canRestore && (
+                    <button
+                      type="button"
+                      className="text-xs underline"
+                      disabled={busyId !== null}
+                      onClick={() => void onRestore(s.id)}
+                    >
+                      Restore previous version
+                    </button>
+                  )}
                   {s.error && (
                     <p role="alert" className="text-xs text-rose-400">
                       {s.error}
@@ -2713,6 +2972,8 @@ function ResultScreen({
   onSaveThumbnail: (v: { url: string; concept: string; headline: string; alt: string }) => void;
 }) {
   const { render, thumbnail, subtitles, seo, brief } = result;
+  const [publishingApproval, setPublishingApproval] = useState("");
+  const publishingApproved = publishingApproval === render.video_url;
 
   function download(url: string, filename: string) {
     const a = document.createElement("a");
@@ -2814,7 +3075,21 @@ function ResultScreen({
               ))}
             </div>
           </div>
-          <button onClick={() => toast.info("YouTube publishing will connect soon")} className="w-full rounded-2xl glass border border-border p-4 text-sm flex items-center justify-center gap-2 hover:border-primary/40 transition">
+          <label className="flex gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={publishingApproved}
+              onChange={(event) =>
+                setPublishingApproval(event.target.checked ? render.video_url : "")
+              }
+            />
+            I’ve watched this export and reviewed it for publishing.
+          </label>
+          <button
+            disabled={!publishingApproved}
+            onClick={() => toast.info("YouTube publishing will connect soon")}
+            className="w-full rounded-2xl glass border border-border p-4 text-sm flex items-center justify-center gap-2 hover:border-primary/40 transition"
+          >
             <Youtube className="w-5 h-5 text-rose-500" />
             <span>Publish to YouTube</span>
             <Send className="w-4 h-4 opacity-60" />

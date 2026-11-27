@@ -49,3 +49,5 @@ controls before rendering.
 - [Veo rate snapshot source](https://fal.ai/models/fal-ai/veo3.1)
 - [fal pricing API](https://fal.ai/docs/documentation/model-apis/pricing)
 - [Professional export and staging checklist](PROFESSIONAL_VIDEO_RENDERING.md)
+
+Studio quality review and credit-confirmed shot recovery are covered in [Video quality assurance](VIDEO_QUALITY_ASSURANCE.md).
