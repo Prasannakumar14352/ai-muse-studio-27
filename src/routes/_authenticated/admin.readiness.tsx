@@ -5,7 +5,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2, RefreshCw, XCircle } from "lucide-react";
-import { getFeatureReadinessFn, getProductionChecks, runReadinessCheckFn } from "@/lib/feature-readiness.functions";
+import {
+  getFeatureReadinessFn,
+  getProductionChecks,
+  runReadinessCheckFn,
+} from "@/lib/feature-readiness.functions";
 import { listCapabilitiesFn } from "@/lib/providers/registry.functions";
 import { CHECK_LABELS, FEATURE_LABELS, type FeatureId, type FeatureReadinessRow, type ReadinessCheck } from "@/lib/feature-readiness";
 
@@ -23,7 +27,11 @@ function ReadinessPage() {
   const caps = useServerFn(listCapabilitiesFn);
   const run = useServerFn(runReadinessCheckFn);
   const production = useServerFn(getProductionChecks);
-  const productionQ = useQuery({ queryKey: ["production-checks"], queryFn: () => production(), enabled: false });
+  const productionQ = useQuery({
+    queryKey: ["production-checks"],
+    queryFn: () => production(),
+    enabled: false,
+  });
   const reconcile = useServerFn(listVideoReconciliation);
   const videoQ = useQuery({
     queryKey: ["video-reconciliation"], queryFn: () => reconcile(), enabled: false,
@@ -64,12 +72,21 @@ function ReadinessPage() {
 
       <section className="rounded-2xl border border-border p-4 text-sm">
         <h2 className="font-semibold">Production checks</h2>
-        <button type="button" className="my-2 underline" disabled={productionQ.isFetching}
-          onClick={() => void productionQ.refetch()}>Check infrastructure and configuration</button>
+        <button
+          type="button"
+          className="my-2 underline"
+          disabled={productionQ.isFetching}
+          onClick={() => void productionQ.refetch()}
+        >
+          Check infrastructure and configuration
+        </button>
         {productionQ.isError && <p role="alert">Could not load production checks.</p>}
         <dl className="grid gap-2 md:grid-cols-2">
           {Object.entries(productionQ.data ?? {}).map(([label, status]) => (
-            <div key={label}><dt>{label}</dt><dd className="text-muted-foreground">{status}</dd></div>
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd className="text-muted-foreground">{status}</dd>
+            </div>
           ))}
         </dl>
       </section>
@@ -103,7 +120,9 @@ function ReadinessPage() {
               {c.configured ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <XCircle className="h-4 w-4 text-red-400" />}
               <div className="min-w-0">
                 <div className="truncate text-white/90">{c.capability}</div>
-                <div className="truncate text-xs text-white/50">{c.configured ? "Configured but unverified" : c.reason ?? "Unavailable"}</div>
+                <div className="truncate text-xs text-white/50">
+                  {c.configured ? "Configured but unverified" : (c.reason ?? "Unavailable")}
+                </div>
               </div>
             </div>
           ))}

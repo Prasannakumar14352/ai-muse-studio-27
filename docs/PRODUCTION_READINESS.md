@@ -8,7 +8,7 @@
 | P0 | The worker parsed caller-supplied storage paths and could sign them with the service role. It also fetched arbitrary media URLs | The worker signs only owned renders on the configured Supabase origin or immutable approved video objects. Browser image publishing stages its media before queuing |
 | P0 | The Studio approval checkbox was local state. Scheduled jobs could send other video URLs | Added private exact-export approval and enforced it in the shared worker. Protected approval bindings and provider state in the database |
 | P0 | Razorpay failure processing could race a captured payment. Logs retained request headers and full payload | Failed updates now match pending payments only, a verified success can supersede a prior failure, and the webhook keeps event metadata |
-| P0 | Razorpay payment status changes before entitlement fulfillment in separate operations. Wallet grants use read-modify-write | Open launch blocker. Add transactional fulfillment with immutable purchase parameters and idempotency. Reconcile historical successful payments before enabling remediation |
+| P0 | Plan and auto-debit fulfillment can change payment status before activating entitlement | Open launch blocker for subscriptions. One-time credit packs now claim the captured payment and increment the wallet atomically. Reconcile historical payments before enabling remediation |
 | P1 | Legacy video jobs have no approved snapshot. Some images are remote or mutable | Legacy video jobs fail closed. Restage remote images through the publishing dialog. Validate third-party image CORS in staging |
 | P1 | Publish claim identification had a race for resumable Instagram containers | The worker now compares the timestamp of the row it read when claiming it. Provider-side success followed by a lost response still needs reconciliation |
 | P1 | Full Supabase installation and upgrade, concurrent credit reservations, real worker recovery, and OAuth/payment staging coverage are required | Open. Local regression tests provide narrower evidence |
@@ -27,7 +27,7 @@ Approved media is signed only for dispatch. Legacy videos in queued jobs must be
 ## Staging and migration
 
 1. Back up the staging database and storage metadata. Restore a sanitized existing snapshot and separately create a clean local Supabase project.
-2. Apply the current migration chain locally. Review the audio, Veo, professional rendering, worker heartbeat, and private showcase migrations from November 27 and the new `20261128120000_video_publish_approvals.sql`. Run SQL checks using authenticated, anonymous and service accounts.
+2. Apply the current migration chain locally. Review the audio, Veo, professional rendering, worker heartbeat, and private showcase migrations from November 27 and the new `20261128120000_video_publish_approvals.sql` and `20261128121000_atomic_credit_pack_fulfillment.sql`. Run SQL checks using authenticated, anonymous and service accounts.
 3. Deploy the matching build to staging with working FFprobe. Create two fixture accounts and verify ownership, revocation, retry, reschedule, worker revalidation, and binds to the original export. Use mocked adapters.
 4. Move legacy public showcase assets by copying them into private storage, checking all references, and verifying replacement playback before removing any old public object. Existing downloaded and cached copies can remain accessible.
 5. Keep new paid capabilities disabled until authorized acceptance runs and account-specific commercial terms and pricing are verified.

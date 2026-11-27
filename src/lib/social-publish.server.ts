@@ -55,7 +55,8 @@ async function resolveImage(admin: Admin, userId: string, raw: string): Promise<
   const storage = admin.storage.from("renders");
   const { data: info } = await storage.info(path);
   const mime = info?.contentType;
-  if (!mime || !publishImageMime.has(mime)) throw new PublishError("Video requires an approved export");
+  if (!mime || !publishImageMime.has(mime))
+    throw new PublishError("Video requires an approved export");
   const { data } = await storage.createSignedUrl(path, 3600);
   if (!data) throw new PublishError("Could not load the publishing image", true);
   return { kind: "image", url: data.signedUrl, mime };
@@ -170,7 +171,12 @@ export function linkedInCommentary(text: string): string {
   }).join("");
 }
 
-async function publishLinkedIn(conn: Conn, job: JobRow, media: Media[], revalidate: () => Promise<void>): Promise<Outcome> {
+async function publishLinkedIn(
+  conn: Conn,
+  job: JobRow,
+  media: Media[],
+  revalidate: () => Promise<void>,
+): Promise<Outcome> {
   const author = `urn:li:person:${conn.account_id}`;
   const headers = {
     Authorization: `Bearer ${conn.accessToken}`,
@@ -261,7 +267,12 @@ async function graphPost(path: string, params: Record<string, string>, label: st
   }), label);
 }
 
-async function publishFacebook(conn: Conn, job: JobRow, media: Media[], revalidate: () => Promise<void>): Promise<Outcome> {
+async function publishFacebook(
+  conn: Conn,
+  job: JobRow,
+  media: Media[],
+  revalidate: () => Promise<void>,
+): Promise<Outcome> {
   const pageId = conn.account_id;
   if (!pageId) throw new PublishError("Pick a Facebook Page in Connected Accounts.", false, true);
   const token = await pageToken(conn, pageId);
@@ -331,7 +342,12 @@ async function waitForContainer(conn: Conn, containerId: string, maxMs: number):
   return false;
 }
 
-async function publishInstagram(conn: Conn, job: JobRow, media: Media[], revalidate: () => Promise<void>): Promise<Outcome> {
+async function publishInstagram(
+  conn: Conn,
+  job: JobRow,
+  media: Media[],
+  revalidate: () => Promise<void>,
+): Promise<Outcome> {
   const igId = conn.account_id;
   if (!igId) throw new PublishError("Pick an Instagram Business account in Connected Accounts.", false, true);
   const state = job.provider_state ?? {};
@@ -376,7 +392,12 @@ async function publishInstagram(conn: Conn, job: JobRow, media: Media[], revalid
 
 // ───────────────────────────── YouTube ─────────────────────────────
 
-async function publishYouTube(conn: Conn, job: JobRow, media: Media[], revalidate: () => Promise<void>): Promise<Outcome> {
+async function publishYouTube(
+  conn: Conn,
+  job: JobRow,
+  media: Media[],
+  revalidate: () => Promise<void>,
+): Promise<Outcome> {
   const video = media.find((m) => m.kind === "video");
   if (!video) throw new PublishError("YouTube needs a rendered video. Render the video first.");
   const { bytes, mime } = await fetchBytes(video);
@@ -400,9 +421,16 @@ async function publishYouTube(conn: Conn, job: JobRow, media: Media[], revalidat
   if (!init.ok) await jsonOrThrow(init, "YouTube upload init");
   const location = init.headers.get("location");
   if (!location) throw new PublishError("YouTube didn't return an upload URL", true);
-  if (new URL(location).origin !== "https://www.googleapis.com") throw new PublishError("Unexpected YouTube upload origin");
+  if (new URL(location).origin !== "https://www.googleapis.com")
+    throw new PublishError("Unexpected YouTube upload origin");
   await revalidate();
-  const up = await fetch(location, { method: "PUT", headers: { "Content-Type": mime }, body: bytes, redirect: "error", signal: AbortSignal.timeout(120_000) });
+  const up = await fetch(location, {
+    method: "PUT",
+    headers: { "Content-Type": mime },
+    body: bytes,
+    redirect: "error",
+    signal: AbortSignal.timeout(120_000),
+  });
   const j = await jsonOrThrow(up, "YouTube upload");
   const id = String(j.id ?? "");
   return { kind: "published", id, url: id ? `https://www.youtube.com/watch?v=${id}` : null };
@@ -419,9 +447,17 @@ async function publish(admin: Admin, job: JobRow): Promise<Outcome> {
     const approval = await getVideoApproval(job.video_approval_id, job.user_id, job.project_id);
     if (!approval) throw new PublishError("Video approval is missing or revoked");
     if (!job.provider_state?.ig_container) {
-      const { data } = await admin.storage.from(approvalBucket).createSignedUrl(approval.object_path, 3600);
+      const { data } = await admin.storage
+        .from(approvalBucket)
+        .createSignedUrl(approval.object_path, 3600);
       if (!data) throw new PublishError("The approved export is unavailable");
-      media = [{ kind: "video", url: data.signedUrl, mime: approval.object_path.endsWith(".webm") ? "video/webm" : "video/mp4" }];
+      media = [
+        {
+          kind: "video",
+          url: data.signedUrl,
+          mime: approval.object_path.endsWith(".webm") ? "video/webm" : "video/mp4",
+        },
+      ];
     }
   } else {
     if (platform === "youtube" || (job.provider_state?.ig_container && !urls.length)) {
@@ -431,27 +467,39 @@ async function publish(admin: Admin, job: JobRow): Promise<Outcome> {
   }
   const conn = await loadConnection(admin, job.user_id, platform, job.connection_id);
   const revalidate = async () => {
-    if (job.video_approval_id && !(await getVideoApproval(job.video_approval_id, job.user_id, job.project_id))) {
+    if (
+      job.video_approval_id &&
+      !(await getVideoApproval(job.video_approval_id, job.user_id, job.project_id))
+    ) {
       throw new PublishError("Video approval was revoked before dispatch");
     }
   };
   await revalidate();
   switch (platform) {
-    case "linkedin": return publishLinkedIn(conn, job, media, revalidate);
-    case "facebook": return publishFacebook(conn, job, media, revalidate);
-    case "instagram": return publishInstagram(conn, job, media, revalidate);
-    case "youtube": return publishYouTube(conn, job, media, revalidate);
+    case "linkedin":
+      return publishLinkedIn(conn, job, media, revalidate);
+    case "facebook":
+      return publishFacebook(conn, job, media, revalidate);
+    case "instagram":
+      return publishInstagram(conn, job, media, revalidate);
+    case "youtube":
+      return publishYouTube(conn, job, media, revalidate);
   }
 }
 
-const JOB_COLUMNS = "id, user_id, project_id, platform, connection_id, caption, hashtags, title, media_urls, video_approval_id, attempts, status, provider_state, updated_at";
+const JOB_COLUMNS =
+  "id, user_id, project_id, platform, connection_id, caption, hashtags, title, media_urls, video_approval_id, attempts, status, provider_state, updated_at";
 
 /**
  * Claim and publish one job. Safe to call from the worker and from
  * "Publish now": the claim only succeeds for a job that isn't already running
  * (or that has been stuck in `publishing` for over 10 minutes).
  */
-export async function runPublishJob(admin: Admin, id: string, owner?: string): Promise<{
+export async function runPublishJob(
+  admin: Admin,
+  id: string,
+  owner?: string,
+): Promise<{
   status: string; url: string | null; error: string | null;
 }> {
   const read = admin.from("scheduled_posts").select(JOB_COLUMNS).eq("id", id);
@@ -461,7 +509,11 @@ export async function runPublishJob(admin: Admin, id: string, owner?: string): P
 
   const resuming = job.status === "publishing" && typeof job.provider_state?.ig_container === "string";
   const stale = new Date(Date.now() - 10 * 60_000).toISOString();
-  const claim = admin.from("scheduled_posts").update({ status: "publishing" } as never).eq("id", id).eq("updated_at", row.updated_at);
+  const claim = admin
+    .from("scheduled_posts")
+    .update({ status: "publishing" } as never)
+    .eq("id", id)
+    .eq("updated_at", row.updated_at);
   const { data: claimed } = await (resuming
     ? claim.eq("status", "publishing")
     : claim.or(`status.in.(scheduled,ready,failed,reconnect_required),and(status.eq.publishing,updated_at.lt.${stale})`)
@@ -484,10 +536,19 @@ export async function runPublishJob(admin: Admin, id: string, owner?: string): P
       external_post_id: outcome.id || null, external_post_url: outcome.url, provider_state: {},
     } as never).eq("id", id);
     if (job.project_id) {
-      const { data: proj } = await admin.from("projects").select("platform_urls").eq("id", job.project_id).eq("user_id", job.user_id).maybeSingle();
+      const { data: proj } = await admin
+        .from("projects")
+        .select("platform_urls")
+        .eq("id", job.project_id)
+        .eq("user_id", job.user_id)
+        .maybeSingle();
       const urls = { ...((proj?.platform_urls as Record<string, string> | null) ?? {}) };
       if (outcome.url) urls[job.platform] = outcome.url;
-      await admin.from("projects").update({ publish_status: "published", platform_urls: urls } as never).eq("id", job.project_id).eq("user_id", job.user_id);
+      await admin
+        .from("projects")
+        .update({ publish_status: "published", platform_urls: urls } as never)
+        .eq("id", job.project_id)
+        .eq("user_id", job.user_id);
     }
     return { status: "published", url: outcome.url, error: null };
   }
@@ -504,7 +565,11 @@ export async function runPublishJob(admin: Admin, id: string, owner?: string): P
     ...(retry ? { scheduled_at: new Date(Date.now() + attempts * 5 * 60_000).toISOString() } : {}),
   } as never).eq("id", id);
   if (job.project_id && !retry) {
-    await admin.from("projects").update({ publish_status: status } as never).eq("id", job.project_id).eq("user_id", job.user_id);
+    await admin
+      .from("projects")
+      .update({ publish_status: status } as never)
+      .eq("id", job.project_id)
+      .eq("user_id", job.user_id);
   }
   return { status, url: null, error: outcome.message };
 }

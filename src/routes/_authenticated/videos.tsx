@@ -55,7 +55,14 @@ import {
 import { toast } from "sonner";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
-  Wand2, Play, RefreshCw, Check, Trash2, Clock, Plus, Video,
+  Wand2,
+  Play,
+  RefreshCw,
+  Check,
+  Trash2,
+  Clock,
+  Plus,
+  Video,
   X, RotateCw, Maximize2, ChevronLeft, ChevronRight, ImagePlus,
 } from "lucide-react";
 import { MediaPicker } from "@/components/media-picker";

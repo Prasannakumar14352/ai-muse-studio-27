@@ -2151,9 +2151,9 @@ export type Database = {
           hashtags: string | null
           id: string
           last_error: string | null
-          title: string | null
-          provider_state: Json
-          video_approval_id: string | null
+          title: string | null;
+          provider_state: Json;
+          video_approval_id: string | null;
           media_urls: Json
           platform: string
           project_id: string | null
@@ -2173,9 +2173,9 @@ export type Database = {
           hashtags?: string | null
           id?: string
           last_error?: string | null
-          title?: string | null
-          provider_state?: Json
-          video_approval_id?: string | null
+          title?: string | null;
+          provider_state?: Json;
+          video_approval_id?: string | null;
           media_urls?: Json
           platform: string
           project_id?: string | null
@@ -2195,9 +2195,9 @@ export type Database = {
           hashtags?: string | null
           id?: string
           last_error?: string | null
-          title?: string | null
-          provider_state?: Json
-          video_approval_id?: string | null
+          title?: string | null;
+          provider_state?: Json;
+          video_approval_id?: string | null;
           media_urls?: Json
           platform?: string
           project_id?: string | null
@@ -2226,32 +2226,32 @@ export type Database = {
       }
       video_publish_approvals: {
         Row: {
-          id: string
-          user_id: string
-          project_id: string | null
-          object_path: string
-          sha256: string
-          metadata: Json
-          accepted_warnings: string[]
-          approved_at: string
-          revoked_at: string | null
-        }
+          id: string;
+          user_id: string;
+          project_id: string | null;
+          object_path: string;
+          sha256: string;
+          metadata: Json;
+          accepted_warnings: string[];
+          approved_at: string;
+          revoked_at: string | null;
+        };
         Insert: {
-          id?: string
-          user_id: string
-          project_id?: string | null
-          object_path: string
-          sha256: string
-          metadata: Json
-          accepted_warnings?: string[]
-          approved_at?: string
-          revoked_at?: string | null
-        }
+          id?: string;
+          user_id: string;
+          project_id?: string | null;
+          object_path: string;
+          sha256: string;
+          metadata: Json;
+          accepted_warnings?: string[];
+          approved_at?: string;
+          revoked_at?: string | null;
+        };
         Update: {
-          revoked_at?: string | null
-        }
-        Relationships: []
-      }
+          revoked_at?: string | null;
+        };
+        Relationships: [];
+      };
       strategies: {
         Row: {
           audience: string | null
@@ -2615,6 +2615,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      fulfill_credit_pack_payment: {
+        Args: { payment_row_id: string; captured_payment_id: string };
+        Returns: { already_credited: boolean; new_balance: number | null }[];
+      };
       deduct_credits: {
         Args: {
           _amount: number

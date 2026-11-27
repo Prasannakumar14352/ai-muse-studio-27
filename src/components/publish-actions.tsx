@@ -195,7 +195,7 @@ export function PublishDialog({
     const results = await Promise.allSettled(list.map((t) => schedule({
       data: {
         projectId: content.projectId,
-        videoApprovalId: content.videoApprovalId,
+            videoApprovalId: content.videoApprovalId,
         platform: t.platform,
         connectionId: t.id,
         title: content.postTitle ?? content.title,

@@ -94,8 +94,8 @@ export const schedulePost = createServerFn({ method: "POST" })
     title: z.string().max(300).optional(),
     caption: z.string().optional(),
     hashtags: z.string().optional(),
-    mediaUrls: z.array(z.string().max(5000)).max(20).optional(),
-    videoApprovalId: z.string().uuid().optional(),
+        mediaUrls: z.array(z.string().max(5000)).max(20).optional(),
+        videoApprovalId: z.string().uuid().optional(),
     scheduledAt: z.string().datetime().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
@@ -103,8 +103,12 @@ export const schedulePost = createServerFn({ method: "POST" })
     const media = data.mediaUrls ?? [];
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (data.projectId) {
-      const { data: project } = await supabase.from("projects").select("id")
-        .eq("id", data.projectId).eq("user_id", userId).maybeSingle();
+      const { data: project } = await supabase
+        .from("projects")
+        .select("id")
+        .eq("id", data.projectId)
+        .eq("user_id", userId)
+        .maybeSingle();
       if (!project) throw new Error("Project not found");
     }
     if (data.videoApprovalId) {
@@ -123,7 +127,10 @@ export const schedulePost = createServerFn({ method: "POST" })
         }
       }
     }
-    const problem = platformMediaProblem(data.platform, data.videoApprovalId ? ["approved.mp4"] : media);
+    const problem = platformMediaProblem(
+      data.platform,
+      data.videoApprovalId ? ["approved.mp4"] : media,
+    );
     if (problem) throw new Error(problem);
 
     const conn = await assertPublishConnection(supabase, userId, data.platform, data.connectionId);
@@ -132,7 +139,9 @@ export const schedulePost = createServerFn({ method: "POST" })
     if (scheduled && new Date(scheduled).getTime() < Date.now() - 60_000) {
       throw new Error("Pick a time in the future.");
     }
-    const { data: row, error } = await supabaseAdmin.from("scheduled_posts").insert({
+    const { data: row, error } = await supabaseAdmin
+      .from("scheduled_posts")
+      .insert({
       user_id: userId,
       project_id: data.projectId ?? null,
       platform: data.platform,
@@ -141,7 +150,7 @@ export const schedulePost = createServerFn({ method: "POST" })
       caption: data.caption ?? null,
       hashtags: data.hashtags ?? null,
       media_urls: media as never,
-      video_approval_id: data.videoApprovalId ?? null,
+        video_approval_id: data.videoApprovalId ?? null,
       scheduled_at: scheduled,
       status: scheduled ? "scheduled" : "ready",
     } as never).select("id").single();
@@ -184,13 +193,19 @@ export const listScheduledPosts = createServerFn({ method: "GET" })
 
 async function assertQueuedVideoApproval(id: string, userId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: post, error } = await supabaseAdmin.from("scheduled_posts")
+  const { data: post, error } = await supabaseAdmin
+    .from("scheduled_posts")
     .select("video_approval_id, project_id, platform, media_urls")
-    .eq("id", id).eq("user_id", userId).maybeSingle();
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
   if (error || !post) throw new Error("Post not found");
   if (!post.video_approval_id) {
-    if (post.platform === "youtube" || (Array.isArray(post.media_urls) &&
-      post.media_urls.some((url) => typeof url === "string" && isVideoUrl(url)))) {
+    if (
+      post.platform === "youtube" ||
+      (Array.isArray(post.media_urls) &&
+        post.media_urls.some((url) => typeof url === "string" && isVideoUrl(url)))
+    ) {
       throw new Error("Approve this video export in Studio and create a new post");
     }
     return;
@@ -210,7 +225,10 @@ export const retryScheduledPost = createServerFn({ method: "POST" })
       status: "ready",
       attempts: 0,
       last_error: null,
-    } as never).eq("id", data.id).eq("user_id", context.userId).in("status", ["draft", "ready", "scheduled", "failed", "reconnect_required"]);
+      } as never)
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .in("status", ["draft", "ready", "scheduled", "failed", "reconnect_required"]);
     if (error) throw error;
     return { ok: true };
   });
@@ -234,7 +252,9 @@ export const updateScheduledPost = createServerFn({ method: "POST" })
     if (data.status !== undefined) patch.status = data.status;
     const { error } = await context.supabase
       .from("scheduled_posts").update(patch as never)
-      .eq("id", data.id).eq("user_id", context.userId).in("status", ["draft", "ready", "scheduled", "failed", "reconnect_required"]);
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .in("status", ["draft", "ready", "scheduled", "failed", "reconnect_required"]);
     if (error) throw error;
     return { ok: true };
   });
@@ -245,12 +265,19 @@ export const publishScheduledPostNow = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     await assertQueuedVideoApproval(data.id, context.userId);
-    const { data: queued, error } = await context.supabase.from("scheduled_posts").update({
+    const { data: queued, error } = await context.supabase
+      .from("scheduled_posts")
+      .update({
       status: "ready",
       scheduled_at: null,
       attempts: 0,
       last_error: null,
-    } as never).eq("id", data.id).eq("user_id", context.userId).in("status", ["draft", "ready", "scheduled", "failed", "reconnect_required"]).select("id").maybeSingle();
+      } as never)
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .in("status", ["draft", "ready", "scheduled", "failed", "reconnect_required"])
+      .select("id")
+      .maybeSingle();
     if (error) throw error;
     if (!queued) throw new Error("This post cannot be published in its current state");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -359,7 +386,11 @@ export const retryAllFailed = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.from("scheduled_posts").update({
       status: "ready", attempts: 0, last_error: null,
-    } as never).eq("user_id", context.userId).eq("status", "failed").is("video_approval_id", null).select("id");
+      } as never)
+      .eq("user_id", context.userId)
+      .eq("status", "failed")
+      .is("video_approval_id", null)
+      .select("id");
     if (error) throw error;
     return { ok: true, count: (data ?? []).length };
   });

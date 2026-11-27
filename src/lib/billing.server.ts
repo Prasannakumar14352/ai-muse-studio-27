@@ -75,6 +75,25 @@ export async function activatePlan(admin: Admin, userId: string, opts: {
   return { credits };
 }
 
+export async function fulfillCreditPackPayment(
+  admin: Admin,
+  payment: { id: string; credits: number },
+  capturedId: string,
+) {
+  const { data, error } = await admin
+    .rpc("fulfill_credit_pack_payment", {
+      payment_row_id: payment.id,
+      captured_payment_id: capturedId,
+    })
+    .single();
+  if (error || !data) throw new Error("Could not fulfill the captured credit pack");
+  return {
+    credits: payment.credits,
+    alreadyCredited: data.already_credited,
+    newBalance: data.new_balance ?? undefined,
+  };
+}
+
 /**
  * Fulfil a successful one-time order (credit pack or plan). Used by both the
  * checkout verification and the webhook, so a user who closes the tab after

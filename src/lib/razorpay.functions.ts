@@ -365,13 +365,27 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     }
 
     const { razorpayApi } = await import("./billing.server");
-    const captured = await razorpayApi<{ order_id: string; status: string; amount: number; currency: string }>(
-      `/payments/${encodeURIComponent(data.razorpay_payment_id)}`,
-    );
-    if (captured.status !== "captured" || captured.order_id !== payment.razorpay_order_id ||
-        captured.amount !== (payment.amount_inr_paise ?? payment.amount_cents) ||
-        captured.currency !== payment.currency) {
+    const captured = await razorpayApi<{
+      order_id: string;
+      status: string;
+      amount: number;
+      currency: string;
+    }>(`/payments/${encodeURIComponent(data.razorpay_payment_id)}`);
+    if (
+      captured.status !== "captured" ||
+      captured.order_id !== payment.razorpay_order_id ||
+      captured.amount !== (payment.amount_inr_paise ?? payment.amount_cents) ||
+      captured.currency !== payment.currency
+    ) {
       throw new Error("Payment capture has not been verified for this order");
+    }
+
+    if (!payment.pack_id.startsWith("plan_")) {
+      const { fulfillCreditPackPayment } = await import("./billing.server");
+      return {
+        ok: true,
+        ...(await fulfillCreditPackPayment(supabaseAdmin, payment, data.razorpay_payment_id)),
+      };
     }
 
     // Claim the payment: only the first of checkout/webhook to flip it fulfils it.
