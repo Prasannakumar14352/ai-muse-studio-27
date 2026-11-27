@@ -1,3 +1,8 @@
+import { persistReviewAudio, previewReviewAudio } from "@/lib/video-agents";
+import { AudioSettingsPanel } from "@/components/video-studio/AudioSettingsPanel";
+import { generateAudio, requestAudio } from "@/lib/audio-client";
+import { audioCredits, type AudioSettings } from "@/lib/audio-generation";
+import { isAudioTrackEnabled, maximumAudioCredits, type PlannedAudio } from "@/lib/audio-plan";
 import { CINEMATIC_STYLES, type CinematicStyleId } from "@/lib/visual-director";
 import { createFileRoute } from "@tanstack/react-router";
 import { celebrate } from "@/components/celebrate";
@@ -429,8 +434,8 @@ function VideosPage() {
   /** Called from the Blueprint Editor when the user clicks "Approve & Generate Assets".
    *  Stamps explicit approval, then runs shots + narration + subtitles + timeline,
    *  then PAUSES at the asset review gate. */
-  async function approveAndGenerate(jobId: string) {
-    if (!gen) return;
+  async function approveAndGenerate(jobId: string, args = gen) {
+    if (!args) return;
     // Stamp approval on the current blueprint version. Any later edit clears it.
     await approveBlueprint(localBlueprintId(jobId));
     const meta = await getBlueprintMetadata(localBlueprintId(jobId));
@@ -443,9 +448,26 @@ function VideosPage() {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const { job, bundle } = await runAssetGenerationPhase(jobId, gen.brief, {
-        niche: gen.niche,
-        topic: gen.topic,
+      const blueprint = meta?.currentBlueprint;
+      const audio = blueprint?.audio ?? args.brief.audio;
+      const musicDirection = [
+        blueprint?.musicDirection,
+        blueprint?.music?.label,
+        blueprint?.music?.bpm && `About ${blueprint.music.bpm} BPM`,
+        audio?.musicPrompt,
+      ]
+        .filter(Boolean)
+        .join(". ");
+      const approvedBrief = {
+        ...args.brief,
+        audio: audio && { ...audio, musicPrompt: musicDirection },
+      };
+      const { job, bundle } = await runAssetGenerationPhase(
+        jobId,
+        approvedBrief,
+        {
+          niche: args.niche,
+          topic: args.topic,
         onEvent: handleJobEvent,
         signal: controller.signal,
       }, edited);
@@ -528,6 +550,7 @@ function VideosPage() {
         return;
       }
       const msg = friendlyVideoError(e, "Render failed");
+      setView("asset_review");
       setError(msg);
       toast.error(msg);
     }
@@ -580,7 +603,7 @@ function VideosPage() {
     // Job was approved earlier — safe to continue asset generation. If shots
     // were already produced, IndexedDB caching short-circuits regen and we
     // land right back on the asset review gate.
-    await approveAndGenerate(job.id);
+    await approveAndGenerate(job.id, { brief, niche: job.niche, topic: job.topic });
   }
 
   /** Abort any active phase and jump back into the blueprint editor without
@@ -777,6 +800,10 @@ function VideosPage() {
         <AssetReviewGate
           shots={dash.shots}
           bundle={assetsBundle}
+          onUpdateAudio={(bundle) => {
+            setAssetsBundle(bundle);
+            void persistReviewAudio(dash.jobId!, bundle);
+          }}
           onRender={renderFinal}
           onRegenerate={regenOneShot}
           onReplace={replaceOneShot}
@@ -878,6 +905,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
   const [duration, setDuration] = useState<DurationSec>(initialDuration ?? 60);
   const [style, setStyle] = useState<StyleId>("cinematic");
   const [visualInstructions, setVisualInstructions] = useState("");
+  const [audio, setAudio] = useState<AudioSettings>();
   const [voice, setVoice] = useState<VoiceId>("George");
   const [ratio, setRatio] = useState<AspectRatio>(initialRatio ?? "9:16");
   // Off by default: it switches character scenes to HD (8 credits each).
@@ -923,12 +951,14 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     if (mode === "script") return submitScript();
     if (!title.trim()) return toast.error("Enter a video title or idea");
     if (isCustom && !customNiche.trim()) return toast.error("Describe your custom niche or topic area");
-    if (needsVoiceChoice(language, voiceLanguage)) return toast.error("Choose a voice language (or no voiceover) for this language first.");
+    if (audio?.voiceoverEnabled !== false && needsVoiceChoice(language, voiceLanguage))
+      return toast.error("Choose a voice language (or no voiceover) for this language first.");
     onGenerate({
       brief: {
         title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio, sameCharacter, language,
         ...(voiceLanguage ? { voiceLanguage } : {}),
         ...(visualInstructions.trim() ? { visualInstructions: visualInstructions.trim() } : {}),
+        audio,
         motionMode: motionMode === "full" && !fullMotionAllowed ? "key" : motionMode,
         motionTier,
       },
@@ -941,7 +971,8 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     const text = script.trim();
     if (!text) return toast.error("Paste your script first");
     if (text.length > SCRIPT_MAX_CHARS) return toast.error(`Scripts can be up to ${SCRIPT_MAX_CHARS.toLocaleString()} characters`);
-    if (needsVoiceChoice(language, voiceLanguage)) return toast.error("Choose a voice language (or no voiceover) for this language first.");
+    if (audio?.voiceoverEnabled !== false && needsVoiceChoice(language, voiceLanguage))
+      return toast.error("Choose a voice language (or no voiceover) for this language first.");
     const firstLine = splitScriptIntoLines(text)[0] ?? "My video";
     const videoTitle = (scriptTitle.trim() || firstLine).slice(0, 100);
     onGenerate({
@@ -950,6 +981,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
         language: language === "auto" ? scriptLang : language,
         ...(voiceLanguage ? { voiceLanguage } : {}),
         ...(visualInstructions.trim() ? { visualInstructions: visualInstructions.trim() } : {}),
+        audio,
         sourceScript: text,
         motionMode: motionMode === "full" && !fullMotionAllowed ? "key" : motionMode,
         motionTier,
@@ -973,7 +1005,15 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     // Same-character scenes use HD images (8 instead of 1) for ~70% of shots, plus one portrait.
     const extra = sameCharacter ? Math.round(base.scenes * 0.7) * 7 + 8 : 0;
     const motion = motionMode === "off" ? 0 : motionEstimate.credits;
-    return { total: base.total + extra + motion, parts: base.parts, extra, motion, scenes: base.scenes };
+    const paidAudio = maximumAudioCredits(audio ?? {}, effDuration);
+    const withoutVoice = voiceLanguage === "none" || audio?.voiceoverEnabled === false;
+    return {
+      total: base.total + extra + motion + paidAudio - (withoutVoice ? base.voice : 0),
+      parts: withoutVoice ? `1 script + ${base.scenes} scene images` : base.parts,
+      extra,
+      motion,
+      paidAudio,
+    };
   })();
   const { data: access } = useAccess();
   const available = access ? getAvailableCredits(access) : null;
@@ -990,11 +1030,21 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
       <SummaryRow label="Language" value={findLanguage(langCode)?.id ?? langCode} />
       <SummaryRow label="Format" value={`${typeLabel} · ${ratio} · ~${effDuration}s`} />
       <SummaryRow label="Style" value={styleLabel} />
-      <SummaryRow label="Voice" value={voiceLanguage === "none" ? "No voiceover" : String(voice)} />
+      <SummaryRow
+        label="Voice"
+        value={
+          voiceLanguage === "none" || audio?.voiceoverEnabled === false
+            ? "No voiceover"
+            : String(voice)
+        }
+      />
       <SummaryRow label="Motion" value={motionMode === "off" ? "Camera moves" : motionMode === "key" ? "Key moments" : "Full motion"} />
       <div className="h-px bg-border" />
       <div className="text-xs text-muted-foreground leading-relaxed">
-        {estimate.parts}{estimate.extra ? ` + ${estimate.extra} for the same character` : ""}{estimate.motion ? ` + ${estimate.motion} for motion clips` : ""}
+        {estimate.parts}
+        {estimate.extra ? ` + ${estimate.extra} for the same character` : ""}
+        {estimate.motion ? ` + ${estimate.motion} for motion clips` : ""}
+        {estimate.paidAudio ? ` + up to ${estimate.paidAudio} for generated audio` : ""}
       </div>
       <div className="flex items-baseline justify-between">
         <span className="font-semibold">Estimated total</span>
@@ -1209,6 +1259,8 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
         <VoicePicker value={voice} onChange={setVoice}
           language={mode === "script" ? scriptLang : resolveContentLanguage(language, title)} />
       </Section>
+
+        <AudioSettingsPanel value={audio} onChange={setAudio} duration={effDuration} />
 
       {/* 8. Aspect ratio */}
       <Section index={next()} title={`Aspect ratio${ratio !== suggestedRatio ? ` (suggested: ${suggestedRatio})` : ""}`}>
@@ -1474,10 +1526,18 @@ function stockQueryFrom(visual: string): string {
 }
 
 function AssetReviewGate({
-  shots, bundle, onRender, onRegenerate, onReplace, onBackToBlueprint, onCancel,
+  shots,
+  bundle,
+  onUpdateAudio,
+  onRender,
+  onRegenerate,
+  onReplace,
+  onBackToBlueprint,
+  onCancel,
 }: {
   shots: ShotProgress[];
   bundle: AssetGenerationBundle;
+  onUpdateAudio: (bundle: AssetGenerationBundle) => void;
   onRender: () => void;
   onRegenerate: (shotId: string) => Promise<void>;
   onReplace: (shotId: string, item: PickedMedia) => Promise<void>;
@@ -1489,9 +1549,69 @@ function AssetReviewGate({
   const [replaceFor, setReplaceFor] = useState<{ id: string; index: number } | null>(null);
   const viewable = useMemo(() => shots.filter((s) => s.previewUrl), [shots]);
   const failedCount = shots.filter((s) => s.status === "failed").length;
+  const enabledAudio = bundle.audioTracks.filter((track) =>
+    isAudioTrackEnabled(bundle.brief.audio, track.request.track),
+  );
+  const audioBlocked = enabledAudio.some((track) => track.error || track.asset?.status !== "ready");
+  const [busyAudio, setBusyAudio] = useState<number | null>(null);
+  const [previewAudio, setPreviewAudio] = useState<string>();
+  const [mixing, setMixing] = useState(false);
+  useEffect(
+    () => () => {
+      if (
+        previewAudio?.startsWith("blob:") &&
+        !bundle.voiceover.some((clip) => clip.url === previewAudio)
+      )
+        URL.revokeObjectURL(previewAudio);
+    },
+    [previewAudio, bundle.voiceover],
+  );
+
+  async function previewMix() {
+    setMixing(true);
+    try {
+      setPreviewAudio(URL.createObjectURL(await previewReviewAudio(bundle)));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Audio preview failed");
+    } finally {
+      setMixing(false);
+    }
+  }
+
   const voMinutes = bundle.voiceover.reduce(
     (a, v) => a + (v.buffer?.duration ?? v.duration_sec ?? 0), 0,
   );
+
+  async function refreshTrack(track: PlannedAudio, index: number, regenerate = false) {
+    const cost = audioCredits(track.request.track, track.request.duration);
+    if (
+      regenerate &&
+      !(await confirmDialog({
+        title: "Generate a new audio asset?",
+        description: `This generation costs ${cost} credits.`,
+        confirmText: "Generate audio",
+      }))
+    )
+      return;
+    const request = { ...track.request, revision: track.request.revision + Number(regenerate) };
+    setBusyAudio(index);
+    try {
+      const asset =
+        !regenerate && track.asset
+          ? await requestAudio({ assetId: track.asset.assetId })
+          : await generateAudio(request);
+      onUpdateAudio({
+        ...bundle,
+        audioTracks: bundle.audioTracks.map((item, i) =>
+          i === index ? { ...item, request, asset, error: undefined } : item,
+        ),
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Audio request failed");
+    } finally {
+      setBusyAudio(null);
+    }
+  }
 
   async function handleRegen(id: string) {
     setBusyId(id);
@@ -1504,8 +1624,7 @@ function AssetReviewGate({
         <div>
           <h2 className="font-semibold text-lg">Review your generated assets</h2>
           <p className="text-sm text-muted-foreground">
-            All shots, narration and subtitles are ready. Preview each scene, regenerate anything
-            you don't like, then render the final MP4.
+            Preview your shots and audio, then render the final MP4.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1520,13 +1639,101 @@ function AssetReviewGate({
           </button>
           <button
             onClick={onRender}
-            disabled={failedCount > 0}
+            disabled={failedCount > 0 || audioBlocked || busyAudio !== null}
             className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
           >
             <Check className="w-4 h-4" /> Render final video
           </button>
         </div>
       </div>
+
+      <AudioSettingsPanel
+        value={bundle.brief.audio}
+        duration={bundle.brief.duration}
+        mixOnly
+        available={{
+          voiceoverEnabled: bundle.voiceover.some((clip) => clip.buffer),
+          backgroundMusicEnabled: bundle.audioTracks.some(
+            (track) => track.request.track === "music",
+          ),
+          soundEffectsEnabled: bundle.audioTracks.some((track) => track.request.track === "sfx"),
+          ambienceEnabled: bundle.audioTracks.some((track) => track.request.track === "ambience"),
+        }}
+        onChange={(audio) => onUpdateAudio({ ...bundle, brief: { ...bundle.brief, audio } })}
+      />
+      {(bundle.audioTracks.length > 0 || bundle.voiceover.some((clip) => clip.url)) && (
+        <div className="space-y-2 rounded-xl border border-border p-4">
+          <h3 className="text-sm font-semibold">Audio previews</h3>
+          <button
+            type="button"
+            className="text-sm underline"
+            disabled={audioBlocked || mixing}
+            onClick={() => void previewMix()}
+          >
+            {mixing ? "Preparing mix…" : "Preview combined mix"}
+          </button>
+          {bundle.voiceover
+            .filter((clip) => clip.url)
+            .map((clip) => (
+              <button
+                key={clip.n}
+                type="button"
+                className="mr-2 text-sm underline"
+                onClick={() => setPreviewAudio(clip.url ?? undefined)}
+              >
+                Narration {clip.n}
+              </button>
+            ))}
+          {bundle.audioTracks.map((track, index) => (
+            <div
+              key={`${track.request.track}-${track.request.slot}`}
+              className="flex flex-wrap items-center gap-2 text-sm"
+            >
+              <span className="capitalize">
+                {track.request.track} · {track.request.duration}s
+              </span>
+              <span>{track.error ?? track.asset?.error ?? track.asset?.status ?? "Pending"}</span>
+              {track.asset?.url && (
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => setPreviewAudio(track.asset?.url)}
+                >
+                  Preview
+                </button>
+              )}
+              {track.asset?.status !== "uncertain" && (
+                <button
+                  type="button"
+                  className="underline"
+                  disabled={busyAudio !== null}
+                  onClick={() => void refreshTrack(track, index, false)}
+                >
+                  {track.asset ? "Refresh status" : "Retry"}
+                </button>
+              )}
+              {["ready", "failed"].includes(track.asset?.status ?? "") &&
+                track.request.revision < 2 && (
+                  <button
+                    type="button"
+                    className="underline"
+                    disabled={busyAudio !== null}
+                    onClick={() => void refreshTrack(track, index, true)}
+                  >
+                    Regenerate
+                  </button>
+                )}
+            </div>
+          ))}
+          {audioBlocked && (
+            <p role="alert" className="text-sm text-rose-300">
+              Refresh or retry pending audio, or disable the affected track in Audio settings to
+              render.
+            </p>
+          )}
+          {previewAudio && <audio key={previewAudio} controls autoPlay src={previewAudio} />}
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4 text-sm">
         <div className="glass rounded-2xl p-4">
@@ -1537,7 +1744,9 @@ function AssetReviewGate({
         <div className="glass rounded-2xl p-4">
           <div className="text-xs uppercase tracking-wider text-muted-foreground">Narration</div>
           <div className="text-2xl font-bold mt-1">{Math.round(voMinutes)}s</div>
-          <div className="text-xs text-muted-foreground mt-1">{bundle.voiceover.length} scenes voiced</div>
+          <div className="text-xs text-muted-foreground mt-1">
+            {bundle.voiceover.filter((clip) => clip.buffer).length} scenes voiced
+          </div>
         </div>
         <div className="glass rounded-2xl p-4">
           <div className="text-xs uppercase tracking-wider text-muted-foreground">Timeline</div>

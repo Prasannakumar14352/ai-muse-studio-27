@@ -49,6 +49,7 @@ import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedThumbnailsRouteImport } from './routes/_authenticated/thumbnails'
 import { Route as AuthenticatedToolsRouteImport } from './routes/_authenticated/tools'
 import { Route as AuthenticatedVideosRouteImport } from './routes/_authenticated/videos'
+import { Route as ApiGenerateAudioRouteImport } from './routes/api/generate-audio'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as ApiGenerateVideoClipRouteImport } from './routes/api/generate-video-clip'
 import { Route as ApiTranscodeVideoRouteImport } from './routes/api/transcode-video'
@@ -288,6 +289,11 @@ const AuthenticatedVideosRoute = AuthenticatedVideosRouteImport.update({
   path: '/videos',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiGenerateAudioRoute = ApiGenerateAudioRouteImport.update({
+  id: '/api/generate-audio',
+  path: '/api/generate-audio',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
   id: '/api/generate-image',
   path: '/api/generate-image',
@@ -517,6 +523,7 @@ export interface FileRoutesByFullPath {
   '/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/tools': typeof AuthenticatedToolsRoute
   '/videos': typeof AuthenticatedVideosRoute
+  '/api/generate-audio': typeof ApiGenerateAudioRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/transcode-video': typeof ApiTranscodeVideoRoute
@@ -589,6 +596,7 @@ export interface FileRoutesByTo {
   '/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/tools': typeof AuthenticatedToolsRoute
   '/videos': typeof AuthenticatedVideosRoute
+  '/api/generate-audio': typeof ApiGenerateAudioRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/transcode-video': typeof ApiTranscodeVideoRoute
@@ -665,6 +673,7 @@ export interface FileRoutesById {
   '/_authenticated/thumbnails': typeof AuthenticatedThumbnailsRoute
   '/_authenticated/tools': typeof AuthenticatedToolsRoute
   '/_authenticated/videos': typeof AuthenticatedVideosRoute
+  '/api/generate-audio': typeof ApiGenerateAudioRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
   '/api/transcode-video': typeof ApiTranscodeVideoRoute
@@ -741,6 +750,7 @@ export interface FileRouteTypes {
     | '/thumbnails'
     | '/tools'
     | '/videos'
+    | '/api/generate-audio'
     | '/api/generate-image'
     | '/api/generate-video-clip'
     | '/api/transcode-video'
@@ -813,6 +823,7 @@ export interface FileRouteTypes {
     | '/thumbnails'
     | '/tools'
     | '/videos'
+    | '/api/generate-audio'
     | '/api/generate-image'
     | '/api/generate-video-clip'
     | '/api/transcode-video'
@@ -888,6 +899,7 @@ export interface FileRouteTypes {
     | '/_authenticated/thumbnails'
     | '/_authenticated/tools'
     | '/_authenticated/videos'
+    | '/api/generate-audio'
     | '/api/generate-image'
     | '/api/generate-video-clip'
     | '/api/transcode-video'
@@ -934,6 +946,7 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
+  ApiGenerateAudioRoute: typeof ApiGenerateAudioRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   ApiGenerateVideoClipRoute: typeof ApiGenerateVideoClipRoute
   ApiTranscodeVideoRoute: typeof ApiTranscodeVideoRoute
@@ -1230,6 +1243,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/videos'
       preLoaderRoute: typeof AuthenticatedVideosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/generate-audio': {
+      id: '/api/generate-audio'
+      path: '/api/generate-audio'
+      fullPath: '/api/generate-audio'
+      preLoaderRoute: typeof ApiGenerateAudioRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/generate-image': {
       id: '/api/generate-image'
@@ -1620,6 +1640,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
+  ApiGenerateAudioRoute: ApiGenerateAudioRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   ApiGenerateVideoClipRoute: ApiGenerateVideoClipRoute,
   ApiTranscodeVideoRoute: ApiTranscodeVideoRoute,

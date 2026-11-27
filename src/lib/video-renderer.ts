@@ -1,3 +1,5 @@
+import { scheduleAudioMix, type MixAsset } from "./audio-mixer";
+import type { AudioSettings } from "./audio-generation";
 // Client-side video renderer: draws each scene onto a canvas and records with
 // MediaRecorder. Produces a real downloadable file (MP4 where the browser
 // supports it, WebM as fallback) — no server dependency required.
@@ -28,6 +30,7 @@ export type TransitionStyle =
   | "slideLeft" | "slideUp" | "maskCircle" | "pageFlip" | "zoomBlur";
 
 export type RenderScene = {
+  audioSceneId?: string;
   n: number;
   visual: string;
   voiceover: string;
@@ -55,6 +58,8 @@ export type RenderOptions = {
    */
   sceneMedia?: Array<{ kind: "image" | "clip"; url: string } | null>;
   sceneAudio?: Array<AudioBuffer | null>;
+  mixAssets?: MixAsset[];
+  audioSettings?: AudioSettings;
   fitToAudio?: boolean;
   /** Cancel the render mid-flight — recorder stops and result rejects with AbortError. */
   signal?: AbortSignal;
@@ -542,7 +547,10 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   // We schedule each buffer at that scene's start on a single AudioContext,
   // route through a MediaStreamAudioDestinationNode, and pass that stream's
   // audio track into the MediaRecorder alongside the video track.
-  const hasAudio = !!opts.sceneAudio?.some((b) => b);
+  const hasAudio = Boolean(
+    opts.mixAssets?.length ||
+    (opts.audioSettings?.voiceoverEnabled !== false && opts.sceneAudio?.some(Boolean)),
+  );
   let audioCtx: AudioContext | null = null;
   let audioDest: MediaStreamAudioDestinationNode | null = null;
   if (hasAudio) {
@@ -596,34 +604,19 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
 
   recorder.start(250);
 
-  if (audioCtx && audioDest && opts.sceneAudio) {
-    const t0 = audioCtx.currentTime + 0.05;
-    let offset = 0;
-    for (let i = 0; i < opts.scenes.length; i++) {
-      const buf = opts.sceneAudio[i];
-      if (buf) {
-        const src = audioCtx.createBufferSource();
-        src.buffer = buf;
-        const rate = opts.exactTimeline ? (opts.audioRates?.[i] ?? 1) : audioPlaybackRate;
-        try { src.playbackRate.value = rate; } catch { /* noop */ }
-        const cut = opts.exactTimeline ? (opts.audioCutSec?.[i] ?? null) : null;
-        const startAt = t0 + offset;
-        if (cut != null && cut > 0) {
-          // Too long even sped up: fade the tail out at the end of its slot.
-          const gain = audioCtx.createGain();
-          const fade = Math.min(0.25, cut / 3);
-          gain.gain.setValueAtTime(1, startAt);
-          gain.gain.setValueAtTime(1, startAt + cut - fade);
-          gain.gain.linearRampToValueAtTime(0, startAt + cut);
-          src.connect(gain); gain.connect(audioDest);
-          src.start(startAt);
-          src.stop(startAt + cut + 0.02);
-        } else {
-          src.connect(audioDest); src.start(startAt);
-        }
-      }
-      offset += durations[i];
-    }
+  if (audioCtx && audioDest) {
+    scheduleAudioMix({
+      context: audioCtx,
+      destination: audioDest,
+      time: audioCtx.currentTime,
+      durations,
+      sceneIds: opts.scenes.map((scene) => scene.audioSceneId),
+      narration: opts.sceneAudio ?? [],
+      rates: opts.exactTimeline ? (opts.audioRates ?? []) : durations.map(() => audioPlaybackRate),
+      cuts: opts.exactTimeline ? (opts.audioCutSec ?? []) : [],
+      assets: opts.mixAssets ?? [],
+      settings: opts.audioSettings,
+    });
   }
 
   const startedAt = performance.now();

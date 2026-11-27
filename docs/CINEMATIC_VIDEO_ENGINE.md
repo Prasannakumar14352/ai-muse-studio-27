@@ -20,19 +20,12 @@ non-human anatomy, fur and ornaments. For shots that need a reference and
 explicitly request consistency, a missing reference or failed reference image
 operation marks the shot failed so it can be retried.
 
-## Audio status
+## Audio generation
 
-Paid music, ambience and sound effects remain pending. This change introduces
-no new endpoints, credits, environment variables or database migrations.
-Existing narration and export behavior continue through the existing renderer.
-Provider schemas, pricing and commercial terms still require verification
-before enabling paid generation. The cloud proxy returned HTTP 403 for the
-official fal.ai and ElevenLabs documentation during this task.
-
-- [fal.ai Music model documentation](https://fal.ai/models/fal-ai/elevenlabs/music/api)
-- [fal.ai Sound Effects model documentation](https://fal.ai/models/fal-ai/elevenlabs/sound-effects/api)
-- [ElevenLabs Music API](https://elevenlabs.io/docs/api-reference/music/compose)
-- [ElevenLabs Sound Effects API](https://elevenlabs.io/docs/api-reference/text-to-sound-effects/convert)
+Generated music, ambience and effects are opt-in. See the
+[Audio Generation Engine](AUDIO_GENERATION_ENGINE.md) for the provider
+contracts, pricing, deployment gate, preview and export workflow.
+Live provider acceptance remains pending.
 
 ## Validation
 
@@ -50,8 +43,7 @@ reference and generated frames retain Hanuman’s appearance, the scenery follow
 the brief, the flight and leap have distinct framing, and an MP4 can be
 downloaded. Repeat with a Telugu script and compare the narration against the
 creator’s lines. With a test provider failure, verify the reference warning and
-retry. Live generation is pending. Music, ambience, effects, ducking and their
-credit and export checks await completion of Phase 2.
+retry. Live generation is pending. Use the audio engine acceptance checklist to verify paid tracks and credit settlement in staging.
 
 ## Deployment and rollback
 

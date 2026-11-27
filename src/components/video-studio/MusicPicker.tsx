@@ -1,5 +1,5 @@
 // Music picker + control (volume, fade, loop) for the global blueprint.
-import { Music2, Play } from "lucide-react";
+import { Music2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -31,7 +31,9 @@ export function MusicPicker({ value, musicDirection, onChange, onDirectionChange
   return (
     <div className="space-y-4">
       <Card className="p-4 space-y-3">
-        <div className="flex items-center gap-2 font-medium"><Music2 className="h-4 w-4" /> Music track</div>
+        <div className="flex items-center gap-2 font-medium">
+          <Music2 className="h-4 w-4" /> Music direction presets
+        </div>
         <div>
           <Label className="text-xs text-muted-foreground">Music direction (used by AI when generating)</Label>
           <Input className="mt-1" value={musicDirection}
@@ -55,7 +57,6 @@ export function MusicPicker({ value, musicDirection, onChange, onDirectionChange
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">{t.label}</span>
-                  <Play className="h-3 w-3 opacity-60" />
                 </div>
                 <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
                   <Badge variant="outline" className="text-[10px]">{t.mood}</Badge>

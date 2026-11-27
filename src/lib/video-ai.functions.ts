@@ -10,6 +10,8 @@ import { aiChatFetch, aiKey, AI_NOT_CONFIGURED } from "@/lib/ai-provider";
 
 
 export type AiVideoScene = {
+  audioSceneId?: string;
+  audioCues?: Array<{ label: string; atSec: number; volume: number }>;
   n: number;
   time_range: string;       // "0-3 sec"
   role: string;             // "Hook" | "Beat" | "CTA"

@@ -208,6 +208,7 @@ export const ACTION_FEATURE: Record<string, string> = {
   research: "research",
   video_script: "videos",
   video_scenes_plan: "videos",
+  video_audio: "videos",
   video_seo: "videos",
   video_title_variants: "videos",
   video_hook: "videos",
