@@ -15,7 +15,11 @@ CHROMIUM = os.environ.get("CHROMIUM_BIN", "/usr/bin/chromium")
 with tempfile.TemporaryDirectory() as directory, sync_playwright() as playwright:
     browser = playwright.chromium.launch(executable_path=CHROMIUM, args=["--no-sandbox"])
     page = browser.new_page()
-    page.goto(BASE)
+    fixture = BASE.rstrip("/") + "/audio-smoke.html"
+    page.route(fixture, lambda route: route.fulfill(
+        content_type="text/html", body="<!doctype html><title>Audio mix fixture</title>",
+    ))
+    page.goto(fixture)
     output = page.evaluate(
         """async () => {
           const { renderVideo } = await import('/src/lib/video-renderer.ts');
