@@ -1,6 +1,7 @@
 // Server functions for publishing / scheduling / marking manually published.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { ownedPublishObject, publishImageMime } from "./publish-media-policy";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const PLATFORMS = ["instagram", "facebook", "youtube", "linkedin"] as const;
@@ -68,6 +69,7 @@ export const stagePublishMedia = createServerFn({ method: "POST" })
     const m = data.dataUrl.match(/^data:((?:image|video)\/[\w.+-]+);base64,(.+)$/s);
     if (!m) throw new Error("Unsupported media");
     const mime = m[1];
+    if (!publishImageMime.has(mime)) throw new Error("Approve a video export before publishing");
     const bytes = Buffer.from(m[2], "base64");
     const ext = (mime.split("/")[1] ?? "bin").replace("jpeg", "jpg").replace("quicktime", "mov");
     const path = `${context.userId}/publish/${crypto.randomUUID()}.${ext}`;
@@ -92,13 +94,43 @@ export const schedulePost = createServerFn({ method: "POST" })
     title: z.string().max(300).optional(),
     caption: z.string().optional(),
     hashtags: z.string().optional(),
-    mediaUrls: z.array(z.string()).optional(),
+        mediaUrls: z.array(z.string().max(5000)).max(20).optional(),
+        videoApprovalId: z.string().uuid().optional(),
     scheduledAt: z.string().datetime().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const media = data.mediaUrls ?? [];
-    const problem = platformMediaProblem(data.platform, media);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.projectId) {
+      const { data: project } = await supabase
+        .from("projects")
+        .select("id")
+        .eq("id", data.projectId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!project) throw new Error("Project not found");
+    }
+    if (data.videoApprovalId) {
+      if (media.length) throw new Error("Approved video must be the sole attachment");
+      const { getVideoApproval } = await import("./video-publish-approval.server");
+      if (!(await getVideoApproval(data.videoApprovalId, userId, data.projectId ?? null))) {
+        throw new Error("Video approval is missing or revoked");
+      }
+    } else {
+      for (const url of media) {
+        const path = ownedPublishObject(url, process.env.SUPABASE_URL ?? "", userId);
+        if (!path) throw new Error("Upload images to your account before publishing");
+        const { data: info } = await supabaseAdmin.storage.from("renders").info(path);
+        if (!info?.contentType || !publishImageMime.has(info.contentType)) {
+          throw new Error("Video requires an approved export");
+        }
+      }
+    }
+    const problem = platformMediaProblem(
+      data.platform,
+      data.videoApprovalId ? ["approved.mp4"] : media,
+    );
     if (problem) throw new Error(problem);
 
     const conn = await assertPublishConnection(supabase, userId, data.platform, data.connectionId);
@@ -107,7 +139,9 @@ export const schedulePost = createServerFn({ method: "POST" })
     if (scheduled && new Date(scheduled).getTime() < Date.now() - 60_000) {
       throw new Error("Pick a time in the future.");
     }
-    const { data: row, error } = await supabase.from("scheduled_posts").insert({
+    const { data: row, error } = await supabaseAdmin
+      .from("scheduled_posts")
+      .insert({
       user_id: userId,
       project_id: data.projectId ?? null,
       platform: data.platform,
@@ -116,6 +150,7 @@ export const schedulePost = createServerFn({ method: "POST" })
       caption: data.caption ?? null,
       hashtags: data.hashtags ?? null,
       media_urls: media as never,
+        video_approval_id: data.videoApprovalId ?? null,
       scheduled_at: scheduled,
       status: scheduled ? "scheduled" : "ready",
     } as never).select("id").single();
@@ -129,9 +164,8 @@ export const schedulePost = createServerFn({ method: "POST" })
       }
       return { ok: true, id, status: "scheduled", url: null as string | null, error: null as string | null };
     }
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { runPublishJob } = await import("./social-publish.server");
-    const r = await runPublishJob(supabaseAdmin, id);
+    const r = await runPublishJob(supabaseAdmin, id, userId);
     return { ok: r.status === "published" || r.status === "publishing", id, ...r };
   });
 
@@ -157,15 +191,44 @@ export const listScheduledPosts = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+async function assertQueuedVideoApproval(id: string, userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: post, error } = await supabaseAdmin
+    .from("scheduled_posts")
+    .select("video_approval_id, project_id, platform, media_urls")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error || !post) throw new Error("Post not found");
+  if (!post.video_approval_id) {
+    if (
+      post.platform === "youtube" ||
+      (Array.isArray(post.media_urls) &&
+        post.media_urls.some((url) => typeof url === "string" && isVideoUrl(url)))
+    ) {
+      throw new Error("Approve this video export in Studio and create a new post");
+    }
+    return;
+  }
+  const { getVideoApproval } = await import("./video-publish-approval.server");
+  if (!(await getVideoApproval(post.video_approval_id, userId, post.project_id))) {
+    throw new Error("Video approval is missing or revoked");
+  }
+}
+
 export const retryScheduledPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    await assertQueuedVideoApproval(data.id, context.userId);
     const { error } = await context.supabase.from("scheduled_posts").update({
       status: "ready",
       attempts: 0,
       last_error: null,
-    } as never).eq("id", data.id).eq("user_id", context.userId);
+      } as never)
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .in("status", ["draft", "ready", "scheduled", "failed", "reconnect_required"]);
     if (error) throw error;
     return { ok: true };
   });
@@ -181,6 +244,7 @@ export const updateScheduledPost = createServerFn({ method: "POST" })
     status: z.enum(["draft", "ready", "scheduled"]).optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
+    await assertQueuedVideoApproval(data.id, context.userId);
     const patch: Record<string, unknown> = {};
     if (data.scheduledAt !== undefined) patch.scheduled_at = data.scheduledAt;
     if (data.caption !== undefined) patch.caption = data.caption;
@@ -188,7 +252,9 @@ export const updateScheduledPost = createServerFn({ method: "POST" })
     if (data.status !== undefined) patch.status = data.status;
     const { error } = await context.supabase
       .from("scheduled_posts").update(patch as never)
-      .eq("id", data.id).eq("user_id", context.userId);
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .in("status", ["draft", "ready", "scheduled", "failed", "reconnect_required"]);
     if (error) throw error;
     return { ok: true };
   });
@@ -198,16 +264,25 @@ export const publishScheduledPostNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("scheduled_posts").update({
+    await assertQueuedVideoApproval(data.id, context.userId);
+    const { data: queued, error } = await context.supabase
+      .from("scheduled_posts")
+      .update({
       status: "ready",
       scheduled_at: null,
       attempts: 0,
       last_error: null,
-    } as never).eq("id", data.id).eq("user_id", context.userId).neq("status", "publishing");
+      } as never)
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .in("status", ["draft", "ready", "scheduled", "failed", "reconnect_required"])
+      .select("id")
+      .maybeSingle();
     if (error) throw error;
+    if (!queued) throw new Error("This post cannot be published in its current state");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { runPublishJob } = await import("./social-publish.server");
-    const r = await runPublishJob(supabaseAdmin, data.id);
+    const r = await runPublishJob(supabaseAdmin, data.id, context.userId);
     return { ok: r.status === "published" || r.status === "publishing", ...r };
   });
 
@@ -311,7 +386,11 @@ export const retryAllFailed = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.from("scheduled_posts").update({
       status: "ready", attempts: 0, last_error: null,
-    } as never).eq("user_id", context.userId).eq("status", "failed").select("id");
+      } as never)
+      .eq("user_id", context.userId)
+      .eq("status", "failed")
+      .is("video_approval_id", null)
+      .select("id");
     if (error) throw error;
     return { ok: true, count: (data ?? []).length };
   });

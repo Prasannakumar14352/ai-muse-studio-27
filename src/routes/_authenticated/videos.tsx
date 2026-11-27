@@ -1,3 +1,4 @@
+import { FinalPublishApproval } from "@/components/video-studio/FinalPublishApproval";
 import { getPublishedShowcaseTemplate } from "@/lib/landing-media.functions";
 import type { ShowcaseTemplate } from "@/lib/showcase-template";
 import type { ShotRepair } from "@/lib/shot-repair";
@@ -54,7 +55,14 @@ import {
 import { toast } from "sonner";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Download, Copy,
-  Wand2, Youtube, Play, RefreshCw, Send, Check, Trash2, Clock, Plus, Video,
+  Wand2,
+  Play,
+  RefreshCw,
+  Check,
+  Trash2,
+  Clock,
+  Plus,
+  Video,
   X, RotateCw, Maximize2, ChevronLeft, ChevronRight, ImagePlus,
 } from "lucide-react";
 import { MediaPicker } from "@/components/media-picker";
@@ -3030,8 +3038,6 @@ function ResultScreen({
   onSaveThumbnail: (v: { url: string; concept: string; headline: string; alt: string }) => void;
 }) {
   const { render, thumbnail, subtitles, seo, brief } = result;
-  const [publishingApproval, setPublishingApproval] = useState("");
-  const publishingApproved = publishingApproval === render.video_url;
 
   function download(url: string, filename: string) {
     const a = document.createElement("a");
@@ -3133,25 +3139,12 @@ function ResultScreen({
               ))}
             </div>
           </div>
-          <label className="flex gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={publishingApproved}
-              onChange={(event) =>
-                setPublishingApproval(event.target.checked ? render.video_url : "")
-              }
-            />
-            I’ve watched this export and reviewed it for publishing.
-          </label>
-          <button
-            disabled={!publishingApproved}
-            onClick={() => toast.info("YouTube publishing will connect soon")}
-            className="w-full rounded-2xl glass border border-border p-4 text-sm flex items-center justify-center gap-2 hover:border-primary/40 transition"
-          >
-            <Youtube className="w-5 h-5 text-rose-500" />
-            <span>Publish to YouTube</span>
-            <Send className="w-4 h-4 opacity-60" />
-          </button>
+          <FinalPublishApproval
+            key={render.video_url}
+            render={render}
+            title={seo.youtube_title}
+            caption={seo.youtube_description}
+          />
         </div>
       </div>
 
