@@ -2,7 +2,7 @@ import { persistReviewAudio, previewReviewAudio } from "@/lib/video-agents";
 import { AudioSettingsPanel } from "@/components/video-studio/AudioSettingsPanel";
 import { generateAudio, requestAudio } from "@/lib/audio-client";
 import { audioCredits, type AudioSettings } from "@/lib/audio-generation";
-import { isAudioTrackEnabled, type PlannedAudio } from "@/lib/audio-plan";
+import { isAudioTrackEnabled, maximumAudioCredits, type PlannedAudio } from "@/lib/audio-plan";
 import { CINEMATIC_STYLES, type CinematicStyleId } from "@/lib/visual-director";
 import { createFileRoute } from "@tanstack/react-router";
 import { celebrate } from "@/components/celebrate";
@@ -542,6 +542,7 @@ function VideosPage() {
         return;
       }
       const msg = friendlyVideoError(e, "Render failed");
+      setView("asset_review");
       setError(msg);
       toast.error(msg);
     }
@@ -942,7 +943,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     if (mode === "script") return submitScript();
     if (!title.trim()) return toast.error("Enter a video title or idea");
     if (isCustom && !customNiche.trim()) return toast.error("Describe your custom niche or topic area");
-    if (needsVoiceChoice(language, voiceLanguage)) return toast.error("Choose a voice language (or no voiceover) for this language first.");
+    if (audio?.voiceoverEnabled !== false && needsVoiceChoice(language, voiceLanguage)) return toast.error("Choose a voice language (or no voiceover) for this language first.");
     onGenerate({
       brief: {
         title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio, sameCharacter, language,
@@ -961,7 +962,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     const text = script.trim();
     if (!text) return toast.error("Paste your script first");
     if (text.length > SCRIPT_MAX_CHARS) return toast.error(`Scripts can be up to ${SCRIPT_MAX_CHARS.toLocaleString()} characters`);
-    if (needsVoiceChoice(language, voiceLanguage)) return toast.error("Choose a voice language (or no voiceover) for this language first.");
+    if (audio?.voiceoverEnabled !== false && needsVoiceChoice(language, voiceLanguage)) return toast.error("Choose a voice language (or no voiceover) for this language first.");
     const firstLine = splitScriptIntoLines(text)[0] ?? "My video";
     const videoTitle = (scriptTitle.trim() || firstLine).slice(0, 100);
     onGenerate({
@@ -994,7 +995,13 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     // Same-character scenes use HD images (8 instead of 1) for ~70% of shots, plus one portrait.
     const extra = sameCharacter ? Math.round(base.scenes * 0.7) * 7 + 8 : 0;
     const motion = motionMode === "off" ? 0 : motionEstimate.credits;
-    return { total: base.total + extra + motion, parts: base.parts, extra, motion, scenes: base.scenes };
+    const paidAudio = maximumAudioCredits(audio ?? {}, effDuration);
+    const withoutVoice = voiceLanguage === "none" || audio?.voiceoverEnabled === false;
+    return {
+      total: base.total + extra + motion + paidAudio - (withoutVoice ? base.voice : 0),
+      parts: withoutVoice ? `1 script + ${base.scenes} scene images` : base.parts,
+      extra, motion, paidAudio,
+    };
   })();
   const { data: access } = useAccess();
   const available = access ? getAvailableCredits(access) : null;
@@ -1011,11 +1018,11 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
       <SummaryRow label="Language" value={findLanguage(langCode)?.id ?? langCode} />
       <SummaryRow label="Format" value={`${typeLabel} · ${ratio} · ~${effDuration}s`} />
       <SummaryRow label="Style" value={styleLabel} />
-      <SummaryRow label="Voice" value={voiceLanguage === "none" ? "No voiceover" : String(voice)} />
+      <SummaryRow label="Voice" value={voiceLanguage === "none" || audio?.voiceoverEnabled === false ? "No voiceover" : String(voice)} />
       <SummaryRow label="Motion" value={motionMode === "off" ? "Camera moves" : motionMode === "key" ? "Key moments" : "Full motion"} />
       <div className="h-px bg-border" />
       <div className="text-xs text-muted-foreground leading-relaxed">
-        {estimate.parts}{estimate.extra ? ` + ${estimate.extra} for the same character` : ""}{estimate.motion ? ` + ${estimate.motion} for motion clips` : ""}
+        {estimate.parts}{estimate.extra ? ` + ${estimate.extra} for the same character` : ""}{estimate.motion ? ` + ${estimate.motion} for motion clips` : ""}{estimate.paidAudio ? ` + up to ${estimate.paidAudio} for generated audio` : ""}
       </div>
       <div className="flex items-baseline justify-between">
         <span className="font-semibold">Estimated total</span>
@@ -1515,7 +1522,7 @@ function AssetReviewGate({
   const failedCount = shots.filter((s) => s.status === "failed").length;
   const enabledAudio = bundle.audioTracks.filter((track) =>
     isAudioTrackEnabled(bundle.brief.audio, track.request.track));
-  const audioBlocked = enabledAudio.some((track) => track.asset?.status !== "ready");
+  const audioBlocked = enabledAudio.some((track) => track.error || track.asset?.status !== "ready");
   const [busyAudio, setBusyAudio] = useState<number | null>(null);
   const [previewAudio, setPreviewAudio] = useState<string>();
   const [mixing, setMixing] = useState(false);

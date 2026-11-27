@@ -1,4 +1,4 @@
-import { decodeAudioAssets, generateAudio, previewAudioMix } from "@/lib/audio-client";
+import { decodeAudioAssets, generateAudio, previewAudioMix, requestAudio, waitForAudio } from "@/lib/audio-client";
 import { isAudioTrackEnabled, planVideoAudio, sceneAudioId, type PlannedAudio } from "@/lib/audio-plan";
 import { AUDIO_LIMITS, type AudioSettings } from "@/lib/audio-generation";
 // Videos module: modular agent pipeline.
@@ -1063,6 +1063,7 @@ async function generateVideoAudio(
     const saved = previous.find((item) => !matched.has(item) && sameRequest(item, track));
     if (saved) {
       track.request = saved.request;
+      track.asset = saved.asset;
       matched.add(saved);
     }
   }
@@ -1080,7 +1081,9 @@ async function generateVideoAudio(
       used.add(`${track.request.track}:${slot}`);
     }
     try {
-      track.asset = await generateAudio(track.request, signal);
+      track.asset = track.asset
+        ? await waitForAudio(await requestAudio({ assetId: track.asset.assetId }, signal), signal)
+        : await generateAudio(track.request, signal);
     } catch (error) {
       signal?.throwIfAborted();
       track.error = error instanceof Error ? error.message : "Audio generation failed";

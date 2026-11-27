@@ -18,7 +18,10 @@ export async function requestAudio(
 }
 
 export async function generateAudio(input: AudioRequest, signal?: AbortSignal) {
-  let asset = await requestAudio(input, signal);
+  return waitForAudio(await requestAudio(input, signal), signal);
+}
+
+export async function waitForAudio(asset: GeneratedAudio, signal?: AbortSignal) {
   for (
     let attempt = 0;
     attempt < 90 && ["queued", "submitting"].includes(asset.status);
@@ -42,7 +45,7 @@ export async function decodeAudioAssets<T extends { asset?: GeneratedAudio; erro
   const context = new OfflineAudioContext(1, 1, 48000);
   return Promise.all(
     tracks.map(async (track) => {
-      if (track.asset?.status !== "ready") {
+      if (track.error || track.asset?.status !== "ready") {
         throw new Error(track.error ?? track.asset?.error ?? "An enabled audio track is pending");
       }
       const refreshed = await requestAudio({ assetId: track.asset.assetId });
