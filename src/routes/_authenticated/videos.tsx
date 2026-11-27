@@ -1,3 +1,5 @@
+import { getPublishedShowcaseTemplate } from "@/lib/landing-media.functions";
+import type { ShowcaseTemplate } from "@/lib/showcase-template";
 import type { ShotRepair } from "@/lib/shot-repair";
 import { StudioServerRender } from "@/components/video-studio/StudioServerRender";
 import { VideoQualityReview } from "@/components/video-studio/VideoQualityReview";
@@ -130,8 +132,10 @@ export const Route = createFileRoute("/_authenticated/videos")({
     ],
   }),
   // ?new=script|idea (from the Create menu / welcome) opens the form straight away.
-  validateSearch: (s: Record<string, unknown>): { new?: "script" | "idea" } =>
-    s.new === "script" || s.new === "idea" ? { new: s.new } : {},
+  validateSearch: (s: Record<string, unknown>): { new?: "script" | "idea"; showcase?: string } => ({
+    ...(s.new === "script" || s.new === "idea" ? { new: s.new } : {}),
+    ...(typeof s.showcase === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(s.showcase) ? { showcase: s.showcase } : {}),
+  }),
   component: VideosPage,
 });
 
@@ -350,16 +354,28 @@ const initialDash: DashState = {
 function VideosPage() {
   const { data: repairAccess } = useAccess();
   const [view, setView] = useState<View>("landing");
-  const { new: startNew } = Route.useSearch();
+  const { new: startNew, showcase } = Route.useSearch();
+  const [template, setTemplate] = useState<ShowcaseTemplate>();
+  useEffect(() => {
+    if (!showcase) return;
+    let active = true;
+    getPublishedShowcaseTemplate({ data: { id: showcase } }).then((published) => {
+      if (!active) return;
+      if (!published) { toast.error("This showcase template is unavailable."); return; }
+      setTemplate(published);
+      setView("input");
+    }).catch(() => { if (active) toast.error("Could not open the showcase template."); });
+    return () => { active = false; };
+  }, [showcase]);
   const navigateSelf = Route.useNavigate();
   const [startMode, setStartMode] = useState<"idea" | "script" | undefined>(undefined);
   useEffect(() => {
-    if (!startNew) return;
+    if (!startNew || showcase) return;
     setStartMode(startNew);
     setView("input");
     // Drop the param so choosing the same option again from the Create menu still works.
     void navigateSelf({ search: {}, replace: true });
-  }, [startNew, navigateSelf]);
+  }, [startNew, showcase, navigateSelf]);
   // Research hands off as "video" (long) or "short" (reel) — accept both.
   const [handoff, setHandoff] = useState<ResearchPrefill | null>(() => consumeResearchPrefill("video") ?? consumeResearchPrefill("short"));
   useEffect(() => {
@@ -872,15 +888,25 @@ function VideosPage() {
             </button>
           </div>
           <HandoffBanner prefill={handoff} onDismiss={() => setHandoff(null)} />
+          {template && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3 text-sm">
+              <span>Showcase template loaded. Review the settings and estimated credits before starting.</span>
+              <button type="button" className="underline" onClick={() => {
+                setTemplate(undefined);
+                void navigateSelf({ search: {}, replace: true });
+              }}>Clear template</button>
+            </div>
+          )}
           <InputScreen
-            key={startMode ?? "default"}
+            key={template ? `showcase-${showcase}` : startMode ?? "default"}
+            template={template}
             onGenerate={start}
             initialTopic={handoff?.titles?.[0] || handoff?.topic}
             initialRatio={handoff?.aspectRatio as AspectRatio | undefined}
             initialMode={startMode}
             initialVideoType={handoffVideoType(handoff)}
             initialDuration={handoffDuration(handoff)}
-            autogen={handoff?.autogen}
+            autogen={template || showcase ? false : handoff?.autogen}
           />
         </>
       )}
@@ -1007,7 +1033,8 @@ function handoffDuration(h: ResearchPrefill | null): DurationSec | undefined {
   return options.reduce((best, d) => (Math.abs(d - h.duration!) < Math.abs(best - h.duration!) ? d : best), options[0]);
 }
 
-function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType, initialDuration, autogen, initialMode }: {
+function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType, initialDuration, autogen, initialMode, template }: {
+  template?: ShowcaseTemplate;
   initialMode?: "idea" | "script";
   onGenerate: (args: GenerateArgs) => void;
   initialTopic?: string;
@@ -1018,26 +1045,29 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
 }) {
   const [niche, setNiche] = useState<string>(NICHES[0].id);
   const [customNiche, setCustomNiche] = useState("");
-  const [title, setTitle] = useState(initialTopic ?? "");
-  const [videoType, setVideoType] = useState<VideoType>(initialVideoType ?? "shorts");
-  const [duration, setDuration] = useState<DurationSec>(initialDuration ?? 60);
-  const [style, setStyle] = useState<StyleId>("cinematic");
-  const [visualInstructions, setVisualInstructions] = useState("");
-  const [audio, setAudio] = useState<AudioSettings>();
-  const [voice, setVoice] = useState<VoiceId>("George");
-  const [ratio, setRatio] = useState<AspectRatio>(initialRatio ?? "9:16");
+  const [title, setTitle] = useState(template?.topic ?? initialTopic ?? "");
+  const [videoType, setVideoType] = useState<VideoType>(template ? (template.aspectRatio === "16:9" ? "youtube_long" : "shorts") : initialVideoType ?? "shorts");
+  const [duration, setDuration] = useState<DurationSec>(template?.duration ?? initialDuration ?? 60);
+  const [style, setStyle] = useState<StyleId>(template?.style ?? "cinematic");
+  const [visualInstructions, setVisualInstructions] = useState(template?.visualInstructions ?? "");
+  const [audio, setAudio] = useState<AudioSettings | undefined>(template ? {
+    musicMood: template.musicMood, backgroundMusicEnabled: template.backgroundMusicEnabled,
+    soundEffectsEnabled: template.soundEffectsEnabled, ambienceEnabled: template.ambienceEnabled,
+  } : undefined);
+  const [voice, setVoice] = useState<VoiceId>(template?.voice ?? "George");
+  const [ratio, setRatio] = useState<AspectRatio>(template?.aspectRatio ?? initialRatio ?? "9:16");
   // Off by default: it switches character scenes to HD (8 credits each).
-  const [sameCharacter, setSameCharacter] = useState(false);
-  const [language, setLanguage] = useState("auto");
+  const [sameCharacter, setSameCharacter] = useState(template?.sameCharacter ?? false);
+  const [language, setLanguage] = useState<string>(template?.language ?? "auto");
   const [voiceLanguage, setVoiceLanguage] = useState("");
-  const [motionMode, setMotionMode] = useState<MotionMode>("off");
-  const [motionTier, setMotionTier] = useState<MotionTier>("standard");
-  const [veo, setVeo] = useState<AdvancedVideoModelId>();
+  const [motionMode, setMotionMode] = useState<MotionMode>(template?.motionMode ?? "off");
+  const [motionTier, setMotionTier] = useState<MotionTier>(template?.motionModel === "premium" ? "premium" : "standard");
+  const [veo, setVeo] = useState<AdvancedVideoModelId | undefined>(isAdvancedVideoModel(template?.motionModel) ? template.motionModel : undefined);
   const [veoReady, setVeoReady] = useState(false);
   const [veoResolution, setVeoResolution] = useState<VeoResolution>("720p");
-  const [sceneAudioSource, setSceneAudioSource] = useState<SceneAudioSource>("separate");
+  const [sceneAudioSource, setSceneAudioSource] = useState<SceneAudioSource>(template?.audioSource ?? "separate");
   const [exportSettings, setExportSettings] = useState<VideoExportSettings>(() =>
-    defaultVideoExport(ratio),
+    ({ ...defaultVideoExport(ratio), resolution: template?.resolution ?? "720p", fps: template?.fps ?? 30 }),
   );
 
   useEffect(() => {
@@ -1049,7 +1079,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     return () => controller.abort();
   }, []);
   // "idea" = AI researches and writes the script; "script" = the creator's own script, word for word.
-  const [mode, setMode] = useState<"idea" | "script">(initialMode ?? "idea");
+  const [mode, setMode] = useState<"idea" | "script">(template ? "idea" : initialMode ?? "idea");
   const [script, setScript] = useState("");
   const [scriptTitle, setScriptTitle] = useState("");
   const scriptLang = resolveContentLanguage(language, script);
@@ -1065,7 +1095,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
   const autoFiredRef = useRef(false);
   useEffect(() => {
     if (autoFiredRef.current) return;
-    if (!autogen) return;
+    if (!autogen || template) return;
     if (!title.trim()) return;
     autoFiredRef.current = true;
     const id = setTimeout(() => submit(), 300);
@@ -1081,7 +1111,16 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     [videoType]
   );
 
-  function submit() {
+  async function confirmTemplateGeneration() {
+    return !template || confirmDialog({
+      title: "Start this video?",
+      description: `The current settings estimate ${estimate.total} credits. You can review the blueprint before generating assets.`,
+      confirmText: "Start planning",
+    });
+  }
+
+  async function submit() {
+    if (veo && motionMode !== "off" && !veoReady) return toast.error("Choose an available motion model or turn motion off.");
     if (mode === "script") return submitScript();
     if (!title.trim()) return toast.error("Enter a video title or idea");
     if (isCustom && !customNiche.trim()) return toast.error("Describe your custom niche or topic area");
@@ -1095,6 +1134,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
       needsVoiceChoice(language, voiceLanguage)
     )
       return toast.error("Choose a voice language (or no voiceover) for this language first.");
+    if (!(await confirmTemplateGeneration())) return;
     onGenerate({
       brief: {
         title: title.trim(), videoType, duration, style, voice, aspectRatio: ratio, sameCharacter, language,
@@ -1113,7 +1153,8 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     });
   }
 
-  function submitScript() {
+  async function submitScript() {
+    if (veo && motionMode !== "off" && !veoReady) return toast.error("Choose an available motion model or turn motion off.");
     const text = script.trim();
     if (!text) return toast.error("Paste your script first");
     if (text.length > SCRIPT_MAX_CHARS) return toast.error(`Scripts can be up to ${SCRIPT_MAX_CHARS.toLocaleString()} characters`);
@@ -1129,6 +1170,7 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
       return toast.error("Choose a voice language (or no voiceover) for this language first.");
     const firstLine = splitScriptIntoLines(text)[0] ?? "My video";
     const videoTitle = (scriptTitle.trim() || firstLine).slice(0, 100);
+    if (!(await confirmTemplateGeneration())) return;
     onGenerate({
       brief: {
         title: videoTitle, videoType, duration: Math.max(5, scriptSec) as DurationSec, style, voice, aspectRatio: ratio, sameCharacter,
@@ -1492,6 +1534,11 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
               );
             })}
           </div>
+          {veo && motionMode !== "off" && !veoReady && (
+            <p role="alert" className="text-sm text-amber-300">
+              This template’s Veo model is unavailable. Select MiniMax or Kling, or turn motion off before generating.
+            </p>
+          )}
           {motionMode !== "off" && (
             <div className="glass rounded-xl p-3 border border-border space-y-2">
               <div className="flex flex-wrap gap-2">

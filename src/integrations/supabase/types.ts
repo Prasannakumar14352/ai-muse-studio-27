@@ -910,6 +910,9 @@ export type Database = {
       }
       landing_media: {
         Row: {
+          showcase_metadata: Json | null
+          showcase_video_path: string | null
+          showcase_poster_path: string | null
           company: string | null
           consent_confirmed: boolean
           country: string | null
@@ -932,6 +935,9 @@ export type Database = {
           video_url: string | null
         }
         Insert: {
+          showcase_metadata?: Json | null
+          showcase_video_path?: string | null
+          showcase_poster_path?: string | null
           company?: string | null
           consent_confirmed?: boolean
           country?: string | null
@@ -954,6 +960,9 @@ export type Database = {
           video_url?: string | null
         }
         Update: {
+          showcase_metadata?: Json | null
+          showcase_video_path?: string | null
+          showcase_poster_path?: string | null
           company?: string | null
           consent_confirmed?: boolean
           country?: string | null
