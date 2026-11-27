@@ -4,19 +4,42 @@ import {
   VEO_CAPABILITIES,
   advancedClipQuote,
   isAdvancedVideoModel,
+  veoProviderInput,
+  veoSecondsFor,
 } from "../advanced-video-models";
 import { clipSecondsFor, motionClipCredits, MOTION_MODELS } from "../motion-clips";
 
 describe("advanced video capability registry", () => {
-  it("keeps the endpoint-specific IDs and gates undocumented capabilities", () => {
+  it("keeps endpoint-specific IDs and the supplied capability limits", () => {
     expect(ADVANCED_VIDEO_MODELS["veo-fast"].endpoint).toBe("fal-ai/veo3.1/fast/image-to-video");
     expect(ADVANCED_VIDEO_MODELS["veo-standard"].endpoint).toBe("fal-ai/veo3.1/image-to-video");
     expect(VEO_CAPABILITIES.requiredFields).toEqual(["prompt", "image_url"]);
-    expect(VEO_CAPABILITIES.productionAvailability).toBe("schema-unverified");
-    expect(VEO_CAPABILITIES.confirmedClipDurations).toHaveLength(0);
-    expect(VEO_CAPABILITIES.confirmedNativeAudioParameter).toBe(false);
+    expect(VEO_CAPABILITIES.productionAvailability).toBe("feature-flagged");
+    expect(VEO_CAPABILITIES.confirmedClipDurations).toEqual([4, 6, 8]);
+    expect(VEO_CAPABILITIES.confirmedNativeAudioParameter).toBe(true);
     expect(isAdvancedVideoModel("toString")).toBe(false);
     expect(isAdvancedVideoModel("veo-fast")).toBe(true);
+  });
+
+  it("rounds motion up to 4, 6, or 8 provider seconds and sends explicit audio", () => {
+    expect([3.5, 4.1, 6.1, 9].map(veoSecondsFor)).toEqual([4, 6, 8, 8]);
+    expect(
+      veoProviderInput({
+        prompt: "Natural motion",
+        image: "source",
+        seconds: 6,
+        aspectRatio: "9:16",
+        resolution: "1080p",
+        nativeAudio: false,
+      }),
+    ).toEqual({
+      prompt: "Natural motion",
+      image_url: "source",
+      duration: "6s",
+      aspect_ratio: "9:16",
+      resolution: "1080p",
+      generate_audio: false,
+    });
   });
 
   it("quotes generated seconds separately from native audio uplift", () => {

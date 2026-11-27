@@ -12,7 +12,19 @@ export const Route = createFileRoute("/api/video-clip-status")({
         const userId = await getUserIdFromRequest(request);
         if (!userId) return unauthorized();
 
-        const { token } = (await request.json().catch(() => ({}))) as { token?: string };
+        const body = await request.json().catch(() => null);
+        if (typeof body?.assetId === "string") {
+          if (!/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(body.assetId)) {
+            return Response.json({ state: "failed", error: "Invalid clip ID" }, { status: 400 });
+          }
+          try {
+            const { pollVeoClip } = await import("@/lib/veo-motion.server");
+            return await pollVeoClip(userId, body.assetId);
+          } catch {
+            return Response.json({ state: "pending", note: "Clip delivery suspended; retry status" });
+          }
+        }
+        const token = typeof body?.token === "string" ? body.token : "";
         const { verifyClipToken } = await import("@/lib/motion-clips.server");
         const t = verifyClipToken(token ?? "", userId);
         if (!t) return Response.json({ state: "failed", error: "invalid_or_expired" }, { status: 400 });
