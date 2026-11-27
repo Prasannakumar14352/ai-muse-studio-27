@@ -1,8 +1,9 @@
+import { ADVANCED_VIDEO_MODELS, type SceneAudioSource } from "@/lib/advanced-video-models";
 import { persistReviewAudio, previewReviewAudio } from "@/lib/video-agents";
 import { AudioSettingsPanel } from "@/components/video-studio/AudioSettingsPanel";
 import { generateAudio, requestAudio } from "@/lib/audio-client";
 import { audioCredits, type AudioSettings } from "@/lib/audio-generation";
-import { isAudioTrackEnabled, maximumAudioCredits, type PlannedAudio } from "@/lib/audio-plan";
+import { audioCreditBreakdown, isAudioTrackEnabled, type PlannedAudio } from "@/lib/audio-plan";
 import { CINEMATIC_STYLES, type CinematicStyleId } from "@/lib/visual-director";
 import { createFileRoute } from "@tanstack/react-router";
 import { celebrate } from "@/components/celebrate";
@@ -489,7 +490,7 @@ function VideosPage() {
   }
 
   /** Called from the Asset Review screen — kicks off the final MP4 render. */
-  async function renderFinal() {
+  async function renderFinal(acceptStillFallback: boolean) {
     if (!gen || !assetsBundle || !dash.jobId) return;
     setError(null);
     setDash((prev) => ({ ...prev, phase: "rendering", renderProgress: 0 }));
@@ -500,6 +501,7 @@ function VideosPage() {
       const { result: r } = await runRenderPhase(dash.jobId, assetsBundle, {
         onEvent: handleJobEvent,
         signal: controller.signal,
+        acceptStillFallback,
       });
       setResult(r);
       setAssetsBundle(null);
@@ -1005,14 +1007,15 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     // Same-character scenes use HD images (8 instead of 1) for ~70% of shots, plus one portrait.
     const extra = sameCharacter ? Math.round(base.scenes * 0.7) * 7 + 8 : 0;
     const motion = motionMode === "off" ? 0 : motionEstimate.credits;
-    const paidAudio = maximumAudioCredits(audio ?? {}, effDuration);
+    const audioCredits = audioCreditBreakdown(audio ?? {}, effDuration);
+    const paidAudio = audioCredits.music + audioCredits.sfx + audioCredits.ambience;
     const withoutVoice = voiceLanguage === "none" || audio?.voiceoverEnabled === false;
     return {
       total: base.total + extra + motion + paidAudio - (withoutVoice ? base.voice : 0),
       parts: withoutVoice ? `1 script + ${base.scenes} scene images` : base.parts,
       extra,
       motion,
-      paidAudio,
+      audioCredits,
     };
   })();
   const { data: access } = useAccess();
@@ -1044,7 +1047,11 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
         {estimate.parts}
         {estimate.extra ? ` + ${estimate.extra} for the same character` : ""}
         {estimate.motion ? ` + ${estimate.motion} for motion clips` : ""}
-        {estimate.paidAudio ? ` + up to ${estimate.paidAudio} for generated audio` : ""}
+        {estimate.audioCredits.music ? ` + ${estimate.audioCredits.music} music` : ""}
+        {estimate.audioCredits.sfx ? ` + up to ${estimate.audioCredits.sfx} sound effects` : ""}
+        {estimate.audioCredits.ambience
+          ? ` + up to ${estimate.audioCredits.ambience} ambience`
+          : ""}
       </div>
       <div className="flex items-baseline justify-between">
         <span className="font-semibold">Estimated total</span>
@@ -1318,7 +1325,20 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
                 {(["standard", "premium"] as MotionTier[]).map((t) => (
                   <button key={t} type="button" onClick={() => setMotionTier(t)}
                     className={`px-3 py-1.5 rounded-lg text-xs border ${motionTier === t ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>
-                    {t === "standard" ? "Standard motion" : "Premium motion"} · {motionClipCredits(t, 3.5)} credits / clip
+                      {t === "standard"
+                        ? "MiniMax H3 Turbo — Economical"
+                        : "Kling 2.5 Turbo Pro — Premium"}{" "}
+                      · {motionClipCredits(t, 3.5)} credits / clip
+                    </button>
+                  ))}
+                  {Object.entries(ADVANCED_VIDEO_MODELS).map(([id, model]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      disabled
+                      className="rounded-lg border px-3 py-1.5 text-xs opacity-60"
+                    >
+                      {model.label} (verification pending)
                   </button>
                 ))}
               </div>
@@ -1538,7 +1558,7 @@ function AssetReviewGate({
   shots: ShotProgress[];
   bundle: AssetGenerationBundle;
   onUpdateAudio: (bundle: AssetGenerationBundle) => void;
-  onRender: () => void;
+  onRender: (acceptStillFallback: boolean) => void;
   onRegenerate: (shotId: string) => Promise<void>;
   onReplace: (shotId: string, item: PickedMedia) => Promise<void>;
   onBackToBlueprint: () => void;
@@ -1548,11 +1568,23 @@ function AssetReviewGate({
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [replaceFor, setReplaceFor] = useState<{ id: string; index: number } | null>(null);
   const viewable = useMemo(() => shots.filter((s) => s.previewUrl), [shots]);
+  const [acceptStillFallback, setAcceptStillFallback] = useState(false);
+  const hasStillFallback =
+    bundle.brief.motionMode === "full" &&
+    shots.some((shot) => shot.status === "done" && shot.kind === "image");
+  const audioSource = bundle.brief.sceneAudioSource ?? "separate";
+  const nativeMuted = bundle.brief.nativeAudioMutedShotIds ?? [];
+  const hasClips = shots.some((shot) => shot.kind === "clip");
+  const updateBrief = (patch: Partial<VideoBrief>) =>
+    onUpdateAudio({ ...bundle, brief: { ...bundle.brief, ...patch } });
+
   const failedCount = shots.filter((s) => s.status === "failed").length;
   const enabledAudio = bundle.audioTracks.filter((track) =>
     isAudioTrackEnabled(bundle.brief.audio, track.request.track),
   );
-  const audioBlocked = enabledAudio.some((track) => track.error || track.asset?.status !== "ready");
+  const audioBlocked =
+    audioSource !== "native" &&
+    enabledAudio.some((track) => track.error || track.asset?.status !== "ready");
   const [busyAudio, setBusyAudio] = useState<number | null>(null);
   const [previewAudio, setPreviewAudio] = useState<string>();
   const [mixing, setMixing] = useState(false);
@@ -1638,8 +1670,13 @@ function AssetReviewGate({
             Back to blueprint
           </button>
           <button
-            onClick={onRender}
-            disabled={failedCount > 0 || audioBlocked || busyAudio !== null}
+            onClick={() => onRender(acceptStillFallback)}
+            disabled={
+              failedCount > 0 ||
+              audioBlocked ||
+              busyAudio !== null ||
+              (hasStillFallback && !acceptStillFallback)
+            }
             className="rounded-lg gradient-primary text-white px-4 py-2 text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
           >
             <Check className="w-4 h-4" /> Render final video
@@ -1647,6 +1684,58 @@ function AssetReviewGate({
         </div>
       </div>
 
+      {hasStillFallback && (
+        <label className="flex items-center gap-2 rounded-xl border border-border p-4 text-sm">
+          <input
+            type="checkbox"
+            checked={acceptStillFallback}
+            onChange={(event) => setAcceptStillFallback(event.target.checked)}
+          />
+          Accept still images in place of missing Full Motion clips.
+        </label>
+      )}
+      {hasClips && (
+        <div className="grid gap-3 rounded-xl border border-border p-4 text-sm">
+          <label className="grid gap-1">
+            Audio source
+            <select
+              value={audioSource}
+              className="rounded-md border border-input bg-background p-2"
+              onChange={(event) =>
+                updateBrief({ sceneAudioSource: event.target.value as SceneAudioSource })
+              }
+            >
+              <option value="separate">Separate cinematic soundtrack</option>
+              <option value="native">Clip audio only</option>
+              <option value="hybrid">Hybrid cinematic audio</option>
+            </select>
+          </label>
+          {audioSource !== "separate" && (
+            <p className="text-muted-foreground">
+              Uses sound already present in each clip. This does not generate audio or change asset
+              charges.
+            </p>
+          )}
+          {audioSource !== "separate" && (
+            <label className="grid gap-1">
+              Clip audio volume ({Math.round((bundle.brief.nativeAudioVolume ?? 0.5) * 100)}%)
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={bundle.brief.nativeAudioVolume ?? 0.5}
+                onChange={(event) => updateBrief({ nativeAudioVolume: event.target.valueAsNumber })}
+              />
+            </label>
+          )}
+          {audioSource === "hybrid" && (
+            <p className="text-muted-foreground">
+              Preview clips for dialogue or music that overlaps the soundtrack.
+            </p>
+          )}
+        </div>
+      )}
       <AudioSettingsPanel
         value={bundle.brief.audio}
         duration={bundle.brief.duration}
@@ -1670,7 +1759,11 @@ function AssetReviewGate({
             disabled={audioBlocked || mixing}
             onClick={() => void previewMix()}
           >
-            {mixing ? "Preparing mix…" : "Preview combined mix"}
+            {mixing
+              ? "Preparing mix…"
+              : audioSource === "separate"
+                ? "Preview combined mix"
+                : "Preview separate tracks"}
           </button>
           {bundle.voiceover
             .filter((clip) => clip.url)
@@ -1791,6 +1884,22 @@ function AssetReviewGate({
                   </div>
                 </button>
                 <div className="p-2.5 space-y-1.5">
+                  {s.kind === "clip" && audioSource !== "separate" && (
+                    <label className="flex items-center gap-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={nativeMuted.includes(s.id)}
+                        onChange={(event) =>
+                          updateBrief({
+                            nativeAudioMutedShotIds: event.target.checked
+                              ? [...nativeMuted, s.id]
+                              : nativeMuted.filter((id) => id !== s.id),
+                          })
+                        }
+                      />
+                      Mute clip audio
+                    </label>
+                  )}
                   {scene?.voiceover && (
                     <div className="text-[11px] text-muted-foreground line-clamp-2">
                       🎙 {scene.voiceover}
@@ -2113,6 +2222,7 @@ function SceneLightbox({
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [clipMetadata, setClipMetadata] = useState<{ url: string; label: string }>();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -2197,13 +2307,27 @@ function SceneLightbox({
           />
         )}
         {shot.previewUrl && shot.kind === "clip" && (
-          <video
-            src={shot.previewUrl}
-            controls
-            autoPlay
-            playsInline
-            className="max-w-full max-h-full object-contain rounded shadow-2xl"
-          />
+          <div className="relative flex max-h-full max-w-full flex-col items-center gap-2">
+            <video
+              key={shot.previewUrl}
+              src={shot.previewUrl}
+              controls
+              autoPlay
+              playsInline
+              onLoadedMetadata={(event) => {
+                const clip = event.currentTarget;
+                if (!Number.isFinite(clip.duration)) return;
+                setClipMetadata({
+                  url: clip.src,
+                  label: `${clip.duration.toFixed(1)}s · ${clip.videoWidth} × ${clip.videoHeight} source`,
+                });
+              }}
+              className="max-h-[75vh] max-w-full rounded object-contain shadow-2xl"
+            />
+            {clipMetadata?.url === shot.previewUrl && (
+              <p className="text-xs text-white">{clipMetadata.label}</p>
+            )}
+          </div>
         )}
         {hasNext && (
           <button aria-label="Next"

@@ -129,3 +129,7 @@ To roll back, disable `VIDEO_PAID_AUDIO_ENABLED` first, reconcile pending
 reservations, and deploy the prior application build. Retain job rows and
 private storage for settlement and account retention. Remove them only after
 that data is accounted for.
+
+Asset review can also mix audio already present in video clips. The
+[advanced model and clip audio guide](ADVANCED_VIDEO_MODELS.md) covers the
+fifth audio layer, source selection and local export verification.

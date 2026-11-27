@@ -2,6 +2,8 @@
 
 import base64
 import json
+import math
+from array import array
 import os
 import subprocess
 import tempfile
@@ -13,6 +15,12 @@ BASE = os.environ.get("VIDEO_AUDIO_TEST_BASE", "http://127.0.0.1:5191")
 CHROMIUM = os.environ.get("CHROMIUM_BIN", "/usr/bin/chromium")
 
 with tempfile.TemporaryDirectory() as directory, sync_playwright() as playwright:
+    clip = Path(directory) / "native-source.mp4"
+    subprocess.run([
+        "ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=blue:s=160x90:d=1",
+        "-f", "lavfi", "-i", "sine=frequency=880:duration=1", "-shortest",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", str(clip),
+    ], check=True)
     browser = playwright.chromium.launch(executable_path=CHROMIUM, args=["--no-sandbox"])
     page = browser.new_page()
     fixture = BASE.rstrip("/") + "/audio-smoke.html"
@@ -21,13 +29,17 @@ with tempfile.TemporaryDirectory() as directory, sync_playwright() as playwright
     ))
     page.goto(fixture)
     output = page.evaluate(
-        """async () => {
+        """async (clipBase64) => {
           const { renderVideo } = await import('/src/lib/video-renderer.ts');
           const { scheduleAudioMix } = await import('/src/lib/audio-mixer.ts');
           const ctx = new OfflineAudioContext(1, 48000, 48000);
-          const tone = ctx.createBuffer(1, 48000, 48000);
-          const signal = tone.getChannelData(0);
-          for (let i = 0; i < signal.length; i++) signal[i] = 0.35 * Math.sin(i * 440 * 2 * Math.PI / 48000);
+          const makeTone = (frequency) => {
+            const buffer = ctx.createBuffer(1, 48000, 48000);
+            const signal = buffer.getChannelData(0);
+            for (let i = 0; i < signal.length; i++) signal[i] = 0.35 * Math.sin(i * frequency * 2 * Math.PI / 48000);
+            return buffer;
+          };
+          const tone = makeTone(440);
           const mixed = new OfflineAudioContext(1, 48000 * 3, 48000);
           scheduleAudioMix({
             context: mixed, destination: mixed.destination, time: 0, durations: [1, 1, 1],
@@ -42,19 +54,35 @@ with tempfile.TemporaryDirectory() as directory, sync_playwright() as playwright
             throw new Error('Music ducking envelope is missing');
           }
           const outputs = {};
-          for (const track of ['music', 'sfx']) {
+          const clipUrl = URL.createObjectURL(new Blob(
+            [Uint8Array.from(atob(clipBase64), x => x.charCodeAt(0))], { type: 'video/mp4' }
+          ));
+          for (const track of ['music', 'sfx', 'native', 'hybrid', 'muted']) {
+            const useNative = track === 'native' || track === 'hybrid';
+            const hybrid = track === 'hybrid';
+            const assets = track === 'native' ? [] : [{
+              track: hybrid || track === 'muted' ? 'music' : track,
+              sceneIds: ['a'], offset: 0.1, buffer: tone
+            }];
+            if (hybrid) {
+              assets.push({ track: 'ambience', sceneIds: ['a'], offset: 0, buffer: makeTone(550) });
+              assets.push({ track: 'sfx', sceneIds: ['a'], offset: 0, buffer: makeTone(660) });
+            }
             const result = await renderVideo({
               title: 'Synthetic audio smoke test', platform: 'youtube', fps: 15,
               scenes: [{ n: 1, audioSceneId: 'a', visual: '', voiceover: '', duration: '2s' }],
-              sceneAudio: [], exactTimeline: true, preferredContainer: 'webm',
-              audioSettings: { voiceoverEnabled: false, fadeInSeconds: 0, fadeOutSeconds: 0.1 },
-              mixAssets: [{ track, sceneIds: ['a'], offset: 0.1, buffer: tone }],
+              sceneAudio: hybrid ? [makeTone(220)] : [], exactTimeline: true, preferredContainer: 'webm',
+              audioSettings: { voiceoverEnabled: hybrid, autoDucking: false, fadeInSeconds: 0, fadeOutSeconds: 0.1 },
+              mixAssets: assets,
+              sceneMedia: useNative || track === 'muted' ? [{ kind: 'clip', url: clipUrl }] : undefined,
+              nativeClipAudio: useNative ? [0.8] : undefined,
             });
             const data = new Uint8Array(await result.blob.arrayBuffer());
             outputs[track] = btoa(Array.from(data, x => String.fromCharCode(x)).join(''));
           }
+          URL.revokeObjectURL(clipUrl);
           return outputs;
-        }"""
+        }""", base64.b64encode(clip.read_bytes()).decode()
     )
     browser.close()
 
@@ -75,7 +103,23 @@ with tempfile.TemporaryDirectory() as directory, sync_playwright() as playwright
         assert any(s["codec_type"] == "audio" and s["codec_name"] == "aac" for s in metadata["streams"])
         assert 1.8 <= float(metadata["format"]["duration"]) <= 2.3, metadata["format"]
         raw = subprocess.check_output(
-            ["ffmpeg", "-v", "error", "-i", str(destination), "-map", "0:a:0", "-f", "s16le", "-"],
+            ["ffmpeg", "-v", "error", "-i", str(destination), "-map", "0:a:0", "-ac", "1", "-ar", "48000", "-f", "s16le", "-"],
         )
-        assert max(abs(int.from_bytes(raw[i:i + 2], "little", signed=True)) for i in range(0, len(raw), 2)) > 100
-        print(f"{track}-only export contains audible AAC and video")
+        samples = array("h")
+        samples.frombytes(raw)
+        assert max(map(abs, samples)) > 100
+        def magnitude(frequency, start=4800, end=43200):
+            segment = samples[start:end]
+            omega = 2 * math.pi * frequency / 48000
+            return abs(sum(value * complex(math.cos(omega * i), math.sin(omega * i))
+                           for i, value in enumerate(segment))) / len(segment)
+        if track in ("native", "hybrid"):
+            assert magnitude(880) > 50, (track, magnitude(880))
+        if track == "native":
+            assert magnitude(880, 57600, 86400) > 50, "Native audio did not loop with the clip"
+        if track == "hybrid":
+            for frequency in (220, 440, 550, 660):
+                assert magnitude(frequency) > 50, (frequency, magnitude(frequency))
+        if track == "muted":
+            assert magnitude(880) < 10, "Muted clip audio leaked into the final mix"
+        print(f"{track} export contains audible AAC and video")

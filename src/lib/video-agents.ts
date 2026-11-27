@@ -1,4 +1,9 @@
 import {
+  isAdvancedVideoModel,
+  type SceneAudioSource,
+  type VideoMotionModelId,
+} from "./advanced-video-models";
+import {
   decodeAudioAssets,
   generateAudio,
   previewAudioMix,
@@ -295,6 +300,10 @@ export type VideoBrief = {
   motionMode?: MotionMode;
   /** "standard" = MiniMax H3 Turbo, "premium" = Kling 2.5 Turbo Pro. */
   motionTier?: MotionTier;
+  motionModel?: VideoMotionModelId;
+  sceneAudioSource?: SceneAudioSource;
+  nativeAudioVolume?: number;
+  nativeAudioMutedShotIds?: string[];
 };
 
 export type ResearchBrief = {
@@ -322,7 +331,14 @@ export type DirectorPlan = {
   sfx_moments: string[];
 };
 
-export type VisualAsset = { n: number; kind: "image" | "clip"; url: string; duration_sec: number; generated: boolean };
+export type VisualAsset = {
+  shotId?: string;
+  n: number;
+  kind: "image" | "clip";
+  url: string;
+  duration_sec: number;
+  generated: boolean;
+};
 export type VoiceoverClip = { n: number; url: string | null; duration_sec: number; text: string; buffer: AudioBuffer | null };
 export type SubtitleTrack = { format: "vtt" | "srt"; content: string };
 
@@ -945,11 +961,14 @@ export const RenderAgent = {
       transition: b.transition,
     }));
 
+    const nativeOnly = brief.sceneAudioSource === "native";
     const mixAssets = await decodeAudioAssets(
+      nativeOnly
+        ? []
       audioTracks.filter((track) => isAudioTrackEnabled(brief.audio, track.request.track)),
     );
     const result = await renderVideo({
-      audioSettings: brief.audio,
+      audioSettings: nativeOnly ? { ...brief.audio, voiceoverEnabled: false } : brief.audio,
       mixAssets: mixAssets.map((track) => ({
         track: track.request.track,
         sceneIds: track.sceneIds,
@@ -964,6 +983,16 @@ export const RenderAgent = {
       scenes,
       sceneImages: beatVisuals.map((v) => (v.kind === "image" ? v.url : null)),
       sceneMedia: beatVisuals.map((v) => ({ kind: v.kind, url: v.url })),
+      nativeClipAudio:
+        brief.sceneAudioSource === "native" || brief.sceneAudioSource === "hybrid"
+          ? beats.map((_, index) => {
+              if (beatVisuals[index]?.kind !== "clip") return null;
+              const shotId = beatVisuals[index]?.shotId;
+              return shotId && brief.nativeAudioMutedShotIds?.includes(shotId)
+                ? null
+                : (brief.nativeAudioVolume ?? 0.5);
+            })
+          : undefined,
       sceneAudio: beatAudio,
       fitToAudio: false,
       targetDurationSec: brief.duration,
@@ -1142,6 +1171,11 @@ export async function persistReviewAudio(jobId: string, bundle: AssetGenerationB
   if (!job) return;
   job.audioTracks = mergeSavedAudio(job.audioTracks, bundle.audioTracks);
   job.audioMixSettings = bundle.brief.audio;
+  job.nativeAudioSettings = {
+    sceneAudioSource: bundle.brief.sceneAudioSource,
+    nativeAudioVolume: bundle.brief.nativeAudioVolume,
+    nativeAudioMutedShotIds: bundle.brief.nativeAudioMutedShotIds,
+  };
   await saveJob(job);
 }
 
@@ -1544,6 +1578,10 @@ export async function runVideoPipeline(
   brief: VideoBrief,
   onStep: (id: StepId, state: StepState, note?: string) => void
 ): Promise<PipelineResult> {
+  if (isAdvancedVideoModel(brief.motionModel) && brief.motionMode !== "off") {
+    throw new Error("Veo is unavailable until its endpoint schema and billing are verified.");
+  }
+
   const mark = async <T>(id: StepId, fn: () => Promise<T>): Promise<T> => {
     onStep(id, "running");
     try {
@@ -1952,6 +1990,11 @@ async function generateOneShot(
   const mode = brief.motionMode ?? "off";
   if (mode !== "off" && totalShots && pickMotionBeats(totalShots, mode).includes(shot.index)) {
     // shot.prompt is the director's English, text-free frame description.
+    if (isAdvancedVideoModel(brief.motionModel)) {
+      throw new Error(
+        "The selected Veo model is unavailable until its endpoint schema and billing are verified.",
+      );
+    }
     const clipBlob = await fetchMotionClip(
       img,
       motionPromptFor(
@@ -1964,7 +2007,7 @@ async function generateOneShot(
         ].filter(Boolean).join(" "),
       ),
       TARGET_BEAT_SEC,
-      brief.motionTier ?? "standard",
+      brief.motionModel ?? brief.motionTier ?? "standard",
       signal,
     );
     if (clipBlob) {
@@ -1984,6 +2027,10 @@ export async function runVideoJobPipeline(
   brief: VideoBrief,
   opts: JobRunOptions,
 ): Promise<{ job: JobRecord; result: PipelineResult }> {
+  if (isAdvancedVideoModel(brief.motionModel) && brief.motionMode !== "off") {
+    throw new Error("Veo is unavailable until its endpoint schema and billing are verified.");
+  }
+
   const { onEvent, signal } = opts;
 
   // ---------- Phase 1: planning ----------
@@ -2213,6 +2260,10 @@ export async function runPlanningPhase(
   brief: VideoBrief,
   opts: JobRunOptions,
 ): Promise<{ job: JobRecord; script: AiVideoScript }> {
+  if (isAdvancedVideoModel(brief.motionModel) && brief.motionMode !== "off") {
+    throw new Error("Veo is unavailable until its endpoint schema and billing are verified.");
+  }
+
   const { onEvent } = opts;
   onEvent({ type: "phase", phase: "planning" });
 
@@ -2490,6 +2541,8 @@ async function runAssetGenerationPhaseInner(
     job.audioPlanSettings = JSON.stringify(brief.audio ?? {});
   }
 
+  brief = { ...brief, ...job.nativeAudioSettings };
+
   // -------- Stop at asset review gate --------
   job.phase = "asset_review";
   await saveJob(job);
@@ -2518,6 +2571,7 @@ export type RenderPhaseOptions = Pick<JobRunOptions, "onEvent" | "signal"> & {
    *  Used for long videos headed to YouTube (which accepts WebM): their
    *  conversion can run past the server's time limit. */
   skipMp4?: boolean;
+  acceptStillFallback?: boolean;
 };
 
 export async function runRenderPhase(
@@ -2574,6 +2628,14 @@ async function runRenderPhaseInner(
     throw new Error(msg);
   }
 
+  if (
+    brief.motionMode === "full" &&
+    job.shots.some((shot) => shot.kind !== "clip") &&
+    !opts.acceptStillFallback
+  ) {
+    throw new Error("Review and accept the still-image fallback before rendering Full Motion.");
+  }
+
   job.phase = "rendering";
   await saveJob(job);
   onEvent({ type: "phase", phase: "rendering" });
@@ -2584,7 +2646,10 @@ async function runRenderPhaseInner(
     if (s.blobKey) url = await loadShotObjectURL(s.blobKey);
     if (!url) url = placeholderImage(brief.aspectRatio, `Shot ${i + 1}`);
     return {
-      n: i + 1, kind: (s.kind ?? "image"), url,
+        shotId: s.id,
+        n: i + 1,
+        kind: s.kind ?? "image",
+        url,
       duration_sec: TARGET_BEAT_SEC, generated: s.status === "done",
     };
   }));

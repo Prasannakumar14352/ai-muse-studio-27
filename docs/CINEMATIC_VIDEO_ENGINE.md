@@ -51,3 +51,6 @@ Deploy through the existing application pipeline after build and review.
 Revert the feature commit to roll back. Existing projects using legacy styles
 continue to use their existing IDs. Projects created with the new IDs should
 be changed to a legacy style before rerendering on a rollback build.
+
+See the [advanced model and clip audio guide](ADVANCED_VIDEO_MODELS.md) for Veo
+availability and the Full Motion review acknowledgement.

@@ -59,6 +59,8 @@ export type RenderOptions = {
   sceneMedia?: Array<{ kind: "image" | "clip"; url: string } | null>;
   sceneAudio?: Array<AudioBuffer | null>;
   mixAssets?: MixAsset[];
+  /** Opt-in per-beat gain for local video clip audio. Null leaves the clip silent. */
+  nativeClipAudio?: Array<number | null>;
   audioSettings?: AudioSettings;
   fitToAudio?: boolean;
   /** Cancel the render mid-flight — recorder stops and result rejects with AbortError. */
@@ -547,7 +549,23 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   // We schedule each buffer at that scene's start on a single AudioContext,
   // route through a MediaStreamAudioDestinationNode, and pass that stream's
   // audio track into the MediaRecorder alongside the video track.
+  const nativeGainFor = (index: number) => {
+    const gain = opts.nativeClipAudio?.[index];
+    return typeof gain === "number" && Number.isFinite(gain) ? Math.min(1, Math.max(0, gain)) : 0;
+  };
+  const nativeClips = sceneMedia.map((media, index) => {
+    if (nativeGainFor(index) <= 0) return null;
+    if (!(media instanceof HTMLVideoElement))
+      throw new Error("Could not load an audio-enabled clip");
+    const url = new URL(media.src, window.location.href);
+    if (url.origin !== window.location.origin) {
+      throw new Error("Audio-enabled clips must be loaded from a local video asset");
+    }
+    return media;
+  });
+  const hasNativeAudio = nativeClips.some(Boolean);
   const hasAudio = Boolean(
+    hasNativeAudio ||
     opts.mixAssets?.length ||
     (opts.audioSettings?.voiceoverEnabled !== false && opts.sceneAudio?.some(Boolean)),
   );
@@ -599,13 +617,12 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       try { next.currentTime = 0; void next.play().catch(() => {}); } catch { /* noop */ }
     }
   };
-  playIfClip(0);
 
 
   recorder.start(250);
 
   if (audioCtx && audioDest) {
-    scheduleAudioMix({
+    const mixBus = scheduleAudioMix({
       context: audioCtx,
       destination: audioDest,
       time: audioCtx.currentTime,
@@ -615,9 +632,21 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       rates: opts.exactTimeline ? (opts.audioRates ?? []) : durations.map(() => audioPlaybackRate),
       cuts: opts.exactTimeline ? (opts.audioCutSec ?? []) : [],
       assets: opts.mixAssets ?? [],
+      hasNativeAudio,
       settings: opts.audioSettings,
     });
+    nativeClips.forEach((clip, index) => {
+      if (!clip) return;
+      const source = audioCtx!.createMediaElementSource(clip);
+      const gain = audioCtx!.createGain();
+      gain.gain.value = nativeGainFor(index);
+      source.connect(gain);
+      gain.connect(mixBus);
+      // The media element feeds only the recorder's mix bus.
+      clip.muted = false;
+    });
   }
+  playIfClip(0);
 
   const startedAt = performance.now();
   let aborted = false;

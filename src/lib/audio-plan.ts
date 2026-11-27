@@ -159,14 +159,19 @@ export function planVideoAudio(input: {
   return tracks;
 }
 
-export function maximumAudioCredits(settings: AudioSettings, duration: number) {
-  return (
-    (settings.backgroundMusicEnabled
+export function audioCreditBreakdown(settings: AudioSettings, duration: number) {
+  return {
+    music: settings.backgroundMusicEnabled
       ? audioCredits("music", Math.max(3, Math.min(600, duration)))
-      : 0) +
-    (settings.soundEffectsEnabled ? AUDIO_LIMITS.sfx * audioCredits("sfx", 3) : 0) +
-    (settings.ambienceEnabled ? AUDIO_LIMITS.ambience * audioCredits("ambience", 15) : 0)
-  );
+      : 0,
+    sfx: settings.soundEffectsEnabled ? AUDIO_LIMITS.sfx * audioCredits("sfx", 3) : 0,
+    ambience: settings.ambienceEnabled ? AUDIO_LIMITS.ambience * audioCredits("ambience", 15) : 0,
+  };
+}
+
+export function maximumAudioCredits(settings: AudioSettings, duration: number) {
+  const { music, sfx, ambience } = audioCreditBreakdown(settings, duration);
+  return music + sfx + ambience;
 }
 
 export function isAudioTrackEnabled(
