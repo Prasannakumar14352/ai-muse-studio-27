@@ -11,6 +11,23 @@ const active = ["queued", "preparing_assets", "rendering", "encoding", "validati
 export const Route = createFileRoute("/api/professional-render")({
   server: {
     handlers: {
+      GET: async () => {
+        if (process.env.VIDEO_SERVER_RENDER_ENABLED !== "true")
+          return Response.json({ available: false });
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data } = await (supabaseAdmin as unknown as SupabaseClient)
+          .from("professional_render_workers")
+          .select("id")
+          .gte("seen_at", new Date(Date.now() - 45_000).toISOString())
+          .limit(1);
+        return Response.json(
+          {
+            available: Boolean(data?.length),
+            fourK: process.env.VIDEO_4K_EXPORT_ENABLED === "true",
+          },
+          { headers: { "Cache-Control": "no-store" } },
+        );
+      },
       POST: async ({ request }) => {
         const { getUserIdFromRequest, unauthorized } = await import("@/lib/route-auth.server");
         const owner = await getUserIdFromRequest(request);
@@ -85,13 +102,24 @@ export const Route = createFileRoute("/api/professional-render")({
             { status: 403 },
           );
         }
-        const { data: project } = await supabaseAdmin
-          .from("projects")
+        // Studio job IDs are local. The authenticated owner and owned input
+        // namespace are authoritative; this mode never reads a cloud project.
+        if (manifest.data.projectScope === "cloud") {
+          const { data: project } = await supabaseAdmin
+            .from("projects")
+            .select("id")
+            .eq("id", manifest.data.projectId)
+            .eq("user_id", owner)
+            .maybeSingle();
+          if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
+        }
+        const { data: workers } = await db
+          .from("professional_render_workers")
           .select("id")
-          .eq("id", manifest.data.projectId)
-          .eq("user_id", owner)
-          .maybeSingle();
-        if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
+          .gte("seen_at", new Date(Date.now() - 45_000).toISOString())
+          .limit(1);
+        if (!workers?.length)
+          return Response.json({ error: "No render worker is online" }, { status: 503 });
         const { data, error } = await db.rpc("queue_professional_render", {
           owner_id: owner,
           project: manifest.data.projectId,

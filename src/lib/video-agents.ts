@@ -1,4 +1,4 @@
-import type { VideoExportSettings } from "./video-export";
+import { exportDimensions, type VideoExportSettings } from "./video-export";
 import {
   isAdvancedVideoModel,
   type VeoResolution,
@@ -41,6 +41,8 @@ import { runShotPool } from "@/lib/video-shot-runner";
 import {
   createJob, getJob, saveJob, saveShotBlob, loadShotObjectURL,
   motionSourceObjectURL,
+  snapshotShot,
+  removeShotSnapshot,
   type JobRecord,
   type ShotRecord,
 } from "@/lib/video-job-store";
@@ -918,18 +920,12 @@ export const VisualGenerationAgent = {
 
 // ---------- Render (real canvas + real audio, beat-driven) ----------
 
-export const RenderAgent = {
-  async run(
-    brief: VideoBrief,
-    script: AiVideoScript,
-    beats: Beat[],
-    beatVisuals: VisualAsset[],
-    voice: VoiceoverClip[],
-    onProgress?: (p: number) => void,
-    audioTracks: PlannedAudio[] = [],
-    exportSettings?: VideoExportSettings,
-    signal?: AbortSignal,
-  ): Promise<RenderResult> {
+function describeRenderTimeline(
+  brief: VideoBrief,
+  script: AiVideoScript,
+  beats: Beat[],
+  voice: VoiceoverClip[],
+) {
     // Distribute each scene's audio duration across its beats.
     const beatDurations: number[] = new Array(beats.length).fill(TARGET_BEAT_SEC);
     const beatAudio: Array<AudioBuffer | null> = new Array(beats.length).fill(null);
@@ -986,6 +982,41 @@ export const RenderAgent = {
       transition: b.transition,
     }));
 
+  return { scenes, beatAudio, beatRates, beatCut };
+}
+
+export async function describeStudioRender(jobId: string, bundle: AssetGenerationBundle) {
+  const job = await getJob(jobId);
+  if (
+    !job ||
+    !job.shots.length ||
+    job.shots.some((shot) => shot.status !== "done" || !shot.blobKey)
+  ) {
+    throw new Error("Generate every shot before submitting a server render.");
+  }
+  const beats = beatsFromShots(job, bundle.brief.style);
+  const timing = describeRenderTimeline(bundle.brief, bundle.script, beats, bundle.voiceover);
+  return { job, beats, ...timing };
+}
+
+export const RenderAgent = {
+  async run(
+    brief: VideoBrief,
+    script: AiVideoScript,
+    beats: Beat[],
+    beatVisuals: VisualAsset[],
+    voice: VoiceoverClip[],
+    onProgress?: (p: number) => void,
+    audioTracks: PlannedAudio[] = [],
+    exportSettings?: VideoExportSettings,
+    signal?: AbortSignal,
+  ): Promise<RenderResult> {
+    const { scenes, beatAudio, beatRates, beatCut } = describeRenderTimeline(
+      brief,
+      script,
+      beats,
+      voice,
+    );
     const nativeOnly = brief.sceneAudioSource === "native";
     const mixAssets = await decodeAudioAssets(
       nativeOnly
@@ -1048,7 +1079,12 @@ function briefVoiceLanguage(brief: VideoBrief): string | undefined {
   return brief.language && brief.language !== "auto" ? brief.language : undefined;
 }
 
-async function fetchSceneAudio(text: string, voice: VoiceId, ctx: AudioContext, language?: string | null): Promise<{ blobUrl: string; buffer: AudioBuffer } | null> {
+async function fetchSceneAudio(
+  text: string,
+  voice: VoiceId,
+  ctx: BaseAudioContext,
+  language?: string | null,
+): Promise<{ blobUrl: string; buffer: AudioBuffer } | null> {
   if (language === "none" || !text?.trim()) return null;
   try {
     const res = await ttsFetch(text, VOICE_MAP[voice] ?? voice, language);
@@ -1060,6 +1096,27 @@ async function fetchSceneAudio(text: string, voice: VoiceId, ctx: AudioContext, 
   } catch {
     return null;
   }
+}
+
+export async function regenerateSceneNarration(
+  brief: VideoBrief,
+  scene: AiVideoScene,
+): Promise<VoiceoverClip> {
+  const context = new OfflineAudioContext(1, 1, 48000);
+  const audio = await fetchSceneAudio(
+    scene.voiceover,
+    brief.voice,
+    context,
+    briefVoiceLanguage(brief),
+  );
+  if (!audio) throw new Error("Narration could not be produced or decoded.");
+  return {
+    n: scene.n,
+    text: scene.voiceover,
+    url: audio.blobUrl,
+    buffer: audio.buffer,
+    duration_sec: audio.buffer.duration,
+  };
 }
 
 export const VoiceoverAgent = {
@@ -1831,6 +1888,7 @@ export type JobPhaseId =
   | "failed";
 
 export type ShotProgress = {
+  canRestore?: boolean;
   id: string;
   index: number;
   status: "pending" | "running" | "done" | "failed";
@@ -2146,7 +2204,11 @@ export async function runVideoJobPipeline(
     return {
       id: s.id, index: s.index,
       status: s.status === "running" ? "pending" : s.status,
-      kind: s.kind, previewUrl, error: s.error, attempts: s.attempts,
+        kind: s.kind,
+        previewUrl,
+        error: s.error,
+        attempts: s.attempts,
+        canRestore: Boolean(s.previousAsset),
     };
   }));
   onEvent({ type: "shots-init", total: job.shots.length, shots: initial });
@@ -2189,7 +2251,9 @@ export async function runVideoJobPipeline(
           shot: {
             id: shot.id, index: shot.index, status: "done",
             kind: shot.kind, previewUrl: outcome.value.previewUrl,
-            error: null, attempts: shot.attempts,
+            error: null,
+            attempts: shot.attempts,
+            canRestore: Boolean(shot.previousAsset),
           },
         });
       } else {
@@ -2201,7 +2265,11 @@ export async function runVideoJobPipeline(
           done, failed, total: job.shots.length,
           shot: {
             id: shot.id, index: shot.index, status: "failed",
-            kind: null, previewUrl: null, error: outcome.error, attempts: shot.attempts,
+            kind: null,
+            previewUrl: null,
+            error: outcome.error,
+            attempts: shot.attempts,
+            canRestore: Boolean(shot.previousAsset),
           },
         });
       }
@@ -2446,7 +2514,11 @@ async function runAssetGenerationPhaseInner(
     return {
       id: s.id, index: s.index,
       status: s.status === "running" ? "pending" : s.status,
-      kind: s.kind, previewUrl, error: s.error, attempts: s.attempts,
+        kind: s.kind,
+        previewUrl,
+        error: s.error,
+        attempts: s.attempts,
+        canRestore: Boolean(s.previousAsset),
     };
   }));
   onEvent({ type: "shots-init", total: job.shots.length, shots: initial });
@@ -2487,7 +2559,10 @@ async function runAssetGenerationPhaseInner(
           type: "shot", done, failed, total: job.shots.length,
           shot: { id: shot.id, index: shot.index, status: "done",
             kind: shot.kind, previewUrl: outcome.value.previewUrl,
-            error: null, attempts: shot.attempts },
+            error: null,
+            attempts: shot.attempts,
+            canRestore: Boolean(shot.previousAsset),
+          },
         });
       } else {
         shot.status = "failed";
@@ -2496,7 +2571,12 @@ async function runAssetGenerationPhaseInner(
         onEvent({
           type: "shot", done, failed, total: job.shots.length,
           shot: { id: shot.id, index: shot.index, status: "failed",
-            kind: null, previewUrl: null, error: outcome.error, attempts: shot.attempts },
+            kind: null,
+            previewUrl: null,
+            error: outcome.error,
+            attempts: shot.attempts,
+            canRestore: Boolean(shot.previousAsset),
+          },
         });
       }
       job.shotsDone = done; job.shotsFailed = failed;
@@ -2531,14 +2611,22 @@ async function runAssetGenerationPhaseInner(
           onEvent({
             type: "shot", done, failed, total: job.shots.length,
             shot: { id: shot.id, index: shot.index, status: "done", kind: shot.kind,
-              previewUrl: outcome.value.previewUrl, error: null, attempts: shot.attempts },
+              previewUrl: outcome.value.previewUrl,
+              error: null,
+              attempts: shot.attempts,
+              canRestore: Boolean(shot.previousAsset),
+            },
           });
         } else {
           shot.status = "failed"; shot.error = outcome.error;
           onEvent({
             type: "shot", done, failed, total: job.shots.length,
             shot: { id: shot.id, index: shot.index, status: "failed", kind: null,
-              previewUrl: null, error: outcome.error, attempts: shot.attempts },
+              previewUrl: null,
+              error: outcome.error,
+              attempts: shot.attempts,
+              canRestore: Boolean(shot.previousAsset),
+            },
           });
         }
         job.shotsDone = done; job.shotsFailed = failed;
@@ -2729,8 +2817,15 @@ async function runRenderPhaseInner(
   // only a real "this file is broken" verdict fails the job.
   let validation: Awaited<ReturnType<typeof validateRenderedVideo>>;
   try {
-    validation = await validateRenderedVideo(render.blob ?? null, brief.duration);
+    const settings = opts.exportSettings;
+    validation = await validateRenderedVideo(
+      render.blob ?? null,
+      brief.duration,
+      Boolean(settings),
+      settings ? exportDimensions(settings.resolution, settings.aspectRatio) : undefined,
+    );
   } catch (e) {
+    if (opts.exportSettings) throw new Error("Could not verify the configured export");
     console.warn("[video-pipeline] validation could not run; keeping the render", e);
     validation = {
       ok: !!render.blob && render.blob.size > 0,
@@ -2850,6 +2945,8 @@ export async function regenerateShot(
     if (revision > 4) throw new Error("This clip has reached its retry limit");
     shot.motionRevision = revision;
   }
+  const priorStatus = shot.status;
+  const snapshot = await snapshotShot(job.id, shot);
   shot.status = "running";
   shot.error = null;
   shot.attempts += 1;
@@ -2860,7 +2957,12 @@ export async function regenerateShot(
     failed: job.shotsFailed,
     total: job.shots.length,
     shot: { id: shot.id, index: shot.index, status: "pending",
-      kind: shot.kind, previewUrl: null, error: null, attempts: shot.attempts },
+      kind: shot.kind,
+      previewUrl: null,
+      error: null,
+      attempts: shot.attempts,
+      canRestore: Boolean(shot.previousAsset),
+    },
   });
 
   const controller = new AbortController();
@@ -2869,31 +2971,52 @@ export async function regenerateShot(
   try {
     const characterRef = shot.hasCharacter !== false ? await ensureCharacterReference(job, brief) : null;
     const out = await generateOneShot(shot, brief, job.id, controller.signal, characterRef, job.shots.length);
+    const prior = shot.previousAsset;
+    shot.previousAsset = snapshot ?? prior;
     shot.status = "done";
     shot.kind = out.kind;
     shot.blobKey = out.blobKey;
     shot.mime = out.mime;
     shot.error = null;
+    job.shotsDone = job.shots.filter((item) => item.status === "done").length;
+    job.shotsFailed = job.shots.filter((item) => item.status === "failed").length;
     await saveJob(job);
+    if (snapshot && prior?.blobKey !== shot.blobKey) await removeShotSnapshot(prior);
     onEvent({
       type: "shot",
       done: job.shotsDone,
       failed: job.shotsFailed,
       total: job.shots.length,
       shot: { id: shot.id, index: shot.index, status: "done",
-        kind: shot.kind, previewUrl: out.previewUrl, error: null, attempts: shot.attempts },
+        kind: shot.kind,
+        previewUrl: out.previewUrl,
+        error: null,
+        attempts: shot.attempts,
+        canRestore: Boolean(shot.previousAsset),
+      },
     });
   } catch (e) {
-    shot.status = "failed";
+    shot.status = priorStatus === "done" && snapshot ? "done" : "failed";
+    if (snapshot) Object.assign(shot, snapshot);
     shot.error = e instanceof Error ? e.message : String(e);
+    job.shotsDone = job.shots.filter((item) => item.status === "done").length;
+    job.shotsFailed = job.shots.filter((item) => item.status === "failed").length;
     await saveJob(job);
     onEvent({
       type: "shot",
       done: job.shotsDone,
       failed: job.shotsFailed,
       total: job.shots.length,
-      shot: { id: shot.id, index: shot.index, status: "failed",
-        kind: null, previewUrl: null, error: shot.error, attempts: shot.attempts },
+      shot: {
+        id: shot.id,
+        index: shot.index,
+        status: shot.status,
+        kind: shot.kind,
+        previewUrl: shot.blobKey ? await loadShotObjectURL(shot.blobKey) : null,
+        error: shot.error,
+        attempts: shot.attempts,
+        canRestore: Boolean(shot.previousAsset),
+      },
     });
   } finally {
     signal?.removeEventListener("abort", onAbort);
@@ -2918,7 +3041,10 @@ export async function replaceShotWithMedia(
   if (!shot) throw new Error("Scene not found");
   const wasDone = shot.status === "done";
   const wasFailed = shot.status === "failed";
+  const snapshot = await snapshotShot(job.id, shot);
+  const prior = shot.previousAsset;
   const key = await saveShotBlob(job.id, shot.id, blob);
+  shot.previousAsset = snapshot ?? prior;
   const url = await loadShotObjectURL(key);
   shot.status = "done";
   shot.kind = kind;
@@ -2928,13 +3054,56 @@ export async function replaceShotWithMedia(
   if (!wasDone) job.shotsDone += 1;
   if (wasFailed) job.shotsFailed = Math.max(0, job.shotsFailed - 1);
   await saveJob(job);
+  if (snapshot && prior?.blobKey !== shot.blobKey) await removeShotSnapshot(prior);
   onEvent({
     type: "shot",
     done: job.shotsDone,
     failed: job.shotsFailed,
     total: job.shots.length,
     shot: { id: shot.id, index: shot.index, status: "done",
-      kind, previewUrl: url, error: null, attempts: shot.attempts },
+      kind,
+      previewUrl: url,
+      error: null,
+      attempts: shot.attempts,
+      canRestore: Boolean(shot.previousAsset),
+    },
+  });
+}
+
+export async function restorePreviousShot(
+  jobId: string,
+  shotId: string,
+  onEvent: (ev: JobEvent) => void,
+) {
+  const job = await getJob(jobId);
+  const shot = job?.shots.find((item) => item.id === shotId);
+  if (!job || !shot?.previousAsset) throw new Error("This shot has no saved previous version");
+  const previous = shot.previousAsset;
+  const url = await loadShotObjectURL(previous.blobKey);
+  if (!url) throw new Error("The previous version is no longer available on this device");
+  const current =
+    shot.blobKey && shot.kind
+      ? { blobKey: shot.blobKey, kind: shot.kind, mime: shot.mime }
+      : undefined;
+  Object.assign(shot, previous, { previousAsset: current, status: "done", error: null });
+  job.shotsDone = job.shots.filter((item) => item.status === "done").length;
+  job.shotsFailed = job.shots.filter((item) => item.status === "failed").length;
+  await saveJob(job);
+  onEvent({
+    type: "shot",
+    done: job.shotsDone,
+    failed: job.shotsFailed,
+    total: job.shots.length,
+    shot: {
+      id: shot.id,
+      index: shot.index,
+      status: "done",
+      kind: shot.kind,
+      previewUrl: url,
+      error: null,
+      attempts: shot.attempts,
+      canRestore: Boolean(shot.previousAsset),
+    },
   });
 }
 
@@ -2978,14 +3147,22 @@ export async function retryFailedShots(
         onEvent({
           type: "shot", done, failed, total: job.shots.length,
           shot: { id: shot.id, index: shot.index, status: "done", kind: shot.kind,
-            previewUrl: outcome.value.previewUrl, error: null, attempts: shot.attempts },
+            previewUrl: outcome.value.previewUrl,
+            error: null,
+            attempts: shot.attempts,
+            canRestore: Boolean(shot.previousAsset),
+          },
         });
       } else {
         shot.status = "failed"; shot.error = outcome.error; failed += 1;
         onEvent({
           type: "shot", done, failed, total: job.shots.length,
           shot: { id: shot.id, index: shot.index, status: "failed", kind: null,
-            previewUrl: null, error: outcome.error, attempts: shot.attempts },
+            previewUrl: null,
+            error: outcome.error,
+            attempts: shot.attempts,
+            canRestore: Boolean(shot.previousAsset),
+          },
         });
       }
       job.shotsDone = done; job.shotsFailed = failed;

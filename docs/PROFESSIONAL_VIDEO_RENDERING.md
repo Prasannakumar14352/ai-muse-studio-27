@@ -128,3 +128,5 @@ To roll back, disable server render and Veo submissions first. Reconcile
 open Veo reservations, let active workers finish or cancel jobs, then
 deploy the previous application. Retain private storage and history
 until outputs and ledger entries have been reconciled.
+
+Studio submission, worker presence, and manifest v2 are described in [Video quality assurance](VIDEO_QUALITY_ASSURANCE.md). The older API example remains useful for manual submission.

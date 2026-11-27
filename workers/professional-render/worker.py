@@ -13,6 +13,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
 
 LOGGER = logging.getLogger("professional-render")
@@ -39,6 +40,7 @@ class Supabase:
             raise ValueError("Invalid Supabase origin")
         self.origin = origin.rstrip("/")
         self.token = token
+        self.worker_id = str(uuid.uuid4())
         self.opener = urllib.request.build_opener(NoRedirect())
 
     def request(self, path, method="GET", body=None, content_type="application/json", prefer=None):
@@ -50,8 +52,14 @@ class Supabase:
         req = urllib.request.Request(self.origin + path, data=body, headers=headers, method=method)
         return self.opener.open(req, timeout=30)
 
+    def presence(self):
+        with self.request("/rest/v1/professional_render_workers", "POST", {
+            "id": self.worker_id, "seen_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        }, prefer="resolution=merge-duplicates,return=minimal"):
+            pass
+
     def claim(self):
-        with self.request("/rest/v1/rpc/claim_professional_render", "POST", {}) as result:
+        with self.request("/rest/v1/rpc/claim_professional_render_supported", "POST", {"max_version": 2}) as result:
             return json.load(result)
 
     def update(self, job, data):
@@ -156,28 +164,53 @@ def compose(manifest, directory, download, progress, cancelled):
         segment = directory / f"segment-{index}.mp4"
         seek = [] if is_image else ["-ss", str(trim)]
         tail = f"tpad=stop_mode=clone:stop_duration={seconds}"
+        filters = f"{geometry},setsar=1,fps={fps},{tail}"
+        movement = scene.get("movement", "static")
+        if is_image and movement != "static":
+            denominator = max(1, scene["frames"] - 1)
+            expressions = {
+                "push": (f"1+0.16*on/{denominator}", "iw/2-iw/zoom/2"),
+                "pull": (f"1.16-0.16*on/{denominator}", "iw/2-iw/zoom/2"),
+                "pan-left": ("1.14", f"(iw-iw/zoom)*(1-on/{denominator})"),
+                "pan-right": ("1.14", f"(iw-iw/zoom)*on/{denominator}"),
+            }
+            zoom, x = expressions[movement]
+            filters = (f"{geometry},setsar=1,zoompan=z='{zoom}':x='{x}':"
+                       f"y='ih/2-ih/zoom/2':d={scene['frames']}:s={width}x{height}:fps={fps}")
+        if scene.get("entrance", "cut") == "flash":
+            filters += f",fade=t=in:st=0:d={min(0.2, seconds / 2)}:color=white"
+        overlay = scene.get("overlay")
+        if overlay:
+            text = directory / f"overlay-{index}.txt"
+            text.write_text(overlay, encoding="utf-8")
+            font = "Noto Sans Telugu" if re.search(r"[ఀ-౿]", overlay) else "Noto Sans"
+            # Safe textfile and expansion=none: text is never interpreted as filter syntax.
+            filters += (f",drawtext=font='{font}':textfile='{text}':expansion=none:"
+                        f"fontsize={max(18, height // 25)}:fontcolor=white:"
+                        "box=1:boxcolor=black@0.65:boxborderw=12:x=(w-tw)/2:y=h*0.78")
+
         run([*ffmpeg, *seek, *input_args(path), "-map", "0:v:0", "-an",
-             "-vf", f"{geometry},setsar=1,fps={fps},{tail}",
+             "-vf", filters,
              "-frames:v", str(scene["frames"]), *clip_args, str(segment)], cancelled)
         segments.append(segment)
         if scene["nativeGain"] > 0:
-            audio.append((path, "native", trim, start, seconds, scene["nativeGain"], False, 0))
+            audio.append((path, "native", trim, start, seconds, scene["nativeGain"], False, 0, 1))
         start += seconds
         progress("rendering", 0.1 + 0.65 * (index + 1) / len(manifest["scenes"]))
 
     for track in manifest["audio"]:
         if track["gain"] > 0:
             audio.append((asset(track["path"])[0], track["track"], 0, track["startFrame"] / fps,
-                          track["frames"] / fps, track["gain"], track["loop"], track["fadeFrames"] / fps))
+                          track["frames"] / fps, track["gain"], track["loop"], track["fadeFrames"] / fps, track.get("rate", 1)))
     listing = directory / "timeline.txt"
     listing.write_text("".join(f"file '{segment.name}'\n" for segment in segments))
     args = [*ffmpeg, "-f", "concat", "-safe", "1", "-i", str(listing)]
     filters = []
     buses = {"narration": [], "music": [], "other": []}
-    for index, (path, track, trim, offset, length, gain, loop, fade) in enumerate(audio, start=1):
+    for index, (path, track, trim, offset, length, gain, loop, fade, rate) in enumerate(audio, start=1):
         args.extend([*(["-stream_loop", "-1"] if loop else []), *(["-ss", str(trim)] if trim else []), *input_args(path)])
         fade = min(fade, length / 2)
-        chain = f"aresample=48000,atrim=duration={length},asetpts=PTS-STARTPTS,volume={gain}"
+        chain = f"aresample=48000,atempo={rate},atrim=duration={length},asetpts=PTS-STARTPTS,volume={gain}"
         if fade:
             chain += f",afade=t=in:d={fade},afade=t=out:st={length-fade}:d={fade}"
         name = f"a{index}"
@@ -217,13 +250,21 @@ def compose(manifest, directory, download, progress, cancelled):
         abs(actual_duration - duration) > 0.15 or abs(actual_fps - fps) > 0.05
     ) or (mixed and (audio_stream.get("codec_name"), audio_stream.get("sample_rate")) != ("aac", "48000")):
         raise RenderError("Encoded output differs from the manifest")
+    filters = ["-vf", "blackdetect=d=0.5:pix_th=0.10,freezedetect=n=-50dB:d=1.5"]
     if mixed:
-        volume = run(["ffmpeg", "-v", "info", *input_args(output), "-vn", "-af", "volumedetect", "-f", "null", "-"], cancelled, 45)
-        peak = re.search(r"max_volume: (-?[\d.]+) dB", volume)
-        if not peak or float(peak[1]) < -75:
-            raise RenderError("Audio was requested but the output is silent")
+        filters += ["-af", "volumedetect"]
+    diagnostics = run(["ffmpeg", "-v", "info", *input_args(output), *filters, "-f", "null", "-"], cancelled, 90)
+    peak = re.search(r"max_volume: (-?[\d.]+) dB", diagnostics)
+    if mixed and (not peak or float(peak[1]) < -75):
+        raise RenderError("Audio was requested but the output is silent")
     return output, {"width": width, "height": height, "fps": actual_fps, "duration": actual_duration,
-                    "codec": "h264", "audio": audio_stream.get("codec_name"), "bytes": output.stat().st_size}
+                    "codec": "h264", "audio": audio_stream.get("codec_name"), "bytes": output.stat().st_size,
+                    "quality": {
+                        "peakDbfs": float(peak[1]) if peak else None,
+                        "blackIntervals": len(re.findall(r"black_start:", diagnostics)),
+                        "freezeCandidates": len(re.findall(r"freeze_start:", diagnostics)),
+                    }}
+
 
 
 def process_job(client, job):
@@ -235,6 +276,7 @@ def process_job(client, job):
     def heartbeat():
         while not finished.wait(15):
             try:
+                client.presence()
                 if not client.update(job, {}):
                     stopped.set()
                     return
@@ -286,6 +328,7 @@ def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     while True:
         try:
+            client.presence()
             job = client.claim()
             if job:
                 process_job(client, job)

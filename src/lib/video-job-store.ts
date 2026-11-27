@@ -8,7 +8,14 @@ import type { AudioSettings } from "./audio-generation";
 // in-progress jobs and skip shots already stored.
 
 import { supabase } from "@/integrations/supabase/client";
-import { putBlob, deleteBlob, deleteBlobsByPrefix, getObjectURL, makeBlobKey } from "@/lib/blob-store";
+import {
+  putBlob,
+  getBlob,
+  deleteBlob,
+  deleteBlobsByPrefix,
+  getObjectURL,
+  makeBlobKey,
+} from "@/lib/blob-store";
 
 export type JobPhase =
   | "planning"
@@ -30,6 +37,7 @@ export type ShotRecord = {
   index: number;
   sceneIndex: number;
   motionRevision?: number;
+  previousAsset?: { blobKey: string; kind: ShotKind; mime: string | null };
   audioSceneId?: string;
   beatIndex: number;
   isFirstOfScene: boolean;
@@ -75,6 +83,7 @@ export type JobRecord = {
   audioTracks?: PlannedAudio[];
   audioMixSettings?: AudioSettings;
   exportSettings?: VideoExportSettings;
+  qualityReview?: { reason: string; reviewedAt: string; warningIds: string[] };
   nativeAudioSettings?: {
     sceneAudioSource?: SceneAudioSource;
     nativeAudioVolume?: number;
@@ -105,6 +114,29 @@ function readJson<T>(key: string, fallback: T): T {
 }
 function writeJson(key: string, value: unknown) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* quota */ }
+}
+
+export async function snapshotShot(jobId: string, shot: ShotRecord) {
+  if (!shot.blobKey || !shot.kind) return;
+  const blob = await getBlob(shot.blobKey, { localOnly: true });
+  if (!blob) throw new Error("Current shot could not be saved for rollback");
+  const blobKey = await saveShotBlob(jobId, `${shot.id}-history-${crypto.randomUUID()}`, blob);
+  return { blobKey, kind: shot.kind, mime: shot.mime };
+}
+
+export async function removeShotSnapshot(snapshot: ShotRecord["previousAsset"]) {
+  if (snapshot) await deleteBlob(snapshot.blobKey).catch(() => {});
+}
+
+export async function saveQualityReview(jobId: string, reason: string, warningIds: string[]) {
+  const job = await getJob(jobId);
+  if (!job) throw new Error("Video job not found");
+  job.qualityReview = {
+    reason: reason.trim().slice(0, 240),
+    reviewedAt: new Date().toISOString(),
+    warningIds,
+  };
+  await saveJob(job);
 }
 
 export async function motionSourceObjectURL(jobId: string, shotId: string) {
