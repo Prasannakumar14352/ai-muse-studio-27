@@ -32,6 +32,7 @@ The showcase publication gate covers private media and human review. Social publ
 
 - Dependency installation completed. npm flagged opt-in dependency scripts. Local media checks use system FFmpeg.
 - Vitest passed 140 tests across 20 files. TypeScript and the production build passed.
+- Chromium and system FFmpeg passed six synthetic export cases, including native, hybrid, and full-HD portrait output.
 - Isolated PostgreSQL 17 passed the migration checks for roles, private bucket configuration, managed publication approval, unpublish, and legacy rows.
 - The local FFmpeg worker produced verified audible 3840×2160 at 24 FPS and 720×720 at 30 FPS fixtures.
 - Repository-wide ESLint reported errors. Hosted Supabase and signed-in landing, checkout, and lead capture checks remain pending.

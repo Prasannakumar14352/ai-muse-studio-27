@@ -1050,10 +1050,10 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
   const [duration, setDuration] = useState<DurationSec>(template?.duration ?? initialDuration ?? 60);
   const [style, setStyle] = useState<StyleId>(template?.style ?? "cinematic");
   const [visualInstructions, setVisualInstructions] = useState(template?.visualInstructions ?? "");
-  const [audio, setAudio] = useState<AudioSettings>(template ? {
+  const [audio, setAudio] = useState<AudioSettings | undefined>(template ? {
     musicMood: template.musicMood, backgroundMusicEnabled: template.backgroundMusicEnabled,
     soundEffectsEnabled: template.soundEffectsEnabled, ambienceEnabled: template.ambienceEnabled,
-  } : {});
+  } : undefined);
   const [voice, setVoice] = useState<VoiceId>(template?.voice ?? "George");
   const [ratio, setRatio] = useState<AspectRatio>(template?.aspectRatio ?? initialRatio ?? "9:16");
   // Off by default: it switches character scenes to HD (8 credits each).

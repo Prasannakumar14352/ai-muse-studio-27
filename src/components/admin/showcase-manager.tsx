@@ -3,9 +3,8 @@ import { showcaseCategories, showcaseMetadata, showcaseTemplate, type ShowcaseMe
 import { showcaseStarterDrafts } from "@/lib/showcase-starters";
 import { probeVideoMetadata } from "@/lib/video-validate";
 // Admin → Landing → "Made with CreatorFlow AI" showcase.
-// Pick a video this account generated (AI Video Studio library or a project
-// render) — it is copied to the public "landing" bucket so it plays forever —
-// or upload a file. Each item carries the exact prompt that produced it.
+// Import a Studio or project export, or upload approved footage. A video and
+// poster stay private until the draft passes publication review.
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
