@@ -2060,7 +2060,7 @@ async function generateOneShot(
   characterRef?: string | null,
   totalShots?: number,
   repair: ShotRepair = "shot",
-): Promise<{ blobKey: string; kind: "clip" | "image"; mime: string; previewUrl: string }> {
+): Promise<{ blobKey: string; kind: "clip" | "image"; mime: string; previewUrl: string; motionSourceKey?: string }> {
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
 
   // Shots with the main character are anchored to the reference portrait so
@@ -2079,7 +2079,9 @@ async function generateOneShot(
     }
   }
   if (!img && repair !== "image" && (repair === "motion" || veo || shot.blobKey == null)) {
-    const cached = await motionSourceObjectURL(jobId, sourceSlot);
+    const cached = !veo && repair === "motion"
+      ? shot.motionSourceKey ? await loadShotObjectURL(shot.motionSourceKey) : null
+      : await motionSourceObjectURL(jobId, sourceSlot);
     if (cached) {
       try { img = await blobToDataUrl(await dataUrlToBlob(cached)); }
       finally { URL.revokeObjectURL(cached); }
@@ -2103,8 +2105,10 @@ async function generateOneShot(
   if (plan.generateMotion) {
     // shot.prompt is the director's English, text-free frame description.
     const source = await dataUrlToBlob(img);
-    await saveShotBlob(jobId, sourceSlot, source);
-    if (veo) img = await blobToDataUrl(source);
+    if (veo) {
+      await saveShotBlob(jobId, sourceSlot, source);
+      img = await blobToDataUrl(source);
+    }
     const clipBlob = await fetchMotionClip(
       img,
       motionPromptFor(
@@ -2134,9 +2138,10 @@ async function generateOneShot(
         : undefined,
     );
     if (clipBlob) {
+      const motionSourceKey = !veo ? await saveShotBlob(jobId, `${sourceSlot}-${crypto.randomUUID()}`, source) : undefined;
       const key = await saveShotBlob(jobId, shot.id, clipBlob);
       const url = await loadShotObjectURL(key);
-      return { blobKey: key, kind: "clip", mime: clipBlob.type || "video/mp4", previewUrl: url ?? "" };
+      return { blobKey: key, motionSourceKey, kind: "clip", mime: clipBlob.type || "video/mp4", previewUrl: url ?? "" };
     }
   }
 
@@ -2252,6 +2257,7 @@ export async function runVideoJobPipeline(
         shot.status = "done";
         shot.kind = outcome.value.kind;
         shot.blobKey = outcome.value.blobKey;
+        shot.motionSourceKey = outcome.value.motionSourceKey;
         shot.mime = outcome.value.mime;
         shot.error = null;
         done += 1;
@@ -2562,6 +2568,7 @@ async function runAssetGenerationPhaseInner(
         shot.status = "done";
         shot.kind = outcome.value.kind;
         shot.blobKey = outcome.value.blobKey;
+        shot.motionSourceKey = outcome.value.motionSourceKey;
         shot.mime = outcome.value.mime;
         shot.error = null;
         done += 1;
@@ -2616,7 +2623,8 @@ async function runAssetGenerationPhaseInner(
         if (!shot) return;
         if (outcome.ok) {
           shot.status = "done"; shot.kind = outcome.value.kind;
-          shot.blobKey = outcome.value.blobKey; shot.mime = outcome.value.mime;
+          shot.blobKey = outcome.value.blobKey;
+        shot.motionSourceKey = outcome.value.motionSourceKey; shot.mime = outcome.value.mime;
           shot.error = null; done += 1; failed = Math.max(0, failed - 1);
           onEvent({
             type: "shot", done, failed, total: job.shots.length,
@@ -2991,6 +2999,7 @@ export async function regenerateShot(
     shot.status = "done";
     shot.kind = out.kind;
     shot.blobKey = out.blobKey;
+    shot.motionSourceKey = out.motionSourceKey;
     shot.mime = out.mime;
     shot.error = null;
     job.shotsDone = job.shots.filter((item) => item.status === "done").length;
@@ -3064,6 +3073,7 @@ export async function replaceShotWithMedia(
   shot.status = "done";
   shot.kind = kind;
   shot.blobKey = key;
+  shot.motionSourceKey = undefined;
   shot.mime = blob.type || (kind === "clip" ? "video/mp4" : "image/jpeg");
   shot.error = null;
   if (!wasDone) job.shotsDone += 1;
@@ -3098,9 +3108,9 @@ export async function restorePreviousShot(
   if (!url) throw new Error("The previous version is no longer available on this device");
   const current =
     shot.blobKey && shot.kind
-      ? { blobKey: shot.blobKey, kind: shot.kind, mime: shot.mime }
+      ? { blobKey: shot.blobKey, kind: shot.kind, mime: shot.mime, motionSourceKey: shot.motionSourceKey }
       : undefined;
-  Object.assign(shot, previous, { previousAsset: current, status: "done", error: null });
+  Object.assign(shot, previous, { motionSourceKey: previous.motionSourceKey, previousAsset: current, status: "done", error: null });
   job.shotsDone = job.shots.filter((item) => item.status === "done").length;
   job.shotsFailed = job.shots.filter((item) => item.status === "failed").length;
   await saveJob(job);
@@ -3157,7 +3167,8 @@ export async function retryFailedShots(
       if (!shot) return;
       if (outcome.ok) {
         shot.status = "done"; shot.kind = outcome.value.kind;
-        shot.blobKey = outcome.value.blobKey; shot.mime = outcome.value.mime;
+        shot.blobKey = outcome.value.blobKey;
+        shot.motionSourceKey = outcome.value.motionSourceKey; shot.mime = outcome.value.mime;
         shot.error = null; done += 1;
         onEvent({
           type: "shot", done, failed, total: job.shots.length,
