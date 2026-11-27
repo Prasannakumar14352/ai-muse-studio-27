@@ -4,6 +4,8 @@ import { supabase } from "./supabase";
 import type { Metrics } from "./types";
 import { Dashboard } from "./Dashboard";
 import { LeadsCard } from "./Leads";
+import { Store, storeRevenue } from "./Store";
+import { rupees } from "./format";
 import { ago } from "./format";
 
 const RANGES = [7, 30, 90] as const;
@@ -71,6 +73,15 @@ function Authed({ session }: { session: Session }) {
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", onVis); };
   }, [load]);
 
+  const [section, setSection] = useState<"creatorflow" | "store">(() => (location.pathname.startsWith("/store") ? "store" : "creatorflow"));
+  const go = (s: "creatorflow" | "store") => { setSection(s); history.pushState(null, "", s === "store" ? "/store" : "/"); };
+  useEffect(() => {
+    const onPop = () => setSection(location.pathname.startsWith("/store") ? "store" : "creatorflow");
+    window.addEventListener("popstate", onPop); return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  const [store, setStore] = useState<{ today: number; range: number; month: number } | null>(null);
+  useEffect(() => { void storeRevenue(days).then(setStore).catch(() => setStore(null)); }, [days, m]);
+
   const meta = session.user.user_metadata as { full_name?: string; name?: string };
   const firstName = (meta.full_name ?? meta.name ?? "").split(" ")[0] || null;
 
@@ -89,7 +100,12 @@ function Authed({ session }: { session: Session }) {
   return (
     <div className="page">
       <nav className="top">
-        <div className="brand"><img src="/icon.svg" alt="" width={28} height={28} /><b>CreatorFlow HQ</b></div>
+        <div className="brand"><img src="/icon.svg" alt="" width={28} height={28} /><b>ProdXStore HQ</b>
+          <div className="seg sections" role="group" aria-label="Section">
+            <button className={section === "creatorflow" ? "on" : ""} aria-pressed={section === "creatorflow"} onClick={() => go("creatorflow")}>CreatorFlow AI</button>
+            <button className={section === "store" ? "on" : ""} aria-pressed={section === "store"} onClick={() => go("store")}>Store</button>
+          </div>
+        </div>
         <div className="controls">
           <div className="seg" role="group" aria-label="Date range">
             {RANGES.map((r) => (
@@ -104,9 +120,34 @@ function Authed({ session }: { session: Session }) {
       </nav>
       {error && <div className="alert">Couldn't load the numbers: {error.text}</div>}
       {!m && !error && <div className="center muted">Loading numbers…</div>}
-      {m && <Dashboard m={m} name={firstName} />}
-      {m && <main className="grid"><LeadsCard days={days} /></main>}
-      <footer className="muted small">Live from the CreatorFlow database · refreshes every 5 minutes · times in IST</footer>
+      {m && <RevenueStrip cfToday={m.kpis.today.revenue} cfRange={m.totals.revenue_range} cfMonth={m.totals.mtd_revenue} store={store} days={days} />}
+      {section === "creatorflow" && m && <Dashboard m={m} name={firstName} />}
+      {section === "creatorflow" && m && <main className="grid"><LeadsCard days={days} /></main>}
+      {section === "store" && <Store days={days} />}
+      <footer className="muted small">Live from the ProdXStore database · refreshes every 5 minutes · times in IST</footer>
     </div>
+  );
+}
+
+/** One revenue view across the businesses: CreatorFlow AI subscriptions/credits + ProdXStore store sales. */
+function RevenueStrip({ cfToday, cfRange, cfMonth, store, days }: {
+  cfToday: number; cfRange: number; cfMonth: number; store: { today: number; range: number; month: number } | null; days: number;
+}) {
+  const s = store ?? { today: 0, range: 0, month: 0 };
+  const rows = [
+    { label: "Today", total: cfToday + s.today, cf: cfToday, st: s.today },
+    { label: `Last ${days} days`, total: cfRange + s.range, cf: cfRange, st: s.range },
+    { label: "This month", total: cfMonth + s.month, cf: cfMonth, st: s.month },
+  ];
+  return (
+    <section className="tiles revenue-strip" aria-label="All revenue">
+      {rows.map((r) => (
+        <div className="tile" key={r.label}>
+          <span className="muted small">All revenue · {r.label}</span>
+          <span className="hero">{rupees(r.total)}</span>
+          <span className="small muted">CreatorFlow {rupees(r.cf)} · Store {store ? rupees(r.st) : "…"}</span>
+        </div>
+      ))}
+    </section>
   );
 }
