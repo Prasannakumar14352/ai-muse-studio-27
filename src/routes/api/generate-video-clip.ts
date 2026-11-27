@@ -15,9 +15,14 @@ import { jobTagFromRequest } from "@/lib/job-credit-tag";
 export const Route = createFileRoute("/api/generate-video-clip")({
   server: {
     handlers: {
-      GET: () => Response.json({
-        veo: process.env[ADVANCED_VIDEO_FEATURE_FLAG] === "true" && Boolean(process.env.FAL_KEY),
-      }, { headers: { "Cache-Control": "no-store" } }),
+      GET: () =>
+        Response.json(
+          {
+            veo:
+              process.env[ADVANCED_VIDEO_FEATURE_FLAG] === "true" && Boolean(process.env.FAL_KEY),
+          },
+          { headers: { "Cache-Control": "no-store" } },
+        ),
       POST: async ({ request }) => {
         const { getUserIdFromRequest, unauthorized } = await import("@/lib/route-auth.server");
         const userId = await getUserIdFromRequest(request);
@@ -43,7 +48,10 @@ export const Route = createFileRoute("/api/generate-video-clip")({
             const { startVeoClip } = await import("@/lib/veo-motion.server");
             return await startVeoClip(userId, body);
           } catch {
-            return Response.json({ ok: false, reason: "Motion service is temporarily unavailable" }, { status: 503 });
+            return Response.json(
+              { ok: false, reason: "Motion service is temporarily unavailable" },
+              { status: 503 },
+            );
           }
         }
         if (body.model !== undefined && body.model !== "standard" && body.model !== "premium") {

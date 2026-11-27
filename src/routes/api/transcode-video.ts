@@ -13,10 +13,14 @@ export const Route = createFileRoute("/api/transcode-video")({
         if (!userId) return unauthorized();
 
         const body = (await request.json().catch(() => ({}))) as {
-          path?: string; shape?: string; deleteSource?: boolean; settings?: unknown;
+          path?: string;
+          shape?: string;
+          deleteSource?: boolean;
+          settings?: unknown;
         };
         const parsed = browserExportSchema.optional().safeParse(body?.settings);
-        if (!parsed.success || parsed.data?.format === "webm") return json({ ok: false, error: "Invalid MP4 export settings" }, 400);
+        if (!parsed.success || parsed.data?.format === "webm")
+          return json({ ok: false, error: "Invalid MP4 export settings" }, 400);
         const path = String(body?.path ?? "");
         if (!path.startsWith(`${userId}/`) || path.includes("..")) return json({ ok: false, error: "Invalid file" }, 400);
         const shape = body.shape === "landscape" || body.shape === "square" ? body.shape : "vertical";
@@ -29,7 +33,11 @@ export const Route = createFileRoute("/api/transcode-video")({
         try {
           const { transcodeToMp4 } = await import("@/lib/transcode.server");
           const started = Date.now();
-          const mp4 = await transcodeToMp4(new Uint8Array(await file.arrayBuffer()), shape, parsed.data);
+          const mp4 = await transcodeToMp4(
+            new Uint8Array(await file.arrayBuffer()),
+            shape,
+            parsed.data,
+          );
           const outPath = `${userId}/mp4/${crypto.randomUUID()}.mp4`;
           const { error: upErr } = await supabaseAdmin.storage.from("renders").upload(outPath, mp4, {
             contentType: "video/mp4", upsert: false,

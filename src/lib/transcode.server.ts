@@ -80,20 +80,45 @@ function run(bin: string, args: string[], timeoutMs: number): Promise<void> {
 const probeFile = promisify(execFile);
 
 async function probe(path: string) {
-  const { stdout } = await probeFile(process.env.FFPROBE_PATH || "ffprobe", [
-    "-v", "error", "-protocol_whitelist", "file", "-format_whitelist", "mov,matroska,webm", "-show_streams", "-show_format", "-of", "json", path,
-  ], { timeout: 10_000, maxBuffer: 1024 * 1024 });
+  const { stdout } = await probeFile(
+    process.env.FFPROBE_PATH || "ffprobe",
+    [
+      "-v",
+      "error",
+      "-protocol_whitelist",
+      "file",
+      "-format_whitelist",
+      "mov,matroska,webm",
+      "-show_streams",
+      "-show_format",
+      "-of",
+      "json",
+      path,
+    ],
+    { timeout: 10_000, maxBuffer: 1024 * 1024 },
+  );
   return JSON.parse(stdout) as {
     format?: { duration?: string; format_name?: string };
-    streams?: Array<{ codec_type: string; codec_name: string; width?: number; height?: number;
-      avg_frame_rate?: string; pix_fmt?: string; sample_rate?: string }>;
+    streams?: Array<{
+      codec_type: string;
+      codec_name: string;
+      width?: number;
+      height?: number;
+      avg_frame_rate?: string;
+      pix_fmt?: string;
+      sample_rate?: string;
+    }>;
   };
 }
 
 export async function transcodeToMp4(
-  input: Uint8Array, shape: TranscodeShape, settings?: VideoExportSettings,
+  input: Uint8Array,
+  shape: TranscodeShape,
+  settings?: VideoExportSettings,
 ): Promise<Uint8Array> {
-  const [w, h] = settings ? exportDimensions(settings.resolution, settings.aspectRatio) : SIZE[shape];
+  const [w, h] = settings
+    ? exportDimensions(settings.resolution, settings.aspectRatio)
+    : SIZE[shape];
   const fps = settings?.fps ?? 30;
   const encoding = settings ? exportEncoding(settings) : undefined;
   const dir = await mkdtemp(join(tmpdir(), "cf-transcode-"));
@@ -116,26 +141,50 @@ export async function transcodeToMp4(
     const existingVideo = source?.streams?.find((stream) => stream.codec_type === "video");
     const existingAudio = source?.streams?.find((stream) => stream.codec_type === "audio");
     const existingFps = existingVideo?.avg_frame_rate?.split("/").map(Number);
-    const matchingVideo = existingVideo?.codec_name === "h264" && existingVideo.pix_fmt === "yuv420p" &&
-      existingVideo.width === w && existingVideo.height === h && existingFps?.[1] &&
+    const matchingVideo =
+      existingVideo?.codec_name === "h264" &&
+      existingVideo.pix_fmt === "yuv420p" &&
+      existingVideo.width === w &&
+      existingVideo.height === h &&
+      existingFps?.[1] &&
       existingFps[0] / existingFps[1] === fps;
-    const videoArgs = matchingVideo ? ["-c:v", "copy"] : [
-      "-vf", `scale=${w}:${h}:force_original_aspect_ratio=decrease:flags=lanczos,` +
-        `pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,fps=${fps},format=yuv420p`,
-      "-c:v", "libx264", "-preset", preset, "-crf", String(encoding?.crf ?? 20), "-profile:v", "high",
-    ];
-    const audioArgs = existingAudio?.codec_name === "aac" && existingAudio.sample_rate === "48000"
-      ? ["-c:a", "copy"]
-      : ["-c:a", "aac", "-b:a", `${encoding?.audioKbps ?? 160}k`, "-ar", "48000"];
+    const videoArgs = matchingVideo
+      ? ["-c:v", "copy"]
+      : [
+          "-vf",
+          `scale=${w}:${h}:force_original_aspect_ratio=decrease:flags=lanczos,` +
+            `pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,fps=${fps},format=yuv420p`,
+          "-c:v",
+          "libx264",
+          "-preset",
+          preset,
+          "-crf",
+          String(encoding?.crf ?? 20),
+          "-profile:v",
+          "high",
+        ];
+    const audioArgs =
+      existingAudio?.codec_name === "aac" && existingAudio.sample_rate === "48000"
+        ? ["-c:a", "copy"]
+        : ["-c:a", "aac", "-b:a", `${encoding?.audioKbps ?? 160}k`, "-ar", "48000"];
     await run(
       bin,
       [
         "-hide_banner", "-loglevel", "error", "-y",
         // WebM from MediaRecorder has bogus timestamps; regenerate them.
         "-fflags", "+genpts",
-        "-protocol_whitelist", "file", "-format_whitelist", "mov,matroska,webm", "-i", inPath,
-        "-map", "0:v:0", "-map", "0:a:0?",
-        ...videoArgs, ...audioArgs,
+        "-protocol_whitelist",
+        "file",
+        "-format_whitelist",
+        "mov,matroska,webm",
+        "-i",
+        inPath,
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a:0?",
+        ...videoArgs,
+        ...audioArgs,
         "-movflags", "+faststart",
         outPath,
       ],
@@ -150,12 +199,20 @@ export async function transcodeToMp4(
       const audio = output.streams?.find((stream) => stream.codec_type === "audio");
       const [num, den] = (video?.avg_frame_rate ?? "").split("/").map(Number);
       const duration = Number(output.format?.duration);
-      if (!video || video.codec_name !== "h264" || video.pix_fmt !== "yuv420p" ||
-        video.width !== w || video.height !== h || !den || Math.abs(num / den - fps) > 0.05 ||
-        !Number.isFinite(duration) || duration <= 0 ||
+      if (
+        !video ||
+        video.codec_name !== "h264" ||
+        video.pix_fmt !== "yuv420p" ||
+        video.width !== w ||
+        video.height !== h ||
+        !den ||
+        Math.abs(num / den - fps) > 0.05 ||
+        !Number.isFinite(duration) ||
+        duration <= 0 ||
         (Number.isFinite(sourceDuration) && Math.abs(sourceDuration - duration) > 0.25) ||
         (source?.streams?.some((stream) => stream.codec_type === "audio") &&
-          (!audio || audio.codec_name !== "aac" || audio.sample_rate !== "48000"))) {
+          (!audio || audio.codec_name !== "aac" || audio.sample_rate !== "48000"))
+      ) {
         throw new Error("Final MP4 does not match the export settings");
       }
     }

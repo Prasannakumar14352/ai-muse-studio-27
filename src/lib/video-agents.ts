@@ -40,7 +40,9 @@ import { detectScene, buildDynamicVideoPrompt, type SceneKind, type DynamicActiv
 import { runShotPool } from "@/lib/video-shot-runner";
 import {
   createJob, getJob, saveJob, saveShotBlob, loadShotObjectURL,
-  motionSourceObjectURL, type JobRecord, type ShotRecord,
+  motionSourceObjectURL,
+  type JobRecord,
+  type ShotRecord,
 } from "@/lib/video-job-store";
 import {
   directBeatPrompt, buildContinuityCard, STYLE_PRESETS, cinematicStyleFor, type CinematicStyleId,
@@ -825,7 +827,14 @@ async function fetchMotionClip(
   beatSeconds: number,
   tier: VideoMotionModelId,
   signal?: AbortSignal,
-  advanced?: { jobId: string; shotId: string; revision?: number; aspectRatio: string; resolution: VeoResolution; nativeAudio: boolean },
+  advanced?: {
+    jobId: string;
+    shotId: string;
+    revision?: number;
+    aspectRatio: string;
+    resolution: VeoResolution;
+    nativeAudio: boolean;
+  },
 ): Promise<Blob | null> {
   try {
     const start = await authFetch("/api/generate-video-clip", {
@@ -834,7 +843,12 @@ async function fetchMotionClip(
       body: JSON.stringify({ image, prompt, beatSeconds, model: tier, ...advanced }),
       signal,
     });
-    const job = (await start.json().catch(() => ({}))) as { ok?: boolean; token?: string; assetId?: string; reason?: string };
+    const job = (await start.json().catch(() => ({}))) as {
+      ok?: boolean;
+      token?: string;
+      assetId?: string;
+      reason?: string;
+    };
     if (!start.ok || !job.ok || (!job.token && !job.assetId)) {
       if (advanced) throw new Error(job.reason ?? "Could not start Veo");
       console.warn("[motion] clip not started:", job.reason ?? start.status);
@@ -1054,7 +1068,12 @@ export const VoiceoverAgent = {
     script: AiVideoScript,
     onProgress?: (done: number, total: number) => void,
   ): Promise<VoiceoverClip[]> {
-    if (brief.sceneAudioSource === "native" || brief.audio?.voiceoverEnabled === false || briefVoiceLanguage(brief) === "none") return [];
+    if (
+      brief.sceneAudioSource === "native" ||
+      brief.audio?.voiceoverEnabled === false ||
+      briefVoiceLanguage(brief) === "none"
+    )
+      return [];
     const ctx = new AudioContext();
     if (ctx.state === "suspended") await ctx.resume().catch(() => {});
     const total = script.scenes.length;
@@ -1185,6 +1204,7 @@ export async function persistReviewAudio(jobId: string, bundle: AssetGenerationB
   if (!job) return;
   job.audioTracks = mergeSavedAudio(job.audioTracks, bundle.audioTracks);
   job.audioMixSettings = bundle.brief.audio;
+  job.exportSettings = bundle.brief.exportSettings;
   job.nativeAudioSettings = {
     sceneAudioSource: bundle.brief.sceneAudioSource,
     nativeAudioVolume: bundle.brief.nativeAudioVolume,
@@ -1991,8 +2011,11 @@ async function generateOneShot(
   if (veo || shot.blobKey == null) {
     const cached = await motionSourceObjectURL(jobId, sourceSlot);
     if (cached) {
-      try { img = await blobToDataUrl(await dataUrlToBlob(cached)); }
-      finally { URL.revokeObjectURL(cached); }
+      try {
+        img = await blobToDataUrl(await dataUrlToBlob(cached));
+      } finally {
+        URL.revokeObjectURL(cached);
+      }
     }
   }
   if (!img && characterRef && shot.hasCharacter !== false) {
@@ -2022,7 +2045,8 @@ async function generateOneShot(
         cinematicStyleFor(brief.style) ? shot.prompt.split(", composed on", 1)[0] : undefined,
         [
           brief.visualInstructions,
-          veo && brief.sceneAudioSource === "hybrid" &&
+          veo &&
+            brief.sceneAudioSource === "hybrid" &&
             "Use scene ambience and physical sounds. Avoid speech and music for the separate soundtrack.",
           cinematicStyleFor(brief.style) &&
             "Preserve physical contact, costume, identity and lighting. Keep foreground and background motion consistent with the camera.",
@@ -2031,11 +2055,16 @@ async function generateOneShot(
       TARGET_BEAT_SEC,
       brief.motionModel ?? brief.motionTier ?? "standard",
       signal,
-      veo ? {
-        jobId, shotId: shot.id, revision: shot.motionRevision,
-        aspectRatio: brief.aspectRatio, resolution: brief.veoResolution ?? "720p",
-        nativeAudio: brief.sceneAudioSource === "native" || brief.sceneAudioSource === "hybrid",
-      } : undefined,
+      veo
+        ? {
+            jobId,
+            shotId: shot.id,
+            revision: shot.motionRevision,
+            aspectRatio: brief.aspectRatio,
+            resolution: brief.veoResolution ?? "720p",
+            nativeAudio: brief.sceneAudioSource === "native" || brief.sceneAudioSource === "hybrid",
+          }
+        : undefined,
     );
     if (clipBlob) {
       const key = await saveShotBlob(jobId, shot.id, clipBlob);
@@ -2562,7 +2591,11 @@ async function runAssetGenerationPhaseInner(
     job.audioPlanSettings = JSON.stringify(brief.audio ?? {});
   }
 
-  brief = { ...brief, ...job.nativeAudioSettings };
+  brief = {
+    ...brief,
+    ...job.nativeAudioSettings,
+    exportSettings: job.exportSettings ?? brief.exportSettings,
+  };
 
   // -------- Stop at asset review gate --------
   job.phase = "asset_review";
@@ -2594,7 +2627,10 @@ export type RenderPhaseOptions = Pick<JobRunOptions, "onEvent" | "signal"> & {
   skipMp4?: boolean;
   acceptStillFallback?: boolean;
   exportSettings?: VideoExportSettings;
-  reuseMetadata?: Pick<PipelineResult, "thumbnail" | "seo" | "titles" | "hook" | "intro" | "curiosity" | "retention" | "chapters">;
+  reuseMetadata?: Pick<
+    PipelineResult,
+    "thumbnail" | "seo" | "titles" | "hook" | "intro" | "curiosity" | "retention" | "chapters"
+  >;
 };
 
 export async function runRenderPhase(
@@ -2717,7 +2753,12 @@ async function runRenderPhaseInner(
   // Convert the browser recording (720p WebM, no duration header) into a
   // 1080p H.264 MP4 on the server — what Instagram / Shorts expect. Keeps the
   // original if conversion isn't available.
-  if (render.blob && render.blob.size > 0 && !opts.skipMp4 && opts.exportSettings?.format !== "webm") {
+  if (
+    render.blob &&
+    render.blob.size > 0 &&
+    !opts.skipMp4 &&
+    opts.exportSettings?.format !== "webm"
+  ) {
     const shape = brief.aspectRatio === "16:9" ? "landscape" : brief.aspectRatio === "1:1" ? "square" : "vertical";
     const mp4 = await convertBlobToMp4(render.blob, shape, opts.exportSettings).catch(() => null);
     if (mp4 && mp4.size > 0) {
@@ -2728,22 +2769,24 @@ async function runRenderPhaseInner(
       render.extension = "mp4";
       render.size_bytes = mp4.size;
     } else {
-      if (opts.exportSettings) throw new Error("MP4 encoding or validation failed. Retry on an FFmpeg-enabled host or choose WebM.");
+      if (opts.exportSettings)
+        throw new Error(
+          "MP4 encoding or validation failed. Retry on an FFmpeg-enabled host or choose WebM.",
+        );
       console.warn("[video-pipeline] MP4 conversion unavailable; keeping the browser recording");
     }
   }
 
   const existing = opts.reuseMetadata;
-  const thumbnail = existing?.thumbnail ?? await ThumbnailAgent.run(brief, script);
-  const seo = existing?.seo ?? await SeoAgent.run(brief, script, timeline);
-  const [titles, hook] = existing ? [existing.titles, existing.hook] : await Promise.all([
-    TitleOptimizerAgent.run(brief, research),
-    HookAgent.run(brief, research),
-  ]);
-  const intro = existing?.intro ?? await IntroAgent.run(brief, script);
-  const curiosity = existing?.curiosity ?? await CuriosityLoopAgent.run(script);
-  const retention = existing?.retention ?? await RetentionAgent.run(brief, script, curiosity);
-  const chapters = existing?.chapters ?? await ChapterAgent.run(brief, script);
+  const thumbnail = existing?.thumbnail ?? (await ThumbnailAgent.run(brief, script));
+  const seo = existing?.seo ?? (await SeoAgent.run(brief, script, timeline));
+  const [titles, hook] = existing
+    ? [existing.titles, existing.hook]
+    : await Promise.all([TitleOptimizerAgent.run(brief, research), HookAgent.run(brief, research)]);
+  const intro = existing?.intro ?? (await IntroAgent.run(brief, script));
+  const curiosity = existing?.curiosity ?? (await CuriosityLoopAgent.run(script));
+  const retention = existing?.retention ?? (await RetentionAgent.run(brief, script, curiosity));
+  const chapters = existing?.chapters ?? (await ChapterAgent.run(script));
 
   validatePipelineDuration({
     requestedSec: brief.duration,

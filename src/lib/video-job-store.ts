@@ -1,3 +1,4 @@
+import type { VideoExportSettings } from "./video-export";
 import type { SceneAudioSource } from "./advanced-video-models";
 import type { PlannedAudio } from "./audio-plan";
 import type { AudioSettings } from "./audio-generation";
@@ -73,6 +74,7 @@ export type JobRecord = {
   characterRefKey?: string | null;
   audioTracks?: PlannedAudio[];
   audioMixSettings?: AudioSettings;
+  exportSettings?: VideoExportSettings;
   nativeAudioSettings?: {
     sceneAudioSource?: SceneAudioSource;
     nativeAudioVolume?: number;

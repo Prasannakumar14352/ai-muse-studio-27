@@ -1,4 +1,9 @@
-import { browserExportSchema, exportDimensions, exportEncoding, type VideoExportSettings } from "./video-export";
+import {
+  browserExportSchema,
+  exportDimensions,
+  exportEncoding,
+  type VideoExportSettings,
+} from "./video-export";
 import { scheduleAudioMix, type MixAsset } from "./audio-mixer";
 import type { AudioSettings } from "./audio-generation";
 // Client-side video renderer: draws each scene onto a canvas and records with
@@ -289,7 +294,10 @@ function drawScene(
   media: Drawable,
   scene: RenderScene,
   opts: {
-    progress: number; accent: string; showOnScreenText?: boolean; fit?: "fit" | "crop";
+    progress: number;
+    accent: string;
+    showOnScreenText?: boolean;
+    fit?: "fit" | "crop";
   },
 ) {
   const { width: W, height: H } = ctx.canvas;
@@ -331,13 +339,16 @@ function drawScene(
   const size = drawableSize(media);
   if (media && size.w > 0 && size.h > 0) {
     const fitting = opts.fit === "fit";
-    const ratio = fitting ? Math.min(W / size.w, H / size.h) * Math.min(1, scale)
+    const ratio = fitting
+      ? Math.min(W / size.w, H / size.h) * Math.min(1, scale)
       : Math.max(W / size.w, H / size.h) * scale;
     const dw = size.w * ratio;
     const dh = size.h * ratio;
-    const dx = fitting ? Math.max(0, Math.min(W - dw, (W - dw) / 2 + panX * W))
+    const dx = fitting
+      ? Math.max(0, Math.min(W - dw, (W - dw) / 2 + panX * W))
       : (W - dw) / 2 + panX * W;
-    const dy = fitting ? Math.max(0, Math.min(H - dh, (H - dh) / 2 + panY * H))
+    const dy = fitting
+      ? Math.max(0, Math.min(H - dh, (H - dh) / 2 + panY * H))
       : (H - dh) / 2 + panY * H;
     if (!fitting && (rotate !== 0 || skewX !== 0)) {
       ctx.save();
@@ -468,7 +479,11 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
     opts.platform === "tiktok" ||
     opts.platform === "instagram";
   const settings = opts.exportSettings ? browserExportSchema.parse(opts.exportSettings) : undefined;
-  const [W, H] = settings ? exportDimensions(settings.resolution, settings.aspectRatio) : isVertical ? [720, 1280] : [1280, 720];
+  const [W, H] = settings
+    ? exportDimensions(settings.resolution, settings.aspectRatio)
+    : isVertical
+      ? [720, 1280]
+      : [1280, 720];
   const fps = settings?.fps ?? opts.fps ?? 30;
   const encoding = settings ? exportEncoding(settings) : undefined;
 
@@ -601,7 +616,9 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   videoStream.getVideoTracks().forEach((t) => combined.addTrack(t));
   if (audioDest) audioDest.stream.getAudioTracks().forEach((t) => combined.addTrack(t));
 
-  const { mime, ext } = pickRecorderMime(settings?.format === "webm" ? "webm" : opts.preferredContainer);
+  const { mime, ext } = pickRecorderMime(
+    settings?.format === "webm" ? "webm" : opts.preferredContainer,
+  );
   LOG("start recording", { mime, ext, W, H, fps, beats: beatCount, totalDuration, hasAudio });
   if (settings?.format === "webm" && ext !== "webm") {
     combined.getTracks().forEach((track) => track.stop());
@@ -619,7 +636,10 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
 
   drawScene(ctx, sceneMedia[0] ?? fallbackImg, opts.scenes[0], {
-    progress: 0, accent: style.accent, showOnScreenText: settings?.subtitles ?? opts.showOnScreenText, fit: settings?.fit,
+    progress: 0,
+    accent: style.accent,
+    showOnScreenText: settings?.subtitles ?? opts.showOnScreenText,
+    fit: settings?.fit,
   });
   requestFrame();
 
@@ -693,7 +713,10 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       }
       playIfClip(sceneIdx);
       drawScene(ctx, sceneMedia[sceneIdx] ?? fallbackImg, opts.scenes[sceneIdx], {
-        progress: localProgress, accent: style.accent, showOnScreenText: settings?.subtitles ?? opts.showOnScreenText, fit: settings?.fit,
+        progress: localProgress,
+        accent: style.accent,
+        showOnScreenText: settings?.subtitles ?? opts.showOnScreenText,
+        fit: settings?.fit,
       });
       requestFrame();
       opts.onProgress?.(clamped / totalDuration);

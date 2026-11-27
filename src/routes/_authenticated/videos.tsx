@@ -1,6 +1,14 @@
 import { ExportSettings } from "@/components/video-studio/ExportSettings";
 import { defaultVideoExport, type VideoExportSettings } from "@/lib/video-export";
-import { ADVANCED_VIDEO_MODELS, advancedClipQuote, isAdvancedVideoModel, veoSecondsFor, type SceneAudioSource, type AdvancedVideoModelId, type VeoResolution } from "@/lib/advanced-video-models";
+import {
+  ADVANCED_VIDEO_MODELS,
+  advancedClipQuote,
+  isAdvancedVideoModel,
+  veoSecondsFor,
+  type SceneAudioSource,
+  type AdvancedVideoModelId,
+  type VeoResolution,
+} from "@/lib/advanced-video-models";
 import { persistReviewAudio, previewReviewAudio } from "@/lib/video-agents";
 import { AudioSettingsPanel } from "@/components/video-studio/AudioSettingsPanel";
 import { generateAudio, requestAudio } from "@/lib/audio-client";
@@ -567,17 +575,29 @@ function VideosPage() {
     const baseBrief = assetsBundle?.brief ?? gen.brief;
     const model = baseBrief.motionModel;
     const shot = dash.shots.find((item) => item.id === shotId);
-    const newVeoRevision = !fallback && isAdvancedVideoModel(model) &&
-      (shot?.status === "done" || /Veo generation failed|Veo rejected|Credit reservation rejected/.test(shot?.error ?? ""));
-    const credits = fallback ? motionClipCredits("standard", 3.5) :
-      newVeoRevision && isAdvancedVideoModel(model)
-        ? advancedClipQuote(model, veoSecondsFor(3.5), (baseBrief.sceneAudioSource === "native" || baseBrief.sceneAudioSource === "hybrid")).totalCredits
+    const newVeoRevision =
+      !fallback &&
+      isAdvancedVideoModel(model) &&
+      (shot?.status === "done" ||
+        /Veo generation failed|Veo rejected|Credit reservation rejected/.test(shot?.error ?? ""));
+    const credits = fallback
+      ? motionClipCredits("standard", 3.5)
+      : newVeoRevision && isAdvancedVideoModel(model)
+        ? advancedClipQuote(
+            model,
+            veoSecondsFor(3.5),
+            baseBrief.sceneAudioSource === "native" || baseBrief.sceneAudioSource === "hybrid",
+          ).totalCredits
         : null;
-    if (credits !== null && !(await confirmDialog({
-      title: fallback ? "Use MiniMax for this shot?" : "Generate a new Veo clip?",
-      description: `This clip costs ${credits} motion credits. Other shots stay as they are.`,
-      confirmText: "Generate clip",
-    }))) return;
+    if (
+      credits !== null &&
+      !(await confirmDialog({
+        title: fallback ? "Use MiniMax for this shot?" : "Generate a new Veo clip?",
+        description: `This clip costs ${credits} motion credits. Other shots stay as they are.`,
+        confirmText: "Generate clip",
+      }))
+    )
+      return;
     const brief: VideoBrief = fallback
       ? { ...baseBrief, motionModel: "standard", motionTier: "standard" }
       : baseBrief;
@@ -944,12 +964,14 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
   const [veoReady, setVeoReady] = useState(false);
   const [veoResolution, setVeoResolution] = useState<VeoResolution>("720p");
   const [sceneAudioSource, setSceneAudioSource] = useState<SceneAudioSource>("separate");
-  const [exportSettings, setExportSettings] = useState<VideoExportSettings>(() => defaultVideoExport(ratio));
+  const [exportSettings, setExportSettings] = useState<VideoExportSettings>(() =>
+    defaultVideoExport(ratio),
+  );
 
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/generate-video-clip", { signal: controller.signal })
-      .then((response) => response.ok ? response.json() : null)
+      .then((response) => (response.ok ? response.json() : null))
       .then((capabilities) => setVeoReady(capabilities?.veo === true))
       .catch(() => {});
     return () => controller.abort();
@@ -991,9 +1013,15 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     if (mode === "script") return submitScript();
     if (!title.trim()) return toast.error("Enter a video title or idea");
     if (isCustom && !customNiche.trim()) return toast.error("Describe your custom niche or topic area");
-    if (veo && motionMode !== "off" && ratio === "1:1") return toast.error("Veo supports landscape or portrait. Choose a different aspect ratio or motion model.");
-    if (!(veo && motionMode !== "off" && sceneAudioSource === "native") &&
-      audio?.voiceoverEnabled !== false && needsVoiceChoice(language, voiceLanguage))
+    if (veo && motionMode !== "off" && ratio === "1:1")
+      return toast.error(
+        "Veo supports landscape or portrait. Choose a different aspect ratio or motion model.",
+      );
+    if (
+      !(veo && motionMode !== "off" && sceneAudioSource === "native") &&
+      audio?.voiceoverEnabled !== false &&
+      needsVoiceChoice(language, voiceLanguage)
+    )
       return toast.error("Choose a voice language (or no voiceover) for this language first.");
     onGenerate({
       brief: {
@@ -1017,9 +1045,15 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     const text = script.trim();
     if (!text) return toast.error("Paste your script first");
     if (text.length > SCRIPT_MAX_CHARS) return toast.error(`Scripts can be up to ${SCRIPT_MAX_CHARS.toLocaleString()} characters`);
-    if (veo && motionMode !== "off" && ratio === "1:1") return toast.error("Veo supports landscape or portrait. Choose a different aspect ratio or motion model.");
-    if (!(veo && motionMode !== "off" && sceneAudioSource === "native") &&
-      audio?.voiceoverEnabled !== false && needsVoiceChoice(language, voiceLanguage))
+    if (veo && motionMode !== "off" && ratio === "1:1")
+      return toast.error(
+        "Veo supports landscape or portrait. Choose a different aspect ratio or motion model.",
+      );
+    if (
+      !(veo && motionMode !== "off" && sceneAudioSource === "native") &&
+      audio?.voiceoverEnabled !== false &&
+      needsVoiceChoice(language, voiceLanguage)
+    )
       return toast.error("Choose a voice language (or no voiceover) for this language first.");
     const firstLine = splitScriptIntoLines(text)[0] ?? "My video";
     const videoTitle = (scriptTitle.trim() || firstLine).slice(0, 100);
@@ -1057,21 +1091,31 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
     // Same-character scenes use HD images (8 instead of 1) for ~70% of shots, plus one portrait.
     const extra = sameCharacter ? Math.round(base.scenes * 0.7) * 7 + 8 : 0;
     const useVeo = Boolean(veo && motionMode !== "off");
-    const veoQuote = veo && useVeo ? advancedClipQuote(veo, veoSecondsFor(3.5), sceneAudioSource !== "separate") : undefined;
-    const motion = motionMode === "off" ? 0 :
-      veoQuote ? veoQuote.motionCredits * motionEstimate.clips : motionEstimate.credits;
+    const veoQuote =
+      veo && useVeo
+        ? advancedClipQuote(veo, veoSecondsFor(3.5), sceneAudioSource !== "separate")
+        : undefined;
+    const motion =
+      motionMode === "off"
+        ? 0
+        : veoQuote
+          ? veoQuote.motionCredits * motionEstimate.clips
+          : motionEstimate.credits;
     const nativeMotion = (veoQuote?.nativeAudioCredits ?? 0) * motionEstimate.clips;
     const audioCredits = audioCreditBreakdown(audio ?? {}, effDuration);
     const nativeOnly = useVeo && sceneAudioSource === "native";
     if (nativeOnly) Object.assign(audioCredits, { music: 0, sfx: 0, ambience: 0 });
     const paidAudio = audioCredits.music + audioCredits.sfx + audioCredits.ambience;
-    const withoutVoice = nativeOnly || voiceLanguage === "none" || audio?.voiceoverEnabled === false;
+    const withoutVoice =
+      nativeOnly || voiceLanguage === "none" || audio?.voiceoverEnabled === false;
     return {
-      total: base.total + extra + motion + nativeMotion + paidAudio - (withoutVoice ? base.voice : 0),
+      total:
+        base.total + extra + motion + nativeMotion + paidAudio - (withoutVoice ? base.voice : 0),
       parts: withoutVoice ? `1 script + ${base.scenes} scene images` : base.parts,
       extra,
       motion,
-      audioCredits, nativeMotion,
+      audioCredits,
+      nativeMotion,
     };
   })();
   const { data: access } = useAccess();
@@ -1380,8 +1424,15 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
             <div className="glass rounded-xl p-3 border border-border space-y-2">
               <div className="flex flex-wrap gap-2">
                 {(["standard", "premium"] as MotionTier[]).map((t) => (
-                  <button key={t} type="button" onClick={() => { setMotionTier(t); setVeo(undefined); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs border ${!veo && motionTier === t ? "gradient-primary text-white border-transparent" : "glass border-border"}`}>
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => {
+                        setMotionTier(t);
+                        setVeo(undefined);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs border ${!veo && motionTier === t ? "gradient-primary text-white border-transparent" : "glass border-border"}`}
+                    >
                       {t === "standard"
                         ? "MiniMax H3 Turbo — Economical"
                         : "Kling 2.5 Turbo Pro — Premium"}{" "}
@@ -1397,32 +1448,54 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
                       onClick={() => setVeo(id as AdvancedVideoModelId)}
                       className="rounded-lg border px-3 py-1.5 text-xs aria-pressed:border-primary disabled:opacity-60"
                     >
-                      {model.label}{veoReady ? "" : " (unavailable)"}
+                      {model.label}
+                      {veoReady ? "" : " (unavailable)"}
                   </button>
                 ))}
               </div>
-              {veo && (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="grid gap-1 text-sm">Source resolution
-                    <select className="rounded border bg-background p-2" value={veoResolution}
-                      onChange={(event) => setVeoResolution(event.target.value as VeoResolution)}>
-                      <option value="720p">720p</option><option value="1080p">1080p</option>
-                    </select>
-                  </label>
-                  <label className="grid gap-1 text-sm">Audio source
-                    <select className="rounded border bg-background p-2" value={sceneAudioSource}
-                      onChange={(event) => setSceneAudioSource(event.target.value as SceneAudioSource)}>
-                      <option value="separate">Separate soundtrack</option>
-                      <option value="native">Native clip audio only</option>
-                      <option value="hybrid">Hybrid</option>
-                    </select>
-                  </label>
-                  {ratio === "1:1" && <p className="text-sm text-rose-400">Veo requires landscape or portrait.</p>}
-                </div>
-              )}
+                {veo && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="grid gap-1 text-sm">
+                      Source resolution
+                      <select
+                        className="rounded border bg-background p-2"
+                        value={veoResolution}
+                        onChange={(event) => setVeoResolution(event.target.value as VeoResolution)}
+                      >
+                        <option value="720p">720p</option>
+                        <option value="1080p">1080p</option>
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      Audio source
+                      <select
+                        className="rounded border bg-background p-2"
+                        value={sceneAudioSource}
+                        onChange={(event) =>
+                          setSceneAudioSource(event.target.value as SceneAudioSource)
+                        }
+                      >
+                        <option value="separate">Separate soundtrack</option>
+                        <option value="native">Native clip audio only</option>
+                        <option value="hybrid">Hybrid</option>
+                      </select>
+                    </label>
+                    {ratio === "1:1" && (
+                      <p className="text-sm text-rose-400">Veo requires landscape or portrait.</p>
+                    )}
+                  </div>
+                )}
               <div className="text-[11px] text-muted-foreground">
-                {veo ? ADVANCED_VIDEO_MODELS[veo].label : MOTION_MODELS[motionTier].label}. {motionEstimate.clips} clip{motionEstimate.clips === 1 ? "" : "s"} ≈ <span className="text-foreground font-medium">{estimate.motion + estimate.nativeMotion} credits</span> on top of the video.
-                {" "}Clips are made 4 at a time and each takes 1–3 minutes{motionEstimate.clips > 12 ? ` — expect roughly ${Math.ceil(motionEstimate.clips / 4) * 2} minutes extra` : ""}. Keep this tab open until it finishes. Review failed clips before rendering.
+                  {veo ? ADVANCED_VIDEO_MODELS[veo].label : MOTION_MODELS[motionTier].label}.{" "}
+                  {motionEstimate.clips} clip{motionEstimate.clips === 1 ? "" : "s"} ≈{" "}
+                  <span className="text-foreground font-medium">
+                    {estimate.motion + estimate.nativeMotion} credits
+                  </span>{" "}
+                  on top of the video. Clips are made 4 at a time and each takes 1–3 minutes
+                  {motionEstimate.clips > 12
+                    ? ` — expect roughly ${Math.ceil(motionEstimate.clips / 4) * 2} minutes extra`
+                    : ""}
+                  . Keep this tab open until it finishes. Review failed clips before rendering.
               </div>
             </div>
           )}
@@ -1431,7 +1504,11 @@ function InputScreen({ onGenerate, initialTopic, initialRatio, initialVideoType,
 
       </div>
 
-      <ExportSettings value={{ ...exportSettings, aspectRatio: ratio }} onChange={setExportSettings} duration={effDuration} />
+      <ExportSettings
+        value={{ ...exportSettings, aspectRatio: ratio }}
+        onChange={setExportSettings}
+        duration={effDuration}
+      />
 
       {/* Summary + cost — stays in view while scrolling on desktop */}
       <div className="lg:sticky lg:top-20 space-y-4">
@@ -1649,8 +1726,9 @@ function AssetReviewGate({
   const [replaceFor, setReplaceFor] = useState<{ id: string; index: number } | null>(null);
   const viewable = useMemo(() => shots.filter((s) => s.previewUrl), [shots]);
   const [acceptStillFallback, setAcceptStillFallback] = useState(false);
-  const [exportSettings, setExportSettings] = useState(() =>
-    bundle.brief.exportSettings ?? defaultVideoExport(bundle.brief.aspectRatio));
+  const [exportSettings, setExportSettings] = useState(
+    () => bundle.brief.exportSettings ?? defaultVideoExport(bundle.brief.aspectRatio),
+  );
 
   const hasStillFallback =
     bundle.brief.motionMode === "full" &&
@@ -1730,7 +1808,11 @@ function AssetReviewGate({
 
   async function handleRegen(id: string, fallback = false) {
     setBusyId(id);
-    try { await onRegenerate(id, fallback); } finally { setBusyId(null); }
+    try {
+      await onRegenerate(id, fallback);
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
@@ -1767,10 +1849,14 @@ function AssetReviewGate({
         </div>
       </div>
 
-      <ExportSettings value={exportSettings} onChange={(settings) => {
-        setExportSettings(settings);
-        updateBrief({ exportSettings: settings });
-      }} duration={bundle.brief.duration} />
+      <ExportSettings
+        value={exportSettings}
+        onChange={(settings) => {
+          setExportSettings(settings);
+          updateBrief({ exportSettings: settings });
+        }}
+        duration={bundle.brief.duration}
+      />
       {hasStillFallback && (
         <label className="flex items-center gap-2 rounded-xl border border-border p-4 text-sm">
           <input
@@ -1971,10 +2057,20 @@ function AssetReviewGate({
                   </div>
                 </button>
                 <div className="p-2.5 space-y-1.5">
-                  {s.error && <p role="alert" className="text-xs text-rose-400">{s.error}</p>}
+                  {s.error && (
+                    <p role="alert" className="text-xs text-rose-400">
+                      {s.error}
+                    </p>
+                  )}
                   {s.status === "failed" && isAdvancedVideoModel(bundle.brief.motionModel) && (
-                    <button type="button" className="text-xs underline" disabled={busyId !== null}
-                      onClick={() => void handleRegen(s.id, true)}>Use MiniMax for this shot</button>
+                    <button
+                      type="button"
+                      className="text-xs underline"
+                      disabled={busyId !== null}
+                      onClick={() => void handleRegen(s.id, true)}
+                    >
+                      Use MiniMax for this shot
+                    </button>
                   )}
                   {s.kind === "clip" && audioSource !== "separate" && (
                     <label className="flex items-center gap-1 text-xs">

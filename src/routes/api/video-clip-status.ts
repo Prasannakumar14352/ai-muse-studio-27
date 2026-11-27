@@ -21,7 +21,10 @@ export const Route = createFileRoute("/api/video-clip-status")({
             const { pollVeoClip } = await import("@/lib/veo-motion.server");
             return await pollVeoClip(userId, body.assetId);
           } catch {
-            return Response.json({ state: "pending", note: "Clip delivery suspended; retry status" });
+            return Response.json({
+              state: "pending",
+              note: "Clip delivery suspended; retry status",
+            });
           }
         }
         const token = typeof body?.token === "string" ? body.token : "";
