@@ -36,8 +36,20 @@ export const listProviderAvailability = createServerFn({ method: "GET" }).handle
 // Kick off OAuth: return the provider's auth URL. Browser will navigate there.
 export const startOAuth = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ platform: platformSchema }).parse(d))
+  .inputValidator((d) => z.object({
+    platform: platformSchema,
+    /** "dm" asks for the extra messaging permissions Auto DM needs (Instagram / Facebook only). */
+    purpose: z.enum(["publish", "dm"]).default("publish"),
+  }).parse(d))
   .handler(async ({ data, context }) => {
+    const isDm = data.purpose === "dm";
+    if (isDm && data.platform !== "instagram" && data.platform !== "facebook") {
+      throw new Error("Auto DM supports Instagram and Facebook only.");
+    }
+    if (isDm) {
+      const { assertFeature } = await import("./plan-access.server");
+      await assertFeature(context.userId, "auto_dm");
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const providerId = PLATFORM_TO_PROVIDER[data.platform];
     const { data: cfg } = await supabaseAdmin.from("oauth_provider_configs")
@@ -53,11 +65,16 @@ export const startOAuth = createServerFn({ method: "POST" })
     const redirectUri = callbackUrl(origin, data.platform);
 
     await supabaseAdmin.from("oauth_states").insert({
-      state, user_id: context.userId, platform: data.platform, redirect_to: `${origin}/connections`,
+      state, user_id: context.userId, platform: data.platform,
+      redirect_to: `${origin}/${isDm ? "auto-dm" : "connections"}`, purpose: data.purpose,
     } as never);
 
     const spec = PROVIDERS[providerId];
-    const scopes = spec.scopes[data.platform];
+    let scopes = spec.scopes[data.platform];
+    if (isDm) {
+      const { DM_SCOPES } = await import("./auto-dm.server");
+      scopes = Array.from(new Set([...scopes, ...DM_SCOPES[data.platform as "instagram" | "facebook"]]));
+    }
     const params = new URLSearchParams({
       client_id: cfg.client_id as string,
       redirect_uri: redirectUri,

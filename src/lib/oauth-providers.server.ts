@@ -138,7 +138,7 @@ export async function fetchProfile(platform: PlatformId, accessToken: string): P
   accountLabel: string;
   avatarUrl?: string;
   profileUrl?: string;
-  accounts?: Array<{ id: string; label: string; avatarUrl?: string; kind: string; profileUrl?: string }>;
+  accounts?: Array<{ id: string; label: string; avatarUrl?: string; kind: string; profileUrl?: string; pageId?: string }>;
 }> {
   if (platform === "youtube") {
     const r = await fetch(
@@ -203,6 +203,7 @@ export async function fetchProfile(platform: PlatformId, accessToken: string): P
     label: p.instagram_business_account!.username ?? p.instagram_business_account!.name ?? p.name,
     avatarUrl: p.instagram_business_account!.profile_picture_url,
     kind: "instagram_business",
+    pageId: p.id,
     profileUrl: p.instagram_business_account!.username ? `https://instagram.com/${p.instagram_business_account!.username}` : undefined,
   }));
   if (igs.length === 0) throw new Error("No Instagram Business account linked to your Facebook Pages.");
@@ -213,4 +214,16 @@ export async function fetchProfile(platform: PlatformId, accessToken: string): P
     profileUrl: `https://instagram.com/${igs[0].label}`,
     accounts: igs,
   };
+}
+
+/** Permissions the user actually granted to a Meta token (Meta grants are cumulative). */
+export async function fetchMetaGrantedScopes(accessToken: string): Promise<string[] | null> {
+  try {
+    const r = await fetch(`${GRAPH}/me/permissions`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const j = (await r.json()) as { data?: Array<{ permission: string; status: string }> };
+    if (!r.ok || !Array.isArray(j.data)) return null;
+    return j.data.filter((x) => x.status === "granted").map((x) => x.permission);
+  } catch {
+    return null;
+  }
 }

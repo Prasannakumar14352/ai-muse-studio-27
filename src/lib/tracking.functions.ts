@@ -45,7 +45,7 @@ export const recordAttribution = createServerFn({ method: "POST" })
   });
 
 const EVENTS = [
-  "pricing_view", "credits_exhausted", "series_interest",
+  "pricing_view", "credits_exhausted", "series_interest", "auto_dm_interest",
   // "Notify me" clicks on the coming-soon AI Tools page (one event per tool,
   // because events are de-duplicated per user per event per day).
   "tool_subtitles_interest", "tool_bg_remove_interest", "tool_upscale_interest",

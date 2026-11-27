@@ -138,6 +138,13 @@ export const FEATURES: FeatureDef[] = [
     group: "page",
   },
   {
+    id: "auto_dm",
+    label: "Auto DM (Instagram / Facebook)",
+    paths: ["/auto-dm"],
+    defaultTier: "creator",
+    group: "page",
+  },
+  {
     id: "connections",
     label: "Connections (auto-publish)",
     paths: ["/connections"],

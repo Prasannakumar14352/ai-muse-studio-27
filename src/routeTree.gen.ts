@@ -23,6 +23,7 @@ import { Route as AuthenticatedAdCreativesRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAgentsRouteImport } from './routes/_authenticated/agents'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
+import { Route as AuthenticatedAutoDmRouteImport } from './routes/_authenticated/auto-dm'
 import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticated/billing'
 import { Route as AuthenticatedBrandKitRouteImport } from './routes/_authenticated/brand-kit'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
@@ -75,8 +76,10 @@ import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authentic
 import { Route as AuthenticatedStudioRawIdRouteImport } from './routes/_authenticated/studio.$rawId'
 import { Route as AuthenticatedLinkedinPostsIdEditRouteImport } from './routes/_authenticated/linkedin-posts.$id.edit'
 import { Route as ApiPublicHooksAgentsSchedulerRouteImport } from './routes/api/public/hooks/agents-scheduler'
+import { Route as ApiPublicHooksAutoDmRouteImport } from './routes/api/public/hooks/auto-dm'
 import { Route as ApiPublicHooksPublishScheduledRouteImport } from './routes/api/public/hooks/publish-scheduled'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
+import { Route as ApiPublicWebhooksMetaRouteImport } from './routes/api/public/webhooks/meta'
 import { Route as ApiPublicWebhooksRazorpayRouteImport } from './routes/api/public/webhooks/razorpay'
 import { Route as ApiPublicOauthPlatformCallbackRouteImport } from './routes/api/public/oauth/$platform.callback'
 
@@ -148,6 +151,11 @@ const AuthenticatedAgentsRoute = AuthenticatedAgentsRouteImport.update({
 const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAutoDmRoute = AuthenticatedAutoDmRouteImport.update({
+  id: '/auto-dm',
+  path: '/auto-dm',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedBillingRoute = AuthenticatedBillingRouteImport.update({
@@ -434,6 +442,11 @@ const ApiPublicHooksAgentsSchedulerRoute =
     path: '/api/public/hooks/agents-scheduler',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksAutoDmRoute = ApiPublicHooksAutoDmRouteImport.update({
+  id: '/api/public/hooks/auto-dm',
+  path: '/api/public/hooks/auto-dm',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksPublishScheduledRoute =
   ApiPublicHooksPublishScheduledRouteImport.update({
     id: '/api/public/hooks/publish-scheduled',
@@ -446,6 +459,11 @@ const ApiPublicTelegramWebhookRoute =
     path: '/api/public/telegram/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicWebhooksMetaRoute = ApiPublicWebhooksMetaRouteImport.update({
+  id: '/api/public/webhooks/meta',
+  path: '/api/public/webhooks/meta',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicWebhooksRazorpayRoute =
   ApiPublicWebhooksRazorpayRouteImport.update({
     id: '/api/public/webhooks/razorpay',
@@ -473,6 +491,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/agents': typeof AuthenticatedAgentsRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
+  '/auto-dm': typeof AuthenticatedAutoDmRoute
   '/billing': typeof AuthenticatedBillingRoute
   '/brand-kit': typeof AuthenticatedBrandKitRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -525,8 +544,10 @@ export interface FileRoutesByFullPath {
   '/linkedin-posts/': typeof AuthenticatedLinkedinPostsIndexRoute
   '/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
   '/api/public/hooks/agents-scheduler': typeof ApiPublicHooksAgentsSchedulerRoute
+  '/api/public/hooks/auto-dm': typeof ApiPublicHooksAutoDmRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
+  '/api/public/webhooks/meta': typeof ApiPublicWebhooksMetaRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
   '/api/public/oauth/$platform/callback': typeof ApiPublicOauthPlatformCallbackRoute
 }
@@ -543,6 +564,7 @@ export interface FileRoutesByTo {
   '/ad-creatives': typeof AuthenticatedAdCreativesRoute
   '/agents': typeof AuthenticatedAgentsRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
+  '/auto-dm': typeof AuthenticatedAutoDmRoute
   '/billing': typeof AuthenticatedBillingRoute
   '/brand-kit': typeof AuthenticatedBrandKitRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -594,8 +616,10 @@ export interface FileRoutesByTo {
   '/linkedin-posts': typeof AuthenticatedLinkedinPostsIndexRoute
   '/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
   '/api/public/hooks/agents-scheduler': typeof ApiPublicHooksAgentsSchedulerRoute
+  '/api/public/hooks/auto-dm': typeof ApiPublicHooksAutoDmRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
+  '/api/public/webhooks/meta': typeof ApiPublicWebhooksMetaRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
   '/api/public/oauth/$platform/callback': typeof ApiPublicOauthPlatformCallbackRoute
 }
@@ -615,6 +639,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/agents': typeof AuthenticatedAgentsRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
+  '/_authenticated/auto-dm': typeof AuthenticatedAutoDmRoute
   '/_authenticated/billing': typeof AuthenticatedBillingRoute
   '/_authenticated/brand-kit': typeof AuthenticatedBrandKitRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
@@ -667,8 +692,10 @@ export interface FileRoutesById {
   '/_authenticated/linkedin-posts/': typeof AuthenticatedLinkedinPostsIndexRoute
   '/_authenticated/linkedin-posts/$id/edit': typeof AuthenticatedLinkedinPostsIdEditRoute
   '/api/public/hooks/agents-scheduler': typeof ApiPublicHooksAgentsSchedulerRoute
+  '/api/public/hooks/auto-dm': typeof ApiPublicHooksAutoDmRoute
   '/api/public/hooks/publish-scheduled': typeof ApiPublicHooksPublishScheduledRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
+  '/api/public/webhooks/meta': typeof ApiPublicWebhooksMetaRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
   '/api/public/oauth/$platform/callback': typeof ApiPublicOauthPlatformCallbackRoute
 }
@@ -688,6 +715,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/agents'
     | '/analytics'
+    | '/auto-dm'
     | '/billing'
     | '/brand-kit'
     | '/calendar'
@@ -740,8 +768,10 @@ export interface FileRouteTypes {
     | '/linkedin-posts/'
     | '/linkedin-posts/$id/edit'
     | '/api/public/hooks/agents-scheduler'
+    | '/api/public/hooks/auto-dm'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/telegram/webhook'
+    | '/api/public/webhooks/meta'
     | '/api/public/webhooks/razorpay'
     | '/api/public/oauth/$platform/callback'
   fileRoutesByTo: FileRoutesByTo
@@ -758,6 +788,7 @@ export interface FileRouteTypes {
     | '/ad-creatives'
     | '/agents'
     | '/analytics'
+    | '/auto-dm'
     | '/billing'
     | '/brand-kit'
     | '/calendar'
@@ -809,8 +840,10 @@ export interface FileRouteTypes {
     | '/linkedin-posts'
     | '/linkedin-posts/$id/edit'
     | '/api/public/hooks/agents-scheduler'
+    | '/api/public/hooks/auto-dm'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/telegram/webhook'
+    | '/api/public/webhooks/meta'
     | '/api/public/webhooks/razorpay'
     | '/api/public/oauth/$platform/callback'
   id:
@@ -829,6 +862,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/agents'
     | '/_authenticated/analytics'
+    | '/_authenticated/auto-dm'
     | '/_authenticated/billing'
     | '/_authenticated/brand-kit'
     | '/_authenticated/calendar'
@@ -881,8 +915,10 @@ export interface FileRouteTypes {
     | '/_authenticated/linkedin-posts/'
     | '/_authenticated/linkedin-posts/$id/edit'
     | '/api/public/hooks/agents-scheduler'
+    | '/api/public/hooks/auto-dm'
     | '/api/public/hooks/publish-scheduled'
     | '/api/public/telegram/webhook'
+    | '/api/public/webhooks/meta'
     | '/api/public/webhooks/razorpay'
     | '/api/public/oauth/$platform/callback'
   fileRoutesById: FileRoutesById
@@ -905,8 +941,10 @@ export interface RootRouteChildren {
   ApiVideoClipStatusRoute: typeof ApiVideoClipStatusRoute
   ApiVoiceSampleRoute: typeof ApiVoiceSampleRoute
   ApiPublicHooksAgentsSchedulerRoute: typeof ApiPublicHooksAgentsSchedulerRoute
+  ApiPublicHooksAutoDmRoute: typeof ApiPublicHooksAutoDmRoute
   ApiPublicHooksPublishScheduledRoute: typeof ApiPublicHooksPublishScheduledRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
+  ApiPublicWebhooksMetaRoute: typeof ApiPublicWebhooksMetaRoute
   ApiPublicWebhooksRazorpayRoute: typeof ApiPublicWebhooksRazorpayRoute
   ApiPublicOauthPlatformCallbackRoute: typeof ApiPublicOauthPlatformCallbackRoute
 }
@@ -1009,6 +1047,13 @@ declare module '@tanstack/react-router' {
       path: '/analytics'
       fullPath: '/analytics'
       preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/auto-dm': {
+      id: '/_authenticated/auto-dm'
+      path: '/auto-dm'
+      fullPath: '/auto-dm'
+      preLoaderRoute: typeof AuthenticatedAutoDmRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/billing': {
@@ -1375,6 +1420,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksAgentsSchedulerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/auto-dm': {
+      id: '/api/public/hooks/auto-dm'
+      path: '/api/public/hooks/auto-dm'
+      fullPath: '/api/public/hooks/auto-dm'
+      preLoaderRoute: typeof ApiPublicHooksAutoDmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/publish-scheduled': {
       id: '/api/public/hooks/publish-scheduled'
       path: '/api/public/hooks/publish-scheduled'
@@ -1387,6 +1439,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/telegram/webhook'
       fullPath: '/api/public/telegram/webhook'
       preLoaderRoute: typeof ApiPublicTelegramWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/webhooks/meta': {
+      id: '/api/public/webhooks/meta'
+      path: '/api/public/webhooks/meta'
+      fullPath: '/api/public/webhooks/meta'
+      preLoaderRoute: typeof ApiPublicWebhooksMetaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/webhooks/razorpay': {
@@ -1480,6 +1539,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedAgentsRoute: typeof AuthenticatedAgentsRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
+  AuthenticatedAutoDmRoute: typeof AuthenticatedAutoDmRoute
   AuthenticatedBillingRoute: typeof AuthenticatedBillingRoute
   AuthenticatedBrandKitRoute: typeof AuthenticatedBrandKitRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
@@ -1515,6 +1575,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedAgentsRoute: AuthenticatedAgentsRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
+  AuthenticatedAutoDmRoute: AuthenticatedAutoDmRoute,
   AuthenticatedBillingRoute: AuthenticatedBillingRoute,
   AuthenticatedBrandKitRoute: AuthenticatedBrandKitRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
@@ -1566,8 +1627,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiVideoClipStatusRoute: ApiVideoClipStatusRoute,
   ApiVoiceSampleRoute: ApiVoiceSampleRoute,
   ApiPublicHooksAgentsSchedulerRoute: ApiPublicHooksAgentsSchedulerRoute,
+  ApiPublicHooksAutoDmRoute: ApiPublicHooksAutoDmRoute,
   ApiPublicHooksPublishScheduledRoute: ApiPublicHooksPublishScheduledRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
+  ApiPublicWebhooksMetaRoute: ApiPublicWebhooksMetaRoute,
   ApiPublicWebhooksRazorpayRoute: ApiPublicWebhooksRazorpayRoute,
   ApiPublicOauthPlatformCallbackRoute: ApiPublicOauthPlatformCallbackRoute,
 }

@@ -22,15 +22,24 @@ export const Route = createFileRoute("/api/public/oauth/$platform/callback")({
           const fp = request.headers.get("x-forwarded-proto") ?? "https";
           return fh ? `${fp}://${fh}` : url.origin;
         })();
+        let page = "connections";
         const back = (msg: string, ok = false) =>
-          Response.redirect(`${origin}/connections?${ok ? "ok" : "err"}=${encodeURIComponent(`${platform}:${msg}`)}`, 302);
+          Response.redirect(`${origin}/${page}?${ok ? "ok" : "err"}=${encodeURIComponent(`${platform}:${msg}`)}`, 302);
 
-        if (errorParam) return back(errorParam);
+        if (errorParam) {
+          if (state) {
+            const { data: s } = await supabaseAdmin.from("oauth_states").select("*").eq("state", state).maybeSingle();
+            if ((s as { purpose?: string } | null)?.purpose === "dm") page = "auto-dm";
+            if (s) await supabaseAdmin.from("oauth_states").delete().eq("state", state);
+          }
+          return back(errorParam);
+        }
         if (!code || !state) return back("Missing code or state");
 
         const { data: stateRow, error: stateErr } = await supabaseAdmin
           .from("oauth_states").select("*").eq("state", state).maybeSingle();
         if (stateErr || !stateRow) return back("Invalid or expired state");
+        if ((stateRow as { purpose?: string }).purpose === "dm") page = "auto-dm";
         if (stateRow.platform !== platform) return back("State/platform mismatch");
         await supabaseAdmin.from("oauth_states").delete().eq("state", state);
 
@@ -67,6 +76,11 @@ export const Route = createFileRoute("/api/public/oauth/$platform/callback")({
 
           const profile = await fetchProfile(platform, token.access_token);
           const spec = PROVIDERS[providerId];
+          // For Meta, record what was really granted (grants add up across logins),
+          // so Auto DM can tell whether messaging permissions are present.
+          const granted = providerId === "meta"
+            ? await (await import("@/lib/oauth-providers.server")).fetchMetaGrantedScopes(token.access_token)
+            : null;
 
           const { cipher: accCipher, iv: accIv } = await encryptSecret(token.access_token);
           const refresh = token.refresh_token
@@ -108,14 +122,17 @@ export const Route = createFileRoute("/api/public/oauth/$platform/callback")({
             account_label: a.label,
             avatar_url: a.avatarUrl ?? null,
             profile_url: a.profileUrl ?? null,
-            scopes: spec.scopes[platform],
+            scopes: granted ?? spec.scopes[platform],
             status: "connected",
             expires_at: expiresAt,
             access_token_encrypted: accCipher,
             token_iv: accIv,
             refresh_token_encrypted: refresh.cipher,
             refresh_iv: refresh.iv,
-            metadata: { kind: a.kind, login_account_id: profile.accountId },
+            metadata: {
+              kind: a.kind, login_account_id: profile.accountId,
+              ...("pageId" in a && a.pageId ? { page_id: a.pageId } : {}),
+            },
             last_error: null,
           }));
           // Google only returns a refresh token on some consents; keep the old one otherwise.
@@ -133,7 +150,7 @@ export const Route = createFileRoute("/api/public/oauth/$platform/callback")({
 
           const names = toSave.map((a) => a.label).join(", ");
           const note = skipped > 0 ? ` (${skipped} more skipped: plan limit is ${max})` : "";
-          return Response.redirect(`${origin}/connections?ok=${encodeURIComponent(`${platform}: ${names}${note}`)}`, 302);
+          return Response.redirect(`${origin}/${page}?ok=${encodeURIComponent(`${platform}: ${names}${note}`)}`, 302);
         } catch (e) {
           return back(e instanceof Error ? e.message : "OAuth failed");
         }
