@@ -18,10 +18,63 @@ import {
   reviewPromptQuality,
 } from "./cinematic-engine";
 
+export const CINEMATIC_STYLES = {
+  indian_mythology: {
+    label: "Indian Mythology",
+    description: "Photorealistic Indian epic mythology with respectful depictions, traditional costumes and ornaments, ancient Indian architecture, epic scale, and realistic fabric and skin or fur textures",
+    lighting: "divine golden lighting with volumetric rays",
+    palette: "gold, saffron, and deep ocean blue",
+    lens: "35mm anamorphic",
+    negative: "anachronistic objects unless the story explicitly requests them",
+    continuity: "preserve canonical or user-specified features, including non-human anatomy, ornaments and traditional clothing",
+    music: "divine orchestral instrumental with Indian instrumentation",
+    sound: "scene-specific natural ambience and restrained divine accents",
+    thumbnail: "ancient",
+    accent: "#d97706",
+    renderer: "ancient",
+  },
+  epic_fantasy: {
+    label: "Epic Fantasy",
+    description: "Expansive fantasy landscapes, detailed costumes and creatures, dramatic skies, grounded magical energy and dynamic action compositions",
+    lighting: "dramatic rim light and atmospheric fog",
+    palette: "deep forest green, indigo, and amber",
+    lens: "28mm anamorphic",
+    negative: "inconsistent creature anatomy or arbitrary changes to magical effects",
+    continuity: "lock creature anatomy, silhouette, costume, accessories and magical attributes",
+    music: "epic cinematic adventure instrumental",
+    sound: "environmental textures and action-specific magic or impacts",
+    thumbnail: "cinematic",
+    accent: "#7c3aed",
+    renderer: "cinematic",
+  },
+  photorealistic_cinema: {
+    label: "Photorealistic Cinema",
+    description: "Feature-film photography with natural skin texture, realistic anatomy and motion, environmental detail and cinematic depth of field",
+    lighting: "physically plausible motivated light with natural bounce",
+    palette: "film-inspired natural colors with restrained contrast",
+    lens: "50mm prime",
+    negative: "plastic skin, exaggerated movement or impossible shadows",
+    continuity: "preserve face, build, complexion, hairstyle, costume and accessories across shots",
+    music: "restrained instrumental film score driven by scene emotion",
+    sound: "realistic location ambience and synchronized Foley",
+    thumbnail: "realistic",
+    accent: "#64748b",
+    renderer: "realistic",
+  },
+} as const;
+
+export type CinematicStyleId = keyof typeof CINEMATIC_STYLES;
+
+export function cinematicStyleFor(style: string) {
+  return Object.hasOwn(CINEMATIC_STYLES, style)
+    ? CINEMATIC_STYLES[style as CinematicStyleId]
+    : undefined;
+}
+
 export type VDStyle =
   | "documentary" | "cinematic" | "realistic" | "ghibli" | "anime"
   | "pixar" | "3d" | "dark_mystery" | "luxury" | "cyberpunk"
-  | "minimal_product" | "futuristic";
+  | "minimal_product" | "futuristic" | CinematicStyleId;
 
 export type VDRatio = "16:9" | "9:16" | "1:1";
 
@@ -32,7 +85,7 @@ export type ShotType =
 
 export type CameraMove =
   | "static" | "push_in" | "pull_out" | "pan_left" | "pan_right"
-  | "tilt_up" | "tilt_down" | "handheld" | "dolly" | "crane";
+  | "tilt_up" | "tilt_down" | "handheld" | "dolly" | "crane" | "orbit";
 
 export type StylePreset = {
   label: string;
@@ -46,7 +99,22 @@ export type StylePreset = {
   isIllustrated: boolean; // true for ghibli/anime/cartoon (mutes photo-negatives)
 };
 
+const CINEMATIC_PRESETS = Object.fromEntries(
+  Object.entries(CINEMATIC_STYLES).map(([id, style]) => [id, {
+    label: style.label,
+    camera: "ARRI Alexa Mini",
+    lens: style.lens,
+    aperture: "f/2.8",
+    lighting: style.lighting,
+    colorGrade: style.palette,
+    look: style.description,
+    extras: [style.continuity],
+    isIllustrated: false,
+  }]),
+) as Record<CinematicStyleId, StylePreset>;
+
 export const STYLE_PRESETS: Record<VDStyle, StylePreset> = {
+  ...CINEMATIC_PRESETS,
   documentary: {
     label: "Documentary",
     camera: "Sony FX6",
@@ -251,6 +319,7 @@ const CAMERA_MOVE_PHRASES: Record<CameraMove, string> = {
   handheld: "handheld micro-shake",
   dolly: "dolly move",
   crane: "crane move",
+  orbit: "controlled orbital camera movement around the subject",
 };
 
 export type ContinuityCard = {
@@ -321,6 +390,7 @@ export type DirectorInput = {
    * so the caller (Character Bible pipeline) can rotate locations across
    * beats to guarantee variety. */
   environmentOverride?: string | null;
+  visualInstructions?: string;
   /** Optional Master Character Reference URL — surfaced in the prompt as an
    * identity anchor cue for models that support reference-image conditioning. */
   masterReferenceUrl?: string | null;
@@ -364,26 +434,49 @@ function pickCameraMove(beatIndex: number): CameraMove {
 /** Indic, Arabic, CJK, Cyrillic, Thai… — scripts image models can't render and shouldn't try. */
 const NON_LATIN_SCRIPT = /[\u0400-\u04FF\u0590-\u06FF\u0900-\u0DFF\u0E00-\u0E7F\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/;
 
+const SCENE_CAMERA_MOVES: Partial<Record<ShotType, CameraMove>> = {
+  drone: "crane",
+  low_angle: "tilt_up",
+  extreme_close_up: "push_in",
+  wide_establishing: "pull_out",
+  tracking: "dolly",
+  hero: "orbit",
+};
+
+function inferCinematicShot(action: string): ShotType | undefined {
+  if (/\b(flies|flying|soars|aerial)\b/i.test(action)) return "drone";
+  if (/\b(leaps?|jumps?|charges?)\b/i.test(action)) return "low_angle";
+  if (/\b(remembers?|realizes?|whispers?)\b/i.test(action)) return "extreme_close_up";
+  if (/\b(overlook\w*|horizon|establishing)\b/i.test(action)) return "wide_establishing";
+  if (/\b(runs?|walks?|chases?)\b/i.test(action)) return "tracking";
+  if (/\b(reveals?|awakens?|transforms?)\b/i.test(action)) return "hero";
+}
+
 export function directBeatPrompt(input: DirectorInput): DirectorOutput {
   const preset = STYLE_PRESETS[input.styleId] ?? STYLE_PRESETS.cinematic;
-  const shotType = pickShotType(input.beatIndex, input.previousShotType);
-  const cameraMove = pickCameraMove(input.beatIndex);
+  const cinematicStyle = cinematicStyleFor(input.styleId);
+  const action = `${input.beatText} ${input.sceneContext ?? ""}`;
+  const preferredShot = cinematicStyle ? inferCinematicShot(action) : undefined;
+  const shotType = preferredShot && preferredShot !== input.previousShotType
+    ? preferredShot
+    : pickShotType(input.beatIndex, input.previousShotType);
+  const cameraMove = (cinematicStyle && SCENE_CAMERA_MOVES[shotType]) || pickCameraMove(input.beatIndex);
 
   const topic = classifyTopic(`${input.title} ${input.beatText} ${input.sceneContext ?? ""} ${input.brief?.intent ?? ""}`);
   const mood = inferMood(input.beatText);
   const emotion = inferEmotion(input.beatText, input.emotion ?? null);
-  const cameraKit = preset.isIllustrated
+  const cameraKit = preset.isIllustrated || cinematicStyle
     ? { camera: preset.camera, lens: preset.lens, aperture: preset.aperture }
     : pickCameraKit(input.beatIndex, input.styleId);
-  const palette = input.brief?.paletteHint || pickPalette(topic, input.beatIndex);
+  const palette = cinematicStyle?.palette || input.brief?.paletteHint || pickPalette(topic, input.beatIndex);
   const environment = input.environmentOverride && input.environmentOverride.trim().length > 0
     ? input.environmentOverride.trim()
     : enrichEnvironment(input.sceneContext, topic, mood.timeOfDay);
   const storyDetail = storyDetailsFor(topic, input.beatIndex);
-  const lighting = preset.isIllustrated ? preset.lighting : lightingRecipe(topic, mood, emotion);
+  const lighting = preset.isIllustrated || cinematicStyle ? preset.lighting : lightingRecipe(topic, mood, emotion);
 
   const negatives = preset.isIllustrated ? ILLUSTRATED_NEGATIVES : PHOTO_NEGATIVES;
-  const negativePrompt = negatives.join(", ");
+  const negativePrompt = [...negatives, ...(cinematicStyle ? [cinematicStyle.negative] : [])].join(", ");
 
   const beat = input.beatText.trim().replace(/\s+/g, " ");
   // The beat is the spoken line, often in Telugu/Hindi/etc. Quoting it in the
@@ -397,7 +490,8 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
   void input.continuity.subjectAnchor;
 
   // B-roll shots show the place / objects, not the protagonist.
-  const hasCharacter = !CHARACTER_FREE_SHOTS.has(shotType);
+  const hasCharacter = !CHARACTER_FREE_SHOTS.has(shotType)
+    || Boolean(cinematicStyle && /\b(stands?|flies|flying|soars|overlooks?)\b/i.test(action));
 
   const compose = (retry: boolean): string => {
     const parts: string[] = [];
@@ -413,7 +507,13 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
         ? `Subject: the protagonist described below, acting out ${beatIdea} — show the action and setting, not just a portrait`
         : `Subject: show ${beatIdea} through the place, objects and details — no close-up of any person's face`,
     );
+    if (sceneVisual && sceneVisual !== environment) parts.push(`Scene direction: ${sceneVisual}`);
     parts.push(`Environment: ${environment}`);
+    if (input.visualInstructions) parts.push(`User visual instructions: ${input.visualInstructions}`);
+    if (cinematicStyle) {
+      parts.push(`Visual style: ${cinematicStyle.description}. ${cinematicStyle.continuity}. Avoid: ${cinematicStyle.negative}`);
+      if (shotType === "low_angle") parts.push("Use a brief slow-motion accent at the peak of the action");
+    }
     if (hasCharacter) {
       parts.push(
         `LOCKED CHARACTER SHEET (must match exactly in every image): ` +
@@ -428,7 +528,7 @@ export function directBeatPrompt(input: DirectorInput): DirectorOutput {
         `palette=${input.brief.paletteHint}.`,
       );
     }
-    parts.push(`Environmental storytelling detail: ${storyDetail}`);
+    if (!sceneVisual) parts.push(`Environmental storytelling detail: ${storyDetail}`);
     parts.push(`Time of day: ${mood.timeOfDay}. Atmosphere: ${mood.weather}. Energy: ${mood.energy}`);
     parts.push(`Camera: ${cameraKit.camera}, ${cameraKit.lens} at ${cameraKit.aperture}, shallow depth of field, sharp focus on ${hasCharacter ? "subject eyes" : "the key detail"}`);
     parts.push(`Lighting: ${lighting}`);
@@ -518,7 +618,7 @@ export function optimizePrompt(raw: string, styleId: VDStyle): string {
   // Captions are drawn by the app with real fonts, so the image must be clean.
   s += ". Absolutely no written words, letters, numbers, captions, subtitles, signs, labels, watermarks or logos anywhere in the image.";
   // Anchor illustrated styles so photorealism cues don't override them.
-  if (STYLE_PRESETS[styleId].isIllustrated && !/illustration|animation|painting/i.test(s)) {
+  if (STYLE_PRESETS[styleId]?.isIllustrated && !/illustration|animation|painting/i.test(s)) {
     s = `${STYLE_PRESETS[styleId].label} illustration. ${s}`;
   }
   return s;

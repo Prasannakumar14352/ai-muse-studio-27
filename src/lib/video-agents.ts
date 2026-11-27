@@ -22,7 +22,7 @@ import {
   type JobRecord, type ShotRecord,
 } from "@/lib/video-job-store";
 import {
-  directBeatPrompt, buildContinuityCard, STYLE_PRESETS,
+  directBeatPrompt, buildContinuityCard, STYLE_PRESETS, cinematicStyleFor, type CinematicStyleId,
   type ContinuityCard, type ShotType, type VDStyle,
 } from "@/lib/visual-director";
 import {
@@ -133,10 +133,11 @@ function expandScriptToBeats(
   title: string,
   brief?: import("@/lib/creative-director").CreativeBrief | null,
   bible?: CharacterBible | null,
+  visualInstructions?: string,
 ): Beat[] {
   const beats: Beat[] = [];
   let globalIdx = 0;
-  const activeBible: CharacterBible = bible ?? defaultCharacterBibleFor(title, brief?.intent);
+  const activeBible: CharacterBible = bible ?? defaultCharacterBibleFor(title, brief?.intent, cinematicCharacterContext(style, title, visualInstructions));
   const continuity: ContinuityCard = bibleToContinuityCard(activeBible);
   // Silence unused-warning for the legacy hint-only builder (kept exported).
   void buildContinuityCard;
@@ -160,7 +161,7 @@ function expandScriptToBeats(
     const baseVisual = scene.visual || scene.image_prompt || `${scene.voiceover?.slice(0, 80)}`;
     // One environment per scene keeps continuity within the scene, but rotates
     // across scenes so a project never becomes "forest, forest, forest".
-    const sceneEnv = pickEnvironmentForBeat(topic, sceneIndex, recentEnvs);
+    const sceneEnv = scene.visual?.trim() || scene.image_prompt?.trim() || pickEnvironmentForBeat(topic, sceneIndex, recentEnvs);
     recentEnvs.push(sceneEnv);
     chunks.forEach((chunk, beatIndex) => {
       const words = chunk.split(/\s+/).filter(Boolean).length || 1;
@@ -169,7 +170,8 @@ function expandScriptToBeats(
         styleId: vdStyle,
         ratio: "16:9",
         beatText: chunk,
-        sceneContext: `${sceneEnv}. ${baseVisual}`,
+        sceneContext: baseVisual,
+        visualInstructions,
         sceneNumber: scene.n,
         chapterLabel: scene.role ?? null,
         scenePurpose: scene.role ?? null,
@@ -246,9 +248,7 @@ function distributeAudioAcrossBeats(sceneBeats: Beat[], audioSec: number): numbe
 
 export type VideoType = "youtube_long" | "shorts" | "reels" | "tiktok";
 export type DurationSec = 30 | 60 | 180 | 300 | 540 | 720;
-export type StyleId =
-  | "3d" | "ghibli" | "anime" | "realistic" | "pixar" | "cinematic"
-  | "documentary" | "dark_mystery" | "luxury" | "cyberpunk" | "minimal_product" | "futuristic";
+export type StyleId = VDStyle;
 /** "male" | "female" | "documentary_narrator" (older choices) or an ElevenLabs voice name from VOICE_CATALOG. */
 export type VoiceId = string;
 export type AspectRatio = "16:9" | "9:16" | "1:1";
@@ -258,6 +258,7 @@ export type VideoBrief = {
   videoType: VideoType;
   duration: DurationSec;
   style: StyleId;
+  visualInstructions?: string;
   voice: VoiceId;
   aspectRatio: AspectRatio;
   /** Keep the same person in every scene using a reference portrait (default on). */
@@ -455,7 +456,7 @@ export type StepStatus = { id: StepId; label: string; state: StepState; note?: s
 
 // ---------- Style / voice descriptors ----------
 
-const STYLE_LABEL: Record<StyleId, string> = {
+const STYLE_LABEL: Record<Exclude<StyleId, CinematicStyleId>, string> = {
   "3d": "3D",
   ghibli: "Ghibli-inspired",
   anime: "Anime",
@@ -470,24 +471,18 @@ const STYLE_LABEL: Record<StyleId, string> = {
   futuristic: "Futuristic",
 };
 
-// Rich visual descriptor injected into every image prompt so the selected
-// style actually controls the output, thumbnail included.
-const STYLE_DESCRIPTOR: Record<StyleId, string> = {
-  "3d": "stylized 3D CGI render, vibrant colors, soft studio lighting, Pixar/Blender-quality shading",
-  ghibli: "Studio Ghibli watercolor scene, hand-painted, Miyazaki nostalgia, warm afternoon light",
-  anime: "modern anime illustration, cel-shaded, expressive characters, dynamic composition, saturated pop colors",
-  realistic: "photorealistic 8k photograph, natural light, 85mm lens, magazine-grade sharpness, cinematic depth of field",
-  pixar: "Pixar animated movie still, cute stylized characters, warm family-movie lighting",
-  cinematic: "cinematic movie still, teal-and-orange color grade, anamorphic lens flare, moody wide shot, Hollywood atmosphere",
-  documentary: "National Geographic documentary photography, candid realism, muted earthy tones, journalistic framing",
-  dark_mystery: "noir mystery scene, deep shadows with rim light, atmospheric fog, thriller mood, black and midnight-blue palette",
-  luxury: "luxury editorial photography, gold and cream palette, refined marble textures, high-end fashion lighting",
-  cyberpunk: "cyberpunk neon street at night, rain-slicked pavement, pink and cyan signage, Blade Runner atmosphere",
-  minimal_product: "minimal Scandinavian product shot, single subject on soft off-white, gentle shadows, calm negative space",
-  futuristic: "sleek futuristic sci-fi, chrome and holographic UI, sterile lighting, near-future aesthetic",
-};
+export function videoStyleLabel(style: StyleId): string {
+  return cinematicStyleFor(style)?.label ?? STYLE_LABEL[style as keyof typeof STYLE_LABEL] ?? STYLE_PRESETS.cinematic.label;
+}
 
-const STYLE_ACCENT: Record<StyleId, string> = {
+function cinematicCharacterContext(style: StyleId, title: string, visualInstructions?: string) {
+  const preset = cinematicStyleFor(style);
+  return preset || visualInstructions
+    ? [title, visualInstructions, preset?.continuity].filter(Boolean).join(". ")
+    : undefined;
+}
+
+const STYLE_ACCENT: Record<Exclude<StyleId, CinematicStyleId>, string> = {
   "3d": "#c026d3", ghibli: "#22c55e", anime: "#ec4899", realistic: "#94a3b8",
   pixar: "#f97316", cinematic: "#6366f1", documentary: "#78716c", dark_mystery: "#0ea5e9",
   luxury: "#eab308", cyberpunk: "#f0abfc", minimal_product: "#a8a29e", futuristic: "#38bdf8",
@@ -520,7 +515,7 @@ export const ResearchAgent = {
     await wait(200);
     return {
       topic: brief.title,
-      angle: `${STYLE_LABEL[brief.style]} take on "${brief.title}"`,
+      angle: `${videoStyleLabel(brief.style)} take on "${brief.title}"`,
       audience: "General creators & curious viewers",
       key_points: [
         `Hook the viewer on ${brief.title} within 3 seconds`,
@@ -697,13 +692,14 @@ export const ScriptAgent = {
         const script = await generateAiVideoScript({
           data: {
             topic: research.topic,
-            tone: STYLE_LABEL[brief.style],
+            tone: videoStyleLabel(brief.style),
             platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType],
-            styleLabel: STYLE_LABEL[brief.style],
+            styleLabel: videoStyleLabel(brief.style),
             contentType: contentTypeFor(brief),
             audience: research.audience,
             targetLengthSec: brief.duration,
             retentionBrief,
+            visualInstructions: brief.visualInstructions,
             // Detect from the title when not chosen, so a Telugu title gets a Telugu script.
             language: brief.language ?? "auto",
           },
@@ -718,7 +714,7 @@ export const ScriptAgent = {
       }
     }
     const sceneCount = Math.max(3, Math.min(120, Math.round(brief.duration / (brief.videoType === "youtube_long" ? 8 : 5))));
-    const fallback = buildFallbackVideoScript(brief.title, sceneCount, brief.duration, brief.aspectRatio, STYLE_LABEL[brief.style]);
+    const fallback = buildFallbackVideoScript(brief.title, sceneCount, brief.duration, brief.aspectRatio, videoStyleLabel(brief.style));
     return {
       ...fallback,
       debug_json: { raw_responses: [], parse_errors: ["Script generation used a structured fallback after 3 failed attempts."], attempts: 3, used_repair: false, used_fallback: true },
@@ -738,7 +734,8 @@ export const UserScriptAgent = {
       data: {
         lines,
         language: resolveContentLanguage(brief.language, brief.sourceScript ?? brief.title),
-        styleLabel: STYLE_LABEL[brief.style],
+        styleLabel: videoStyleLabel(brief.style),
+        visualInstructions: brief.visualInstructions,
         contentType: contentTypeFor(brief),
         aspectRatio: brief.aspectRatio,
       },
@@ -762,9 +759,12 @@ export const DirectorAgent = {
     return {
       pacing: brief.videoType === "youtube_long" ? "Measured, breathing room between beats" : "Fast, punchy, 2-4s per shot",
       transitions: ["hard cut", "whip pan", "match cut"],
-      color_grade: `${STYLE_LABEL[brief.style]} grade — ${STYLE_ACCENT[brief.style]} accent`,
-      music_direction: `${STYLE_LABEL[brief.style]} underscore, tempo matches pacing`,
-      sfx_moments: storyboard.shots.slice(0, 3).map((s) => `whoosh on shot ${s.n}`),
+      color_grade: `${videoStyleLabel(brief.style)} grade — ${cinematicStyleFor(brief.style)?.accent ?? STYLE_ACCENT[brief.style as keyof typeof STYLE_ACCENT]} accent`,
+      music_direction: cinematicStyleFor(brief.style)?.music ?? `${videoStyleLabel(brief.style)} underscore, tempo matches pacing`,
+      sfx_moments: cinematicStyleFor(brief.style)
+        ? storyboard.shots.filter((shot) => shot.description?.trim()).map((shot) =>
+            `Scene ${shot.n}: ${shot.description}. ${cinematicStyleFor(brief.style)?.sound}`)
+        : storyboard.shots.slice(0, 3).map((shot) => `whoosh on shot ${shot.n}`),
     };
   },
 };
@@ -1031,7 +1031,7 @@ export const SubtitleAgent = {
 
 export const MusicAgent = {
   async run(brief: VideoBrief, total: number): Promise<MusicTrack> {
-    return { url: "", mood: STYLE_LABEL[brief.style], duration_sec: total };
+    return { url: "", mood: videoStyleLabel(brief.style), duration_sec: total };
   },
 };
 
@@ -1064,13 +1064,13 @@ export const VideoEditingAgent = {
 // The renderer's constants use slightly different style ids; keep the accent
 // color consistent by mapping our extended set back to the base palette.
 function mapStyleForRenderer(id: StyleId): string {
-  const map: Record<StyleId, string> = {
+  const map: Record<Exclude<StyleId, CinematicStyleId>, string> = {
     "3d": "3d", ghibli: "ghibli", anime: "anime", realistic: "realistic",
     pixar: "pixar", cinematic: "cinematic", documentary: "documentary",
     dark_mystery: "dark", luxury: "ancient", cyberpunk: "cyberpunk",
     minimal_product: "minimal", futuristic: "cinematic",
   };
-  return map[id];
+  return cinematicStyleFor(id)?.renderer ?? map[id as keyof typeof map] ?? "cinematic";
 }
 
 // ---------- Thumbnail (layered, high-CTR via Thumbnail Director) ----------
@@ -1165,7 +1165,7 @@ export const SeoAgent = {
       return await generateAiVideoSeo({
         data: {
           topic: brief.title,
-          styleLabel: STYLE_LABEL[brief.style],
+          styleLabel: videoStyleLabel(brief.style),
           platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType],
           contentType: contentTypeFor(brief),
           scenes: timeline.scenes.map((s) => ({
@@ -1197,7 +1197,7 @@ export const TitleOptimizerAgent = {
   async run(brief: VideoBrief, research: ResearchBrief): Promise<VideoTitleVariants> {
     try {
       return await generateVideoTitleVariants({
-        data: { topic: research.topic || brief.title, styleLabel: STYLE_LABEL[brief.style], platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType] },
+        data: { topic: research.topic || brief.title, styleLabel: videoStyleLabel(brief.style), platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType] },
       });
     } catch (e) {
       console.error("[TitleOptimizerAgent] failed, using fallback", e);
@@ -1218,14 +1218,14 @@ export const HookAgent = {
   async run(brief: VideoBrief, research: ResearchBrief): Promise<VideoHook> {
     try {
       return await generateVideoHook({
-        data: { topic: research.topic || brief.title, styleLabel: STYLE_LABEL[brief.style], platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType], currentHook: "" },
+        data: { topic: research.topic || brief.title, styleLabel: videoStyleLabel(brief.style), platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType], currentHook: "" },
       });
     } catch (e) {
       console.error("[HookAgent] failed, using fallback", e);
       return {
         voiceover: `What if everything you knew about ${brief.title} was wrong?`,
         on_screen_text: "",
-        visual: `${STYLE_LABEL[brief.style]} cinematic opening shot on ${brief.title}, dramatic lighting.`,
+        visual: `${videoStyleLabel(brief.style)} cinematic opening shot on ${brief.title}, dramatic lighting.`,
         rationale: "Contrarian curiosity gap that promises a payoff.",
       };
     }
@@ -1446,13 +1446,15 @@ export async function runVideoPipeline(
     voiceover: retentionEngine.hook.line || hook.voiceover,
   };
 
-  const script = await mark("script", () => ScriptAgent.run(brief, research, () => {
-    onStep("script", "running", "Script generation failed. Retrying...");
-  }, retentionEngine));
+  const script = await mark("script", () => brief.sourceScript?.trim()
+    ? UserScriptAgent.run(brief)
+    : ScriptAgent.run(brief, research, () => {
+        onStep("script", "running", "Script generation failed. Retrying...");
+      }, retentionEngine));
 
   // Apply the retention engine's hook line to scene 1 so the video opens
   // with the blueprint's hook verbatim.
-  if (script.scenes[0] && effectiveHook.voiceover.trim().length > 0) {
+  if (!brief.sourceScript?.trim() && script.scenes[0] && effectiveHook.voiceover.trim().length > 0) {
     script.scenes[0] = {
       ...script.scenes[0],
       voiceover: effectiveHook.voiceover,
@@ -1470,7 +1472,7 @@ export async function runVideoPipeline(
   const storyboard = await mark("storyboard", () => StoryboardAgent.run(script));
   const direction = await mark("direction", () => DirectorAgent.run(brief, storyboard));
 
-  const beats = expandScriptToBeats(script, brief.style, brief.title, creativeBrief);
+  const beats = expandScriptToBeats(script, brief.style, brief.title, creativeBrief, null, brief.visualInstructions);
 
   const visuals = await mark("visuals", () =>
     VisualGenerationAgent.run(brief, beats, (done, total) =>
@@ -1591,8 +1593,8 @@ export const DURATIONS: { id: DurationSec; label: string }[] = [
   { id: 720, label: "12 min" },
 ];
 
-export const STYLES: { id: StyleId; label: string }[] = (Object.keys(STYLE_LABEL) as StyleId[])
-  .map((id) => ({ id, label: STYLE_LABEL[id] }));
+export const STYLES: { id: StyleId; label: string }[] = (Object.keys(STYLE_PRESETS) as StyleId[])
+  .map((id) => ({ id, label: videoStyleLabel(id) }));
 
 export const VOICES: { id: VoiceId; label: string }[] = [
   { id: "male", label: "Male" },
@@ -1666,6 +1668,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 // B-roll shots (no person) stay on the fast text-to-image model.
 
 const characterRefCache = new Map<string, Promise<string | null>>();
+const CHARACTER_REFERENCE_ERROR = "Character reference generation failed. Retry the failed shots to try again.";
 
 /** Returns the job's character reference portrait (data URL), creating it once. */
 async function ensureCharacterReference(
@@ -1687,25 +1690,28 @@ async function ensureCharacterReference(
     }
     const cd = detectIntentHeuristic(brief.title);
     const cb = buildBriefFromIntent(brief.title, cd.intent, cd.confidence);
-    const bible = defaultCharacterBibleFor(brief.title, cb.intent);
+    const bible = defaultCharacterBibleFor(brief.title, cb.intent, cinematicCharacterContext(brief.style, brief.title, brief.visualInstructions));
     const preset = STYLE_PRESETS[brief.style as VDStyle];
     const portraitPrompt = preset?.isIllustrated
       ? `${preset.label} illustration style character design. ${bible.masterPortraitPrompt.replace(/ARRI Alexa quality, photorealistic 8K\./, "")}`
-      : `${STYLE_LABEL[brief.style]} look. ${bible.masterPortraitPrompt}`;
+      : `${videoStyleLabel(brief.style)} look. ${bible.masterPortraitPrompt}`;
     const { image, error } = await fetchGeneratedImage({ prompt: portraitPrompt, ratio: "1:1", quality: "high" });
     if (!image) {
-      console.warn("[character-ref] could not create the reference portrait; scenes will use text prompts only", error);
+      console.warn("[character-ref] could not create the reference portrait", error);
       return null;
     }
     const blob = await dataUrlToBlob(image);
     job.characterRefKey = await saveShotBlob(job.id, "character", blob);
     await saveJob(job);
     return image;
-  })();
+  })().catch((error: unknown) => {
+    console.warn("[character-ref] could not load or save the reference portrait", error);
+    return null;
+  }).finally(() => {
+    characterRefCache.delete(job.id);
+  });
   characterRefCache.set(job.id, p);
-  const out = await p;
-  if (!out) characterRefCache.delete(job.id); // allow a later retry
-  return out;
+  return p;
 }
 
 /** Render a shot that shows the main character, anchored to the reference portrait. */
@@ -1747,8 +1753,9 @@ function planShots(
   style: StyleId,
   title: string,
   brief?: CreativeBrief | null,
+  visualInstructions?: string,
 ): ShotRecord[] {
-  const beats = expandScriptToBeats(script, style, title, brief ?? null);
+  const beats = expandScriptToBeats(script, style, title, brief ?? null, null, visualInstructions);
   return beats.map<ShotRecord>((b, i) => ({
     id: `s${i + 1}`,
     index: i,
@@ -1790,6 +1797,9 @@ async function generateOneShot(
   if (characterRef && shot.hasCharacter !== false) {
     img = await fetchSceneImageWithCharacter(shot.prompt, characterRef, brief.aspectRatio);
   }
+  if (brief.sameCharacter === true && shot.hasCharacter !== false && !img) {
+    throw new Error(CHARACTER_REFERENCE_ERROR);
+  }
   if (!img) img = await fetchSceneImage(shot.prompt, brief.style, brief.aspectRatio);
   if (!img) throw new Error("Image generation failed");
 
@@ -1801,7 +1811,11 @@ async function generateOneShot(
     // shot.prompt is the director's English, text-free frame description.
     const clipBlob = await fetchMotionClip(
       img,
-      motionPromptFor(shot.prompt.slice(0, 500)),
+      motionPromptFor([
+        shot.prompt.slice(0, 900),
+        brief.visualInstructions,
+        cinematicStyleFor(brief.style) && "Match the action and moving environment in the scene. Maintain physical contact, costume, identity and motivated lighting. Show foreground and background parallax consistent with the camera motion.",
+      ].filter(Boolean).join(" ")),
       TARGET_BEAT_SEC,
       brief.motionTier ?? "standard",
       signal,
@@ -1846,7 +1860,9 @@ export async function runVideoJobPipeline(
     // from the persisted shot records so visuals stay consistent.
     research = await ResearchAgent.run(brief);
     retentionEngine = await RetentionEngineAgent.run(brief, research);
-    script = await ScriptAgent.run(brief, research, undefined, retentionEngine);
+    script = brief.sourceScript?.trim()
+      ? await UserScriptAgent.run(brief)
+      : await ScriptAgent.run(brief, research, undefined, retentionEngine);
     storyboard = await StoryboardAgent.run(script);
     direction = await DirectorAgent.run(brief, storyboard);
     job = existing;
@@ -1854,10 +1870,12 @@ export async function runVideoJobPipeline(
     onEvent({ type: "phase", phase: "planning" });
     research = await ResearchAgent.run(brief);
     retentionEngine = await RetentionEngineAgent.run(brief, research);
-    script = await ScriptAgent.run(brief, research, undefined, retentionEngine);
+    script = brief.sourceScript?.trim()
+      ? await UserScriptAgent.run(brief)
+      : await ScriptAgent.run(brief, research, undefined, retentionEngine);
     storyboard = await StoryboardAgent.run(script);
     direction = await DirectorAgent.run(brief, storyboard);
-    const shots = planShots(script, brief.style, brief.title, creativeBrief);
+    const shots = planShots(script, brief.style, brief.title, creativeBrief, brief.visualInstructions);
     job = await createJob({
       title: brief.title,
       niche: opts.niche,
@@ -2053,7 +2071,7 @@ export async function runPlanningPhase(
   const script = brief.sourceScript?.trim()
     ? await UserScriptAgent.run(brief)
     : await ScriptAgent.run(brief, research, undefined, retentionEngine);
-  const shots = planShots(script, brief.style, brief.title, creativeBrief);
+  const shots = planShots(script, brief.style, brief.title, creativeBrief, brief.visualInstructions);
 
   const job = await createJob({
     title: brief.title,
@@ -2133,7 +2151,7 @@ async function runAssetGenerationPhaseInner(
   // progress on the current shots.
   const anyProgress = job.shots.some((s) => s.status !== "pending");
   if (editedScript && !anyProgress) {
-    job.shots = planShots(editedScript, brief.style, brief.title, creativeBrief);
+    job.shots = planShots(editedScript, brief.style, brief.title, creativeBrief, brief.visualInstructions);
     job.shotsTotal = job.shots.length;
     job.shotsDone = 0;
     job.shotsFailed = 0;

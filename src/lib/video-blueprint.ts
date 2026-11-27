@@ -130,6 +130,7 @@ export type VideoBlueprint = {
   brand: string;
   product: string;
   cta: string;
+  visualInstructions?: string;
   globalVisualStyle: string;          // extra style guardrails
   globalNegative: string;             // global negative prompt
   musicDirection: string;
@@ -265,6 +266,7 @@ export function buildBlueprintFromPlanning(
     brand: opts.brand ?? "",
     product: opts.product ?? "",
     cta: opts.cta ?? "",
+    visualInstructions: brief.visualInstructions,
     globalVisualStyle: script.style_note ?? "",
     globalNegative: "",
     musicDirection: opts.musicDirection ?? "",
