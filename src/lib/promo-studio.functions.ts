@@ -1139,12 +1139,11 @@ export const addPromoToShowcase = createServerFn({ method: "POST" })
     if ((existing ?? []).length) return { ok: true, already: true };
     const { data: blob, error: dErr } = await d.storage.from("renders").download(src);
     if (dErr || !blob) throw new Error("Couldn't read the rendered image");
-    const path = `showcase/promo-${c.id}.png`;
+    const path = `${adminId}/${crypto.randomUUID()}.png`;
     const { error: uErr } = await d.storage
-      .from("landing")
-      .upload(path, blob, { contentType: "image/png", upsert: true });
+      .from("showcase-private")
+      .upload(path, blob, { contentType: "image/png", upsert: false });
     if (uErr) throw new Error(`Upload failed: ${uErr.message}`);
-    const url = d.storage.from("landing").getPublicUrl(path).data.publicUrl as string;
     const { count } = await d
       .from("landing_media")
       .select("id", { count: "exact", head: true })
@@ -1153,7 +1152,7 @@ export const addPromoToShowcase = createServerFn({ method: "POST" })
       kind: "showcase",
       status: "draft",
       title: c.headline,
-      poster_url: url,
+      showcase_poster_path: path,
       prompt: c.hook,
       tool: "Promo Studio",
       source_ref: `promo:${c.id}`,
@@ -1161,7 +1160,7 @@ export const addPromoToShowcase = createServerFn({ method: "POST" })
       consent_confirmed: false,
     });
     if (error) throw new Error(error.message);
-    await audit(adminId, "creative.showcase", c.id, { url });
+    await audit(adminId, "creative.showcase", c.id, {});
     return { ok: true, already: false };
   });
 /* eslint-enable @typescript-eslint/no-explicit-any */

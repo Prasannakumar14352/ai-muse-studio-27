@@ -1,108 +1,320 @@
-// Landing: "Made with CreatorFlow AI" — real videos generated in the app,
-// each with the exact prompt that made it. Managed in Admin → Landing.
-// Hidden until at least one item is published.
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
-import { listPublishedLandingMedia, type LandingMediaRow } from "@/lib/landing-media.functions";
+import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { Play } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import {
+  getPublishedShowcaseVideo,
+  listPublishedLandingMedia,
+  type LandingMediaRow,
+} from "@/lib/landing-media.functions";
+import { selectShowcaseItems } from "@/lib/showcase-template";
 
-function ShowcaseCard({ r }: { r: LandingMediaRow }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  // Play muted while on screen, pause when scrolled away (saves data on phones).
-  useEffect(() => {
-    const v = ref.current;
-    if (!v) return;
-    const io = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) v.play().catch(() => {});
-      else v.pause();
-    }, { threshold: 0.6 });
-    io.observe(v);
-    return () => io.disconnect();
-  }, []);
-
-  return (
-    <div className="snap-start shrink-0 w-[85vw] sm:w-[420px] flex flex-col">
-      <div className="relative rounded-2xl overflow-hidden bg-black border border-border aspect-video">
-        {r.video_url ? (
-          <video ref={ref} src={r.video_url} poster={r.poster_url ?? undefined}
-            muted loop playsInline controls preload="metadata" className="w-full h-full object-cover" />
-        ) : (
-          <img src={r.poster_url ?? undefined} alt={r.title ?? "Made with CreatorFlow AI"} loading="lazy" className="w-full h-full object-contain" />
-        )}
-        {r.tool && (
-          <span className="absolute top-3 left-3 text-[10px] uppercase tracking-wider font-semibold rounded-full px-2.5 py-1 bg-black/60 text-white backdrop-blur">
-            {r.tool}
-          </span>
-        )}
-      </div>
-      <div className="relative mt-6 rounded-2xl border-2 border-dashed border-violet-400/40 bg-violet-950/40 px-5 pt-7 pb-5 text-center flex-1">
-        <span className="absolute -top-4 left-1/2 -translate-x-1/2 gradient-primary text-white font-bold text-sm px-5 py-1.5 rounded-full shadow-lg">
-          Prompt
-        </span>
-        <p className="text-sm md:text-base leading-relaxed text-white/90">{r.prompt}</p>
-      </div>
-    </div>
-  );
-}
-
-/** Published showcase videos (Admin → Landing). Empty until the admin adds some. */
 export function useShowcaseItems() {
   const { data } = useQuery({
     queryKey: ["landing-media-public"],
     queryFn: () => listPublishedLandingMedia(),
     staleTime: 60_000,
   });
-  return (data ?? []).filter((r) => r.kind === "showcase" && (r.video_url || r.poster_url) && (r.prompt ?? "").trim());
+  return (data ?? []).filter(
+    (row) =>
+      row.kind === "showcase" &&
+      row.status === "published" &&
+      (row.video_url || row.managed_showcase),
+  );
+}
+
+function provenance(item: LandingMediaRow) {
+  switch (item.showcase_metadata?.provenance) {
+    case "creatorflow":
+      return "CreatorFlow Studio import";
+    case "customer":
+      return "Customer-submitted example";
+    case "demo":
+      return "Product demonstration";
+    case "external":
+      return "External example";
+    default:
+      return "Showcase example";
+  }
+}
+
+function details(item: LandingMediaRow) {
+  const meta = item.showcase_metadata;
+  const duration = meta?.durationSeconds;
+  const dimensions = meta?.width && meta.height ? `${meta.width} × ${meta.height}` : "";
+  const ratio = dimensions
+    ? meta!.width! / meta!.height! > 1.15
+      ? "Landscape"
+      : meta!.width! / meta!.height! < 0.87
+        ? "Portrait"
+        : "Square"
+    : "";
+  return [
+    meta?.language,
+    duration ? `${Math.round(duration)}s` : item.duration,
+    ratio,
+    dimensions,
+    meta?.template?.style.replaceAll("_", " "),
+    item.tool,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function ShowcaseDetails({
+  item,
+  initialMode,
+}: {
+  item: LandingMediaRow;
+  initialMode: "watch" | "prompt";
+}) {
+  const [watch, setWatch] = useState(initialMode === "watch");
+  const [playbackError, setPlaybackError] = useState(false);
+  const [copy, setCopy] = useState("");
+  const video = useQuery({
+    queryKey: ["showcase-playback", item.id],
+    enabled: watch,
+    queryFn: () => getPublishedShowcaseVideo({ data: { id: item.id } }),
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+  const meta = item.showcase_metadata;
+  return (
+    <DialogContent className="max-h-[90dvh] max-w-3xl overflow-auto border-white/15 bg-zinc-950 text-white">
+      <DialogTitle>{item.title || "Showcase video"}</DialogTitle>
+      <DialogDescription>{meta?.description || provenance(item)}</DialogDescription>
+      <p className="text-xs text-zinc-400">{details(item)}</p>
+      {watch ? (
+        video.isFetching && !video.data ? (
+          <p role="status">Loading video…</p>
+        ) : playbackError || video.isError || !video.data?.url ? (
+          <div role="alert" className="rounded-lg border p-4">
+            Video playback is unavailable.
+            <button
+              className="ml-2 underline"
+              onClick={() => {
+                setPlaybackError(false);
+                void video.refetch();
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <video
+            key={video.data.url}
+            aria-label={item.title ?? "Showcase video"}
+            src={video.data.url}
+            poster={item.poster_url ?? undefined}
+            controls
+            playsInline
+            preload="metadata"
+            onError={() => setPlaybackError(true)}
+            className="max-h-[56dvh] w-full rounded-lg bg-black object-contain"
+          />
+        )
+      ) : (
+        <button className="w-fit text-orange-300 underline" onClick={() => setWatch(true)}>
+          Watch video
+        </button>
+      )}
+      {item.prompt && (
+        <details open={initialMode === "prompt"}>
+          <summary className="cursor-pointer font-medium">
+            {meta?.promptKind === "original"
+              ? "Original prompt"
+              : meta?.promptKind === "example"
+                ? "Example prompt"
+                : "Published prompt"}
+          </summary>
+          <p className="my-3 whitespace-pre-wrap text-sm text-zinc-300">{item.prompt}</p>
+          <button
+            type="button"
+            className="text-sm underline"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(item.prompt!);
+                setCopy("Prompt copied.");
+              } catch {
+                setCopy("Select the prompt to copy it.");
+              }
+            }}
+          >
+            Copy prompt
+          </button>
+          <span role="status" className="ml-2 text-sm">
+            {copy}
+          </span>
+        </details>
+      )}
+      {meta?.attribution && <p className="text-sm text-zinc-400">Video by {meta.attribution}</p>}
+      {meta?.template && (
+        <Link
+          to="/videos"
+          search={{ showcase: item.id }}
+          className="w-fit rounded-lg bg-orange-500 px-4 py-2 font-semibold text-black"
+        >
+          Create similar video
+        </Link>
+      )}
+    </DialogContent>
+  );
 }
 
 export function ShowcaseSection() {
   const items = useShowcaseItems();
-  const rail = useRef<HTMLDivElement>(null);
-  const [edge, setEdge] = useState({ start: true, end: false });
-
-  const update = () => {
-    const el = rail.current;
-    if (!el) return;
-    setEdge({ start: el.scrollLeft < 8, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 8 });
-  };
-  useEffect(update, [items.length]);
-
+  const [category, setCategory] = useState("");
+  const [language, setLanguage] = useState("");
+  const [term, setTerm] = useState("");
+  const [open, setOpen] = useState<{ item: LandingMediaRow; mode: "watch" | "prompt" }>();
   if (!items.length) return null;
-  const scroll = (dir: -1 | 1) => {
-    const el = rail.current;
-    if (!el) return;
-    el.scrollBy({ left: dir * Math.min(el.clientWidth * 0.9, 460), behavior: "smooth" });
-  };
 
+  const categories = [
+    ...new Set(items.flatMap((item) => item.showcase_metadata?.categories ?? [])),
+  ];
+  const languages = [
+    ...new Set(
+      items.flatMap((item) =>
+        item.showcase_metadata?.language ? [item.showcase_metadata.language] : [],
+      ),
+    ),
+  ];
+  const visible = selectShowcaseItems(items, category, language, term);
   return (
-    <section id="made-with" className="py-20 scroll-mt-24">
-      <div className="max-w-7xl mx-auto px-6 text-center mb-10">
-        <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-semibold rounded-full px-2.5 py-1 bg-orange-500/15 text-orange-200 border border-orange-400/20">
-          <Sparkles className="w-3.5 h-3.5" /> Made with CreatorFlow AI
-        </span>
-        <h2 className="mt-4 text-3xl md:text-5xl font-bold">One prompt. <span className="gradient-text">One video.</span></h2>
-        <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
-          Real videos generated in CreatorFlow, with the exact prompt that made each one. Tap a video to hear it.
+    <section
+      id="made-with"
+      className="mx-auto max-w-7xl scroll-mt-24 px-6 py-20"
+      aria-labelledby="showcase-title"
+    >
+      <div className="mb-8 max-w-2xl">
+        <h2 id="showcase-title" className="text-3xl font-bold md:text-5xl">
+          Video showcase
+        </h2>
+        <p className="mt-3 text-muted-foreground">
+          Watch published examples, browse their prompts, and open an editable Studio template.
         </p>
       </div>
-      <div className="relative max-w-7xl mx-auto">
-        {!edge.start && (
-          <button aria-label="Previous videos" onClick={() => scroll(-1)}
-            className="hidden sm:flex absolute left-2 top-[22%] z-10 w-11 h-11 rounded-full gradient-primary text-white items-center justify-center shadow-lg">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-        )}
-        {!edge.end && (
-          <button aria-label="Next videos" onClick={() => scroll(1)}
-            className="hidden sm:flex absolute right-2 top-[22%] z-10 w-11 h-11 rounded-full gradient-primary text-white items-center justify-center shadow-lg">
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        )}
-        <div ref={rail} onScroll={update}
-          className="flex gap-6 overflow-x-auto snap-x snap-mandatory px-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {items.map((r) => <ShowcaseCard key={r.id} r={r} />)}
-        </div>
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <label className="grid gap-1 text-sm">
+          Search videos and prompts
+          <input
+            type="search"
+            value={term}
+            onChange={(event) => setTerm(event.target.value)}
+            className="rounded-lg border border-border bg-background p-2"
+          />
+        </label>
+        <label className="grid gap-1 text-sm">
+          Category
+          <select
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+            className="rounded-lg border border-border bg-background p-2"
+          >
+            <option value="">All categories</option>
+            {categories.map((name) => (
+              <option key={name}>{name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-sm">
+          Language
+          <select
+            value={language}
+            onChange={(event) => setLanguage(event.target.value)}
+            className="rounded-lg border border-border bg-background p-2"
+          >
+            <option value="">All languages</option>
+            {languages.map((name) => (
+              <option key={name}>{name}</option>
+            ))}
+          </select>
+        </label>
       </div>
+      <p className="sr-only" role="status">
+        {visible.length} videos
+      </p>
+      {!visible.length && (
+        <p className="text-sm text-muted-foreground">No videos match those filters.</p>
+      )}
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        {visible.map((item, index) => {
+          const meta = item.showcase_metadata;
+          const featured = index === 0 && meta?.featured;
+          return (
+            <article
+              key={item.id}
+              className={`overflow-hidden rounded-xl border border-border bg-card ${featured ? "lg:col-span-2" : ""}`}
+            >
+              <button
+                type="button"
+                onClick={() => setOpen({ item, mode: "watch" })}
+                aria-label={`Watch ${item.title ?? "showcase video"}`}
+                className="relative grid aspect-video w-full place-items-center overflow-hidden bg-black"
+              >
+                {item.poster_url && (
+                  <img
+                    src={item.poster_url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="absolute h-full w-full object-contain"
+                  />
+                )}
+                <span className="z-10 rounded-full bg-black/80 p-3 text-orange-300">
+                  <Play aria-hidden className="h-5 w-5" />
+                </span>
+              </button>
+              <div className="space-y-2 p-4">
+                <p className="text-xs text-orange-300">{provenance(item)}</p>
+                <h3 className="text-lg font-semibold">{item.title || "Showcase video"}</h3>
+                <p className="text-xs text-muted-foreground">{details(item)}</p>
+                {meta?.categories.length ? (
+                  <p className="text-xs text-muted-foreground">{meta.categories.join(" · ")}</p>
+                ) : null}
+                <div className="flex flex-wrap gap-3 pt-2 text-sm">
+                  <button
+                    className="underline"
+                    type="button"
+                    onClick={() => setOpen({ item, mode: "watch" })}
+                  >
+                    Watch video
+                  </button>
+                  {item.prompt && (
+                    <button
+                      className="underline"
+                      type="button"
+                      onClick={() => setOpen({ item, mode: "prompt" })}
+                    >
+                      View prompt
+                    </button>
+                  )}
+                  {meta?.template && (
+                    <Link
+                      className="font-medium text-orange-300"
+                      to="/videos"
+                      search={{ showcase: item.id }}
+                    >
+                      Create similar video
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <Dialog
+        open={Boolean(open)}
+        onOpenChange={(value) => {
+          if (!value) setOpen(undefined);
+        }}
+      >
+        {open && <ShowcaseDetails key={open.item.id} item={open.item} initialMode={open.mode} />}
+      </Dialog>
     </section>
   );
 }

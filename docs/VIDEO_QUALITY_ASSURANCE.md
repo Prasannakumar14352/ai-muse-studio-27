@@ -102,3 +102,5 @@ Roll back by disabling server submission, draining active jobs, and
 deploying the previous app and worker. Keep the new worker until all v2
 jobs are completed or cancelled. Preserve both input and output storage
 for jobs that may still be inspected, downloaded or retried.
+
+The [Phase 6 showcase workflow](VIDEO_SHOWCASE_AND_TEMPLATES.md) adds separate publication review for showcase entries. Final social publishing still requires a server-side approval bound to the exact exported asset and invalidation when the export changes.
