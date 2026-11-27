@@ -64,15 +64,17 @@ export function scheduleAudioMix(input: {
   cuts: Array<number | null>;
   assets: MixAsset[];
   settings?: AudioSettings;
+  hasNativeAudio?: boolean;
 }) {
   const { context, time } = input;
   const settings = { ...DEFAULT_AUDIO_SETTINGS, ...input.settings };
   const windows = mixWindows(input.durations, input.sceneIds);
   const total = windows.at(-1)?.end ?? 0;
   const master = context.createGain();
-  master.gain.value = input.assets.length ? 0.92 : 1;
+  master.gain.value = input.assets.length || input.hasNativeAudio ? 0.92 : 1;
   master.connect(input.destination);
-  const compressor = input.assets.length ? context.createDynamicsCompressor() : null;
+  const compressor =
+    input.assets.length || input.hasNativeAudio ? context.createDynamicsCompressor() : null;
   if (compressor) {
     compressor.threshold.value = -7;
     compressor.ratio.value = 12;
@@ -178,4 +180,5 @@ export function scheduleAudioMix(input: {
       }
     }
   }
+  return mixBus;
 }

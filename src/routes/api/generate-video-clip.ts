@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ADVANCED_VIDEO_FEATURE_FLAG, isAdvancedVideoModel } from "@/lib/advanced-video-models";
 import { jobTagFromRequest } from "@/lib/job-credit-tag";
 
 // Real-motion clip for one story beat: animates the beat's still image with an
@@ -19,9 +20,37 @@ export const Route = createFileRoute("/api/generate-video-clip")({
         const userId = await getUserIdFromRequest(request);
         if (!userId) return unauthorized();
 
-        let body: { image?: string; prompt?: string; beatSeconds?: number; tier?: string };
+        let body: {
+          image?: string;
+          prompt?: string;
+          beatSeconds?: number;
+          tier?: string;
+          model?: string;
+        };
         try { body = await request.json(); } catch { return Response.json({ ok: false, reason: "bad_json" }, { status: 400 }); }
 
+        if (!body || typeof body !== "object") {
+          return Response.json({ ok: false, reason: "bad_json" }, { status: 400 });
+        }
+        if (isAdvancedVideoModel(body.model)) {
+          const enabled = process.env[ADVANCED_VIDEO_FEATURE_FLAG] === "true";
+          return Response.json(
+            {
+              ok: false,
+              reason: enabled ? "advanced_video_schema_unverified" : "advanced_video_disabled",
+            },
+            { status: 503 },
+          );
+        }
+        if (body.model !== undefined && body.model !== "standard" && body.model !== "premium") {
+          return Response.json({ ok: false, reason: "unknown_video_model" }, { status: 400 });
+        }
+        if (
+          (body.image !== undefined && typeof body.image !== "string") ||
+          (body.prompt !== undefined && typeof body.prompt !== "string")
+        ) {
+          return Response.json({ ok: false, reason: "invalid_clip_input" }, { status: 400 });
+        }
         const image = (body.image ?? "").trim();
         const prompt = (body.prompt ?? "").trim();
         if (!image || !/^(https:\/\/|data:image\/)/.test(image)) {
@@ -30,7 +59,7 @@ export const Route = createFileRoute("/api/generate-video-clip")({
         if (!prompt) return Response.json({ ok: false, reason: "prompt_required" }, { status: 400 });
 
         const { MOTION_MODELS, clipSecondsFor, motionClipCredits } = await import("@/lib/motion-clips");
-        const tier = body.tier === "premium" ? "premium" : "standard";
+        const tier = (body.model ?? body.tier) === "premium" ? "premium" : "standard";
         const model = MOTION_MODELS[tier];
         const beatSeconds = Math.max(1, Math.min(15, Number(body.beatSeconds) || 4));
         const seconds = clipSecondsFor(tier, beatSeconds);

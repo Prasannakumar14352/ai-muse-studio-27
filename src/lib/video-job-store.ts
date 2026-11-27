@@ -1,3 +1,4 @@
+import type { SceneAudioSource } from "./advanced-video-models";
 import type { PlannedAudio } from "./audio-plan";
 import type { AudioSettings } from "./audio-generation";
 // Async video job persistence. Job metadata lives in localStorage, per-shot
@@ -71,6 +72,11 @@ export type JobRecord = {
   characterRefKey?: string | null;
   audioTracks?: PlannedAudio[];
   audioMixSettings?: AudioSettings;
+  nativeAudioSettings?: {
+    sceneAudioSource?: SceneAudioSource;
+    nativeAudioVolume?: number;
+    nativeAudioMutedShotIds?: string[];
+  };
   audioPlanSettings?: string;
 };
 
