@@ -1,3 +1,4 @@
+import type { ShotRepair } from "@/lib/shot-repair";
 import { StudioServerRender } from "@/components/video-studio/StudioServerRender";
 import { VideoQualityReview } from "@/components/video-studio/VideoQualityReview";
 import { assessVideoAssets, type QualityFinding } from "@/lib/video-quality";
@@ -596,13 +597,13 @@ function VideosPage() {
   }
 
   /** Regenerate one shot from the asset review screen. */
-  async function regenOneShot(shotId: string, fallback = false) {
+  async function regenOneShot(shotId: string, fallback = false, repair: ShotRepair = "shot") {
     if (!gen || !dash.jobId) return;
     const baseBrief = assetsBundle?.brief ?? gen.brief;
     const model = baseBrief.motionModel;
     const shot = dash.shots.find((item) => item.id === shotId);
     const newVeoRevision =
-      !fallback &&
+      !fallback && repair !== "image" &&
       isAdvancedVideoModel(model) &&
       (shot?.status === "done" ||
         /Veo generation failed|Veo rejected|Credit reservation rejected/.test(shot?.error ?? ""));
@@ -610,7 +611,7 @@ function VideosPage() {
       dash.shots.length,
       baseBrief.motionMode ?? "off",
     ).includes(shot?.index ?? -1);
-    const imageCredits = baseBrief.sameCharacter ? 8 : 1;
+    const imageCredits = baseBrief.sameCharacter === false ? 1 : 16;
     const credits = fallback
       ? imageCredits + motionClipCredits("standard", 3.5)
       : newVeoRevision && isAdvancedVideoModel(model)
@@ -624,19 +625,21 @@ function VideosPage() {
           ? null
           : imageCredits +
             (plannedMotion ? motionClipCredits(baseBrief.motionTier ?? "standard", 3.5) : 0);
+    const approvedCredits = repair === "image" ? imageCredits :
+      repair === "motion" ? motionClipCredits(baseBrief.motionTier ?? "standard", 3.5) : credits;
     const balance = repairAccess ? getAvailableCredits(repairAccess) : null;
     if (
       !(await confirmDialog({
         title: fallback
           ? "Use MiniMax for this shot?"
-          : credits === null
+          : approvedCredits === null
             ? "Recover this Veo shot?"
-            : "Regenerate this shot?",
+            : repair === "image" ? "Replace this shot with a new still?" : repair === "motion" ? "Regenerate motion from the saved still?" : "Regenerate this shot?",
         description:
-          credits === null
-            ? `Resume the same provider revision. If the source image is missing, its regeneration can cost up to ${imageCredits} credits. Available: ${balance ?? "unavailable"}.`
-            : `Shot ${(shot?.index ?? 0) + 1} · ${fallback ? "MiniMax" : (model ?? baseBrief.motionTier ?? "Image model")} · up to ${credits} additional credits. Available: ${balance ?? "unavailable"}. Other shots are preserved.`,
-        confirmText: "Generate clip",
+          approvedCredits === null
+            ? `Resume the same provider revision. ${repair === "motion" ? "Uses only the saved source image." : `If the source image is missing, its regeneration can cost up to ${imageCredits} credits.`} Available: ${balance ?? "unavailable"}.`
+            : `Shot ${(shot?.index ?? 0) + 1} · ${repair === "image" ? "Scene image" : fallback ? "MiniMax" : (model ?? baseBrief.motionTier ?? "Image model")} · up to ${approvedCredits} additional credits. Available: ${balance ?? "unavailable"}. Other shots are preserved.`,
+        confirmText: repair === "image" ? "Generate still" : "Confirm regeneration",
       }))
     )
       return;
@@ -644,7 +647,7 @@ function VideosPage() {
       ? { ...baseBrief, motionModel: "standard", motionTier: "standard" }
       : baseBrief;
     try {
-      await regenerateShot(dash.jobId, shotId, brief, handleJobEvent, undefined, newVeoRevision);
+      await regenerateShot(dash.jobId, shotId, brief, handleJobEvent, undefined, newVeoRevision, repair);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Regenerate failed");
     }
@@ -1789,7 +1792,7 @@ function AssetReviewGate({
   bundle: AssetGenerationBundle;
   onUpdateAudio: (bundle: AssetGenerationBundle) => void;
   onRender: (acceptStillFallback: boolean, settings: VideoExportSettings) => void;
-  onRegenerate: (shotId: string, fallback?: boolean) => Promise<void>;
+  onRegenerate: (shotId: string, fallback?: boolean, repair?: ShotRepair) => Promise<void>;
   onReplace: (shotId: string, item: PickedMedia) => Promise<void>;
   onBackToBlueprint: () => void;
   onCancel: () => void;
@@ -1983,10 +1986,10 @@ function AssetReviewGate({
     }
   }
 
-  async function handleRegen(id: string, fallback = false) {
+  async function handleRegen(id: string, fallback = false, repair: ShotRepair = "shot") {
     setBusyId(id);
     try {
-      await onRegenerate(id, fallback);
+      await onRegenerate(id, fallback, repair);
     } finally {
       setBusyId(null);
     }
@@ -2364,6 +2367,14 @@ function AssetReviewGate({
                       ? <><Loader2 className="w-3 h-3 animate-spin" /> Regenerating…</>
                       : <><RotateCw className="w-3 h-3" /> Regenerate this shot</>}
                   </button>
+                  {!isAdvancedVideoModel(bundle.brief.motionModel) && <div className="flex flex-wrap gap-2 text-xs">
+                    <button type="button" className="underline" disabled={busyId !== null}
+                      onClick={() => void handleRegen(s.id, false, "image")}>Generate still only</button>
+                    {pickMotionBeats(shots.length, bundle.brief.motionMode ?? "off").includes(s.index) && (
+                      <button type="button" className="underline" disabled={busyId !== null}
+                        onClick={() => void handleRegen(s.id, false, "motion")}>Regenerate motion only</button>
+                    )}
+                  </div>}
                   <button
                     onClick={() => setReplaceFor({ id: s.id, index: i })}
                     disabled={busyId === s.id}

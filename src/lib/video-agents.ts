@@ -1,3 +1,4 @@
+import { shotRepairPlan, type ShotRepair } from "./shot-repair";
 import { exportDimensions, type VideoExportSettings } from "./video-export";
 import {
   isAdvancedVideoModel,
@@ -2058,6 +2059,7 @@ async function generateOneShot(
   signal: AbortSignal,
   characterRef?: string | null,
   totalShots?: number,
+  repair: ShotRepair = "shot",
 ): Promise<{ blobKey: string; kind: "clip" | "image"; mime: string; previewUrl: string }> {
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
 
@@ -2065,16 +2067,26 @@ async function generateOneShot(
   // the face stays the same; if that render fails, fall back to text-only.
   let img: string | null = null;
   const veo = isAdvancedVideoModel(brief.motionModel);
+  const mode = brief.motionMode ?? "off";
+  const plan = shotRepairPlan(repair, Boolean(totalShots && pickMotionBeats(totalShots, mode).includes(shot.index)));
+
   const sourceSlot = `${shot.id}-motion-source`;
-  if (veo || shot.blobKey == null) {
+  if (repair === "motion" && shot.kind === "image" && shot.blobKey && !veo) {
+    const still = await loadShotObjectURL(shot.blobKey);
+    if (still) {
+      try { img = await blobToDataUrl(await dataUrlToBlob(still)); }
+      finally { URL.revokeObjectURL(still); }
+    }
+  }
+  if (!img && repair !== "image" && (repair === "motion" || veo || shot.blobKey == null)) {
     const cached = await motionSourceObjectURL(jobId, sourceSlot);
     if (cached) {
-      try {
-        img = await blobToDataUrl(await dataUrlToBlob(cached));
-      } finally {
-        URL.revokeObjectURL(cached);
-      }
+      try { img = await blobToDataUrl(await dataUrlToBlob(cached)); }
+      finally { URL.revokeObjectURL(cached); }
     }
+  }
+  if (plan.requiresExistingStill && !img) {
+    throw new Error("The original still is unavailable. Use Regenerate this shot to make a new source.");
   }
   if (!img && characterRef && shot.hasCharacter !== false) {
     img = await fetchSceneImageWithCharacter(shot.prompt, characterRef, brief.aspectRatio);
@@ -2088,14 +2100,11 @@ async function generateOneShot(
   // Real motion: animate the still into a clip for the beats the user chose
   // (key moments or all). The image is the first frame, so faces and outfits
   // stay consistent. Any failure keeps the still (camera-move) version.
-  const mode = brief.motionMode ?? "off";
-  if (mode !== "off" && totalShots && pickMotionBeats(totalShots, mode).includes(shot.index)) {
+  if (plan.generateMotion) {
     // shot.prompt is the director's English, text-free frame description.
-    if (veo) {
-      const source = await dataUrlToBlob(img);
-      await saveShotBlob(jobId, sourceSlot, source);
-      img = await blobToDataUrl(source);
-    }
+    const source = await dataUrlToBlob(img);
+    await saveShotBlob(jobId, sourceSlot, source);
+    if (veo) img = await blobToDataUrl(source);
     const clipBlob = await fetchMotionClip(
       img,
       motionPromptFor(
@@ -2131,6 +2140,7 @@ async function generateOneShot(
     }
   }
 
+  if (!plan.permitsStillFallback) throw new Error("Motion generation failed. The previous shot was preserved.");
   const blob = await dataUrlToBlob(img);
   const key = await saveShotBlob(jobId, shot.id, blob);
   const url = await loadShotObjectURL(key);
@@ -2934,11 +2944,16 @@ export async function regenerateShot(
   onEvent: (ev: JobEvent) => void,
   signal?: AbortSignal,
   newVeoRevision = false,
+  repair: ShotRepair = "shot",
 ): Promise<void> {
   const job = await getJob(jobId);
   if (!job) return;
   const shot = job.shots.find((s) => s.id === shotId);
   if (!shot) return;
+
+  if (repair !== "shot" && isAdvancedVideoModel(brief.motionModel)) {
+    throw new Error("Use the existing Veo shot recovery controls for this provider.");
+  }
 
   if (newVeoRevision) {
     const revision = (shot.motionRevision ?? 0) + 1;
@@ -2969,8 +2984,8 @@ export async function regenerateShot(
   const onAbort = () => controller.abort();
   signal?.addEventListener("abort", onAbort);
   try {
-    const characterRef = shot.hasCharacter !== false ? await ensureCharacterReference(job, brief) : null;
-    const out = await generateOneShot(shot, brief, job.id, controller.signal, characterRef, job.shots.length);
+    const characterRef = repair !== "motion" && shot.hasCharacter !== false ? await ensureCharacterReference(job, brief) : null;
+    const out = await generateOneShot(shot, brief, job.id, controller.signal, characterRef, job.shots.length, repair);
     const prior = shot.previousAsset;
     shot.previousAsset = snapshot ?? prior;
     shot.status = "done";
