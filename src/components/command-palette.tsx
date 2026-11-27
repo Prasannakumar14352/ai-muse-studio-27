@@ -12,6 +12,7 @@ import {
   Bot, Palette, Library, Store, Target, Search, Calendar as CalendarIcon,
   Plug, Linkedin, Wallet, CreditCard, Receipt, Settings, BarChart3, Crown,
   Split, FolderKanban, Plus, LogOut,
+  MessageCircle,
 } from "lucide-react";
 import { isHiddenPath } from "@/lib/hidden-features";
 
@@ -34,6 +35,7 @@ const NAV: Intent[] = [
   { label: "Brand Kit", icon: Palette, to: "/brand-kit", keywords: "brand identity colors logo" },
   { label: "Media Library", icon: Library, to: "/library", keywords: "assets library media files" },
   { label: "Publish / Connections", icon: Plug, to: "/connections", keywords: "publish social accounts" },
+  { label: "Auto DM", icon: MessageCircle, to: "/auto-dm", keywords: "instagram facebook comment dm reply automation" },
   { label: "Analytics", icon: BarChart3, to: "/analytics", keywords: "stats performance" },
   { label: "Marketplace", icon: Store, to: "/marketplace", keywords: "templates marketplace" },
   { label: "Settings", icon: Settings, to: "/settings", keywords: "preferences" },

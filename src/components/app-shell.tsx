@@ -5,6 +5,7 @@ import {
   Settings, CreditCard, LogOut, Menu, X, Crown, Film, Layers, Mail, Receipt, Zap, Infinity as InfinityIcon, Wallet, Sparkles, Plug, Linkedin,
   ChevronLeft, Search, Bot, Palette, Split, BarChart3, Store, Target, Calendar as CalendarIcon, Library, Megaphone, Tag,
   Bell, User as UserIcon, FolderKanban, Command as CommandIcon, Clapperboard, Lock, Repeat, Wand2, ChevronDown, Home,
+  MessageCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -117,6 +118,8 @@ const SECTIONS: readonly NavSection[] = [
     label: "Publish",
     items: [
       { to: "/connections", label: "Connections", icon: Plug },
+      // Remove `soon` once Meta App Review is approved and Auto DM is live.
+      { to: "/auto-dm", label: "Auto DM", icon: MessageCircle, soon: true },
     ],
   },
   {
