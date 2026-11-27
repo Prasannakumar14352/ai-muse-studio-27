@@ -48,8 +48,10 @@ existing MiniMax fallback require separate confirmation. Narration can be
 regenerated per scene using the existing voice and text. Audio review
 preserves existing status refresh and credit-confirmed soundtrack
 regeneration. Permanent narration and soundtrack version history,
-reference-only regeneration, image/motion separation, and an admin
-reconciliation dashboard remain pending. The existing credit ledger is
+reference-only regeneration and image/motion separation remain pending.
+Admin Readiness includes a read-only snapshot for recent audio and Veo
+records, provider request IDs, storage state and ledger settlement.
+Operators still reconcile ambiguous submissions through the existing approved workflow. The existing credit ledger is
 still authoritative and server rendering adds no AI generation charge.
 
 ## Server render deployment

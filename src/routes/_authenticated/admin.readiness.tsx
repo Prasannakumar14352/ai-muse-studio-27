@@ -1,3 +1,4 @@
+import { listVideoReconciliation } from "@/lib/video-reconciliation.functions";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -21,6 +22,10 @@ function ReadinessPage() {
   const get = useServerFn(getFeatureReadinessFn);
   const caps = useServerFn(listCapabilitiesFn);
   const run = useServerFn(runReadinessCheckFn);
+  const reconcile = useServerFn(listVideoReconciliation);
+  const videoQ = useQuery({
+    queryKey: ["video-reconciliation"], queryFn: () => reconcile(), enabled: false,
+  });
   const [runningFor, setRunningFor] = useState<string | null>(null);
 
   const rowsQ = useQuery({ queryKey: ["feature_readiness"], queryFn: () => get() });
@@ -54,6 +59,26 @@ function ReadinessPage() {
           Run readiness check
         </button>
       </div>
+
+      <section className="rounded-2xl border border-border p-4 text-sm">
+        <h2 className="font-semibold">Video generation reconciliation</h2>
+        <p>Latest Veo and soundtrack records with their linked credit ledger state.</p>
+        <button type="button" className="my-2 underline" disabled={videoQ.isFetching}
+          onClick={() => void videoQ.refetch()}>Refresh reconciliation snapshot</button>
+        {videoQ.isError && <p role="alert">Could not load video reconciliation.</p>}
+        <ul className="max-h-80 space-y-2 overflow-auto">
+          {videoQ.data?.map((item) => (
+            <li key={item.id} className="rounded border border-border p-2">
+              <div>{item.kind} · {item.state} · {item.assetStored ? "asset stored" : "no stored asset"}</div>
+              <div className="break-all text-muted-foreground">Asset {item.id} · Provider request {item.providerRequestId ?? "unavailable"}</div>
+              {item.requiresReconciliation && <div className="text-amber-300">Submission requires reconciliation</div>}
+              {item.ledger ? <div>
+                Ledger {item.ledger.status} · {item.ledger.credits_reserved} reserved · {item.ledger.credits_charged} finalized · {item.ledger.credits_refunded} refunded
+              </div> : <div>Ledger record unavailable</div>}
+            </li>
+          ))}
+        </ul>
+      </section>
 
       {/* Provider registry snapshot */}
       <section className="rounded-2xl border border-border bg-white/[0.03] p-4">
