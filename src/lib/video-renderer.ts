@@ -547,8 +547,10 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   // We schedule each buffer at that scene's start on a single AudioContext,
   // route through a MediaStreamAudioDestinationNode, and pass that stream's
   // audio track into the MediaRecorder alongside the video track.
-  const hasAudio = Boolean(opts.mixAssets?.length ||
-    (opts.audioSettings?.voiceoverEnabled !== false && opts.sceneAudio?.some(Boolean)));
+  const hasAudio = Boolean(
+    opts.mixAssets?.length ||
+    (opts.audioSettings?.voiceoverEnabled !== false && opts.sceneAudio?.some(Boolean)),
+  );
   let audioCtx: AudioContext | null = null;
   let audioDest: MediaStreamAudioDestinationNode | null = null;
   if (hasAudio) {
@@ -604,12 +606,16 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
 
   if (audioCtx && audioDest) {
     scheduleAudioMix({
-      context: audioCtx, destination: audioDest, time: audioCtx.currentTime,
-      durations, sceneIds: opts.scenes.map((scene) => scene.audioSceneId),
+      context: audioCtx,
+      destination: audioDest,
+      time: audioCtx.currentTime,
+      durations,
+      sceneIds: opts.scenes.map((scene) => scene.audioSceneId),
       narration: opts.sceneAudio ?? [],
-      rates: opts.exactTimeline ? opts.audioRates ?? [] : durations.map(() => audioPlaybackRate),
-      cuts: opts.exactTimeline ? opts.audioCutSec ?? [] : [],
-      assets: opts.mixAssets ?? [], settings: opts.audioSettings,
+      rates: opts.exactTimeline ? (opts.audioRates ?? []) : durations.map(() => audioPlaybackRate),
+      cuts: opts.exactTimeline ? (opts.audioCutSec ?? []) : [],
+      assets: opts.mixAssets ?? [],
+      settings: opts.audioSettings,
     });
   }
 

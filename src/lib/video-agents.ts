@@ -1,5 +1,16 @@
-import { decodeAudioAssets, generateAudio, previewAudioMix, requestAudio, waitForAudio } from "@/lib/audio-client";
-import { isAudioTrackEnabled, planVideoAudio, sceneAudioId, type PlannedAudio } from "@/lib/audio-plan";
+import {
+  decodeAudioAssets,
+  generateAudio,
+  previewAudioMix,
+  requestAudio,
+  waitForAudio,
+} from "@/lib/audio-client";
+import {
+  isAudioTrackEnabled,
+  planVideoAudio,
+  sceneAudioId,
+  type PlannedAudio,
+} from "@/lib/audio-plan";
 import { AUDIO_LIMITS, type AudioSettings } from "@/lib/audio-generation";
 // Videos module: modular agent pipeline.
 //
@@ -934,12 +945,17 @@ export const RenderAgent = {
       transition: b.transition,
     }));
 
-    const mixAssets = await decodeAudioAssets(audioTracks.filter((track) =>
-      isAudioTrackEnabled(brief.audio, track.request.track)));
+    const mixAssets = await decodeAudioAssets(
+      audioTracks.filter((track) => isAudioTrackEnabled(brief.audio, track.request.track)),
+    );
     const result = await renderVideo({
       audioSettings: brief.audio,
       mixAssets: mixAssets.map((track) => ({
-        track: track.request.track, sceneIds: track.sceneIds, offset: track.offset, gain: track.gain, buffer: track.buffer,
+        track: track.request.track,
+        sceneIds: track.sceneIds,
+        offset: track.offset,
+        gain: track.gain,
+        buffer: track.buffer,
       })),
       title: brief.title,
       platform: VIDEO_TYPE_TO_PLATFORM[brief.videoType],
@@ -1049,8 +1065,13 @@ async function generateVideoAudio(
   previous: PlannedAudio[] = [],
 ) {
   const tracks = planVideoAudio({
-    jobId, title: brief.title, style: videoStyleLabel(brief.style), duration: brief.duration,
-    musicDirection: direction.music_direction, settings: brief.audio, scenes: script.scenes,
+    jobId,
+    title: brief.title,
+    style: videoStyleLabel(brief.style),
+    duration: brief.duration,
+    musicDirection: direction.music_direction,
+    settings: brief.audio,
+    scenes: script.scenes,
   });
   const sameRequest = (left: PlannedAudio, right: PlannedAudio) =>
     left.request.track === right.request.track &&
@@ -1071,10 +1092,13 @@ async function generateVideoAudio(
   for (const track of tracks) {
     signal?.throwIfAborted();
     if (!previous.some((item) => item.request === track.request)) {
-      const slot = Array.from({ length: AUDIO_LIMITS[track.request.track] }, (_, index) => index)
-        .find((index) => !used.has(`${track.request.track}:${index}`));
+      const slot = Array.from(
+        { length: AUDIO_LIMITS[track.request.track] },
+        (_, index) => index,
+      ).find((index) => !used.has(`${track.request.track}:${index}`));
       if (slot === undefined) {
-        track.error = "This edit needs a new audio generation slot. Disable the affected track or use a new video job.";
+        track.error =
+          "This edit needs a new audio generation slot. Disable the affected track or use a new video job.";
         continue;
       }
       track.request.slot = slot;
@@ -1094,14 +1118,23 @@ async function generateVideoAudio(
 
 function stripAudioUrls(tracks: PlannedAudio[]) {
   return tracks.map((track) => ({
-    ...track, asset: track.asset ? { ...track.asset, url: undefined } : undefined,
+    ...track,
+    asset: track.asset ? { ...track.asset, url: undefined } : undefined,
   }));
 }
 
 function mergeSavedAudio(previous: PlannedAudio[] = [], current: PlannedAudio[]) {
   const active = stripAudioUrls(current).filter((track) => track.asset);
-  return [...previous.filter((item) => !active.some((track) =>
-    track.request.track === item.request.track && track.request.slot === item.request.slot)), ...active];
+  return [
+    ...previous.filter(
+      (item) =>
+        !active.some(
+          (track) =>
+            track.request.track === item.request.track && track.request.slot === item.request.slot,
+        ),
+    ),
+    ...active,
+  ];
 }
 
 export async function persistReviewAudio(jobId: string, bundle: AssetGenerationBundle) {
@@ -1114,16 +1147,31 @@ export async function persistReviewAudio(jobId: string, bundle: AssetGenerationB
 
 export async function previewReviewAudio(bundle: AssetGenerationBundle) {
   const { brief, script, voiceover } = bundle;
-  const durations = slotsForTarget(script.scenes.map((scene) => parseSec(scene.duration)), brief.duration);
+  const durations = slotsForTarget(
+    script.scenes.map((scene) => parseSec(scene.duration)),
+    brief.duration,
+  );
   const narration = voiceover.map((clip) => clip.buffer ?? null);
-  const fits = fitNarrationToSlots(durations, durations.map((_, i) => narration[i]?.duration ?? null));
-  const assets = await decodeAudioAssets(bundle.audioTracks.filter((track) =>
-    isAudioTrackEnabled(brief.audio, track.request.track)));
+  const fits = fitNarrationToSlots(
+    durations,
+    durations.map((_, i) => narration[i]?.duration ?? null),
+  );
+  const assets = await decodeAudioAssets(
+    bundle.audioTracks.filter((track) => isAudioTrackEnabled(brief.audio, track.request.track)),
+  );
   return previewAudioMix({
-    durations, narration, settings: brief.audio, sceneIds: script.scenes.map(sceneAudioId),
-    rates: fits.map((fit) => fit.rate), cuts: fits.map((fit) => fit.trimmed ? fit.playSec : null),
+    durations,
+    narration,
+    settings: brief.audio,
+    sceneIds: script.scenes.map(sceneAudioId),
+    rates: fits.map((fit) => fit.rate),
+    cuts: fits.map((fit) => (fit.trimmed ? fit.playSec : null)),
     assets: assets.map((track) => ({
-      track: track.request.track, sceneIds: track.sceneIds, offset: track.offset, gain: track.gain, buffer: track.buffer,
+      track: track.request.track,
+      sceneIds: track.sceneIds,
+      offset: track.offset,
+      gain: track.gain,
+      buffer: track.buffer,
     })),
   });
 }
@@ -1573,7 +1621,9 @@ export async function runVideoPipeline(
   );
   const subtitles = await mark("subtitles", () => SubtitleAgent.run(script, voiceover));
   const timeline = await mark("edit", () => VideoEditingAgent.run(script, voiceover));
-  const audioTracks = await mark("music", () => generateVideoAudio(brief, crypto.randomUUID(), direction, script));
+  const audioTracks = await mark("music", () =>
+    generateVideoAudio(brief, crypto.randomUUID(), direction, script),
+  );
   const render = await mark("render", () =>
     RenderAgent.run(brief, script, beats, visuals, voiceover, (p: number) =>
       onStep("render", "running", `${Math.round(p * 100)}%`), audioTracks
@@ -1591,7 +1641,13 @@ export async function runVideoPipeline(
 
   return {
     brief, research, retentionEngine, titles, hook: effectiveHook, intro, curiosity, script, retention, chapters,
-    storyboard, direction, visuals, voiceover, subtitles, audioTracks, timeline,
+    storyboard,
+    direction,
+    visuals,
+    voiceover,
+    subtitles,
+    audioTracks,
+    timeline,
     render, thumbnail, seo,
   };
 }
@@ -2126,7 +2182,13 @@ export async function runVideoJobPipeline(
 
   const result: PipelineResult = {
     brief, research, retentionEngine, titles, hook, intro, curiosity, script, retention, chapters,
-    storyboard, direction, visuals, voiceover, subtitles, audioTracks, timeline,
+    storyboard,
+    direction,
+    visuals,
+    voiceover,
+    subtitles,
+    audioTracks,
+    timeline,
     render, thumbnail, seo,
   };
   return { job, result };
@@ -2248,15 +2310,26 @@ async function runAssetGenerationPhaseInner(
   }
 
   if (editedScript && anyProgress && job.shots.every((shot) => shot.audioSceneId)) {
-    const sceneIndices = new Map(editedScript.scenes.map((scene, index) => [sceneAudioId(scene), index]));
+    const sceneIndices = new Map(
+      editedScript.scenes.map((scene, index) => [sceneAudioId(scene), index]),
+    );
     const retained = job.shots.filter((shot) => sceneIndices.has(shot.audioSceneId!));
     const existingSceneIds = new Set(retained.map((shot) => shot.audioSceneId));
-    const additions = planShots(editedScript, brief.style, brief.title, creativeBrief, brief.visualInstructions)
+    const additions = planShots(
+      editedScript,
+      brief.style,
+      brief.title,
+      creativeBrief,
+      brief.visualInstructions,
+    )
       .filter((shot) => !existingSceneIds.has(shot.audioSceneId))
       .map((shot) => ({ ...shot, id: crypto.randomUUID() }));
-    job.shots = [...retained, ...additions].map((shot) => ({
-      ...shot, sceneIndex: sceneIndices.get(shot.audioSceneId!) ?? shot.sceneIndex,
-    })).sort((left, right) => left.sceneIndex - right.sceneIndex || left.beatIndex - right.beatIndex)
+    job.shots = [...retained, ...additions]
+      .map((shot) => ({
+        ...shot,
+        sceneIndex: sceneIndices.get(shot.audioSceneId!) ?? shot.sceneIndex,
+      }))
+      .sort((left, right) => left.sceneIndex - right.sceneIndex || left.beatIndex - right.beatIndex)
       .map((shot, index) => ({ ...shot, index }));
     job.shotsTotal = job.shots.length;
   }
@@ -2401,7 +2474,14 @@ async function runAssetGenerationPhaseInner(
   }
   const subtitles = await SubtitleAgent.run(script, voiceover);
   const timeline = await VideoEditingAgent.run(script, voiceover);
-  const audioTracks = await generateVideoAudio(brief, job.id, direction, script, signal, job.audioTracks);
+  const audioTracks = await generateVideoAudio(
+    brief,
+    job.id,
+    direction,
+    script,
+    signal,
+    job.audioTracks,
+  );
   job.audioTracks = mergeSavedAudio(job.audioTracks, audioTracks);
   if (job.audioMixSettings && job.audioPlanSettings === JSON.stringify(brief.audio ?? {})) {
     brief = { ...brief, audio: job.audioMixSettings };
@@ -2420,7 +2500,10 @@ async function runAssetGenerationPhaseInner(
     job,
     bundle: {
       brief, research, retentionEngine, script, storyboard, direction,
-      voiceover, subtitles, timeline, audioTracks,
+      voiceover,
+      subtitles,
+      timeline,
+      audioTracks,
     },
   };
 }
@@ -2472,7 +2555,10 @@ async function runRenderPhaseInner(
   if (!job) throw new Error("Job not found");
   const {
     brief, research, retentionEngine, script, storyboard, direction,
-    voiceover, subtitles, timeline, audioTracks,
+    voiceover,
+    subtitles,
+    timeline,
+    audioTracks,
   } = bundle;
 
   // Gate: every planned shot must have a generated asset before we start
@@ -2583,7 +2669,13 @@ async function runRenderPhaseInner(
 
   const result: PipelineResult = {
     brief, research, retentionEngine, titles, hook, intro, curiosity, script, retention, chapters,
-    storyboard, direction, visuals, voiceover, subtitles, audioTracks, timeline,
+    storyboard,
+    direction,
+    visuals,
+    voiceover,
+    subtitles,
+    audioTracks,
+    timeline,
     render, thumbnail, seo,
   };
   return { job, result };

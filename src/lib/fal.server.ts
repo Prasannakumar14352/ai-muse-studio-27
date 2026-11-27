@@ -60,12 +60,19 @@ async function falFetch(url: string, init: RequestInit = {}): Promise<Response> 
 }
 
 export class FalSubmissionError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
     super(message);
   }
 }
 
-export async function falSubmit(endpoint: string, input: Record<string, unknown>, signal?: AbortSignal) {
+export async function falSubmit(
+  endpoint: string,
+  input: Record<string, unknown>,
+  signal?: AbortSignal,
+) {
   const res = await falFetch(`https://queue.fal.run/${endpoint}`, {
     method: "POST",
     signal,

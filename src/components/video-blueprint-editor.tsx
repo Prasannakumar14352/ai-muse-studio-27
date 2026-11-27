@@ -204,16 +204,19 @@ export function VideoBlueprintEditor({
     );
     scheduleAutosave({ ...bp, scenes });
   };
-  const setMusic = (music: MusicTrack | undefined) => patchGlobal({
-    music,
-    audio: music ? {
-      ...bp.audio,
-      musicVolume: music.volume,
-      fadeInSeconds: Math.max(0, Math.min(5, music.fadeInSec)),
-      fadeOutSeconds: Math.max(0, Math.min(5, music.fadeOutSec)),
-      loopMusic: music.loop,
-    } : bp.audio,
-  });
+  const setMusic = (music: MusicTrack | undefined) =>
+    patchGlobal({
+      music,
+      audio: music
+        ? {
+            ...bp.audio,
+            musicVolume: music.volume,
+            fadeInSeconds: Math.max(0, Math.min(5, music.fadeInSec)),
+            fadeOutSeconds: Math.max(0, Math.min(5, music.fadeOutSec)),
+            loopMusic: music.loop,
+          }
+        : bp.audio,
+    });
   const setSubtitleStyle = (subtitleStyle: SubtitleStyle | undefined) => patchGlobal({ subtitleStyle });
   const setCharacters = (characterLibrary: Character[]) => patchGlobal({ characterLibrary });
 
