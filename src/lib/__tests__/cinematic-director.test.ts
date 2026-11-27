@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { bibleToContinuityCard, defaultCharacterBibleFor } from "../character-bible";
+import { motionPromptFor } from "../motion-clips";
 import { CINEMATIC_STYLES, directBeatPrompt, STYLE_PRESETS } from "../visual-director";
 
 const title = "Hanuman — The Awakening of Divine Power";
@@ -69,6 +70,12 @@ describe("cinematic visual direction", () => {
     expect(result.prompt).not.toContain("white low-top sneakers");
     expect(bible.masterPortraitPrompt).toContain("simian face");
     expect(bible.masterPortraitPrompt).toContain("skin or fur");
+  });
+
+  it("retains motion direction after the frame description is capped", () => {
+    const prompt = motionPromptFor("description ".repeat(80), "sweeping aerial", instructions);
+    expect(prompt).toContain("Camera: sweeping aerial");
+    expect(prompt).toContain(instructions);
   });
 
   it("varies framing across consecutive beats with similar action", () => {

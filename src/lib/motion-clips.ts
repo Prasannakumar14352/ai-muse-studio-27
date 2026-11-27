@@ -110,13 +110,18 @@ export function estimateMotionCredits(
 }
 
 /** Motion prompt for the image-to-video model: animate what's in the frame, keep it text-free. */
-export function motionPromptFor(sceneVisual: string, cameraHint?: string): string {
+export function motionPromptFor(
+  sceneVisual: string,
+  cameraHint?: string,
+  visualDirection?: string,
+): string {
   const visual = sceneVisual.trim().slice(0, 600);
   return [
     `Animate this exact image: ${visual || "the scene"}.`,
     `Natural, believable motion — people move, gesture and react; hair, cloth, light and background details move subtly.`,
     cameraHint ? `Camera: ${cameraHint}.` : `Camera: gentle cinematic movement.`,
+    visualDirection,
     `Keep the same characters, faces, outfits and setting as the image. No new people.`,
     `No text, captions, letters or logos.`,
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 }

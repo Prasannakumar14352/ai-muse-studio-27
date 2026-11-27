@@ -1542,7 +1542,6 @@ function AssetReviewGate({
         <div className="glass rounded-2xl p-4">
           <div className="text-xs uppercase tracking-wider text-muted-foreground">Timeline</div>
           <div className="text-2xl font-bold mt-1">{Math.round(bundle.timeline.total_sec)}s</div>
-          <div className="text-xs text-muted-foreground mt-1">Music + SFX layered</div>
         </div>
       </div>
 

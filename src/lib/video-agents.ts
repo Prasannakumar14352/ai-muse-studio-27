@@ -1811,11 +1811,15 @@ async function generateOneShot(
     // shot.prompt is the director's English, text-free frame description.
     const clipBlob = await fetchMotionClip(
       img,
-      motionPromptFor([
-        shot.prompt.slice(0, 900),
-        brief.visualInstructions,
-        cinematicStyleFor(brief.style) && "Match the action and moving environment in the scene. Maintain physical contact, costume, identity and motivated lighting. Show foreground and background parallax consistent with the camera motion.",
-      ].filter(Boolean).join(" ")),
+      motionPromptFor(
+        shot.prompt.slice(0, 500),
+        cinematicStyleFor(brief.style) ? shot.prompt.split(", composed on", 1)[0] : undefined,
+        [
+          brief.visualInstructions,
+          cinematicStyleFor(brief.style) &&
+            "Preserve physical contact, costume, identity and lighting. Keep foreground and background motion consistent with the camera.",
+        ].filter(Boolean).join(" "),
+      ),
       TARGET_BEAT_SEC,
       brief.motionTier ?? "standard",
       signal,
