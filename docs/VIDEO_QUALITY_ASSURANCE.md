@@ -48,7 +48,11 @@ existing MiniMax fallback require separate confirmation. Narration can be
 regenerated per scene using the existing voice and text. Audio review
 preserves existing status refresh and credit-confirmed soundtrack
 regeneration. Permanent narration and soundtrack version history,
-reference-only regeneration and image/motion separation remain pending.
+reference-only regeneration remains pending. MiniMax and Kling shots offer
+separate still-only and motion-only repair. Motion-only uses the current still
+or the source image cached during generation and preserves the prior shot on
+failure. Older clips without their original still need whole-shot regeneration.
+Veo continues through its durable whole-shot recovery and revision controls.
 Admin Readiness includes a read-only snapshot for recent audio and Veo
 records, provider request IDs, storage state and ledger settlement.
 Operators still reconcile ambiguous submissions through the existing approved workflow. The existing credit ledger is

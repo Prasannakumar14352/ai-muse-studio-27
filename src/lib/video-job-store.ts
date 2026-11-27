@@ -37,7 +37,8 @@ export type ShotRecord = {
   index: number;
   sceneIndex: number;
   motionRevision?: number;
-  previousAsset?: { blobKey: string; kind: ShotKind; mime: string | null };
+  motionSourceKey?: string;
+  previousAsset?: { blobKey: string; kind: ShotKind; mime: string | null; motionSourceKey?: string };
   audioSceneId?: string;
   beatIndex: number;
   isFirstOfScene: boolean;
@@ -121,7 +122,7 @@ export async function snapshotShot(jobId: string, shot: ShotRecord) {
   const blob = await getBlob(shot.blobKey, { localOnly: true });
   if (!blob) throw new Error("Current shot could not be saved for rollback");
   const blobKey = await saveShotBlob(jobId, `${shot.id}-history-${crypto.randomUUID()}`, blob);
-  return { blobKey, kind: shot.kind, mime: shot.mime };
+  return { blobKey, kind: shot.kind, mime: shot.mime, motionSourceKey: shot.motionSourceKey };
 }
 
 export async function removeShotSnapshot(snapshot: ShotRecord["previousAsset"]) {
