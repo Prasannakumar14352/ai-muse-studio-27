@@ -4,7 +4,7 @@ import {
   exportEncoding,
   type VideoExportSettings,
 } from "./video-export";
-import { scheduleAudioMix, type MixAsset } from "./audio-mixer";
+import { duckUnderSpeech, scheduleAudioMix, type MixAsset } from "./audio-mixer";
 import type { AudioSettings } from "./audio-generation";
 // Client-side video renderer: draws each scene onto a canvas and records with
 // MediaRecorder. Produces a real downloadable file (MP4 where the browser
@@ -661,10 +661,11 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   recorder.start(250);
 
   if (audioCtx && audioDest) {
-    const mixBus = scheduleAudioMix({
+    const mixStart = audioCtx.currentTime;
+    const { bus: mixBus, speech } = scheduleAudioMix({
       context: audioCtx,
       destination: audioDest,
-      time: audioCtx.currentTime,
+      time: mixStart,
       durations,
       sceneIds: opts.scenes.map((scene) => scene.audioSceneId),
       narration: opts.sceneAudio ?? [],
@@ -678,7 +679,8 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       if (!clip) return;
       const source = audioCtx!.createMediaElementSource(clip);
       const gain = audioCtx!.createGain();
-      gain.gain.value = nativeGainFor(index);
+      // Hybrid: the voiceover leads, so clip audio dips while narration plays.
+      duckUnderSpeech(gain.gain, nativeGainFor(index), speech, mixStart);
       source.connect(gain);
       gain.connect(mixBus);
       // The media element feeds only the recorder's mix bus.

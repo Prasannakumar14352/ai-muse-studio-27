@@ -180,5 +180,28 @@ export function scheduleAudioMix(input: {
       }
     }
   }
-  return mixBus;
+  return { bus: mixBus, speech: mergeWindows(narration, 0.37) };
+}
+
+/**
+ * Lower a clip-audio gain while the voiceover is speaking, so speech baked into
+ * an AI clip (Veo can return dialogue even when asked not to) never talks over
+ * the narration. Same attack/release as music ducking.
+ */
+export function duckUnderSpeech(
+  gain: AudioParam,
+  level: number,
+  speech: Array<{ start: number; end: number }>,
+  time: number,
+  ducked = 0.12,
+) {
+  const attack = 0.12;
+  const release = 0.25;
+  gain.setValueAtTime(level, time);
+  for (const spoken of speech) {
+    gain.setValueAtTime(level, time + Math.max(0, spoken.start - attack));
+    gain.linearRampToValueAtTime(level * ducked, time + Math.max(0.01, spoken.start));
+    gain.setValueAtTime(level * ducked, time + Math.max(spoken.end, spoken.start + 0.01));
+    gain.linearRampToValueAtTime(level, time + spoken.end + release);
+  }
 }
