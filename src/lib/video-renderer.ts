@@ -1,3 +1,9 @@
+import {
+  browserExportSchema,
+  exportDimensions,
+  exportEncoding,
+  type VideoExportSettings,
+} from "./video-export";
 import { scheduleAudioMix, type MixAsset } from "./audio-mixer";
 import type { AudioSettings } from "./audio-generation";
 // Client-side video renderer: draws each scene onto a canvas and records with
@@ -49,6 +55,7 @@ export type RenderOptions = {
   styleId?: string | null;
   contentType?: string | null; // "long_video" | "short_reel" | ...
   fps?: number;
+  exportSettings?: VideoExportSettings;
   onProgress?: (p: number) => void; // 0..1
   sceneImages?: Array<string | null>;
   /**
@@ -287,7 +294,10 @@ function drawScene(
   media: Drawable,
   scene: RenderScene,
   opts: {
-    progress: number; accent: string; showOnScreenText?: boolean;
+    progress: number;
+    accent: string;
+    showOnScreenText?: boolean;
+    fit?: "fit" | "crop";
   },
 ) {
   const { width: W, height: H } = ctx.canvas;
@@ -328,12 +338,19 @@ function drawScene(
   ctx.fillRect(0, 0, W, H);
   const size = drawableSize(media);
   if (media && size.w > 0 && size.h > 0) {
-    const ratio = Math.max(W / size.w, H / size.h) * scale;
+    const fitting = opts.fit === "fit";
+    const ratio = fitting
+      ? Math.min(W / size.w, H / size.h) * Math.min(1, scale)
+      : Math.max(W / size.w, H / size.h) * scale;
     const dw = size.w * ratio;
     const dh = size.h * ratio;
-    const dx = (W - dw) / 2 + panX * W;
-    const dy = (H - dh) / 2 + panY * H;
-    if (rotate !== 0 || skewX !== 0) {
+    const dx = fitting
+      ? Math.max(0, Math.min(W - dw, (W - dw) / 2 + panX * W))
+      : (W - dw) / 2 + panX * W;
+    const dy = fitting
+      ? Math.max(0, Math.min(H - dh, (H - dh) / 2 + panY * H))
+      : (H - dh) / 2 + panY * H;
+    if (!fitting && (rotate !== 0 || skewX !== 0)) {
       ctx.save();
       ctx.translate(W / 2, H / 2);
       if (rotate !== 0) ctx.rotate(rotate);
@@ -452,6 +469,7 @@ function wrapText(
 function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 
 export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
+  opts.signal?.throwIfAborted();
   // Fetch the lazy WebM helper NOW, not after a long render: if the site is
   // redeployed mid-render, the old build's chunk would no longer exist.
   const webmFixModule = import("webm-duration-fix").catch(() => null);
@@ -460,9 +478,14 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
     opts.contentType === "short_reel" ||
     opts.platform === "tiktok" ||
     opts.platform === "instagram";
-  const W = isVertical ? 720 : 1280;
-  const H = isVertical ? 1280 : 720;
-  const fps = opts.fps ?? 30;
+  const settings = opts.exportSettings ? browserExportSchema.parse(opts.exportSettings) : undefined;
+  const [W, H] = settings
+    ? exportDimensions(settings.resolution, settings.aspectRatio)
+    : isVertical
+      ? [720, 1280]
+      : [1280, 720];
+  const fps = settings?.fps ?? opts.fps ?? 30;
+  const encoding = settings ? exportEncoding(settings) : undefined;
 
   const canvas = document.createElement("canvas");
   canvas.width = W;
@@ -488,6 +511,8 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       return stillSrc ? await loadImage(stillSrc) : null;
     }),
   ]);
+
+  opts.signal?.throwIfAborted();
 
   // Scene durations — stretched to fit voiceover audio when requested so the
   // audio never cuts off mid-sentence.
@@ -591,16 +616,30 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   videoStream.getVideoTracks().forEach((t) => combined.addTrack(t));
   if (audioDest) audioDest.stream.getAudioTracks().forEach((t) => combined.addTrack(t));
 
-  const { mime, ext } = pickRecorderMime(opts.preferredContainer);
+  const { mime, ext } = pickRecorderMime(
+    settings?.format === "webm" ? "webm" : opts.preferredContainer,
+  );
   LOG("start recording", { mime, ext, W, H, fps, beats: beatCount, totalDuration, hasAudio });
-  const recorder = new MediaRecorder(combined, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
+  if (settings?.format === "webm" && ext !== "webm") {
+    combined.getTracks().forEach((track) => track.stop());
+    if (audioCtx) await audioCtx.close();
+    throw new Error("This browser cannot record WebM. Choose MP4 export.");
+  }
+  const recorder = new MediaRecorder(combined, {
+    mimeType: mime,
+    videoBitsPerSecond: encoding?.videoBps ?? 4_000_000,
+    audioBitsPerSecond: encoding ? encoding.audioKbps * 1000 : undefined,
+  });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
   const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
 
   drawScene(ctx, sceneMedia[0] ?? fallbackImg, opts.scenes[0], {
-    progress: 0, accent: style.accent, showOnScreenText: opts.showOnScreenText,
+    progress: 0,
+    accent: style.accent,
+    showOnScreenText: settings?.subtitles ?? opts.showOnScreenText,
+    fit: settings?.fit,
   });
   requestFrame();
 
@@ -674,7 +713,10 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       }
       playIfClip(sceneIdx);
       drawScene(ctx, sceneMedia[sceneIdx] ?? fallbackImg, opts.scenes[sceneIdx], {
-        progress: localProgress, accent: style.accent, showOnScreenText: opts.showOnScreenText,
+        progress: localProgress,
+        accent: style.accent,
+        showOnScreenText: settings?.subtitles ?? opts.showOnScreenText,
+        fit: settings?.fit,
       });
       requestFrame();
       opts.onProgress?.(clamped / totalDuration);

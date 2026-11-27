@@ -37,15 +37,12 @@ it("requires authentication before model selection", async () => {
   expect((await post({ request: request("veo-fast") })).status).toBe(401);
 });
 
-it.each([
-  ["false", "advanced_video_disabled"],
-  ["true", "advanced_video_schema_unverified"],
-])("fails closed for a gated Veo request when flag is %s", async (flag, reason) => {
+it("fails closed when the paid Veo flag is false", async () => {
   auth.user.mockResolvedValue("owner");
-  vi.stubEnv("VIDEO_ADVANCED_MODELS_ENABLED", flag);
+  vi.stubEnv("VIDEO_ADVANCED_MODELS_ENABLED", "false");
   const result = await post({ request: request("veo-fast") });
   expect(result.status).toBe(503);
-  expect(await result.json()).toEqual({ ok: false, reason });
+  expect(await result.json()).toEqual({ ok: false, reason: "advanced_video_disabled" });
 });
 
 it("rejects arbitrary endpoint IDs rather than forwarding them", async () => {

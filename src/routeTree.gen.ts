@@ -52,6 +52,7 @@ import { Route as AuthenticatedVideosRouteImport } from './routes/_authenticated
 import { Route as ApiGenerateAudioRouteImport } from './routes/api/generate-audio'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as ApiGenerateVideoClipRouteImport } from './routes/api/generate-video-clip'
+import { Route as ApiProfessionalRenderRouteImport } from './routes/api/professional-render'
 import { Route as ApiTranscodeVideoRouteImport } from './routes/api/transcode-video'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiVideoClipStatusRouteImport } from './routes/api/video-clip-status'
@@ -304,6 +305,11 @@ const ApiGenerateVideoClipRoute = ApiGenerateVideoClipRouteImport.update({
   path: '/api/generate-video-clip',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProfessionalRenderRoute = ApiProfessionalRenderRouteImport.update({
+  id: '/api/professional-render',
+  path: '/api/professional-render',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTranscodeVideoRoute = ApiTranscodeVideoRouteImport.update({
   id: '/api/transcode-video',
   path: '/api/transcode-video',
@@ -526,6 +532,7 @@ export interface FileRoutesByFullPath {
   '/api/generate-audio': typeof ApiGenerateAudioRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
+  '/api/professional-render': typeof ApiProfessionalRenderRoute
   '/api/transcode-video': typeof ApiTranscodeVideoRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/video-clip-status': typeof ApiVideoClipStatusRoute
@@ -599,6 +606,7 @@ export interface FileRoutesByTo {
   '/api/generate-audio': typeof ApiGenerateAudioRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
+  '/api/professional-render': typeof ApiProfessionalRenderRoute
   '/api/transcode-video': typeof ApiTranscodeVideoRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/video-clip-status': typeof ApiVideoClipStatusRoute
@@ -676,6 +684,7 @@ export interface FileRoutesById {
   '/api/generate-audio': typeof ApiGenerateAudioRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/api/generate-video-clip': typeof ApiGenerateVideoClipRoute
+  '/api/professional-render': typeof ApiProfessionalRenderRoute
   '/api/transcode-video': typeof ApiTranscodeVideoRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/video-clip-status': typeof ApiVideoClipStatusRoute
@@ -753,6 +762,7 @@ export interface FileRouteTypes {
     | '/api/generate-audio'
     | '/api/generate-image'
     | '/api/generate-video-clip'
+    | '/api/professional-render'
     | '/api/transcode-video'
     | '/api/tts'
     | '/api/video-clip-status'
@@ -826,6 +836,7 @@ export interface FileRouteTypes {
     | '/api/generate-audio'
     | '/api/generate-image'
     | '/api/generate-video-clip'
+    | '/api/professional-render'
     | '/api/transcode-video'
     | '/api/tts'
     | '/api/video-clip-status'
@@ -902,6 +913,7 @@ export interface FileRouteTypes {
     | '/api/generate-audio'
     | '/api/generate-image'
     | '/api/generate-video-clip'
+    | '/api/professional-render'
     | '/api/transcode-video'
     | '/api/tts'
     | '/api/video-clip-status'
@@ -949,6 +961,7 @@ export interface RootRouteChildren {
   ApiGenerateAudioRoute: typeof ApiGenerateAudioRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   ApiGenerateVideoClipRoute: typeof ApiGenerateVideoClipRoute
+  ApiProfessionalRenderRoute: typeof ApiProfessionalRenderRoute
   ApiTranscodeVideoRoute: typeof ApiTranscodeVideoRoute
   ApiTtsRoute: typeof ApiTtsRoute
   ApiVideoClipStatusRoute: typeof ApiVideoClipStatusRoute
@@ -1263,6 +1276,13 @@ declare module '@tanstack/react-router' {
       path: '/api/generate-video-clip'
       fullPath: '/api/generate-video-clip'
       preLoaderRoute: typeof ApiGenerateVideoClipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/professional-render': {
+      id: '/api/professional-render'
+      path: '/api/professional-render'
+      fullPath: '/api/professional-render'
+      preLoaderRoute: typeof ApiProfessionalRenderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/transcode-video': {
@@ -1643,6 +1663,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGenerateAudioRoute: ApiGenerateAudioRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   ApiGenerateVideoClipRoute: ApiGenerateVideoClipRoute,
+  ApiProfessionalRenderRoute: ApiProfessionalRenderRoute,
   ApiTranscodeVideoRoute: ApiTranscodeVideoRoute,
   ApiTtsRoute: ApiTtsRoute,
   ApiVideoClipStatusRoute: ApiVideoClipStatusRoute,

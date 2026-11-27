@@ -15,6 +15,14 @@ import { jobTagFromRequest } from "@/lib/job-credit-tag";
 export const Route = createFileRoute("/api/generate-video-clip")({
   server: {
     handlers: {
+      GET: () =>
+        Response.json(
+          {
+            veo:
+              process.env[ADVANCED_VIDEO_FEATURE_FLAG] === "true" && Boolean(process.env.FAL_KEY),
+          },
+          { headers: { "Cache-Control": "no-store" } },
+        ),
       POST: async ({ request }) => {
         const { getUserIdFromRequest, unauthorized } = await import("@/lib/route-auth.server");
         const userId = await getUserIdFromRequest(request);
@@ -33,14 +41,18 @@ export const Route = createFileRoute("/api/generate-video-clip")({
           return Response.json({ ok: false, reason: "bad_json" }, { status: 400 });
         }
         if (isAdvancedVideoModel(body.model)) {
-          const enabled = process.env[ADVANCED_VIDEO_FEATURE_FLAG] === "true";
-          return Response.json(
-            {
-              ok: false,
-              reason: enabled ? "advanced_video_schema_unverified" : "advanced_video_disabled",
-            },
-            { status: 503 },
-          );
+          if (process.env[ADVANCED_VIDEO_FEATURE_FLAG] !== "true") {
+            return Response.json({ ok: false, reason: "advanced_video_disabled" }, { status: 503 });
+          }
+          try {
+            const { startVeoClip } = await import("@/lib/veo-motion.server");
+            return await startVeoClip(userId, body);
+          } catch {
+            return Response.json(
+              { ok: false, reason: "Motion service is temporarily unavailable" },
+              { status: 503 },
+            );
+          }
         }
         if (body.model !== undefined && body.model !== "standard" && body.model !== "premium") {
           return Response.json({ ok: false, reason: "unknown_video_model" }, { status: 400 });

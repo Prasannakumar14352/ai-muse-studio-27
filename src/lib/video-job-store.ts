@@ -1,3 +1,4 @@
+import type { VideoExportSettings } from "./video-export";
 import type { SceneAudioSource } from "./advanced-video-models";
 import type { PlannedAudio } from "./audio-plan";
 import type { AudioSettings } from "./audio-generation";
@@ -28,6 +29,7 @@ export type ShotRecord = {
   id: string;
   index: number;
   sceneIndex: number;
+  motionRevision?: number;
   audioSceneId?: string;
   beatIndex: number;
   isFirstOfScene: boolean;
@@ -72,6 +74,7 @@ export type JobRecord = {
   characterRefKey?: string | null;
   audioTracks?: PlannedAudio[];
   audioMixSettings?: AudioSettings;
+  exportSettings?: VideoExportSettings;
   nativeAudioSettings?: {
     sceneAudioSource?: SceneAudioSource;
     nativeAudioVolume?: number;
@@ -102,6 +105,11 @@ function readJson<T>(key: string, fallback: T): T {
 }
 function writeJson(key: string, value: unknown) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* quota */ }
+}
+
+export async function motionSourceObjectURL(jobId: string, shotId: string) {
+  const user = await currentUserId();
+  return user ? loadShotObjectURL(shotBlobKey(user, jobId, shotId)) : null;
 }
 
 export async function createJob(
