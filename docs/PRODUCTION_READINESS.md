@@ -67,3 +67,12 @@ Pricing, rate limits, commercial usage and availability must be verified against
 | Customer journey | Sign-up, verified test payment, entitlement, generation, export and atomic remaining balance |
 
 Run these in staging with deterministic media, mock providers, and test-only payment credentials before executing a separately approved live run. See [Video quality assurance](VIDEO_QUALITY_ASSURANCE.md) and [Showcase and templates](VIDEO_SHOWCASE_AND_TEMPLATES.md).
+
+## Local verification results
+
+- `npm ci` completed. npm flagged optional install-script approvals. Fixtures used system FFmpeg and FFprobe.
+- Vitest passed 147 tests. TypeScript and the production build passed.
+- Isolated PostgreSQL 17 checked private export approval bindings, project invalidation, credit-pack duplicate delivery, concurrent separate purchases, and rollback when the wallet row is missing. This fixture does not install the full Supabase stack.
+- Chromium audio export smoke passed six synthetic cases. The FFmpeg composition worker verified audible AAC and exact output for 3840 × 2160, 2160 × 3840, 2160 × 2160 square, 1080 × 1920 and 720 × 720. These sources are synthetic and upscaled. The worker smoke does not exercise a live queue or storage backend.
+- The repository-wide lint backlog remains. The baseline reported 14,647 errors and 43 warnings. CI surfaces the lint result while keeping automated checks usable.
+- `npm audit --omit=dev` reported 27 advisories, including 21 high and zero critical. This result includes build-tool dependencies and does not establish production exploitability.

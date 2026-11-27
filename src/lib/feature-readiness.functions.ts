@@ -67,18 +67,18 @@ export const runReadinessCheckFn = createServerFn({ method: "POST" })
       },
     };
 
-    // Static per-feature app-side checks (UI + backend + persistence).
-    // These reflect what THIS turn actually shipped.
+    // App-side indicators describe the implemented surfaces. This probe never
+    // submits provider work, so live generation remains unverified.
     const appChecks: Record<FeatureId, Partial<Record<keyof FeatureReadinessRow, boolean>>> = {
       seo_package: {
         ui_implemented: true, backend_implemented: true,
-        generation_tested: true, credits_tested: true,
+        generation_tested: false, credits_tested: true,
         preview_tested: true, download_tested: true,
         persistence_tested: true, retry_tested: true, no_production_mocks: true,
       },
       image_editing: {
         ui_implemented: true, backend_implemented: true,
-        generation_tested: true, credits_tested: true,
+        generation_tested: false, credits_tested: true,
         preview_tested: true, download_tested: true,
         persistence_tested: true, retry_tested: true, no_production_mocks: true,
       },

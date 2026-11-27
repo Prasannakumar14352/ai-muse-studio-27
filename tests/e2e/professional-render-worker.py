@@ -25,9 +25,13 @@ with tempfile.TemporaryDirectory() as work:
                     str(tone)], check=True)
 
     for resolution, aspect, fps, expected in [
-        ("4k", "16:9", 24, (3840, 2160)), ("720p", "1:1", 30, (720, 720)),
+        ("4k", "16:9", 24, (3840, 2160)),
+        ("4k", "9:16", 24, (2160, 3840)),
+        ("4k", "1:1", 24, (2160, 2160)),
+        ("1080p", "9:16", 30, (1080, 1920)),
+        ("720p", "1:1", 30, (720, 720)),
     ]:
-        destination = directory / resolution
+        destination = directory / f"{resolution}-{aspect.replace(':', 'x')}"
         destination.mkdir()
         manifest = {
             "resolution": resolution, "fps": fps, "aspectRatio": aspect, "fit": "fit",
