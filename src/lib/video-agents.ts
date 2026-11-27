@@ -965,7 +965,7 @@ export const RenderAgent = {
     const mixAssets = await decodeAudioAssets(
       nativeOnly
         ? []
-      audioTracks.filter((track) => isAudioTrackEnabled(brief.audio, track.request.track)),
+        : audioTracks.filter((track) => isAudioTrackEnabled(brief.audio, track.request.track)),
     );
     const result = await renderVideo({
       audioSettings: nativeOnly ? { ...brief.audio, voiceoverEnabled: false } : brief.audio,
