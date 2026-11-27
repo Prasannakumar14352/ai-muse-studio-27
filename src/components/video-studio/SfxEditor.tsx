@@ -40,7 +40,7 @@ export function SfxEditor({ blueprint, onUpdateScene }: SfxEditorProps) {
         <Volume2 className="h-4 w-4" /> Sound effects
       </div>
       <p className="text-xs text-muted-foreground">
-        Add whooshes, impacts, or UI cues per scene. Cues render as markers on the timeline.
+        Place effects on a scene. Turn on Sound effects in Audio settings to generate them.
       </p>
       <div className="space-y-3">
         {blueprint.scenes.map((s) => (

@@ -1,3 +1,4 @@
+import type { AudioSettings } from "./audio-generation";
 // Structured Video Blueprint — the single source of truth for a video.
 // Once the AI planning agents produce their draft, everything the user sees
 // in the editor and everything the renderer uses lives in this shape.
@@ -131,6 +132,7 @@ export type VideoBlueprint = {
   product: string;
   cta: string;
   visualInstructions?: string;
+  audio?: AudioSettings;
   globalVisualStyle: string;          // extra style guardrails
   globalNegative: string;             // global negative prompt
   musicDirection: string;
@@ -267,6 +269,7 @@ export function buildBlueprintFromPlanning(
     product: opts.product ?? "",
     cta: opts.cta ?? "",
     visualInstructions: brief.visualInstructions,
+    audio: brief.audio,
     globalVisualStyle: script.style_note ?? "",
     globalNegative: "",
     musicDirection: opts.musicDirection ?? "",
@@ -332,6 +335,8 @@ export function nextCharacterId(): string {
 export function blueprintToScript(bp: VideoBlueprint): AiVideoScript {
   const scenes: AiVideoScene[] = bp.scenes.map((s) => ({
     n: s.n,
+    audioSceneId: s.id,
+    audioCues: s.sfx,
     time_range: `${Math.round(s.startSec)}-${Math.round(s.endSec)} sec`,
     role: s.role,
     voiceover: s.voiceover,

@@ -1,3 +1,5 @@
+import type { PlannedAudio } from "./audio-plan";
+import type { AudioSettings } from "./audio-generation";
 // Async video job persistence. Job metadata lives in localStorage, per-shot
 // media blobs live in IndexedDB via blob-store.ts. Used to power resumable
 // generation: if the tab closes mid-run, on next mount we can enumerate
@@ -25,6 +27,7 @@ export type ShotRecord = {
   id: string;
   index: number;
   sceneIndex: number;
+  audioSceneId?: string;
   beatIndex: number;
   isFirstOfScene: boolean;
   text: string;
@@ -66,6 +69,9 @@ export type JobRecord = {
   shots: ShotRecord[];
   /** Blob key of the main character's reference portrait (same face in every scene). */
   characterRefKey?: string | null;
+  audioTracks?: PlannedAudio[];
+  audioMixSettings?: AudioSettings;
+  audioPlanSettings?: string;
 };
 
 let cachedUserId: string | null = null;

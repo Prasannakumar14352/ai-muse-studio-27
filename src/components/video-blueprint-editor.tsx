@@ -1,3 +1,4 @@
+import { AudioSettingsPanel } from "@/components/video-studio/AudioSettingsPanel";
 // Structured Video Blueprint Editor.
 // Renders the current blueprint from projects.metadata, autosaves edits,
 // and exposes render actions with credit estimates + pre-render validation.
@@ -203,7 +204,16 @@ export function VideoBlueprintEditor({
     );
     scheduleAutosave({ ...bp, scenes });
   };
-  const setMusic = (music: MusicTrack | undefined) => patchGlobal({ music });
+  const setMusic = (music: MusicTrack | undefined) => patchGlobal({
+    music,
+    audio: music ? {
+      ...bp.audio,
+      musicVolume: music.volume,
+      fadeInSeconds: Math.max(0, Math.min(5, music.fadeInSec)),
+      fadeOutSeconds: Math.max(0, Math.min(5, music.fadeOutSec)),
+      loopMusic: music.loop,
+    } : bp.audio,
+  });
   const setSubtitleStyle = (subtitleStyle: SubtitleStyle | undefined) => patchGlobal({ subtitleStyle });
   const setCharacters = (characterLibrary: Character[]) => patchGlobal({ characterLibrary });
 
@@ -624,7 +634,12 @@ export function VideoBlueprintEditor({
           />
         </TabsContent>
 
-        <TabsContent value="music" className="mt-4">
+        <TabsContent value="music" className="mt-4 space-y-4">
+          <AudioSettingsPanel
+            value={bp.audio}
+            duration={bp.totalDurationSec}
+            onChange={(audio) => patchGlobal({ audio })}
+          />
           <MusicPicker
             value={bp.music}
             musicDirection={bp.musicDirection ?? ""}
