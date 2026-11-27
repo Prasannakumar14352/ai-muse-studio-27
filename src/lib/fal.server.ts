@@ -56,12 +56,19 @@ async function falFetch(url: string, init: RequestInit = {}): Promise<Response> 
   headers.set("Authorization", `Key ${falKey()}`);
   headers.set("Accept", "application/json");
   if (init.body) headers.set("Content-Type", "application/json");
-  return fetch(url, { ...init, headers });
+  return fetch(url, { ...init, headers, ...(init.signal ? { redirect: "error" as const } : {}) });
 }
 
-export async function falSubmit(endpoint: string, input: Record<string, unknown>) {
+export class FalSubmissionError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
+
+export async function falSubmit(endpoint: string, input: Record<string, unknown>, signal?: AbortSignal) {
   const res = await falFetch(`https://queue.fal.run/${endpoint}`, {
     method: "POST",
+    signal,
     body: JSON.stringify(input),
   });
   const body = (await res.json().catch(() => ({}))) as {
@@ -71,7 +78,8 @@ export async function falSubmit(endpoint: string, input: Record<string, unknown>
     detail?: unknown;
   };
   if (!res.ok || !body.request_id || !body.status_url || !body.response_url) {
-    throw new Error(
+    throw new FalSubmissionError(
+      res.status,
       `Provider rejected the request (${res.status}): ${JSON.stringify(body.detail ?? body).slice(0, 300)}`,
     );
   }
@@ -87,19 +95,21 @@ export async function falPoll(
   statusUrl: string,
   responseUrl: string,
   kind: CatalogModel["kind"],
+  signal?: AbortSignal,
 ): Promise<FalPoll> {
-  const sRes = await falFetch(statusUrl);
+  const sRes = await falFetch(statusUrl, { signal });
   const s = (await sRes.json().catch(() => ({}))) as { status?: string };
   if (!sRes.ok) return { state: "pending" }; // transient — try again next poll
   if (s.status !== "COMPLETED") return { state: "pending" };
 
-  const rRes = await falFetch(responseUrl);
+  const rRes = await falFetch(responseUrl, { signal });
   const r = (await rRes.json().catch(() => ({}))) as {
     video?: { url?: string };
     audio?: { url?: string };
     images?: Array<{ url?: string }>;
     detail?: unknown;
   };
+  if (rRes.status === 429 || rRes.status >= 500) return { state: "pending" };
   if (!rRes.ok) {
     return {
       state: "failed",
